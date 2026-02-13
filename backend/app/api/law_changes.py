@@ -1,6 +1,7 @@
-"""Law change routes — browse, search, get details, scan."""
+"""Law change routes — browse, search, get details, scan, debug."""
 
 import logging
+import traceback
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -129,6 +130,78 @@ async def my_feed(
     return LawChangeListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
+@router.get("/debug-ris")
+async def debug_ris_api(
+    endpoint: str = Query("bundesrecht", description="bundesrecht, landesrecht, or a court source key"),
+    page: int = Query(1, ge=1),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    keywords: str = Query(""),
+    user: User = Depends(get_current_user),
+):
+    """Debug endpoint: Fetch raw RIS API response and show parsing results.
+
+    Use this to inspect what the API actually returns and how it gets parsed.
+    """
+    if endpoint in ("bundesrecht", "landesrecht"):
+        raw = await fetch_law_changes(
+            date_from=date_from,
+            date_to=date_to,
+            keywords=keywords,
+            page=page,
+            law_source=endpoint,
+        )
+        parsed = parse_ris_response(raw, law_source=endpoint)
+    else:
+        raw = await fetch_court_rulings(
+            court_source=endpoint,
+            date_from=date_from,
+            date_to=date_to,
+            keywords=keywords,
+            page=page,
+        )
+        parsed = parse_judikatur_response(raw, court_source=endpoint)
+
+    # Extract some info about the raw response for debugging
+    search_result = raw.get("OgdSearchResult", {})
+    hits = search_result.get("Hits", {})
+    doc_results = search_result.get("OgdDocumentResults", {})
+    references = doc_results.get("OgdDocumentReference", [])
+    if isinstance(references, dict):
+        references = [references]
+    if references is None:
+        references = []
+
+    # Show first raw document for structure inspection
+    first_raw_doc = references[0] if references else None
+
+    return {
+        "endpoint": endpoint,
+        "total_hits": hits,
+        "raw_documents_on_page": len(references),
+        "parsed_documents": len(parsed),
+        "first_raw_document_structure": _summarize_structure(first_raw_doc) if first_raw_doc else None,
+        "first_raw_document": first_raw_doc,
+        "first_parsed": parsed[0] if parsed else None,
+        "last_parsed": parsed[-1] if len(parsed) > 1 else None,
+    }
+
+
+def _summarize_structure(obj, depth=0, max_depth=4):
+    """Recursively summarize the structure of a nested dict/list for debugging."""
+    if depth > max_depth:
+        return f"<{type(obj).__name__}>"
+    if isinstance(obj, dict):
+        return {k: _summarize_structure(v, depth + 1, max_depth) for k, v in obj.items()}
+    if isinstance(obj, list):
+        if not obj:
+            return "[]"
+        return [_summarize_structure(obj[0], depth + 1, max_depth), f"... ({len(obj)} items)"]
+    if isinstance(obj, str):
+        return obj[:100] + ("..." if len(obj) > 100 else "")
+    return obj
+
+
 @router.get("/{change_id}", response_model=LawChangeResponse)
 async def get_law_change(
     change_id: int,
@@ -161,71 +234,110 @@ async def trigger_scan(
     created_bund = 0
     created_land = 0
     created_rulings = 0
+    errors = []
+    scanned_total = 0
+    duplicates_total = 0
 
     # Scan Bundesrecht (Federal Law)
     if source_type in ("all", "laws"):
         logger.info(f"Scanning Bundesrecht from {date_from} to {date_to}")
-        for page in range(1, 11):
+        for page_num in range(1, 11):
             raw = await fetch_law_changes(
                 date_from=date_from,
                 date_to=date_to,
                 keywords=keywords,
-                page=page,
+                page=page_num,
                 law_source="bundesrecht",
             )
             changes = parse_ris_response(raw, law_source="bundesrecht")
             if not changes:
+                logger.info(f"Bundesrecht page {page_num}: no results, stopping.")
                 break
+            scanned_total += len(changes)
             for change_data in changes:
-                count = await _store_and_count(db, change_data)
-                created_bund += count
+                try:
+                    count = await _store_and_count(db, change_data, date_from, date_to)
+                    if count == 1:
+                        created_bund += 1
+                    elif count == 0:
+                        duplicates_total += 1
+                except Exception as e:
+                    err_msg = f"Bundesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
+                    logger.error(err_msg)
+                    errors.append(err_msg)
             await db.commit()
-        logger.info(f"Bundesrecht: {created_bund} new entries")
+        logger.info(f"Bundesrecht: {created_bund} new entries stored")
 
     # Scan Landesrecht (State Law)
     if source_type in ("all", "laws"):
         logger.info(f"Scanning Landesrecht from {date_from} to {date_to}")
-        for page in range(1, 6):
+        for page_num in range(1, 6):
             raw = await fetch_law_changes(
                 date_from=date_from,
                 date_to=date_to,
                 keywords=keywords,
-                page=page,
+                page=page_num,
                 law_source="landesrecht",
             )
             changes = parse_ris_response(raw, law_source="landesrecht")
             if not changes:
+                logger.info(f"Landesrecht page {page_num}: no results, stopping.")
                 break
+            scanned_total += len(changes)
             for change_data in changes:
-                count = await _store_and_count(db, change_data)
-                created_land += count
+                try:
+                    count = await _store_and_count(db, change_data, date_from, date_to)
+                    if count == 1:
+                        created_land += 1
+                    elif count == 0:
+                        duplicates_total += 1
+                except Exception as e:
+                    err_msg = f"Landesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
+                    logger.error(err_msg)
+                    errors.append(err_msg)
             await db.commit()
-        logger.info(f"Landesrecht: {created_land} new entries")
+        logger.info(f"Landesrecht: {created_land} new entries stored")
 
     # Scan Judikatur (Court Rulings - all court sources)
     if source_type in ("all", "rulings"):
         logger.info(f"Scanning Judikatur from {date_from} to {date_to}")
         for source_key in COURT_SOURCES:
-            for page in range(1, 6):
+            for page_num in range(1, 6):
                 raw = await fetch_court_rulings(
                     court_source=source_key,
                     date_from=date_from,
                     date_to=date_to,
                     keywords=keywords,
-                    page=page,
+                    page=page_num,
                 )
                 rulings = parse_judikatur_response(raw, court_source=source_key)
                 if not rulings:
                     break
+                scanned_total += len(rulings)
                 for ruling_data in rulings:
-                    count = await _store_and_count(db, ruling_data)
-                    created_rulings += count
+                    try:
+                        count = await _store_and_count(db, ruling_data, date_from, date_to)
+                        if count == 1:
+                            created_rulings += 1
+                        elif count == 0:
+                            duplicates_total += 1
+                    except Exception as e:
+                        err_msg = f"Judikatur store error for {ruling_data.get('ris_doc_id', '?')}: {e}"
+                        logger.error(err_msg)
+                        errors.append(err_msg)
                 await db.commit()
-        logger.info(f"Judikatur: {created_rulings} new entries")
+        logger.info(f"Judikatur: {created_rulings} new entries stored")
 
     total_created = created_bund + created_land + created_rulings
     total_laws = created_bund + created_land
-    message = f"{total_created} neue Einträge: {total_laws} Gesetze (Bund: {created_bund}, Land: {created_land}), {created_rulings} Urteile"
+    message = (
+        f"{total_created} neue Einträge gespeichert "
+        f"(von {scanned_total} gescannt, {duplicates_total} Duplikate): "
+        f"{total_laws} Gesetze (Bund: {created_bund}, Land: {created_land}), "
+        f"{created_rulings} Urteile"
+    )
+    if errors:
+        message += f". {len(errors)} Fehler aufgetreten."
 
     return {
         "message": message,
@@ -233,44 +345,74 @@ async def trigger_scan(
         "landesrecht_created": created_land,
         "rulings_created": created_rulings,
         "total_created": total_created,
+        "total_scanned": scanned_total,
+        "total_duplicates": duplicates_total,
+        "errors": errors[:20],  # Limit error output
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
     }
 
 
-async def _store_and_count(db: AsyncSession, change_data: dict) -> int:
-    """Store a change if new; return 1 if created, 0 if duplicate."""
+async def _store_and_count(
+    db: AsyncSession,
+    change_data: dict,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> int:
+    """Store a change if new; return 1 if created, 0 if duplicate, -1 if filtered out."""
+    ris_doc_id = change_data.get("ris_doc_id", "")
+    if not ris_doc_id:
+        logger.warning("Skipping entry without ris_doc_id")
+        return -1
+
+    # Post-filter by date range if provided (API may not support exact date filtering)
+    if date_from or date_to:
+        change_date = change_data.get("change_date")
+        if change_date:
+            cd = change_date.date() if isinstance(change_date, datetime) else change_date
+            if date_from and cd < date_from:
+                return -1
+            if date_to and cd > date_to:
+                return -1
+
+    # Check for duplicate
     existing = await db.execute(
-        select(LawChange).where(LawChange.ris_doc_id == change_data["ris_doc_id"])
+        select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
     )
     if existing.scalar_one_or_none():
         return 0
 
-    ai_summary = await generate_law_summary(
-        title=change_data["title"],
-        content_snippet=change_data["content_snippet"],
-        bgbl_number=change_data["bgbl_number"],
-        categories=change_data["categories"],
-    )
+    # Generate AI summary (non-blocking: store even if this fails)
+    try:
+        ai_summary = await generate_law_summary(
+            title=change_data["title"],
+            content_snippet=change_data.get("content_snippet", ""),
+            bgbl_number=change_data.get("bgbl_number", ""),
+            categories=change_data.get("categories", []),
+        )
+    except Exception as e:
+        logger.warning(f"AI summary failed for {ris_doc_id}: {e}")
+        ai_summary = ""
 
     law_change = LawChange(
-        ris_doc_id=change_data["ris_doc_id"],
-        title=change_data["title"],
-        short_title=change_data["short_title"],
-        law_type=change_data["law_type"],
-        bgbl_number=change_data["bgbl_number"],
-        categories=change_data["categories"],
-        index_numbers=change_data["index_numbers"],
-        change_date=change_data["change_date"],
-        publication_date=change_data["publication_date"],
-        document_url=change_data["document_url"],
-        content_snippet=change_data["content_snippet"],
+        ris_doc_id=ris_doc_id,
+        title=change_data.get("title", ""),
+        short_title=change_data.get("short_title", ""),
+        law_type=change_data.get("law_type", ""),
+        bgbl_number=change_data.get("bgbl_number", ""),
+        categories=change_data.get("categories", []),
+        index_numbers=change_data.get("index_numbers", []),
+        change_date=change_data.get("change_date"),
+        publication_date=change_data.get("publication_date"),
+        document_url=change_data.get("document_url", ""),
+        content_snippet=change_data.get("content_snippet", ""),
         court_name=change_data.get("court_name"),
         case_number=change_data.get("case_number"),
         ai_summary=ai_summary,
-        ai_summary_generated_at=datetime.now(timezone.utc),
+        ai_summary_generated_at=datetime.now(timezone.utc) if ai_summary else None,
     )
     db.add(law_change)
+    logger.info(f"NEW: {ris_doc_id} — {change_data.get('short_title', '')[:60]} ({change_data.get('law_type', '')})")
     return 1
 
 

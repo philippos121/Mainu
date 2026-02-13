@@ -142,6 +142,10 @@
           </v-btn>
         </v-col>
       </v-row>
+      <div class="text-caption text-medium-emphasis mt-2">
+        Hinweis: Für Gesetze (Bundes-/Landesrecht) wird der nächstliegende Zeitraum verwendet (bis max. 1 Jahr).
+        Für Gerichtsurteile ist ein exakter Zeitraum möglich.
+      </div>
       <v-alert v-if="scanResult" :type="scanResult.type" variant="tonal" class="mt-3" closable @click:close="scanResult = null">
         {{ scanResult.message }}
       </v-alert>
@@ -258,8 +262,8 @@ async function triggerScan() {
     }
     if (scanKeywords.value) params.keywords = scanKeywords.value
 
-    const { data } = await api.post('/law-changes/scan', null, { params })
-    scanResult.value = { type: 'success', message: data.message }
+    const { data } = await api.post('/law-changes/scan', null, { params, timeout: 300000 })
+    scanResult.value = { type: data.errors?.length ? 'warning' : 'success', message: data.message }
     // Refresh the list
     await fetchChanges()
   } catch (e) {
