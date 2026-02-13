@@ -1,4 +1,10 @@
-"""Client for the Austrian RIS (Rechtsinformationssystem) OGD API v2.6."""
+"""Client for the Austrian RIS (Rechtsinformationssystem) OGD API v2.6.
+
+API documentation: https://data.bka.gv.at/ris/api/v2.6/
+Bundesrecht: GET /Bundesrecht?Applikation=BrKons&DokumenteProSeite=OneHundred&Seitennummer=1
+Landesrecht: GET /Landesrecht?Applikation=LrKons&DokumenteProSeite=OneHundred&Seitennummer=1
+Judikatur:   GET /Judikatur?Applikation=Justiz&DokumenteProSeite=OneHundred&Seitennummer=1
+"""
 
 import logging
 from datetime import date, datetime, timezone
@@ -9,8 +15,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Valid ImRisSeit enum values for Bundesrecht/Landesrecht date filtering.
-# The API does NOT support arbitrary date ranges for these endpoints.
+# Valid ImRisSeit enum values for date filtering.
 IM_RIS_SEIT_VALUES = [
     ("EinerWoche", 7),
     ("ZweiWochen", 14),
@@ -20,13 +25,12 @@ IM_RIS_SEIT_VALUES = [
     ("EinemJahr", 366),
 ]
 
+# DokumenteProSeite enum mapping
+_PAGE_SIZE_MAP = {10: "Ten", 20: "Twenty", 50: "Fifty", 100: "OneHundred"}
+
 
 def _map_date_range_to_im_ris_seit(date_from: date | None) -> str | None:
-    """Map a date_from to the closest ImRisSeit enum value.
-
-    The Bundesrecht/Landesrecht API only supports predefined lookback periods,
-    not arbitrary date ranges. Returns None if date_from is None.
-    """
+    """Map a date_from to the closest ImRisSeit enum value."""
     if date_from is None:
         return None
     days_back = (date.today() - date_from).days
@@ -35,8 +39,19 @@ def _map_date_range_to_im_ris_seit(date_from: date | None) -> str | None:
     for label, max_days in IM_RIS_SEIT_VALUES:
         if days_back <= max_days:
             return label
-    # More than a year — use the maximum
     return "EinemJahr"
+
+
+def _page_size_enum(size: int) -> str:
+    """Convert numeric page size to the API's DokumenteProSeite enum value."""
+    if size <= 10:
+        return "Ten"
+    if size <= 20:
+        return "Twenty"
+    if size <= 50:
+        return "Fifty"
+    return "OneHundred"
+
 
 # Legal categories available in the RIS system
 LEGAL_CATEGORIES = {
@@ -66,15 +81,19 @@ LEGAL_CATEGORIES = {
     "eu_recht": {"label": "EU-Recht", "index": "24"},
 }
 
-# Court sources available in the RIS Judikatur API
+# Court sources — Applikation values for Judikatur endpoint
 COURT_SOURCES = {
-    "justiz": {"label": "Ordentliche Gerichte (OGH, OLG, …)", "path": "Justiz", "metadata_key": "Justiz"},
-    "vfgh": {"label": "Verfassungsgerichtshof (VfGH)", "path": "Vfgh", "metadata_key": "Vfgh"},
-    "vwgh": {"label": "Verwaltungsgerichtshof (VwGH)", "path": "Vwgh", "metadata_key": "Vwgh"},
-    "bvwg": {"label": "Bundesverwaltungsgericht (BVwG)", "path": "Bvwg", "metadata_key": "Bvwg"},
-    "lvwg": {"label": "Landesverwaltungsgerichte (LVwG)", "path": "Lvwg", "metadata_key": "Lvwg"},
+    "justiz": {"label": "Ordentliche Gerichte (OGH, OLG, …)", "applikation": "Justiz"},
+    "vfgh": {"label": "Verfassungsgerichtshof (VfGH)", "applikation": "Vfgh"},
+    "vwgh": {"label": "Verwaltungsgerichtshof (VwGH)", "applikation": "Vwgh"},
+    "bvwg": {"label": "Bundesverwaltungsgericht (BVwG)", "applikation": "Bvwg"},
+    "lvwg": {"label": "Landesverwaltungsgerichte (LVwG)", "applikation": "Lvwg"},
 }
 
+
+# ──────────────────────────────────────
+# API Fetch Functions
+# ──────────────────────────────────────
 
 async def fetch_law_changes(
     date_from: date | None = None,
@@ -85,18 +104,19 @@ async def fetch_law_changes(
     page_size: int = 100,
     law_source: str = "bundesrecht",
 ) -> dict:
-    """
-    Fetch law changes from the RIS Bundesrecht or Landesrecht API.
+    """Fetch law changes from the RIS Bundesrecht or Landesrecht API.
 
-    IMPORTANT: The Bundesrecht/Landesrecht API does NOT support arbitrary date ranges.
-    The only date-related parameter is `ImRisSeit` with predefined enum values:
-    EinerWoche, ZweiWochen, EinemMonat, DreiMonaten, SechsMonaten, EinemJahr.
-
-    For Judikatur, use fetch_court_rulings() which supports EntscheidungsdatumVon/Bis.
+    Uses documented API parameters:
+    - Applikation: BrKons (Bundesrecht) or LrKons (Landesrecht)
+    - DokumenteProSeite: Ten/Twenty/Fifty/OneHundred
+    - Seitennummer: page number (1-based)
+    - ImRisSeit: date lookback filter
     """
+    applikation = "BrKons" if law_source == "bundesrecht" else "LrKons"
     params = {
-        "Pagesize": min(page_size, 100),
-        "Pagenumber": page,
+        "Applikation": applikation,
+        "DokumenteProSeite": _page_size_enum(page_size),
+        "Seitennummer": page,
     }
 
     if keywords:
@@ -104,7 +124,6 @@ async def fetch_law_changes(
     if index_number:
         params["Index"] = index_number
 
-    # Use ImRisSeit for date filtering (the only valid date param for Bundesrecht/Landesrecht)
     im_ris_seit = _map_date_range_to_im_ris_seit(date_from)
     if im_ris_seit:
         params["ImRisSeit"] = im_ris_seit
@@ -119,8 +138,17 @@ async def fetch_law_changes(
             response = await client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            hits = data.get("OgdSearchResult", {}).get("Hits", {}).get("#text", "0")
-            logger.info(f"RIS {endpoint} page {page}: {hits} hits total")
+
+            # Check for API error
+            error = data.get("OgdSearchResult", {}).get("Error")
+            if error:
+                logger.error(f"RIS API error ({endpoint}): {error}")
+                return _empty_response()
+
+            hits = data.get("OgdSearchResult", {}).get("Hits", {})
+            hit_count = hits.get("#text", "0") if isinstance(hits, dict) else str(hits)
+            page_info = f"page {hits.get('@pageNumber', '?')}/{hits.get('@pageSize', '?')}" if isinstance(hits, dict) else ""
+            logger.info(f"RIS {endpoint} page {page}: {hit_count} total hits {page_info}")
             return data
         except httpx.HTTPStatusError as e:
             logger.error(f"RIS API HTTP error ({endpoint}): {e.response.status_code} – {e.response.text[:500]}")
@@ -138,11 +166,11 @@ async def fetch_court_rulings(
     page: int = 1,
     page_size: int = 100,
 ) -> dict:
-    """
-    Fetch court rulings from a RIS Judikatur API endpoint.
+    """Fetch court rulings from the RIS Judikatur API.
 
-    Uses the REST endpoint:
-    GET /Judikatur/{Source}?Suchworte=...&EntscheidungsdatumVon=...&EntscheidungsdatumBis=...
+    Uses documented API parameters:
+    - Applikation: Justiz/Vfgh/Vwgh/Bvwg/Lvwg
+    - EntscheidungsdatumVon/Bis: decision date range (YYYY-MM-DD)
     """
     source = COURT_SOURCES.get(court_source)
     if not source:
@@ -150,8 +178,9 @@ async def fetch_court_rulings(
         return _empty_response()
 
     params = {
-        "Pagesize": min(page_size, 100),
-        "Pagenumber": page,
+        "Applikation": source["applikation"],
+        "DokumenteProSeite": _page_size_enum(page_size),
+        "Seitennummer": page,
     }
 
     if keywords:
@@ -161,18 +190,30 @@ async def fetch_court_rulings(
     if date_to:
         params["EntscheidungsdatumBis"] = date_to.strftime("%Y-%m-%d")
 
-    url = f"{settings.RIS_API_BASE_URL}/Judikatur/{source['path']}"
+    url = f"{settings.RIS_API_BASE_URL}/Judikatur"
+
+    logger.info(f"RIS Judikatur ({court_source}) request: page={page}, params={params}")
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+
+            error = data.get("OgdSearchResult", {}).get("Error")
+            if error:
+                logger.error(f"RIS Judikatur API error ({court_source}): {error}")
+                return _empty_response()
+
+            hits = data.get("OgdSearchResult", {}).get("Hits", {})
+            hit_count = hits.get("#text", "0") if isinstance(hits, dict) else str(hits)
+            logger.info(f"RIS Judikatur ({court_source}) page {page}: {hit_count} total hits")
+            return data
         except httpx.HTTPStatusError as e:
-            logger.error(f"RIS Judikatur API HTTP error ({court_source}): {e.response.status_code} – {e.response.text}")
+            logger.error(f"RIS Judikatur HTTP error ({court_source}): {e.response.status_code} – {e.response.text[:500]}")
             return _empty_response()
         except httpx.RequestError as e:
-            logger.error(f"RIS Judikatur API request error ({court_source}): {e}")
+            logger.error(f"RIS Judikatur request error ({court_source}): {e}")
             return _empty_response()
 
 
@@ -180,28 +221,30 @@ def _empty_response() -> dict:
     return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": []}, "Hits": {"#text": "0"}}}
 
 
-def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict]:
-    """Parse the RIS API response into a list of structured law change dicts.
+# ──────────────────────────────────────
+# Response Parsing
+# ──────────────────────────────────────
 
-    Each document is parsed independently — one bad document won't block the rest.
-    """
+def _extract_references(data: dict) -> list[dict]:
+    """Extract the OgdDocumentReference list from an API response."""
+    search_result = data.get("OgdSearchResult", {})
+    doc_results = search_result.get("OgdDocumentResults", {})
+    references = doc_results.get("OgdDocumentReference", [])
+    if isinstance(references, dict):
+        references = [references]
+    if references is None:
+        references = []
+    return references
+
+
+def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict]:
+    """Parse the RIS API response into a list of structured law change dicts."""
     results = []
     law_type = "Bundesrecht" if law_source == "bundesrecht" else "Landesrecht"
     skipped = 0
 
     try:
-        search_result = data.get("OgdSearchResult", {})
-        doc_results = search_result.get("OgdDocumentResults", {})
-        references = doc_results.get("OgdDocumentReference", [])
-
-        # Handle single result (dict instead of list)
-        if isinstance(references, dict):
-            references = [references]
-
-        # Handle None
-        if references is None:
-            references = []
-
+        references = _extract_references(data)
         logger.info(f"Parsing {len(references)} {law_type} documents")
 
         for i, ref in enumerate(references):
@@ -214,9 +257,7 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
             except Exception as e:
                 skipped += 1
                 logger.warning(f"Error parsing {law_type} document #{i}: {e}")
-                # Log first 200 chars of the problematic reference for debugging
-                ref_str = str(ref)[:200]
-                logger.debug(f"Problematic document data: {ref_str}")
+                logger.debug(f"Problematic document data: {str(ref)[:300]}")
 
     except Exception as e:
         logger.error(f"Error parsing RIS {law_type} response structure: {e}")
@@ -225,28 +266,59 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
     return results
 
 
+def _get_br_metadata(metadata: dict) -> dict:
+    """Extract the innermost Bundesrecht/Landesrecht metadata block.
+
+    The API nests metadata as: Metadaten.Bundesrecht.BrKons.{fields}
+    or Metadaten.Landesrecht.LrKons.{fields}
+    We need the innermost dict containing the actual fields.
+    """
+    # Path 1: Metadaten.Bundesrecht.BrKons
+    bundesrecht = metadata.get("Bundesrecht", {})
+    if isinstance(bundesrecht, dict):
+        brkons = bundesrecht.get("BrKons")
+        if isinstance(brkons, dict) and brkons:
+            return brkons
+        # Maybe the fields are directly in Bundesrecht (without BrKons nesting)
+        if "Kurztitel" in bundesrecht or "Langtitel" in bundesrecht:
+            return bundesrecht
+
+    # Path 2: Metadaten.Landesrecht.LrKons
+    landesrecht = metadata.get("Landesrecht", {})
+    if isinstance(landesrecht, dict):
+        lrkons = landesrecht.get("LrKons")
+        if isinstance(lrkons, dict) and lrkons:
+            return lrkons
+        if "Kurztitel" in landesrecht or "Langtitel" in landesrecht:
+            return landesrecht
+
+    # Path 3: Direct keys (BrKons/LrKons at top level of Metadaten)
+    for key in ("BrKons", "LrKons"):
+        block = metadata.get(key)
+        if isinstance(block, dict) and block:
+            return block
+
+    # Path 4: Fall back to Bundesrecht or Landesrecht dict itself
+    if isinstance(bundesrecht, dict) and bundesrecht:
+        return bundesrecht
+    if isinstance(landesrecht, dict) and landesrecht:
+        return landesrecht
+
+    return {}
+
+
 def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
-    """Parse a single OgdDocumentReference into a structured dict. Returns None if invalid."""
+    """Parse a single OgdDocumentReference into a structured dict."""
     data_entry = ref.get("Data", {})
     metadata = data_entry.get("Metadaten", {})
 
-    # Try multiple metadata keys — the actual key depends on the document type
-    br_metadata = (
-        metadata.get("Bundesrecht")
-        or metadata.get("Landesrecht")
-        or metadata.get("BrKons")
-        or metadata.get("LrKons")
-        or {}
-    )
+    # Navigate the nested metadata structure correctly
+    br_metadata = _get_br_metadata(metadata)
 
-    # Extract document ID — try multiple locations
-    doc_id = (
-        data_entry.get("Dokumentnummer", "")
-        or ref.get("Dokumentnummer", "")
-    )
-
+    # Extract document ID
+    doc_id = data_entry.get("Dokumentnummer", "") or ref.get("Dokumentnummer", "")
     if not doc_id:
-        logger.debug(f"Skipping document without ID. Keys in ref: {list(ref.keys())}, Data keys: {list(data_entry.keys())}")
+        logger.debug(f"Skipping document without ID. Metadata keys: {list(metadata.keys())}")
         return None
 
     # Extract title
@@ -259,12 +331,13 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
 
     short_title = (
         br_metadata.get("Kurztitel", "")
+        or br_metadata.get("Abkuerzung", "")
         or data_entry.get("Kurztitel", "")
         or title[:200]
     )
 
     # Extract index/category info
-    index_list = br_metadata.get("Indexe", "")
+    index_list = br_metadata.get("Indexe", "") or br_metadata.get("Indizes", "")
     if isinstance(index_list, str):
         indices = [i.strip() for i in index_list.split(";") if i.strip()]
     elif isinstance(index_list, list):
@@ -273,18 +346,22 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
         indices = []
 
     # Extract BGBl/LGBl number
-    bgbl = br_metadata.get("Aenderung", "") or br_metadata.get("Kundmachung", "") or br_metadata.get("StF", "")
+    bgbl = (
+        br_metadata.get("Aenderung", "")
+        or br_metadata.get("Kundmachungsorgan", "")
+        or br_metadata.get("StF", "")
+        or ""
+    )
     if isinstance(bgbl, list):
         bgbl = "; ".join(str(b) for b in bgbl)
     if isinstance(bgbl, dict):
         bgbl = str(bgbl)
 
-    # Extract dates - try multiple date field names
+    # Extract dates
     change_date_str = (
-        br_metadata.get("Kundmachungsdatum", "")
-        or br_metadata.get("Aenderungsdatum", "")
+        br_metadata.get("Aenderungsdatum", "")
+        or br_metadata.get("Inkrafttretensdatum", "")
         or br_metadata.get("Unterzeichnungsdatum", "")
-        or data_entry.get("Kundmachungsdatum", "")
         or data_entry.get("Aenderungsdatum", "")
         or ""
     )
@@ -308,6 +385,18 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
     if isinstance(schlagworte, str) and schlagworte:
         categories = [s.strip() for s in schlagworte.split(",") if s.strip()]
 
+    # Document type info for display
+    doc_typ = br_metadata.get("Typ", "")
+    artikel = br_metadata.get("ArtikelParagraphAnlage", "")
+    snippet_parts = []
+    if doc_typ:
+        snippet_parts.append(f"Typ: {doc_typ}")
+    if artikel:
+        snippet_parts.append(artikel)
+    if schlagworte:
+        snippet_parts.append(schlagworte)
+    content_snippet = ". ".join(snippet_parts)
+
     return {
         "ris_doc_id": doc_id,
         "title": title,
@@ -319,38 +408,26 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
         "change_date": change_date,
         "publication_date": pub_date,
         "document_url": doc_url,
-        "content_snippet": schlagworte if isinstance(schlagworte, str) else "",
+        "content_snippet": content_snippet[:2000] if content_snippet else "",
         "court_name": None,
         "case_number": None,
     }
 
 
 def parse_judikatur_response(data: dict, court_source: str = "justiz") -> list[dict]:
-    """Parse a RIS Judikatur API response into a list of structured dicts.
-
-    Each document is parsed independently — one bad document won't block the rest.
-    """
+    """Parse a RIS Judikatur API response into structured dicts."""
     results = []
     source = COURT_SOURCES.get(court_source, {})
-    metadata_key = source.get("metadata_key", "Justiz")
+    applikation = source.get("applikation", "Justiz")
     skipped = 0
 
     try:
-        search_result = data.get("OgdSearchResult", {})
-        doc_results = search_result.get("OgdDocumentResults", {})
-        references = doc_results.get("OgdDocumentReference", [])
-
-        if isinstance(references, dict):
-            references = [references]
-
-        if references is None:
-            references = []
-
+        references = _extract_references(data)
         logger.info(f"Parsing {len(references)} Judikatur ({court_source}) documents")
 
         for i, ref in enumerate(references):
             try:
-                parsed = _parse_single_judikatur_document(ref, source, metadata_key, court_source)
+                parsed = _parse_single_judikatur_document(ref, source, applikation, court_source)
                 if parsed:
                     results.append(parsed)
                 else:
@@ -366,17 +443,43 @@ def parse_judikatur_response(data: dict, court_source: str = "justiz") -> list[d
     return results
 
 
-def _parse_single_judikatur_document(ref: dict, source: dict, metadata_key: str, court_source: str) -> dict | None:
-    """Parse a single Judikatur OgdDocumentReference. Returns None if invalid."""
+def _get_jud_metadata(metadata: dict, applikation: str) -> dict:
+    """Extract the innermost Judikatur metadata block.
+
+    The API nests metadata as: Metadaten.Judikatur.{Applikation}.{fields}
+    e.g. Metadaten.Judikatur.Justiz.Geschaeftszahl
+    """
+    judikatur = metadata.get("Judikatur", {})
+    if isinstance(judikatur, dict):
+        # Try the specific court metadata key
+        inner = judikatur.get(applikation)
+        if isinstance(inner, dict) and inner:
+            return inner
+        # Maybe fields are directly in Judikatur
+        if "Geschaeftszahl" in judikatur or "Entscheidungsdatum" in judikatur:
+            return judikatur
+
+    # Try direct key at Metadaten level
+    direct = metadata.get(applikation)
+    if isinstance(direct, dict) and direct:
+        return direct
+
+    # Fallback
+    if isinstance(judikatur, dict) and judikatur:
+        return judikatur
+
+    return {}
+
+
+def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, court_source: str) -> dict | None:
+    """Parse a single Judikatur OgdDocumentReference."""
     data_entry = ref.get("Data", {})
     metadata = data_entry.get("Metadaten", {})
-    jud_metadata = metadata.get(metadata_key, metadata.get("Judikatur", {}))
 
-    doc_id = (
-        data_entry.get("Dokumentnummer", "")
-        or ref.get("Dokumentnummer", "")
-    )
+    # Navigate the nested metadata correctly
+    jud_metadata = _get_jud_metadata(metadata, applikation)
 
+    doc_id = data_entry.get("Dokumentnummer", "") or ref.get("Dokumentnummer", "")
     if not doc_id:
         return None
 
@@ -405,7 +508,7 @@ def _parse_single_judikatur_document(ref: dict, source: dict, metadata_key: str,
         or f"{court_name} {case_number}"
     )
 
-    normen = jud_metadata.get("Norm", "")
+    normen = jud_metadata.get("Norm", "") or ""
     if isinstance(normen, list):
         normen = "; ".join(str(n) for n in normen)
     if isinstance(normen, dict):
@@ -437,7 +540,7 @@ def _parse_single_judikatur_document(ref: dict, source: dict, metadata_key: str,
     elif normen:
         content_snippet = f"Normen: {normen}"
 
-    index_list = jud_metadata.get("Indexe", "")
+    index_list = jud_metadata.get("Indexe", "") or ""
     if isinstance(index_list, str):
         indices = [i.strip() for i in index_list.split(";") if i.strip()]
     elif isinstance(index_list, list):
@@ -461,6 +564,10 @@ def _parse_single_judikatur_document(ref: dict, source: dict, metadata_key: str,
         "case_number": case_number,
     }
 
+
+# ──────────────────────────────────────
+# Utilities
+# ──────────────────────────────────────
 
 def _parse_date(date_str) -> datetime | None:
     if not date_str:
@@ -492,6 +599,6 @@ def get_legal_categories() -> list[dict]:
 def get_court_sources() -> list[dict]:
     """Return all available court sources for scanning."""
     return [
-        {"slug": slug, "label": info["label"], "path": info["path"]}
+        {"slug": slug, "label": info["label"], "applikation": info["applikation"]}
         for slug, info in COURT_SOURCES.items()
     ]
