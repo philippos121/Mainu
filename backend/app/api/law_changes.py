@@ -233,7 +233,7 @@ async def trigger_scan(
 ):
     """Manually trigger a scan of the RIS API (Bundesrecht + Landesrecht + Judikatur)."""
     if date_from is None:
-        date_from = date.today() - timedelta(days=7)
+        date_from = date.today() - timedelta(days=90)
     if date_to is None:
         date_to = date.today()
 

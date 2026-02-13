@@ -35,8 +35,9 @@ async def scan_law_changes():
 
     yesterday = date.today() - timedelta(days=1)
     today = date.today()
-    # For Bundesrecht/Landesrecht, use a lookback of 3 days to catch anything missed
-    law_lookback = date.today() - timedelta(days=3)
+    # Use 90-day lookback (maps to ImRisSeit=DreiMonaten) to catch more changes.
+    # Duplicates are filtered by ris_doc_id, so a broad lookback is safe.
+    law_lookback = date.today() - timedelta(days=90)
 
     async with async_session() as session:
         # 1) Scan Bundesrecht (federal laws)
