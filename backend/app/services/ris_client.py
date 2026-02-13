@@ -54,12 +54,15 @@ async def fetch_law_changes(
     index_number: str = "",
     page: int = 1,
     page_size: int = 100,
+    law_source: str = "bundesrecht",
 ) -> dict:
     """
-    Fetch law changes from the RIS Bundesrecht API.
+    Fetch law changes from the RIS Bundesrecht or Landesrecht API.
 
     Uses the REST endpoint:
-    GET /Bundesrecht?Suchworte=...&AenderungsdatumVon=...&AenderungsdatumBis=...&Pagesize=...&Pagenumber=...
+    GET /Bundesrecht or /Landesrecht?Suchworte=...&Kundmachungsdatum...&Pagesize=...&Pagenumber=...
+
+    Note: Using Kundmachungsdatum (publication date) instead of Aenderungsdatum for better results.
     """
     params = {
         "Pagesize": min(page_size, 100),
@@ -69,24 +72,29 @@ async def fetch_law_changes(
     if keywords:
         params["Suchworte"] = keywords
     if date_from:
-        params["AenderungsdatumVon"] = date_from.strftime("%Y-%m-%d")
+        # Use Kundmachungsdatum (publication/promulgation date) for more reliable filtering
+        params["KundmachungsdatumVon"] = date_from.strftime("%Y-%m-%d")
     if date_to:
-        params["AenderungsdatumBis"] = date_to.strftime("%Y-%m-%d")
+        params["KundmachungsdatumBis"] = date_to.strftime("%Y-%m-%d")
     if index_number:
         params["Index"] = index_number
 
-    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+    endpoint = "Bundesrecht" if law_source == "bundesrecht" else "Landesrecht"
+    url = f"{settings.RIS_API_BASE_URL}/{endpoint}"
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            hits = data.get("OgdSearchResult", {}).get("Hits", {}).get("#text", "0")
+            logger.info(f"RIS {endpoint} page {page}: {hits} hits total")
+            return data
         except httpx.HTTPStatusError as e:
-            logger.error(f"RIS API HTTP error: {e.response.status_code} – {e.response.text}")
+            logger.error(f"RIS API HTTP error ({endpoint}): {e.response.status_code} – {e.response.text}")
             return _empty_response()
         except httpx.RequestError as e:
-            logger.error(f"RIS API request error: {e}")
+            logger.error(f"RIS API request error ({endpoint}): {e}")
             return _empty_response()
 
 
@@ -140,9 +148,11 @@ def _empty_response() -> dict:
     return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": []}, "Hits": {"#text": "0"}}}
 
 
-def parse_ris_response(data: dict) -> list[dict]:
+def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict]:
     """Parse the RIS API response into a list of structured law change dicts."""
     results = []
+    law_type = "Bundesrecht" if law_source == "bundesrecht" else "Landesrecht"
+
     try:
         search_result = data.get("OgdSearchResult", {})
         doc_results = search_result.get("OgdDocumentResults", {})
@@ -152,10 +162,19 @@ def parse_ris_response(data: dict) -> list[dict]:
         if isinstance(references, dict):
             references = [references]
 
+        logger.info(f"Parsing {len(references)} {law_type} documents")
+
         for ref in references:
             data_entry = ref.get("Data", {})
             metadata = data_entry.get("Metadaten", {})
-            br_metadata = metadata.get("Bundesrecht", metadata.get("BrKons", {}))
+            # Try Bundesrecht, Landesrecht, BrKons, LrKons metadata keys
+            br_metadata = (
+                metadata.get("Bundesrecht")
+                or metadata.get("Landesrecht")
+                or metadata.get("BrKons")
+                or metadata.get("LrKons")
+                or {}
+            )
             doc_metadata = metadata.get("Dokumentliste", metadata)
 
             # Extract document ID
@@ -163,6 +182,10 @@ def parse_ris_response(data: dict) -> list[dict]:
                 data_entry.get("Dokumentnummer", "")
                 or ref.get("Dokumentnummer", "")
             )
+
+            if not doc_id:
+                logger.warning(f"Skipping document without ID")
+                continue
 
             # Extract title
             title = (
@@ -187,19 +210,22 @@ def parse_ris_response(data: dict) -> list[dict]:
             else:
                 indices = []
 
-            # Extract BGBl number
-            bgbl = br_metadata.get("Aenderung", "")
+            # Extract BGBl/LGBl number
+            bgbl = br_metadata.get("Aenderung", "") or br_metadata.get("Kundmachung", "")
             if isinstance(bgbl, list):
                 bgbl = "; ".join(str(b) for b in bgbl)
 
-            # Extract dates
+            # Extract dates - try both Aenderungsdatum and Kundmachungsdatum
             change_date_str = (
-                br_metadata.get("Aenderungsdatum", "")
+                br_metadata.get("Kundmachungsdatum", "")
+                or br_metadata.get("Aenderungsdatum", "")
+                or data_entry.get("Kundmachungsdatum", "")
                 or data_entry.get("Aenderungsdatum", "")
             )
             pub_date_str = (
                 br_metadata.get("Veroeffentlichungsdatum", "")
                 or data_entry.get("Veroeffentlichungsdatum", "")
+                or change_date_str  # Fallback to change date
             )
 
             change_date = _parse_date(change_date_str)
@@ -218,7 +244,7 @@ def parse_ris_response(data: dict) -> list[dict]:
                 "ris_doc_id": doc_id,
                 "title": title,
                 "short_title": short_title,
-                "law_type": "Bundesrecht",
+                "law_type": law_type,
                 "bgbl_number": str(bgbl),
                 "categories": categories,
                 "index_numbers": indices,
@@ -232,6 +258,7 @@ def parse_ris_response(data: dict) -> list[dict]:
     except Exception as e:
         logger.error(f"Error parsing RIS response: {e}")
 
+    logger.info(f"Successfully parsed {len(results)} {law_type} entries")
     return results
 
 

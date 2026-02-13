@@ -152,29 +152,59 @@ async def trigger_scan(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Manually trigger a scan of the RIS API (laws + court rulings)."""
+    """Manually trigger a scan of the RIS API (Bundesrecht + Landesrecht + Judikatur)."""
     if date_from is None:
         date_from = date.today() - timedelta(days=7)
     if date_to is None:
         date_to = date.today()
 
-    created_laws = 0
+    created_bund = 0
+    created_land = 0
     created_rulings = 0
 
-    # Scan Bundesrecht
+    # Scan Bundesrecht (Federal Law)
     if source_type in ("all", "laws"):
+        logger.info(f"Scanning Bundesrecht from {date_from} to {date_to}")
         for page in range(1, 11):
-            raw = await fetch_law_changes(date_from=date_from, date_to=date_to, keywords=keywords, page=page)
-            changes = parse_ris_response(raw)
+            raw = await fetch_law_changes(
+                date_from=date_from,
+                date_to=date_to,
+                keywords=keywords,
+                page=page,
+                law_source="bundesrecht",
+            )
+            changes = parse_ris_response(raw, law_source="bundesrecht")
             if not changes:
                 break
             for change_data in changes:
                 count = await _store_and_count(db, change_data)
-                created_laws += count
+                created_bund += count
             await db.commit()
+        logger.info(f"Bundesrecht: {created_bund} new entries")
 
-    # Scan Judikatur (all court sources)
+    # Scan Landesrecht (State Law)
+    if source_type in ("all", "laws"):
+        logger.info(f"Scanning Landesrecht from {date_from} to {date_to}")
+        for page in range(1, 6):
+            raw = await fetch_law_changes(
+                date_from=date_from,
+                date_to=date_to,
+                keywords=keywords,
+                page=page,
+                law_source="landesrecht",
+            )
+            changes = parse_ris_response(raw, law_source="landesrecht")
+            if not changes:
+                break
+            for change_data in changes:
+                count = await _store_and_count(db, change_data)
+                created_land += count
+            await db.commit()
+        logger.info(f"Landesrecht: {created_land} new entries")
+
+    # Scan Judikatur (Court Rulings - all court sources)
     if source_type in ("all", "rulings"):
+        logger.info(f"Scanning Judikatur from {date_from} to {date_to}")
         for source_key in COURT_SOURCES:
             for page in range(1, 6):
                 raw = await fetch_court_rulings(
@@ -191,12 +221,18 @@ async def trigger_scan(
                     count = await _store_and_count(db, ruling_data)
                     created_rulings += count
                 await db.commit()
+        logger.info(f"Judikatur: {created_rulings} new entries")
 
-    total_created = created_laws + created_rulings
+    total_created = created_bund + created_land + created_rulings
+    total_laws = created_bund + created_land
+    message = f"{total_created} neue Einträge: {total_laws} Gesetze (Bund: {created_bund}, Land: {created_land}), {created_rulings} Urteile"
+
     return {
-        "message": f"{total_created} neue Einträge importiert ({created_laws} Gesetze, {created_rulings} Urteile).",
-        "laws_created": created_laws,
+        "message": message,
+        "bundesrecht_created": created_bund,
+        "landesrecht_created": created_land,
         "rulings_created": created_rulings,
+        "total_created": total_created,
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
     }

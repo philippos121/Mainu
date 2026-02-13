@@ -74,8 +74,8 @@ const props = defineProps({
 const lawTypeColor = computed(() => {
   switch (props.change.law_type) {
     case 'Bundesrecht': return 'primary'
-    case 'Judikatur': return 'warning'
     case 'Landesrecht': return 'secondary'
+    case 'Judikatur': return 'warning'
     default: return 'info'
   }
 })

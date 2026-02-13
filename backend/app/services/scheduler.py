@@ -27,22 +27,25 @@ scheduler = AsyncIOScheduler()
 
 async def scan_law_changes():
     """Scan RIS for new law changes AND court rulings, store them in the database."""
-    logger.info("Starting daily RIS scan (laws + court rulings)...")
+    logger.info("Starting daily RIS scan (Bundesrecht + Landesrecht + Judikatur)...")
 
     yesterday = date.today() - timedelta(days=1)
     today = date.today()
 
     async with async_session() as session:
         # 1) Scan Bundesrecht (federal laws)
-        law_count = await _scan_bundesrecht(session, yesterday, today)
+        bund_count = await _scan_bundesrecht(session, yesterday, today)
 
-        # 2) Scan Judikatur (court rulings) from all court sources
+        # 2) Scan Landesrecht (state laws)
+        land_count = await _scan_landesrecht(session, yesterday, today)
+
+        # 3) Scan Judikatur (court rulings) from all court sources
         ruling_count = await _scan_judikatur(session, yesterday, today)
 
-        # 3) Generate notifications for users
+        # 4) Generate notifications for users
         await _generate_user_notifications(session)
 
-    logger.info(f"Daily RIS scan completed: {law_count} laws, {ruling_count} rulings imported.")
+    logger.info(f"Daily RIS scan completed: {bund_count} Bundesrecht, {land_count} Landesrecht, {ruling_count} Judikatur imported.")
 
 
 async def _scan_bundesrecht(
@@ -53,25 +56,61 @@ async def _scan_bundesrecht(
 ) -> int:
     """Scan Bundesrecht and store new entries. Returns count of new records."""
     created = 0
+    scanned = 0
     for page in range(1, 11):  # Up to 10 pages (1000 results)
         raw = await fetch_law_changes(
             date_from=date_from,
             date_to=date_to,
             keywords=keywords,
             page=page,
+            law_source="bundesrecht",
         )
-        changes = parse_ris_response(raw)
+        changes = parse_ris_response(raw, law_source="bundesrecht")
 
         if not changes:
             break
 
+        scanned += len(changes)
         for change_data in changes:
             if await _store_change(session, change_data):
                 created += 1
 
         await session.commit()
 
-    logger.info(f"Bundesrecht scan: {created} new entries.")
+    logger.info(f"Bundesrecht scan: {created} new / {scanned} scanned ({scanned - created} duplicates)")
+    return created
+
+
+async def _scan_landesrecht(
+    session: AsyncSession,
+    date_from: date,
+    date_to: date,
+    keywords: str = "",
+) -> int:
+    """Scan Landesrecht and store new entries. Returns count of new records."""
+    created = 0
+    scanned = 0
+    for page in range(1, 6):  # Up to 5 pages (500 results)
+        raw = await fetch_law_changes(
+            date_from=date_from,
+            date_to=date_to,
+            keywords=keywords,
+            page=page,
+            law_source="landesrecht",
+        )
+        changes = parse_ris_response(raw, law_source="landesrecht")
+
+        if not changes:
+            break
+
+        scanned += len(changes)
+        for change_data in changes:
+            if await _store_change(session, change_data):
+                created += 1
+
+        await session.commit()
+
+    logger.info(f"Landesrecht scan: {created} new / {scanned} scanned ({scanned - created} duplicates)")
     return created
 
 
@@ -85,8 +124,11 @@ async def _scan_judikatur(
     """Scan Judikatur from specified (or all) court sources. Returns count of new records."""
     sources = court_sources or list(COURT_SOURCES.keys())
     created = 0
+    scanned = 0
 
     for source_key in sources:
+        source_scanned = 0
+        source_created = 0
         for page in range(1, 6):  # Up to 5 pages (500 results) per court
             raw = await fetch_court_rulings(
                 court_source=source_key,
@@ -100,23 +142,32 @@ async def _scan_judikatur(
             if not rulings:
                 break
 
+            source_scanned += len(rulings)
             for ruling_data in rulings:
                 if await _store_change(session, ruling_data):
-                    created += 1
+                    source_created += 1
 
             await session.commit()
 
-    logger.info(f"Judikatur scan: {created} new entries.")
+        if source_scanned > 0:
+            logger.info(f"  {source_key}: {source_created} new / {source_scanned} scanned")
+        created += source_created
+        scanned += source_scanned
+
+    logger.info(f"Judikatur scan total: {created} new / {scanned} scanned ({scanned - created} duplicates)")
     return created
 
 
 async def _store_change(session: AsyncSession, change_data: dict) -> bool:
     """Store a single law change / court ruling. Returns True if new record created."""
+    ris_doc_id = change_data["ris_doc_id"]
+
     # Check if already exists
     existing = await session.execute(
-        select(LawChange).where(LawChange.ris_doc_id == change_data["ris_doc_id"])
+        select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
     )
     if existing.scalar_one_or_none():
+        logger.debug(f"Duplicate: {ris_doc_id} ({change_data['law_type']})")
         return False
 
     # Generate AI summary
@@ -128,7 +179,7 @@ async def _store_change(session: AsyncSession, change_data: dict) -> bool:
     )
 
     law_change = LawChange(
-        ris_doc_id=change_data["ris_doc_id"],
+        ris_doc_id=ris_doc_id,
         title=change_data["title"],
         short_title=change_data["short_title"],
         law_type=change_data["law_type"],
@@ -145,6 +196,7 @@ async def _store_change(session: AsyncSession, change_data: dict) -> bool:
         ai_summary_generated_at=datetime.now(timezone.utc),
     )
     session.add(law_change)
+    logger.info(f"NEW: {ris_doc_id} - {change_data['short_title'][:50]} ({change_data['law_type']})")
     return True
 
 

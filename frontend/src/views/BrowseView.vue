@@ -190,8 +190,9 @@ const categories = ref([])
 
 // Source type filter options
 const sourceTypes = [
-  { label: 'Gesetze', value: 'Bundesrecht' },
-  { label: 'Urteile', value: 'Judikatur' },
+  { label: 'Bundesrecht', value: 'Bundesrecht' },
+  { label: 'Landesrecht', value: 'Landesrecht' },
+  { label: 'Judikatur', value: 'Judikatur' },
 ]
 
 // Historical scan

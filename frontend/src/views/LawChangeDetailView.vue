@@ -105,7 +105,9 @@
                 <template v-slot:prepend>
                   <v-icon icon="mdi-newspaper" size="20" class="mr-3" />
                 </template>
-                <v-list-item-title class="text-caption text-medium-emphasis">BGBl-Nummer</v-list-item-title>
+                <v-list-item-title class="text-caption text-medium-emphasis">
+                  {{ change.law_type === 'Landesrecht' ? 'LGBl-Nummer' : 'BGBl-Nummer' }}
+                </v-list-item-title>
                 <v-list-item-subtitle>{{ change.bgbl_number }}</v-list-item-subtitle>
               </v-list-item>
 
@@ -181,8 +183,8 @@ const loading = ref(true)
 const lawTypeColor = computed(() => {
   switch (change.value?.law_type) {
     case 'Bundesrecht': return 'primary'
-    case 'Judikatur': return 'warning'
     case 'Landesrecht': return 'secondary'
+    case 'Judikatur': return 'warning'
     default: return 'info'
   }
 })
