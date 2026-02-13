@@ -22,6 +22,7 @@ from app.schemas.law_change import (
 from app.services.openai_service import generate_law_summary
 from app.services.ris_client import (
     COURT_SOURCES,
+    debug_ris_api_raw,
     fetch_court_rulings,
     fetch_law_changes,
     get_court_sources,
@@ -133,16 +134,23 @@ async def my_feed(
 @router.get("/debug-ris")
 async def debug_ris_api(
     endpoint: str = Query("bundesrecht", description="bundesrecht, landesrecht, or a court source key"),
+    mode: str = Query("raw", description="'raw' = test all param combinations, 'parse' = fetch+parse like scan does"),
     page: int = Query(1, ge=1),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     keywords: str = Query(""),
     user: User = Depends(get_current_user),
 ):
-    """Debug endpoint: Fetch raw RIS API response and show parsing results.
+    """Debug endpoint: Test RIS API parameter combinations to find which ones work.
 
-    Use this to inspect what the API actually returns and how it gets parsed.
+    mode=raw: Tests 6 different parameter combinations and shows raw HTTP responses.
+              This is the PRIMARY diagnostic tool — check the 'summary' field first.
+    mode=parse: Fetches with auto-fallback (like scan does) and shows parsed results.
     """
+    if mode == "raw":
+        return await debug_ris_api_raw(endpoint)
+
+    # mode=parse: Normal fetch+parse flow (uses auto-fallback)
     if endpoint in ("bundesrecht", "landesrecht"):
         raw = await fetch_law_changes(
             date_from=date_from,
@@ -162,7 +170,6 @@ async def debug_ris_api(
         )
         parsed = parse_judikatur_response(raw, court_source=endpoint)
 
-    # Extract some info about the raw response for debugging
     search_result = raw.get("OgdSearchResult", {})
     hits = search_result.get("Hits", {})
     doc_results = search_result.get("OgdDocumentResults", {})
@@ -172,7 +179,6 @@ async def debug_ris_api(
     if references is None:
         references = []
 
-    # Show first raw document for structure inspection
     first_raw_doc = references[0] if references else None
 
     return {
