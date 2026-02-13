@@ -15,11 +15,28 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+async def _run_migrations(conn):
+    """Add new columns to existing tables if they don't exist yet."""
+    # Add court_name and case_number to law_changes if missing
+    for col, col_type in [("court_name", "VARCHAR(255)"), ("case_number", "VARCHAR(255)")]:
+        result = await conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'law_changes' AND column_name = :col"
+            ),
+            {"col": col},
+        )
+        if not result.fetchone():
+            await conn.execute(text(f"ALTER TABLE law_changes ADD COLUMN {col} {col_type}"))
+            logger.info(f"Added column '{col}' to law_changes table.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create tables and start scheduler
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _run_migrations(conn)
     logger.info("Database tables created.")
     start_scheduler()
     yield

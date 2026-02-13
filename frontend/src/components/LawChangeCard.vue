@@ -8,6 +8,9 @@
       <v-chip :color="lawTypeColor" size="x-small" variant="flat">
         {{ change.law_type }}
       </v-chip>
+      <v-chip v-if="change.court_name" size="x-small" variant="tonal" color="warning" class="ml-1">
+        {{ change.court_name }}
+      </v-chip>
       <v-spacer />
       <span class="text-caption text-medium-emphasis">
         {{ formatDate(change.change_date) }}
@@ -51,6 +54,11 @@
       <v-icon v-if="change.ai_summary" icon="mdi-robot" size="16" color="accent" class="mr-1" />
       <span v-if="change.ai_summary" class="text-caption text-accent">KI-Zusammenfassung</span>
       <v-spacer />
+      <v-icon
+        :icon="change.law_type === 'Judikatur' ? 'mdi-gavel' : 'mdi-file-document'"
+        size="16"
+        class="text-medium-emphasis mr-1"
+      />
       <v-icon icon="mdi-arrow-right" size="16" class="text-medium-emphasis" />
     </div>
   </v-card>
@@ -66,6 +74,7 @@ const props = defineProps({
 const lawTypeColor = computed(() => {
   switch (props.change.law_type) {
     case 'Bundesrecht': return 'primary'
+    case 'Judikatur': return 'warning'
     case 'Landesrecht': return 'secondary'
     default: return 'info'
   }

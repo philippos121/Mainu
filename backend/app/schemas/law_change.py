@@ -17,6 +17,8 @@ class LawChangeResponse(BaseModel):
     effective_date: datetime | None
     document_url: str
     content_snippet: str
+    court_name: str | None = None
+    case_number: str | None = None
     ai_summary: str
     ai_summary_generated_at: datetime | None
     created_at: datetime

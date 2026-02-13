@@ -12,13 +12,18 @@
           <!-- Main content -->
           <v-card elevation="0" class="card-glass pa-6">
             <div class="d-flex align-center mb-4">
-              <v-avatar color="primary" variant="tonal" size="48" class="mr-4">
-                <v-icon size="24">mdi-gavel</v-icon>
+              <v-avatar :color="change.law_type === 'Judikatur' ? 'warning' : 'primary'" variant="tonal" size="48" class="mr-4">
+                <v-icon size="24">{{ change.law_type === 'Judikatur' ? 'mdi-gavel' : 'mdi-file-document' }}</v-icon>
               </v-avatar>
               <div>
-                <v-chip :color="lawTypeColor" size="small" variant="flat" class="mb-1">
-                  {{ change.law_type }}
-                </v-chip>
+                <div class="d-flex align-center ga-2 mb-1">
+                  <v-chip :color="lawTypeColor" size="small" variant="flat">
+                    {{ change.law_type }}
+                  </v-chip>
+                  <v-chip v-if="change.court_name" size="small" variant="tonal" color="warning">
+                    {{ change.court_name }}
+                  </v-chip>
+                </div>
                 <h1 class="text-h5 font-weight-bold">{{ change.short_title || change.title }}</h1>
               </div>
             </div>
@@ -80,7 +85,23 @@
                 <v-list-item-subtitle>{{ change.ris_doc_id }}</v-list-item-subtitle>
               </v-list-item>
 
-              <v-list-item v-if="change.bgbl_number">
+              <v-list-item v-if="change.court_name">
+                <template v-slot:prepend>
+                  <v-icon icon="mdi-bank" size="20" class="mr-3" />
+                </template>
+                <v-list-item-title class="text-caption text-medium-emphasis">Gericht</v-list-item-title>
+                <v-list-item-subtitle>{{ change.court_name }}</v-list-item-subtitle>
+              </v-list-item>
+
+              <v-list-item v-if="change.case_number">
+                <template v-slot:prepend>
+                  <v-icon icon="mdi-file-sign" size="20" class="mr-3" />
+                </template>
+                <v-list-item-title class="text-caption text-medium-emphasis">Geschäftszahl</v-list-item-title>
+                <v-list-item-subtitle>{{ change.case_number }}</v-list-item-subtitle>
+              </v-list-item>
+
+              <v-list-item v-if="change.bgbl_number && change.law_type !== 'Judikatur'">
                 <template v-slot:prepend>
                   <v-icon icon="mdi-newspaper" size="20" class="mr-3" />
                 </template>
@@ -92,11 +113,13 @@
                 <template v-slot:prepend>
                   <v-icon icon="mdi-calendar-edit" size="20" class="mr-3" />
                 </template>
-                <v-list-item-title class="text-caption text-medium-emphasis">Änderungsdatum</v-list-item-title>
+                <v-list-item-title class="text-caption text-medium-emphasis">
+                  {{ change.law_type === 'Judikatur' ? 'Entscheidungsdatum' : 'Änderungsdatum' }}
+                </v-list-item-title>
                 <v-list-item-subtitle>{{ formatDate(change.change_date) }}</v-list-item-subtitle>
               </v-list-item>
 
-              <v-list-item v-if="change.publication_date">
+              <v-list-item v-if="change.publication_date && change.law_type !== 'Judikatur'">
                 <template v-slot:prepend>
                   <v-icon icon="mdi-calendar-check" size="20" class="mr-3" />
                 </template>
@@ -158,6 +181,7 @@ const loading = ref(true)
 const lawTypeColor = computed(() => {
   switch (change.value?.law_type) {
     case 'Bundesrecht': return 'primary'
+    case 'Judikatur': return 'warning'
     case 'Landesrecht': return 'secondary'
     default: return 'info'
   }

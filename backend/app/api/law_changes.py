@@ -1,4 +1,4 @@
-"""Law change routes — browse, search, get details."""
+"""Law change routes — browse, search, get details, scan."""
 
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -20,8 +20,12 @@ from app.schemas.law_change import (
 )
 from app.services.openai_service import generate_law_summary
 from app.services.ris_client import (
+    COURT_SOURCES,
+    fetch_court_rulings,
     fetch_law_changes,
+    get_court_sources,
     get_legal_categories,
+    parse_judikatur_response,
     parse_ris_response,
 )
 
@@ -35,12 +39,19 @@ async def list_categories():
     return get_legal_categories()
 
 
+@router.get("/courts")
+async def list_courts():
+    """Return all available court sources."""
+    return get_court_sources()
+
+
 @router.get("", response_model=LawChangeListResponse)
 async def list_law_changes(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: str = Query("", description="Freitextsuche"),
     category: str = Query("", description="Kategorie-Filter"),
+    source_type: str = Query("", description="Quellentyp: Bundesrecht, Judikatur, oder leer für alle"),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     user: User = Depends(get_current_user),
@@ -60,6 +71,8 @@ async def list_law_changes(
         )
     if category:
         query = query.where(LawChange.categories.any(category))
+    if source_type:
+        query = query.where(LawChange.law_type == source_type)
     if date_from:
         query = query.where(
             LawChange.change_date >= datetime.combine(date_from, datetime.min.time()).replace(tzinfo=timezone.utc)
@@ -135,53 +148,94 @@ async def trigger_scan(
     date_from: date = Query(default=None),
     date_to: date = Query(default=None),
     keywords: str = Query(""),
+    source_type: str = Query("all", description="Was scannen: 'laws', 'rulings', oder 'all'"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Manually trigger a scan of the RIS API (for testing / admin use)."""
+    """Manually trigger a scan of the RIS API (laws + court rulings)."""
     if date_from is None:
         date_from = date.today() - timedelta(days=7)
     if date_to is None:
         date_to = date.today()
 
-    raw = await fetch_law_changes(date_from=date_from, date_to=date_to, keywords=keywords)
-    changes = parse_ris_response(raw)
-    created = 0
+    created_laws = 0
+    created_rulings = 0
 
-    for change_data in changes:
-        existing = await db.execute(
-            select(LawChange).where(LawChange.ris_doc_id == change_data["ris_doc_id"])
-        )
-        if existing.scalar_one_or_none():
-            continue
+    # Scan Bundesrecht
+    if source_type in ("all", "laws"):
+        for page in range(1, 11):
+            raw = await fetch_law_changes(date_from=date_from, date_to=date_to, keywords=keywords, page=page)
+            changes = parse_ris_response(raw)
+            if not changes:
+                break
+            for change_data in changes:
+                count = await _store_and_count(db, change_data)
+                created_laws += count
+            await db.commit()
 
-        ai_summary = await generate_law_summary(
-            title=change_data["title"],
-            content_snippet=change_data["content_snippet"],
-            bgbl_number=change_data["bgbl_number"],
-            categories=change_data["categories"],
-        )
+    # Scan Judikatur (all court sources)
+    if source_type in ("all", "rulings"):
+        for source_key in COURT_SOURCES:
+            for page in range(1, 6):
+                raw = await fetch_court_rulings(
+                    court_source=source_key,
+                    date_from=date_from,
+                    date_to=date_to,
+                    keywords=keywords,
+                    page=page,
+                )
+                rulings = parse_judikatur_response(raw, court_source=source_key)
+                if not rulings:
+                    break
+                for ruling_data in rulings:
+                    count = await _store_and_count(db, ruling_data)
+                    created_rulings += count
+                await db.commit()
 
-        law_change = LawChange(
-            ris_doc_id=change_data["ris_doc_id"],
-            title=change_data["title"],
-            short_title=change_data["short_title"],
-            law_type=change_data["law_type"],
-            bgbl_number=change_data["bgbl_number"],
-            categories=change_data["categories"],
-            index_numbers=change_data["index_numbers"],
-            change_date=change_data["change_date"],
-            publication_date=change_data["publication_date"],
-            document_url=change_data["document_url"],
-            content_snippet=change_data["content_snippet"],
-            ai_summary=ai_summary,
-            ai_summary_generated_at=datetime.now(timezone.utc),
-        )
-        db.add(law_change)
-        created += 1
+    total_created = created_laws + created_rulings
+    return {
+        "message": f"{total_created} neue Einträge importiert ({created_laws} Gesetze, {created_rulings} Urteile).",
+        "laws_created": created_laws,
+        "rulings_created": created_rulings,
+        "date_from": date_from.isoformat(),
+        "date_to": date_to.isoformat(),
+    }
 
-    await db.commit()
-    return {"message": f"{created} neue Rechtsänderungen importiert.", "total_found": len(changes)}
+
+async def _store_and_count(db: AsyncSession, change_data: dict) -> int:
+    """Store a change if new; return 1 if created, 0 if duplicate."""
+    existing = await db.execute(
+        select(LawChange).where(LawChange.ris_doc_id == change_data["ris_doc_id"])
+    )
+    if existing.scalar_one_or_none():
+        return 0
+
+    ai_summary = await generate_law_summary(
+        title=change_data["title"],
+        content_snippet=change_data["content_snippet"],
+        bgbl_number=change_data["bgbl_number"],
+        categories=change_data["categories"],
+    )
+
+    law_change = LawChange(
+        ris_doc_id=change_data["ris_doc_id"],
+        title=change_data["title"],
+        short_title=change_data["short_title"],
+        law_type=change_data["law_type"],
+        bgbl_number=change_data["bgbl_number"],
+        categories=change_data["categories"],
+        index_numbers=change_data["index_numbers"],
+        change_date=change_data["change_date"],
+        publication_date=change_data["publication_date"],
+        document_url=change_data["document_url"],
+        content_snippet=change_data["content_snippet"],
+        court_name=change_data.get("court_name"),
+        case_number=change_data.get("case_number"),
+        ai_summary=ai_summary,
+        ai_summary_generated_at=datetime.now(timezone.utc),
+    )
+    db.add(law_change)
+    return 1
 
 
 # ──────────────────────────────────────

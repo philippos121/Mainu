@@ -37,6 +37,15 @@ LEGAL_CATEGORIES = {
     "eu_recht": {"label": "EU-Recht", "index": "24"},
 }
 
+# Court sources available in the RIS Judikatur API
+COURT_SOURCES = {
+    "justiz": {"label": "Ordentliche Gerichte (OGH, OLG, …)", "path": "Justiz", "metadata_key": "Justiz"},
+    "vfgh": {"label": "Verfassungsgerichtshof (VfGH)", "path": "Vfgh", "metadata_key": "Vfgh"},
+    "vwgh": {"label": "Verwaltungsgerichtshof (VwGH)", "path": "Vwgh", "metadata_key": "Vwgh"},
+    "bvwg": {"label": "Bundesverwaltungsgericht (BVwG)", "path": "Bvwg", "metadata_key": "Bvwg"},
+    "lvwg": {"label": "Landesverwaltungsgerichte (LVwG)", "path": "Lvwg", "metadata_key": "Lvwg"},
+}
+
 
 async def fetch_law_changes(
     date_from: date | None = None,
@@ -75,10 +84,60 @@ async def fetch_law_changes(
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"RIS API HTTP error: {e.response.status_code} – {e.response.text}")
-            return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": []}, "Hits": {"#text": "0"}}}
+            return _empty_response()
         except httpx.RequestError as e:
             logger.error(f"RIS API request error: {e}")
-            return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": []}, "Hits": {"#text": "0"}}}
+            return _empty_response()
+
+
+async def fetch_court_rulings(
+    court_source: str = "justiz",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    keywords: str = "",
+    page: int = 1,
+    page_size: int = 100,
+) -> dict:
+    """
+    Fetch court rulings from a RIS Judikatur API endpoint.
+
+    Uses the REST endpoint:
+    GET /Judikatur/{Source}?Suchworte=...&EntscheidungsdatumVon=...&EntscheidungsdatumBis=...
+    """
+    source = COURT_SOURCES.get(court_source)
+    if not source:
+        logger.error(f"Unknown court source: {court_source}")
+        return _empty_response()
+
+    params = {
+        "Pagesize": min(page_size, 100),
+        "Pagenumber": page,
+    }
+
+    if keywords:
+        params["Suchworte"] = keywords
+    if date_from:
+        params["EntscheidungsdatumVon"] = date_from.strftime("%Y-%m-%d")
+    if date_to:
+        params["EntscheidungsdatumBis"] = date_to.strftime("%Y-%m-%d")
+
+    url = f"{settings.RIS_API_BASE_URL}/Judikatur/{source['path']}"
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"RIS Judikatur API HTTP error ({court_source}): {e.response.status_code} – {e.response.text}")
+            return _empty_response()
+        except httpx.RequestError as e:
+            logger.error(f"RIS Judikatur API request error ({court_source}): {e}")
+            return _empty_response()
+
+
+def _empty_response() -> dict:
+    return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": []}, "Hits": {"#text": "0"}}}
 
 
 def parse_ris_response(data: dict) -> list[dict]:
@@ -167,9 +226,126 @@ def parse_ris_response(data: dict) -> list[dict]:
                 "publication_date": pub_date,
                 "document_url": doc_url,
                 "content_snippet": schlagworte if isinstance(schlagworte, str) else "",
+                "court_name": None,
+                "case_number": None,
             })
     except Exception as e:
         logger.error(f"Error parsing RIS response: {e}")
+
+    return results
+
+
+def parse_judikatur_response(data: dict, court_source: str = "justiz") -> list[dict]:
+    """Parse a RIS Judikatur API response into a list of structured dicts."""
+    results = []
+    source = COURT_SOURCES.get(court_source, {})
+    metadata_key = source.get("metadata_key", "Justiz")
+
+    try:
+        search_result = data.get("OgdSearchResult", {})
+        doc_results = search_result.get("OgdDocumentResults", {})
+        references = doc_results.get("OgdDocumentReference", [])
+
+        if isinstance(references, dict):
+            references = [references]
+
+        for ref in references:
+            data_entry = ref.get("Data", {})
+            metadata = data_entry.get("Metadaten", {})
+            jud_metadata = metadata.get(metadata_key, metadata.get("Judikatur", {}))
+
+            # Extract document ID
+            doc_id = (
+                data_entry.get("Dokumentnummer", "")
+                or ref.get("Dokumentnummer", "")
+            )
+
+            # Extract case number (Geschäftszahl)
+            case_number = (
+                jud_metadata.get("Geschaeftszahl", "")
+                or data_entry.get("Geschaeftszahl", "")
+                or ""
+            )
+
+            # Extract court name
+            court_name = (
+                jud_metadata.get("Gericht", "")
+                or data_entry.get("Gericht", "")
+                or source.get("label", court_source)
+            )
+
+            # Extract title — court rulings often use Geschaeftszahl as title
+            title = (
+                jud_metadata.get("Kurztitel", "")
+                or data_entry.get("Kurztitel", "")
+                or jud_metadata.get("Betreff", "")
+                or f"{court_name} {case_number}"
+            )
+
+            short_title = (
+                jud_metadata.get("Kurztitel", "")
+                or data_entry.get("Kurztitel", "")
+                or f"{court_name} {case_number}"
+            )
+
+            # Extract referenced norms
+            normen = jud_metadata.get("Norm", "")
+            if isinstance(normen, list):
+                normen = "; ".join(str(n) for n in normen)
+
+            # Extract dates — Judikatur uses Entscheidungsdatum
+            decision_date_str = (
+                jud_metadata.get("Entscheidungsdatum", "")
+                or data_entry.get("Entscheidungsdatum", "")
+            )
+            decision_date = _parse_date(decision_date_str)
+
+            # Extract document URL
+            doc_url = ref.get("DokumentUrl", "") or data_entry.get("DokumentUrl", "")
+
+            # Extract keywords/Schlagworte
+            schlagworte = jud_metadata.get("Schlagworte", "")
+            categories = []
+            if isinstance(schlagworte, str) and schlagworte:
+                categories = [s.strip() for s in schlagworte.split(",") if s.strip()]
+
+            # Extract Rechtssatz (legal principle) for content snippet
+            rechtssatz = jud_metadata.get("Rechtssatz", "")
+            if isinstance(rechtssatz, list):
+                rechtssatz = " ".join(str(r) for r in rechtssatz)
+
+            content_snippet = rechtssatz or (schlagworte if isinstance(schlagworte, str) else "")
+            if normen and content_snippet:
+                content_snippet = f"Normen: {normen}. {content_snippet}"
+            elif normen:
+                content_snippet = f"Normen: {normen}"
+
+            # Extract index numbers if available
+            index_list = jud_metadata.get("Indexe", "")
+            if isinstance(index_list, str):
+                indices = [i.strip() for i in index_list.split(";") if i.strip()]
+            elif isinstance(index_list, list):
+                indices = index_list
+            else:
+                indices = []
+
+            results.append({
+                "ris_doc_id": doc_id,
+                "title": title,
+                "short_title": short_title,
+                "law_type": "Judikatur",
+                "bgbl_number": case_number,  # Store case number in bgbl_number field for display
+                "categories": categories,
+                "index_numbers": indices,
+                "change_date": decision_date,
+                "publication_date": decision_date,
+                "document_url": doc_url,
+                "content_snippet": content_snippet[:2000] if content_snippet else "",
+                "court_name": court_name,
+                "case_number": case_number,
+            })
+    except Exception as e:
+        logger.error(f"Error parsing Judikatur response ({court_source}): {e}")
 
     return results
 
@@ -190,4 +366,12 @@ def get_legal_categories() -> list[dict]:
     return [
         {"slug": slug, "label": info["label"], "index": info["index"]}
         for slug, info in LEGAL_CATEGORIES.items()
+    ]
+
+
+def get_court_sources() -> list[dict]:
+    """Return all available court sources for scanning."""
+    return [
+        {"slug": slug, "label": info["label"], "path": info["path"]}
+        for slug, info in COURT_SOURCES.items()
     ]

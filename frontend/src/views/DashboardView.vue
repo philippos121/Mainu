@@ -6,7 +6,7 @@
         Guten {{ greeting }}, {{ authStore.user?.full_name?.split(' ')[0] || 'Benutzer' }}
       </h1>
       <p class="text-body-1 text-medium-emphasis mt-1">
-        Hier ist Ihre Übersicht der aktuellen Rechtsänderungen in Österreich.
+        Hier ist Ihre Übersicht der aktuellen Rechtsänderungen und Urteile in Österreich.
       </p>
     </div>
 
@@ -20,7 +20,7 @@
             </v-avatar>
             <div>
               <div class="text-h5 font-weight-bold">{{ stats.totalChanges }}</div>
-              <div class="text-caption text-medium-emphasis">Änderungen gesamt</div>
+              <div class="text-caption text-medium-emphasis">Einträge gesamt</div>
             </div>
           </div>
         </v-card>
@@ -72,7 +72,7 @@
         <v-card elevation="0" class="card-glass">
           <v-card-title class="d-flex align-center">
             <v-icon icon="mdi-clock-outline" class="mr-2" />
-            Neueste Rechtsänderungen
+            Neueste Einträge
             <v-spacer />
             <v-btn variant="text" size="small" to="/browse" append-icon="mdi-arrow-right">
               Alle anzeigen
@@ -80,7 +80,7 @@
           </v-card-title>
           <v-card-text>
             <v-alert v-if="!loading && recentChanges.length === 0" type="info" variant="tonal">
-              Noch keine Rechtsänderungen vorhanden. Starten Sie einen Scan oder warten Sie auf den täglichen Import.
+              Noch keine Einträge vorhanden. Starten Sie einen Scan oder warten Sie auf den täglichen Import.
             </v-alert>
 
             <v-list v-else lines="three" class="bg-transparent">
@@ -90,8 +90,8 @@
                   class="rounded-lg mb-2 change-item"
                 >
                   <template v-slot:prepend>
-                    <v-avatar color="primary" variant="tonal" size="40">
-                      <v-icon size="20">mdi-gavel</v-icon>
+                    <v-avatar :color="change.law_type === 'Judikatur' ? 'warning' : 'primary'" variant="tonal" size="40">
+                      <v-icon size="20">{{ change.law_type === 'Judikatur' ? 'mdi-gavel' : 'mdi-file-document' }}</v-icon>
                     </v-avatar>
                   </template>
                   <v-list-item-title class="font-weight-medium">
@@ -102,9 +102,12 @@
                   </v-list-item-subtitle>
                   <template v-slot:append>
                     <div class="text-right">
-                      <v-chip size="x-small" color="primary" variant="tonal" class="mb-1">
+                      <v-chip size="x-small" :color="change.law_type === 'Judikatur' ? 'warning' : 'primary'" variant="tonal" class="mb-1">
                         {{ change.law_type }}
                       </v-chip>
+                      <div v-if="change.court_name" class="text-caption text-warning">
+                        {{ change.court_name }}
+                      </div>
                       <div class="text-caption text-medium-emphasis">
                         {{ formatDate(change.change_date) }}
                       </div>

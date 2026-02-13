@@ -2,16 +2,16 @@
   <v-container fluid class="pa-6">
     <h1 class="text-h4 font-weight-bold mb-2">
       <v-icon icon="mdi-magnify" class="mr-2" />
-      Alle Rechtsänderungen
+      Alle Rechtsänderungen & Urteile
     </h1>
     <p class="text-body-1 text-medium-emphasis mb-6">
-      Durchsuchen und filtern Sie sämtliche erfassten Änderungen der österreichischen Gesetzgebung.
+      Durchsuchen und filtern Sie sämtliche erfassten Änderungen der österreichischen Gesetzgebung und Judikatur.
     </p>
 
     <!-- Filters -->
     <v-card elevation="0" class="card-glass mb-6 pa-4">
       <v-row dense>
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="3">
           <v-text-field
             v-model="search"
             label="Suche"
@@ -23,7 +23,21 @@
             @update:model-value="debouncedFetch"
           />
         </v-col>
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="2">
+          <v-select
+            v-model="selectedSourceType"
+            :items="sourceTypes"
+            item-title="label"
+            item-value="value"
+            label="Quellentyp"
+            variant="outlined"
+            density="compact"
+            clearable
+            hide-details
+            @update:model-value="fetchChanges"
+          />
+        </v-col>
+        <v-col cols="12" md="2">
           <v-select
             v-model="selectedCategory"
             :items="categories"
@@ -67,6 +81,72 @@
       </v-row>
     </v-card>
 
+    <!-- Historical Scan -->
+    <v-card elevation="0" class="card-glass mb-6 pa-4">
+      <div class="d-flex align-center mb-3">
+        <v-icon icon="mdi-history" class="mr-2" />
+        <span class="text-subtitle-1 font-weight-bold">Vergangene Daten scannen</span>
+      </div>
+      <v-row dense align="center">
+        <v-col cols="12" md="3">
+          <v-text-field
+            v-model="scanDateFrom"
+            label="Scan von"
+            type="date"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </v-col>
+        <v-col cols="12" md="3">
+          <v-text-field
+            v-model="scanDateTo"
+            label="Scan bis"
+            type="date"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </v-col>
+        <v-col cols="12" md="2">
+          <v-select
+            v-model="scanSourceType"
+            :items="scanSourceTypes"
+            item-title="label"
+            item-value="value"
+            label="Was scannen"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </v-col>
+        <v-col cols="12" md="2">
+          <v-text-field
+            v-model="scanKeywords"
+            label="Suchbegriffe (optional)"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </v-col>
+        <v-col cols="12" md="2">
+          <v-btn
+            color="primary"
+            block
+            :loading="scanning"
+            :disabled="!scanDateFrom || !scanDateTo"
+            prepend-icon="mdi-radar"
+            @click="triggerScan"
+          >
+            Scannen
+          </v-btn>
+        </v-col>
+      </v-row>
+      <v-alert v-if="scanResult" :type="scanResult.type" variant="tonal" class="mt-3" closable @click:close="scanResult = null">
+        {{ scanResult.message }}
+      </v-alert>
+    </v-card>
+
     <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
 
     <!-- Results -->
@@ -103,9 +183,30 @@ const total = ref(0)
 const pageSize = 12
 const search = ref('')
 const selectedCategory = ref('')
+const selectedSourceType = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const categories = ref([])
+
+// Source type filter options
+const sourceTypes = [
+  { label: 'Gesetze', value: 'Bundesrecht' },
+  { label: 'Urteile', value: 'Judikatur' },
+]
+
+// Historical scan
+const scanning = ref(false)
+const scanDateFrom = ref('')
+const scanDateTo = ref('')
+const scanSourceType = ref('all')
+const scanKeywords = ref('')
+const scanResult = ref(null)
+
+const scanSourceTypes = [
+  { label: 'Alles', value: 'all' },
+  { label: 'Nur Gesetze', value: 'laws' },
+  { label: 'Nur Urteile', value: 'rulings' },
+]
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 
@@ -121,6 +222,7 @@ async function fetchChanges() {
     const params = { page: page.value, page_size: pageSize }
     if (search.value) params.search = search.value
     if (selectedCategory.value) params.category = selectedCategory.value
+    if (selectedSourceType.value) params.source_type = selectedSourceType.value
     if (dateFrom.value) params.date_from = dateFrom.value
     if (dateTo.value) params.date_to = dateTo.value
 
@@ -137,10 +239,33 @@ async function fetchChanges() {
 function resetFilters() {
   search.value = ''
   selectedCategory.value = ''
+  selectedSourceType.value = ''
   dateFrom.value = ''
   dateTo.value = ''
   page.value = 1
   fetchChanges()
+}
+
+async function triggerScan() {
+  scanning.value = true
+  scanResult.value = null
+  try {
+    const params = {
+      date_from: scanDateFrom.value,
+      date_to: scanDateTo.value,
+      source_type: scanSourceType.value,
+    }
+    if (scanKeywords.value) params.keywords = scanKeywords.value
+
+    const { data } = await api.post('/law-changes/scan', null, { params })
+    scanResult.value = { type: 'success', message: data.message }
+    // Refresh the list
+    await fetchChanges()
+  } catch (e) {
+    scanResult.value = { type: 'error', message: 'Scan fehlgeschlagen: ' + (e.response?.data?.detail || e.message) }
+  } finally {
+    scanning.value = false
+  }
 }
 
 watch(page, fetchChanges)

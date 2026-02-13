@@ -28,6 +28,10 @@ class LawChange(Base):
     document_url: Mapped[str] = mapped_column(Text, default="")
     content_snippet: Mapped[str] = mapped_column(Text, default="")
 
+    # Court ruling specific fields
+    court_name: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    case_number: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+
     # AI-generated summary
     ai_summary: Mapped[str] = mapped_column(Text, default="")
     ai_summary_generated_at: Mapped[datetime | None] = mapped_column(
