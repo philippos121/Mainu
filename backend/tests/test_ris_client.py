@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 
 from app.services.ris_client import (
     _dig_metadata,
+    _docs_per_page_str,
     _extract_references,
     _map_date_range_to_im_ris_seit,
     _parse_date,
@@ -267,6 +268,29 @@ class TestMapDateRange:
         from datetime import timedelta
         d = date.today() - timedelta(days=90)
         assert _map_date_range_to_im_ris_seit(d) == "DreiMonaten"
+
+
+class TestDocsPerPageStr:
+    def test_100(self):
+        assert _docs_per_page_str(100) == "OneHundred"
+
+    def test_50(self):
+        assert _docs_per_page_str(50) == "Fifty"
+
+    def test_20(self):
+        assert _docs_per_page_str(20) == "Twenty"
+
+    def test_10(self):
+        assert _docs_per_page_str(10) == "Ten"
+
+    def test_5_rounds_up_to_ten(self):
+        assert _docs_per_page_str(5) == "Ten"
+
+    def test_25_rounds_up_to_fifty(self):
+        assert _docs_per_page_str(25) == "Fifty"
+
+    def test_200_caps_at_onehundred(self):
+        assert _docs_per_page_str(200) == "OneHundred"
 
 
 class TestParseDate:

@@ -46,6 +46,20 @@ LEGAL_CATEGORIES = {
     "eu_recht": {"label": "EU-Recht", "index": "24"},
 }
 
+# DokumenteProSeite — the API expects string enum values, not integers.
+DOCS_PER_PAGE = {
+    10: "Ten",
+    20: "Twenty",
+    50: "Fifty",
+    100: "OneHundred",
+}
+
+# Applikation values for each law source
+LAW_SOURCE_CONFIG = {
+    "bundesrecht": {"endpoint": "Bundesrecht", "applikation": "BrKons"},
+    "landesrecht": {"endpoint": "Landesrecht", "applikation": "LrKons"},
+}
+
 COURT_SOURCES = {
     "justiz": {"label": "Ordentliche Gerichte (OGH, OLG, …)", "applikation": "Justiz"},
     "vfgh": {"label": "Verfassungsgerichtshof (VfGH)", "applikation": "Vfgh"},
@@ -72,6 +86,15 @@ def _map_date_range_to_im_ris_seit(date_from: date | None) -> str | None:
 # API Fetch
 # ──────────────────────────────────────
 
+def _docs_per_page_str(page_size: int) -> str:
+    """Convert integer page_size to the API's string enum (Ten/Twenty/Fifty/OneHundred)."""
+    # Find the closest valid value (rounding up)
+    for limit, label in sorted(DOCS_PER_PAGE.items()):
+        if page_size <= limit:
+            return label
+    return "OneHundred"
+
+
 async def fetch_law_changes(
     date_from: date | None = None,
     date_to: date | None = None,
@@ -81,10 +104,20 @@ async def fetch_law_changes(
     page_size: int = 100,
     law_source: str = "bundesrecht",
 ) -> dict:
-    """Fetch Bundesrecht or Landesrecht from the RIS API."""
+    """Fetch Bundesrecht or Landesrecht from the RIS API.
+
+    Uses the correct OGD RIS API v2.6 parameter names:
+      - Applikation (mandatory): BrKons / LrKons
+      - DokumenteProSeite: Ten / Twenty / Fifty / OneHundred
+      - Seitennummer: integer page number
+      - ImRisSeit: EinerWoche / ZweiWochen / EinemMonat / DreiMonaten / ...
+    """
+    config = LAW_SOURCE_CONFIG.get(law_source, LAW_SOURCE_CONFIG["bundesrecht"])
+
     params: dict = {
-        "Pagesize": min(page_size, 100),
-        "Pagenumber": page,
+        "Applikation": config["applikation"],
+        "DokumenteProSeite": _docs_per_page_str(page_size),
+        "Seitennummer": page,
     }
     if keywords:
         params["Suchworte"] = keywords
@@ -95,7 +128,7 @@ async def fetch_law_changes(
     if im_ris_seit:
         params["ImRisSeit"] = im_ris_seit
 
-    endpoint = "Bundesrecht" if law_source == "bundesrecht" else "Landesrecht"
+    endpoint = config["endpoint"]
     url = f"{settings.RIS_API_BASE_URL}/{endpoint}"
 
     logger.info(f"RIS {endpoint}: GET {url} params={params}")
@@ -106,6 +139,11 @@ async def fetch_law_changes(
             logger.info(f"RIS {endpoint}: HTTP {response.status_code}, url={response.url}")
             response.raise_for_status()
             data = response.json()
+
+            # Check for API-level error
+            error = data.get("OgdSearchResult", {}).get("Error")
+            if error:
+                logger.error(f"RIS {endpoint}: API Error: {error}")
 
             # Log hits
             hits = data.get("OgdSearchResult", {}).get("Hits", {})
@@ -135,8 +173,9 @@ async def fetch_court_rulings(
         return _empty_response()
 
     params: dict = {
-        "Pagesize": min(page_size, 100),
-        "Pagenumber": page,
+        "Applikation": source["applikation"],
+        "DokumenteProSeite": _docs_per_page_str(page_size),
+        "Seitennummer": page,
     }
     if keywords:
         params["Suchworte"] = keywords
@@ -145,7 +184,7 @@ async def fetch_court_rulings(
     if date_to:
         params["EntscheidungsdatumBis"] = date_to.strftime("%Y-%m-%d")
 
-    url = f"{settings.RIS_API_BASE_URL}/Judikatur/{source['applikation']}"
+    url = f"{settings.RIS_API_BASE_URL}/Judikatur"
 
     logger.info(f"RIS Judikatur ({court_source}): GET {url} params={params}")
 
@@ -458,14 +497,23 @@ def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, 
 async def debug_ris_api_raw(endpoint: str = "bundesrecht") -> dict:
     """Call the RIS API with minimal params and return raw response for diagnosis."""
     if endpoint in ("bundesrecht", "landesrecht"):
-        ep = "Bundesrecht" if endpoint == "bundesrecht" else "Landesrecht"
-        url = f"{settings.RIS_API_BASE_URL}/{ep}"
-        params = {"Pagesize": 5, "Pagenumber": 1, "ImRisSeit": "EinemMonat"}
+        config = LAW_SOURCE_CONFIG.get(endpoint, LAW_SOURCE_CONFIG["bundesrecht"])
+        url = f"{settings.RIS_API_BASE_URL}/{config['endpoint']}"
+        params = {
+            "Applikation": config["applikation"],
+            "DokumenteProSeite": "Twenty",
+            "Seitennummer": 1,
+            "ImRisSeit": "EinemMonat",
+        }
     else:
         source = COURT_SOURCES.get(endpoint, {})
         app = source.get("applikation", "Justiz")
-        url = f"{settings.RIS_API_BASE_URL}/Judikatur/{app}"
-        params = {"Pagesize": 5, "Pagenumber": 1}
+        url = f"{settings.RIS_API_BASE_URL}/Judikatur"
+        params = {
+            "Applikation": app,
+            "DokumenteProSeite": "Twenty",
+            "Seitennummer": 1,
+        }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
