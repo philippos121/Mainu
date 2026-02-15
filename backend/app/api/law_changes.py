@@ -262,7 +262,10 @@ async def trigger_scan(
             scanned_total += len(changes)
             for change_data in changes:
                 try:
-                    count = await _store_and_count(db, change_data, date_from, date_to)
+                    # Don't pass date range — ImRisSeit already filters on the API side.
+                    # The post-filter would incorrectly drop results because Aenderungsdatum
+                    # (law change date) differs from "last modified in RIS".
+                    count = await _store_and_count(db, change_data)
                     if count == 1:
                         created_bund += 1
                     elif count == 0:
@@ -292,7 +295,7 @@ async def trigger_scan(
             scanned_total += len(changes)
             for change_data in changes:
                 try:
-                    count = await _store_and_count(db, change_data, date_from, date_to)
+                    count = await _store_and_count(db, change_data)
                     if count == 1:
                         created_land += 1
                     elif count == 0:
@@ -322,7 +325,7 @@ async def trigger_scan(
                 scanned_total += len(rulings)
                 for ruling_data in rulings:
                     try:
-                        count = await _store_and_count(db, ruling_data, date_from, date_to)
+                        count = await _store_and_count(db, ruling_data)
                         if count == 1:
                             created_rulings += 1
                         elif count == 0:
