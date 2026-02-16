@@ -243,6 +243,11 @@ async def trigger_scan(
 
     If 'categories' is provided, only those Rechtsgebiete are scanned (by RIS Index).
     """
+    # Extract user ID as a plain int BEFORE any DB ops.
+    # After a session rollback() all ORM attributes are expired — accessing
+    # user.id would then trigger a lazy-load in a sync context → MissingGreenlet.
+    current_user_id: int = user.id
+
     if date_from is None:
         date_from = date.today() - timedelta(days=90)
     if date_to is None:
@@ -288,7 +293,7 @@ async def trigger_scan(
                 scanned_total += len(changes)
                 for change_data in changes:
                     try:
-                        entry_id = await _store_without_ai(db, change_data, user_id=user.id)
+                        entry_id = await _store_without_ai(db, change_data, user_id=current_user_id)
                         if entry_id is not None:
                             created_bund += 1
                             new_entry_ids.append(entry_id)
@@ -321,7 +326,7 @@ async def trigger_scan(
                 scanned_total += len(changes)
                 for change_data in changes:
                     try:
-                        entry_id = await _store_without_ai(db, change_data, user_id=user.id)
+                        entry_id = await _store_without_ai(db, change_data, user_id=current_user_id)
                         if entry_id is not None:
                             created_land += 1
                             new_entry_ids.append(entry_id)
@@ -352,7 +357,7 @@ async def trigger_scan(
                 scanned_total += len(rulings)
                 for ruling_data in rulings:
                     try:
-                        entry_id = await _store_without_ai(db, ruling_data, user_id=user.id)
+                        entry_id = await _store_without_ai(db, ruling_data, user_id=current_user_id)
                         if entry_id is not None:
                             created_rulings += 1
                             new_entry_ids.append(entry_id)
