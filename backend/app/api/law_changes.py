@@ -230,6 +230,7 @@ async def trigger_scan(
     date_to: date = Query(default=None),
     keywords: str = Query(""),
     source_type: str = Query("all", description="Was scannen: 'laws', 'rulings', oder 'all'"),
+    categories: str = Query("", description="Komma-getrennte Rechtsgebiets-Slugs, z.B. 'strafrecht,zivilrecht'"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -237,11 +238,25 @@ async def trigger_scan(
 
     Stores entries immediately WITHOUT AI summaries to avoid timeouts.
     AI summaries are generated in the background afterward.
+
+    If 'categories' is provided, only those Rechtsgebiete are scanned (by RIS Index).
     """
     if date_from is None:
         date_from = date.today() - timedelta(days=90)
     if date_to is None:
         date_to = date.today()
+
+    # Parse selected Rechtsgebiete into RIS index numbers
+    from app.services.ris_client import LEGAL_CATEGORIES
+    selected_indices: list[str] = []
+    if categories:
+        for slug in categories.split(","):
+            slug = slug.strip()
+            cat = LEGAL_CATEGORIES.get(slug)
+            if cat:
+                selected_indices.append(cat["index"])
+    # If no specific categories selected, scan without index filter (= all)
+    index_filters = selected_indices if selected_indices else [""]
 
     created_bund = 0
     created_land = 0
@@ -253,64 +268,68 @@ async def trigger_scan(
 
     # Scan Bundesrecht (Federal Law)
     if source_type in ("all", "laws"):
-        logger.info(f"Scanning Bundesrecht from {date_from} to {date_to}")
-        for page_num in range(1, 11):
-            raw = await fetch_law_changes(
-                date_from=date_from,
-                date_to=date_to,
-                keywords=keywords,
-                page=page_num,
-                law_source="bundesrecht",
-            )
-            changes = parse_ris_response(raw, law_source="bundesrecht")
-            if not changes:
-                logger.info(f"Bundesrecht page {page_num}: no results, stopping.")
-                break
-            scanned_total += len(changes)
-            for change_data in changes:
-                try:
-                    entry_id = await _store_without_ai(db, change_data)
-                    if entry_id is not None:
-                        created_bund += 1
-                        new_entry_ids.append(entry_id)
-                    elif entry_id is None:
-                        duplicates_total += 1
-                except Exception as e:
-                    err_msg = f"Bundesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
-                    logger.error(err_msg)
-                    errors.append(err_msg)
-            await db.commit()
+        logger.info(f"Scanning Bundesrecht from {date_from} to {date_to}, indices={selected_indices or 'all'}")
+        for idx in index_filters:
+            for page_num in range(1, 11):
+                raw = await fetch_law_changes(
+                    date_from=date_from,
+                    date_to=date_to,
+                    keywords=keywords,
+                    index_number=idx,
+                    page=page_num,
+                    law_source="bundesrecht",
+                )
+                changes = parse_ris_response(raw, law_source="bundesrecht")
+                if not changes:
+                    logger.info(f"Bundesrecht idx={idx or 'all'} page {page_num}: no results, stopping.")
+                    break
+                scanned_total += len(changes)
+                for change_data in changes:
+                    try:
+                        entry_id = await _store_without_ai(db, change_data)
+                        if entry_id is not None:
+                            created_bund += 1
+                            new_entry_ids.append(entry_id)
+                        elif entry_id is None:
+                            duplicates_total += 1
+                    except Exception as e:
+                        err_msg = f"Bundesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
+                        logger.error(err_msg)
+                        errors.append(err_msg)
+                await db.commit()
         logger.info(f"Bundesrecht: {created_bund} new entries stored")
 
     # Scan Landesrecht (State Law)
     if source_type in ("all", "laws"):
-        logger.info(f"Scanning Landesrecht from {date_from} to {date_to}")
-        for page_num in range(1, 6):
-            raw = await fetch_law_changes(
-                date_from=date_from,
-                date_to=date_to,
-                keywords=keywords,
-                page=page_num,
-                law_source="landesrecht",
-            )
-            changes = parse_ris_response(raw, law_source="landesrecht")
-            if not changes:
-                logger.info(f"Landesrecht page {page_num}: no results, stopping.")
-                break
-            scanned_total += len(changes)
-            for change_data in changes:
-                try:
-                    entry_id = await _store_without_ai(db, change_data)
-                    if entry_id is not None:
-                        created_land += 1
-                        new_entry_ids.append(entry_id)
-                    elif entry_id is None:
-                        duplicates_total += 1
-                except Exception as e:
-                    err_msg = f"Landesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
-                    logger.error(err_msg)
-                    errors.append(err_msg)
-            await db.commit()
+        logger.info(f"Scanning Landesrecht from {date_from} to {date_to}, indices={selected_indices or 'all'}")
+        for idx in index_filters:
+            for page_num in range(1, 6):
+                raw = await fetch_law_changes(
+                    date_from=date_from,
+                    date_to=date_to,
+                    keywords=keywords,
+                    index_number=idx,
+                    page=page_num,
+                    law_source="landesrecht",
+                )
+                changes = parse_ris_response(raw, law_source="landesrecht")
+                if not changes:
+                    logger.info(f"Landesrecht idx={idx or 'all'} page {page_num}: no results, stopping.")
+                    break
+                scanned_total += len(changes)
+                for change_data in changes:
+                    try:
+                        entry_id = await _store_without_ai(db, change_data)
+                        if entry_id is not None:
+                            created_land += 1
+                            new_entry_ids.append(entry_id)
+                        elif entry_id is None:
+                            duplicates_total += 1
+                    except Exception as e:
+                        err_msg = f"Landesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
+                        logger.error(err_msg)
+                        errors.append(err_msg)
+                await db.commit()
         logger.info(f"Landesrecht: {created_land} new entries stored")
 
     # Scan Judikatur (Court Rulings - all court sources)

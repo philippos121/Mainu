@@ -88,7 +88,7 @@
         <span class="text-subtitle-1 font-weight-bold">Vergangene Daten scannen</span>
       </div>
       <v-row dense align="center">
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="2">
           <v-text-field
             v-model="scanDateFrom"
             label="Scan von"
@@ -98,7 +98,7 @@
             hide-details
           />
         </v-col>
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="2">
           <v-text-field
             v-model="scanDateTo"
             label="Scan bis"
@@ -120,16 +120,34 @@
             hide-details
           />
         </v-col>
+        <v-col cols="12" md="3">
+          <v-select
+            v-model="scanCategories"
+            :items="categories"
+            item-title="label"
+            item-value="slug"
+            label="Rechtsgebiete"
+            variant="outlined"
+            density="compact"
+            multiple
+            chips
+            closable-chips
+            clearable
+            hide-details
+            :disabled="scanSourceType === 'rulings'"
+            :placeholder="scanCategories.length === 0 ? 'Alle Gebiete' : ''"
+          />
+        </v-col>
         <v-col cols="12" md="2">
           <v-text-field
             v-model="scanKeywords"
-            label="Suchbegriffe (optional)"
+            label="Suchbegriffe"
             variant="outlined"
             density="compact"
             hide-details
           />
         </v-col>
-        <v-col cols="12" md="2">
+        <v-col cols="12" md="1">
           <v-btn
             color="primary"
             block
@@ -138,13 +156,13 @@
             prepend-icon="mdi-radar"
             @click="triggerScan"
           >
-            Scannen
+            Scan
           </v-btn>
         </v-col>
       </v-row>
       <div class="text-caption text-medium-emphasis mt-2">
-        Hinweis: Für Gesetze (Bundes-/Landesrecht) wird der nächstliegende Zeitraum verwendet (bis max. 1 Jahr).
-        Für Gerichtsurteile ist ein exakter Zeitraum möglich.
+        Hinweis: Rechtsgebiete-Filter gilt nur für Gesetze (Bundes-/Landesrecht).
+        Für Gerichtsurteile wird immer alles im Zeitraum gescannt.
       </div>
       <v-alert v-if="scanResult" :type="scanResult.type" variant="tonal" class="mt-3" closable @click:close="scanResult = null">
         {{ scanResult.message }}
@@ -204,6 +222,7 @@ const scanning = ref(false)
 const scanDateFrom = ref('')
 const scanDateTo = ref('')
 const scanSourceType = ref('all')
+const scanCategories = ref([])
 const scanKeywords = ref('')
 const scanResult = ref(null)
 
@@ -260,6 +279,7 @@ async function triggerScan() {
       date_to: scanDateTo.value,
       source_type: scanSourceType.value,
     }
+    if (scanCategories.value.length > 0) params.categories = scanCategories.value.join(',')
     if (scanKeywords.value) params.keywords = scanKeywords.value
 
     const { data } = await api.post('/law-changes/scan', null, { params, timeout: 300000 })
