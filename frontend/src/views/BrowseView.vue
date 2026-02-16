@@ -198,6 +198,16 @@ import { ref, computed, watch, onMounted } from 'vue'
 import api from '../services/api'
 import LawChangeCard from '../components/LawChangeCard.vue'
 
+// Default date range: last 30 days
+function defaultDateFrom() {
+  const d = new Date()
+  d.setDate(d.getDate() - 30)
+  return d.toISOString().slice(0, 10)
+}
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 const changes = ref([])
 const loading = ref(true)
 const page = ref(1)
@@ -206,8 +216,8 @@ const pageSize = 12
 const search = ref('')
 const selectedCategory = ref('')
 const selectedSourceType = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
+const dateFrom = ref(defaultDateFrom())
+const dateTo = ref(todayStr())
 const categories = ref([])
 
 // Source type filter options
