@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from app.services.ris_client import (
     _collect_metadata,
     _docs_per_page_str,
+    _extract_id_from_url,
     _extract_references,
     _map_date_range_to_im_ris_seit,
     _parse_date,
@@ -280,6 +281,109 @@ class TestParseRisResponse:
         first = results[0]
         # Typ comes from Allgemein
         assert "Typ: V" in first["content_snippet"]
+
+
+class TestExtractIdFromUrl:
+    def test_standard_url(self):
+        url = "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BrKons&Dokumentnummer=NOR40262001"
+        assert _extract_id_from_url(url) == "NOR40262001"
+
+    def test_url_with_more_params(self):
+        url = "https://example.com?Foo=bar&Dokumentnummer=ABC123&Other=x"
+        assert _extract_id_from_url(url) == "ABC123"
+
+    def test_empty_url(self):
+        assert _extract_id_from_url("") == ""
+        assert _extract_id_from_url(None) == ""
+
+    def test_url_without_dokumentnummer(self):
+        url = "https://example.com?Abfrage=BrKons"
+        assert _extract_id_from_url(url) == ""
+
+
+# Test that docs with no explicit ID field but with DokumentUrl still parse
+SAMPLE_NO_ID_RESPONSE = {
+    "OgdSearchResult": {
+        "Hits": {"#text": "0"},
+        "OgdDocumentResults": {
+            "OgdDocumentReference": [
+                {
+                    "Data": {
+                        "Metadaten": {
+                            "Technisch": {
+                                "Applikation": "BrKons",
+                                "Organ": "BMF",
+                            },
+                            "Allgemein": {
+                                "Geaendert": "2024-06-15T00:00:00",
+                                "DokumentUrl": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BrKons&Dokumentnummer=NOR40999001",
+                            },
+                            "Bundesrecht": {
+                                "Kurztitel": "EStG",
+                                "BrKons": {
+                                    "Langtitel": "Einkommensteuergesetz 1988",
+                                    "Aenderungsdatum": "2024-06-01T00:00:00",
+                                    "Typ": "BG",
+                                },
+                            },
+                        },
+                    },
+                },
+            ]
+        },
+    }
+}
+
+
+class TestParseNoIdFallback:
+    """Test that documents without explicit ID/Dokumentnummer are parsed via URL fallback."""
+
+    def test_parses_doc_with_url_id(self):
+        results = parse_ris_response(SAMPLE_NO_ID_RESPONSE, law_source="bundesrecht")
+        assert len(results) == 1
+        assert results[0]["ris_doc_id"] == "NOR40999001"
+        assert results[0]["short_title"] == "EStG"
+
+    def test_parses_doc_with_eli_fallback(self):
+        """Doc with Eli but no ID or Dokumentnummer."""
+        response = {
+            "OgdSearchResult": {
+                "Hits": {"#text": "1"},
+                "OgdDocumentResults": {
+                    "OgdDocumentReference": [
+                        {
+                            "Data": {
+                                "Metadaten": {
+                                    "Technisch": {"Applikation": "BrKons"},
+                                    "Bundesrecht": {
+                                        "Kurztitel": "TestG",
+                                        "Eli": "eli/bund/bgbl/2024/100",
+                                        "BrKons": {"Langtitel": "Testgesetz"},
+                                    },
+                                },
+                            },
+                        },
+                    ]
+                },
+            }
+        }
+        results = parse_ris_response(response, law_source="bundesrecht")
+        assert len(results) == 1
+        assert results[0]["ris_doc_id"] == "eli/bund/bgbl/2024/100"
+
+
+class TestCollectMetadataListWrapped:
+    """Test that list-wrapped metadata sections are handled."""
+
+    def test_list_wrapped_technisch(self):
+        meta = {
+            "Technisch": [{"ID": "NOR123", "Applikation": "BrKons"}],
+            "Allgemein": {"Geaendert": "2024-01-01"},
+            "Bundesrecht": {"Kurztitel": "TestG"},
+        }
+        m = _collect_metadata(meta)
+        assert m.get("ID") == "NOR123"
+        assert m.get("Kurztitel") == "TestG"
 
 
 class TestMapDateRange:

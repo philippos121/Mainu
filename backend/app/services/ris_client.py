@@ -232,11 +232,12 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
             # Log structure of first doc for debugging
             first = references[0]
             data_keys = list(first.get("Data", {}).keys())
-            meta_keys = list(first.get("Data", {}).get("Metadaten", {}).keys())
-            logger.info(f"First doc Data keys: {data_keys}, Metadaten keys: {meta_keys}")
-            # Log deeper structure (including BrKons/LrKons sub-dicts)
+            meta = first.get("Data", {}).get("Metadaten", {})
+            meta_keys = list(meta.keys())
+            logger.info(f"First doc ref keys: {list(first.keys())[:10]}, Data keys: {data_keys}, Metadaten keys: {meta_keys}")
+            # Log deeper structure (including sub-dicts and actual values)
             for mk in meta_keys:
-                child = first.get("Data", {}).get("Metadaten", {}).get(mk, {})
+                child = meta.get(mk, {})
                 if isinstance(child, dict):
                     child_keys = list(child.keys())[:15]
                     logger.info(f"  Metadaten.{mk} keys: {child_keys}")
@@ -244,10 +245,19 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
                         sub = child.get(ck)
                         if isinstance(sub, dict):
                             logger.info(f"    {mk}.{ck} keys: {list(sub.keys())[:15]}")
+                elif isinstance(child, list):
+                    logger.info(f"  Metadaten.{mk} is a list with {len(child)} items, first type: {type(child[0]).__name__ if child else '?'}")
+                else:
+                    logger.info(f"  Metadaten.{mk} = {str(child)[:100]}")
+            # Also log ref-level and Data-level fields that might contain IDs
+            for key in ("Dokumentnummer", "DokumentUrl", "ID"):
+                val = first.get(key) or first.get("Data", {}).get(key)
+                if val:
+                    logger.info(f"  ref/Data.{key} = {str(val)[:150]}")
             # Log first parsed result for verification
-            first_m = _collect_metadata(first.get("Data", {}).get("Metadaten", {}))
-            logger.info(f"  Merged metadata keys: {list(first_m.keys())[:20]}")
-            logger.info(f"  ID={first_m.get('ID','?')}, Kurztitel={first_m.get('Kurztitel','?')}")
+            first_m = _collect_metadata(meta)
+            logger.info(f"  Merged metadata keys: {list(first_m.keys())[:25]}")
+            logger.info(f"  ID={first_m.get('ID','?')}, Dokumentnummer={first_m.get('Dokumentnummer','?')}, Kurztitel={first_m.get('Kurztitel','?')}, DokumentUrl={str(first_m.get('DokumentUrl','?'))[:100]}")
 
         for i, ref in enumerate(references):
             try:
@@ -272,31 +282,37 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
 def _collect_metadata(metadata: dict) -> dict:
     """Merge all metadata sections into a single flat dict.
 
-    Actual v2.6 API structure (confirmed from live logs):
-      Metadaten:
-        Technisch: {ID, Applikation, Organ, ImportTimestamp}
-        Allgemein: {Veroeffentlicht, Geaendert, DokumentUrl}
-        Bundesrecht: {Kurztitel, Eli, BrKons: {Langtitel, Aenderungsdatum, ...}}
-        (or Landesrecht: {Kurztitel, Titel, Bundesland, LrKons: {...}})
+    Handles multiple API response formats:
+      v2.6: Metadaten → Technisch/Allgemein/Bundesrecht (with BrKons/LrKons sub-dicts)
+      legacy: Metadaten → {fields directly}
+      mixed: some sections may be lists (take first element) or missing entirely
 
-    We merge all sections (including BrKons/LrKons sub-dicts) so field
-    access is simple. Later sections override earlier ones.
+    We merge all sections so field access is simple. Later sections override earlier ones.
     """
     merged: dict = {}
 
     # Priority order: Technisch (lowest) → Allgemein → Bundesrecht/Landesrecht (highest)
     for section_key in ("Technisch", "Allgemein", "Bundesrecht", "Landesrecht", "BrKons", "LrKons"):
         section = metadata.get(section_key)
+        # Handle list-wrapped sections: take first element
+        if isinstance(section, list) and section and isinstance(section[0], dict):
+            section = section[0]
         if isinstance(section, dict):
             merged.update(section)
             # Also check one level deeper (e.g., Bundesrecht.BrKons)
             for subkey in ("BrKons", "LrKons"):
                 subsection = section.get(subkey)
+                if isinstance(subsection, list) and subsection and isinstance(subsection[0], dict):
+                    subsection = subsection[0]
                 if isinstance(subsection, dict):
                     merged.update(subsection)
+                    # Check two levels deeper (e.g., Bundesrecht.BrKons.Kons — some API variants)
+                    for deep_key, deep_val in subsection.items():
+                        if isinstance(deep_val, dict):
+                            merged.update(deep_val)
 
     # If metadata itself has known fields directly (fallback for other formats)
-    known_fields = {"Kurztitel", "Langtitel", "Aenderungsdatum", "Dokumentnummer"}
+    known_fields = {"Kurztitel", "Langtitel", "Aenderungsdatum", "Dokumentnummer", "ID"}
     if not merged or not (known_fields & set(merged.keys())):
         # Try the old format: metadata has the fields directly
         if known_fields & set(metadata.keys()):
@@ -305,20 +321,44 @@ def _collect_metadata(metadata: dict) -> dict:
     return merged
 
 
+def _extract_id_from_url(url: str) -> str:
+    """Extract Dokumentnummer from a DokumentUrl query parameter."""
+    if not url:
+        return ""
+    # URLs look like: ...?Abfrage=BrKons&Dokumentnummer=NOR40262001
+    for part in url.split("&"):
+        if "=" in part:
+            key, _, val = part.partition("=")
+            if key.split("?")[-1] == "Dokumentnummer" and val:
+                return val
+    return ""
+
+
 def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
     """Parse a single OgdDocumentReference."""
     data_entry = ref.get("Data", {})
     metadata = data_entry.get("Metadaten", {})
     m = _collect_metadata(metadata)
 
-    # v2.6 uses "ID" in Technisch section; older formats may use "Dokumentnummer"
+    # Try many possible ID locations — the actual field name and nesting
+    # varies across RIS API versions and Applikation types.
     doc_id = (
         m.get("ID", "")
         or m.get("Dokumentnummer", "")
         or data_entry.get("Dokumentnummer", "")
         or ref.get("Dokumentnummer", "")
+        or m.get("Eli", "")
+        or _extract_id_from_url(m.get("DokumentUrl", ""))
+        or _extract_id_from_url(ref.get("DokumentUrl", ""))
+        or _extract_id_from_url(data_entry.get("DokumentUrl", ""))
     )
     if not doc_id:
+        logger.warning(
+            f"Skipping {law_type} doc — no ID found. "
+            f"Merged keys: {list(m.keys())[:20]}, "
+            f"Data keys: {list(data_entry.keys())[:10]}, "
+            f"Ref keys: {list(ref.keys())[:10]}"
+        )
         return None
 
     title = (
@@ -444,15 +484,19 @@ def _collect_jud_metadata(metadata: dict, applikation: str) -> dict:
 
     for section_key in ("Technisch", "Allgemein", "Judikatur", applikation):
         section = metadata.get(section_key)
+        if isinstance(section, list) and section and isinstance(section[0], dict):
+            section = section[0]
         if isinstance(section, dict):
             merged.update(section)
             # Check one level deeper (e.g., Judikatur.Justiz)
             inner = section.get(applikation)
+            if isinstance(inner, list) and inner and isinstance(inner[0], dict):
+                inner = inner[0]
             if isinstance(inner, dict):
                 merged.update(inner)
 
     # Fallback: metadata has the fields directly
-    known = {"Geschaeftszahl", "Entscheidungsdatum", "Dokumentnummer"}
+    known = {"Geschaeftszahl", "Entscheidungsdatum", "Dokumentnummer", "ID"}
     if not merged or not (known & set(merged.keys())):
         if known & set(metadata.keys()):
             merged.update(metadata)
@@ -471,6 +515,9 @@ def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, 
         or m.get("Dokumentnummer", "")
         or data_entry.get("Dokumentnummer", "")
         or ref.get("Dokumentnummer", "")
+        or _extract_id_from_url(m.get("DokumentUrl", ""))
+        or _extract_id_from_url(ref.get("DokumentUrl", ""))
+        or _extract_id_from_url(data_entry.get("DokumentUrl", ""))
     )
     if not doc_id:
         return None
