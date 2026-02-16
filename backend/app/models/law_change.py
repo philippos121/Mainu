@@ -15,7 +15,7 @@ class LawChange(Base):
     title: Mapped[str] = mapped_column(Text)
     short_title: Mapped[str] = mapped_column(String(500), default="")
     law_type: Mapped[str] = mapped_column(String(100))  # Bundesrecht, Landesrecht, etc.
-    bgbl_number: Mapped[str] = mapped_column(String(100), default="")
+    bgbl_number: Mapped[str] = mapped_column(Text, default="")
     categories: Mapped[list[str]] = mapped_column(
         ARRAY(String), default=list, server_default="{}"
     )

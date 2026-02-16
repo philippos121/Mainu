@@ -391,11 +391,21 @@ async def _store_without_ai(
     if existing.scalar_one_or_none():
         return None
 
+    # Truncate fields that have VARCHAR length limits in the DB
+    short_title = (change_data.get("short_title", "") or "")[:500]
+    law_type = (change_data.get("law_type", "") or "")[:100]
+    court_name = change_data.get("court_name")
+    if court_name:
+        court_name = court_name[:255]
+    case_number = change_data.get("case_number")
+    if case_number:
+        case_number = case_number[:255]
+
     law_change = LawChange(
-        ris_doc_id=ris_doc_id,
+        ris_doc_id=ris_doc_id[:255],
         title=change_data.get("title", ""),
-        short_title=change_data.get("short_title", ""),
-        law_type=change_data.get("law_type", ""),
+        short_title=short_title,
+        law_type=law_type,
         bgbl_number=change_data.get("bgbl_number", ""),
         categories=change_data.get("categories", []),
         index_numbers=change_data.get("index_numbers", []),
@@ -403,14 +413,19 @@ async def _store_without_ai(
         publication_date=change_data.get("publication_date"),
         document_url=change_data.get("document_url", ""),
         content_snippet=change_data.get("content_snippet", ""),
-        court_name=change_data.get("court_name"),
-        case_number=change_data.get("case_number"),
+        court_name=court_name,
+        case_number=case_number,
         ai_summary="",
         ai_summary_generated_at=None,
     )
     db.add(law_change)
-    await db.flush()  # Assign ID without committing
-    logger.info(f"NEW: {ris_doc_id} — {change_data.get('short_title', '')[:60]} ({change_data.get('law_type', '')})")
+    try:
+        await db.flush()  # Assign ID without committing
+    except Exception as e:
+        logger.error(f"Flush failed for {ris_doc_id}: {e}")
+        await db.rollback()
+        return None
+    logger.info(f"NEW: {ris_doc_id} — {short_title[:60]} ({law_type})")
     return law_change.id
 
 

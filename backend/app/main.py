@@ -30,6 +30,18 @@ async def _run_migrations(conn):
             await conn.execute(text(f"ALTER TABLE law_changes ADD COLUMN {col} {col_type}"))
             logger.info(f"Added column '{col}' to law_changes table.")
 
+    # Widen bgbl_number from VARCHAR(100) to TEXT (law amendment histories can be very long)
+    result = await conn.execute(
+        text(
+            "SELECT data_type FROM information_schema.columns "
+            "WHERE table_name = 'law_changes' AND column_name = 'bgbl_number'"
+        )
+    )
+    row = result.fetchone()
+    if row and row[0] != "text":
+        await conn.execute(text("ALTER TABLE law_changes ALTER COLUMN bgbl_number TYPE TEXT"))
+        logger.info("Widened bgbl_number column to TEXT.")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
