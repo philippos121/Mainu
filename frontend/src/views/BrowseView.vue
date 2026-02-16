@@ -329,12 +329,15 @@ async function triggerScan() {
     // Map scan source type to browse source type filter
     if (scanSourceType.value === 'laws') {
       selectedSourceType.value = 'Bundesrecht'
+      // Only apply category filter for law scans (Rechtsgebiete doesn't apply to rulings)
+      selectedCategory.value = scanCategories.value.length === 1 ? scanCategories.value[0] : ''
     } else if (scanSourceType.value === 'rulings') {
       selectedSourceType.value = 'Judikatur'
+      selectedCategory.value = ''
     } else {
       selectedSourceType.value = ''
+      selectedCategory.value = ''
     }
-    selectedCategory.value = scanCategories.value.length === 1 ? scanCategories.value[0] : ''
     page.value = 1
     await fetchChanges()
   } catch (e) {
