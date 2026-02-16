@@ -1,23 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <path d="M32 3 L58 16 L58 35 C58 48 45 59 32 63 C19 59 6 48 6 35 L6 16 Z"
-        fill="url(#sg)" stroke="url(#bg)" stroke-width="1.8"/>
-  <text x="32" y="40" text-anchor="middle" dominant-baseline="central"
-        font-family="Georgia, serif" font-weight="700"
-        font-size="32" fill="url(#tg)">§</text>
-  <line x1="16" y1="50" x2="48" y2="50" stroke="#ffab00" stroke-width="2.5"
-        stroke-linecap="round" opacity="0.9"/>
-  <defs>
-    <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1a237e"/>
-      <stop offset="100%" stop-color="#0d47a1"/>
-    </linearGradient>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#5c6bc0" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#42a5f5" stop-opacity="0.3"/>
-    </linearGradient>
-    <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#bbdefb"/>
-    </linearGradient>
-  </defs>
+<svg width="128" height="128" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Extracted "A" mark from Logo_farbe_vector.svg, centered in a square -->
+  <g transform="translate(16, 27)">
+    <path d="M171.168 53.9816H164.377V80.093H171.168V53.9816Z" fill="#B7BAC3"/>
+    <path d="M171.168 98.8412H164.377V124.953H171.168V98.8412Z" fill="#B7BAC3"/>
+    <path d="M120.076 0H136.233V124.953H120.076V0Z" fill="#B7BAC3"/>
+    <path d="M50.7057 0H69.8031L120.075 124.953H101.366L50.7057 0Z" fill="#B7BAC3"/>
+    <path d="M18.7097 124.953H0L43.2988 17.4076L52.802 40.8597L18.7097 124.953Z" fill="#007993"/>
+    <path d="M89.4919 90.9724H47.0362L53.6905 74.5096H89.4919V90.9724Z" fill="#B7BAC3"/>
+  </g>
 </svg>

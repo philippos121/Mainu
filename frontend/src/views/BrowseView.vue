@@ -312,7 +312,13 @@ async function triggerScan() {
 
     const { data } = await api.post('/law-changes/scan', null, { params, timeout: 300000 })
     scanResult.value = { type: data.errors?.length ? 'warning' : 'success', message: data.message }
-    // Refresh the list
+    // Clear search filters so the user sees fresh results
+    search.value = ''
+    selectedCategory.value = ''
+    selectedSourceType.value = ''
+    dateFrom.value = ''
+    dateTo.value = ''
+    page.value = 1
     await fetchChanges()
   } catch (e) {
     scanResult.value = { type: 'error', message: 'Scan fehlgeschlagen: ' + (e.response?.data?.detail || e.message) }

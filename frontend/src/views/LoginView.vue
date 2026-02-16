@@ -4,9 +4,8 @@
       <v-col cols="12" sm="8" md="5" lg="4" xl="3">
         <!-- Logo -->
         <div class="text-center mb-8">
-          <img :src="logoUrl" alt="LexWatch" class="login-logo" />
-          <h1 class="text-h3 font-weight-bold mt-4">LexWatch</h1>
-          <p class="text-body-1 text-medium-emphasis mt-2">
+          <img :src="logoUrl" alt="ASSOCIATE" class="login-logo" />
+          <p class="text-body-1 text-medium-emphasis mt-4">
             Österreichischer Rechtsänderungs-Tracker
           </p>
         </div>
@@ -97,9 +96,9 @@ async function handleLogin() {
 }
 
 .login-logo {
-  height: 80px;
-  width: 80px;
-  filter: drop-shadow(0 4px 24px rgba(92, 107, 192, 0.4));
+  height: auto;
+  width: min(280px, 80%);
+  filter: drop-shadow(0 4px 24px rgba(0, 121, 147, 0.3));
 }
 
 .card-glass {
