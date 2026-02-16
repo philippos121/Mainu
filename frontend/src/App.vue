@@ -5,7 +5,9 @@
       <v-app-bar-nav-icon @click="drawer = !drawer" class="d-lg-none" />
 
       <v-toolbar-title class="d-flex align-center">
-        <img :src="logoUrl" alt="ASSOCIATE" class="app-logo" />
+        <img :src="logoUrl" alt="ASSOCIATE" class="app-logo mr-3" />
+        <span class="text-h6 font-weight-bold">LexWatch</span>
+        <v-chip size="x-small" color="accent" variant="flat" class="ml-2">AT</v-chip>
       </v-toolbar-title>
 
       <v-spacer />

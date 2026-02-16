@@ -5,7 +5,11 @@
         <!-- Logo -->
         <div class="text-center mb-8">
           <img :src="logoUrl" alt="ASSOCIATE" class="login-logo" />
-          <p class="text-body-1 text-medium-emphasis mt-4">
+          <h1 class="text-h4 font-weight-bold mt-4">
+            LexWatch
+            <v-chip size="x-small" color="accent" variant="flat" class="ml-1">AT</v-chip>
+          </h1>
+          <p class="text-body-1 text-medium-emphasis mt-2">
             Österreichischer Rechtsänderungs-Tracker
           </p>
         </div>

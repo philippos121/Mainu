@@ -312,12 +312,19 @@ async function triggerScan() {
 
     const { data } = await api.post('/law-changes/scan', null, { params, timeout: 300000 })
     scanResult.value = { type: data.errors?.length ? 'warning' : 'success', message: data.message }
-    // Clear search filters so the user sees fresh results
-    search.value = ''
-    selectedCategory.value = ''
-    selectedSourceType.value = ''
-    dateFrom.value = ''
-    dateTo.value = ''
+    // Apply scan parameters as browse filters so only relevant results show
+    search.value = scanKeywords.value || ''
+    dateFrom.value = scanDateFrom.value
+    dateTo.value = scanDateTo.value
+    // Map scan source type to browse source type filter
+    if (scanSourceType.value === 'laws') {
+      selectedSourceType.value = 'Bundesrecht'
+    } else if (scanSourceType.value === 'rulings') {
+      selectedSourceType.value = 'Judikatur'
+    } else {
+      selectedSourceType.value = ''
+    }
+    selectedCategory.value = scanCategories.value.length === 1 ? scanCategories.value[0] : ''
     page.value = 1
     await fetchChanges()
   } catch (e) {

@@ -4,7 +4,11 @@
       <v-col cols="12" sm="8" md="5" lg="4" xl="3">
         <div class="text-center mb-8">
           <img :src="logoUrl" alt="ASSOCIATE" class="register-logo" />
-          <p class="text-body-1 text-medium-emphasis mt-4">
+          <h1 class="text-h4 font-weight-bold mt-4">
+            LexWatch
+            <v-chip size="x-small" color="accent" variant="flat" class="ml-1">AT</v-chip>
+          </h1>
+          <p class="text-body-1 text-medium-emphasis mt-2">
             Konto erstellen
           </p>
         </div>
