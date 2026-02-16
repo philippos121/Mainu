@@ -201,9 +201,12 @@ async def _store_change(session: AsyncSession, change_data: dict) -> int | None:
         return None
 
     try:
-        # Check if already exists
+        # Check if already exists (scheduler entries have user_id=NULL)
         existing = await session.execute(
-            select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
+            select(LawChange).where(
+                LawChange.ris_doc_id == ris_doc_id,
+                LawChange.user_id.is_(None),
+            )
         )
         if existing.scalar_one_or_none():
             return None

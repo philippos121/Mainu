@@ -61,7 +61,7 @@ async def list_law_changes(
     db: AsyncSession = Depends(get_db),
 ):
     """List law changes with pagination and filters."""
-    query = select(LawChange)
+    query = select(LawChange).where(LawChange.user_id == user.id)
 
     if search:
         query = query.where(
@@ -107,7 +107,7 @@ async def my_feed(
     db: AsyncSession = Depends(get_db),
 ):
     """Get law changes matching the current user's interests."""
-    query = select(LawChange)
+    query = select(LawChange).where(LawChange.user_id == user.id)
 
     # Filter by user interests if they have any
     if user.interests or user.keywords:
@@ -216,7 +216,9 @@ async def get_law_change(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single law change by ID."""
-    result = await db.execute(select(LawChange).where(LawChange.id == change_id))
+    result = await db.execute(
+        select(LawChange).where(LawChange.id == change_id, LawChange.user_id == user.id)
+    )
     change = result.scalar_one_or_none()
     if not change:
         raise HTTPException(status_code=404, detail="Rechtsänderung nicht gefunden.")
@@ -286,7 +288,7 @@ async def trigger_scan(
                 scanned_total += len(changes)
                 for change_data in changes:
                     try:
-                        entry_id = await _store_without_ai(db, change_data)
+                        entry_id = await _store_without_ai(db, change_data, user_id=user.id)
                         if entry_id is not None:
                             created_bund += 1
                             new_entry_ids.append(entry_id)
@@ -319,7 +321,7 @@ async def trigger_scan(
                 scanned_total += len(changes)
                 for change_data in changes:
                     try:
-                        entry_id = await _store_without_ai(db, change_data)
+                        entry_id = await _store_without_ai(db, change_data, user_id=user.id)
                         if entry_id is not None:
                             created_land += 1
                             new_entry_ids.append(entry_id)
@@ -350,7 +352,7 @@ async def trigger_scan(
                 scanned_total += len(rulings)
                 for ruling_data in rulings:
                     try:
-                        entry_id = await _store_without_ai(db, ruling_data)
+                        entry_id = await _store_without_ai(db, ruling_data, user_id=user.id)
                         if entry_id is not None:
                             created_rulings += 1
                             new_entry_ids.append(entry_id)
@@ -396,6 +398,7 @@ async def trigger_scan(
 async def _store_without_ai(
     db: AsyncSession,
     change_data: dict,
+    user_id: int | None = None,
 ) -> int | None:
     """Store a change without AI summary. Returns the new entry's ID, or None if duplicate."""
     ris_doc_id = change_data.get("ris_doc_id", "")
@@ -403,10 +406,13 @@ async def _store_without_ai(
         logger.warning("Skipping entry without ris_doc_id")
         return None
 
-    # Check for duplicate
-    existing = await db.execute(
-        select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
-    )
+    # Check for duplicate per user
+    dup_query = select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
+    if user_id is not None:
+        dup_query = dup_query.where(LawChange.user_id == user_id)
+    else:
+        dup_query = dup_query.where(LawChange.user_id.is_(None))
+    existing = await db.execute(dup_query)
     if existing.scalar_one_or_none():
         return None
 
@@ -428,6 +434,7 @@ async def _store_without_ai(
 
     law_change = LawChange(
         ris_doc_id=_s(ris_doc_id)[:255],
+        user_id=user_id,
         title=_s(change_data.get("title", "")),
         short_title=short_title,
         law_type=law_type,

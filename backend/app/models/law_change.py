@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,9 +9,15 @@ from app.core.database import Base
 
 class LawChange(Base):
     __tablename__ = "law_changes"
+    __table_args__ = (
+        UniqueConstraint("ris_doc_id", "user_id", name="uq_law_change_per_user"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    ris_doc_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    ris_doc_id: Mapped[str] = mapped_column(String(255), index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(Text)
     short_title: Mapped[str] = mapped_column(String(500), default="")
     law_type: Mapped[str] = mapped_column(String(100))  # Bundesrecht, Landesrecht, etc.
