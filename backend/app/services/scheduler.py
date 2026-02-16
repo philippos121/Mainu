@@ -1,5 +1,6 @@
 """Background scheduler for daily RIS scanning and notification generation."""
 
+import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
 
@@ -39,20 +40,32 @@ async def scan_law_changes():
     # Duplicates are filtered by ris_doc_id, so a broad lookback is safe.
     law_lookback = date.today() - timedelta(days=90)
 
+    new_ids: list[int] = []
+
     async with async_session() as session:
         # 1) Scan Bundesrecht (federal laws)
-        bund_count = await _scan_bundesrecht(session, law_lookback, today)
+        bund_ids = await _scan_bundesrecht(session, law_lookback, today)
 
         # 2) Scan Landesrecht (state laws)
-        land_count = await _scan_landesrecht(session, law_lookback, today)
+        land_ids = await _scan_landesrecht(session, law_lookback, today)
 
         # 3) Scan Judikatur (court rulings) from all court sources
-        ruling_count = await _scan_judikatur(session, yesterday, today)
+        ruling_ids = await _scan_judikatur(session, yesterday, today)
 
-        # 4) Generate notifications for users
+        new_ids = bund_ids + land_ids + ruling_ids
+
+    # 4) Generate AI summaries in parallel batches
+    if new_ids:
+        await _generate_ai_summaries(new_ids)
+
+    # 5) Generate notifications for users
+    async with async_session() as session:
         await _generate_user_notifications(session)
 
-    logger.info(f"Daily RIS scan completed: {bund_count} Bundesrecht, {land_count} Landesrecht, {ruling_count} Judikatur imported.")
+    logger.info(
+        f"Daily RIS scan completed: {len(bund_ids)} Bundesrecht, "
+        f"{len(land_ids)} Landesrecht, {len(ruling_ids)} Judikatur imported."
+    )
 
 
 async def _scan_bundesrecht(
@@ -60,9 +73,9 @@ async def _scan_bundesrecht(
     date_from: date,
     date_to: date,
     keywords: str = "",
-) -> int:
-    """Scan Bundesrecht and store new entries. Returns count of new records."""
-    created = 0
+) -> list[int]:
+    """Scan Bundesrecht and store new entries. Returns IDs of new records."""
+    new_ids: list[int] = []
     scanned = 0
     for page in range(1, 11):  # Up to 10 pages (1000 results)
         try:
@@ -80,15 +93,16 @@ async def _scan_bundesrecht(
 
             scanned += len(changes)
             for change_data in changes:
-                if await _store_change(session, change_data):
-                    created += 1
+                entry_id = await _store_change(session, change_data)
+                if entry_id is not None:
+                    new_ids.append(entry_id)
 
             await session.commit()
         except Exception as e:
             logger.error(f"Error scanning Bundesrecht page {page}: {e}")
 
-    logger.info(f"Bundesrecht scan: {created} new / {scanned} scanned ({scanned - created} duplicates)")
-    return created
+    logger.info(f"Bundesrecht scan: {len(new_ids)} new / {scanned} scanned ({scanned - len(new_ids)} duplicates)")
+    return new_ids
 
 
 async def _scan_landesrecht(
@@ -96,9 +110,9 @@ async def _scan_landesrecht(
     date_from: date,
     date_to: date,
     keywords: str = "",
-) -> int:
-    """Scan Landesrecht and store new entries. Returns count of new records."""
-    created = 0
+) -> list[int]:
+    """Scan Landesrecht and store new entries. Returns IDs of new records."""
+    new_ids: list[int] = []
     scanned = 0
     for page in range(1, 6):  # Up to 5 pages (500 results)
         try:
@@ -116,15 +130,16 @@ async def _scan_landesrecht(
 
             scanned += len(changes)
             for change_data in changes:
-                if await _store_change(session, change_data):
-                    created += 1
+                entry_id = await _store_change(session, change_data)
+                if entry_id is not None:
+                    new_ids.append(entry_id)
 
             await session.commit()
         except Exception as e:
             logger.error(f"Error scanning Landesrecht page {page}: {e}")
 
-    logger.info(f"Landesrecht scan: {created} new / {scanned} scanned ({scanned - created} duplicates)")
-    return created
+    logger.info(f"Landesrecht scan: {len(new_ids)} new / {scanned} scanned ({scanned - len(new_ids)} duplicates)")
+    return new_ids
 
 
 async def _scan_judikatur(
@@ -133,10 +148,10 @@ async def _scan_judikatur(
     date_to: date,
     keywords: str = "",
     court_sources: list[str] | None = None,
-) -> int:
-    """Scan Judikatur from specified (or all) court sources. Returns count of new records."""
+) -> list[int]:
+    """Scan Judikatur from specified (or all) court sources. Returns IDs of new records."""
     sources = court_sources or list(COURT_SOURCES.keys())
-    created = 0
+    new_ids: list[int] = []
     scanned = 0
 
     for source_key in sources:
@@ -158,7 +173,9 @@ async def _scan_judikatur(
 
                 source_scanned += len(rulings)
                 for ruling_data in rulings:
-                    if await _store_change(session, ruling_data):
+                    entry_id = await _store_change(session, ruling_data)
+                    if entry_id is not None:
+                        new_ids.append(entry_id)
                         source_created += 1
 
                 await session.commit()
@@ -167,19 +184,21 @@ async def _scan_judikatur(
 
         if source_scanned > 0:
             logger.info(f"  {source_key}: {source_created} new / {source_scanned} scanned")
-        created += source_created
         scanned += source_scanned
 
-    logger.info(f"Judikatur scan total: {created} new / {scanned} scanned ({scanned - created} duplicates)")
-    return created
+    logger.info(f"Judikatur scan total: {len(new_ids)} new / {scanned} scanned ({scanned - len(new_ids)} duplicates)")
+    return new_ids
 
 
-async def _store_change(session: AsyncSession, change_data: dict) -> bool:
-    """Store a single law change / court ruling. Returns True if new record created."""
+async def _store_change(session: AsyncSession, change_data: dict) -> int | None:
+    """Store a single law change / court ruling WITHOUT AI summary.
+
+    Returns the new entry's ID, or None if duplicate/skipped.
+    """
     ris_doc_id = change_data.get("ris_doc_id", "")
     if not ris_doc_id:
         logger.warning("Skipping entry without ris_doc_id")
-        return False
+        return None
 
     try:
         # Check if already exists
@@ -187,19 +206,7 @@ async def _store_change(session: AsyncSession, change_data: dict) -> bool:
             select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
         )
         if existing.scalar_one_or_none():
-            return False
-
-        # Generate AI summary (non-blocking)
-        try:
-            ai_summary = await generate_law_summary(
-                title=change_data.get("title", ""),
-                content_snippet=change_data.get("content_snippet", ""),
-                bgbl_number=change_data.get("bgbl_number", ""),
-                categories=change_data.get("categories", []),
-            )
-        except Exception as e:
-            logger.warning(f"AI summary failed for {ris_doc_id}: {e}")
-            ai_summary = ""
+            return None
 
         law_change = LawChange(
             ris_doc_id=ris_doc_id,
@@ -215,15 +222,57 @@ async def _store_change(session: AsyncSession, change_data: dict) -> bool:
             content_snippet=change_data.get("content_snippet", ""),
             court_name=change_data.get("court_name"),
             case_number=change_data.get("case_number"),
-            ai_summary=ai_summary,
-            ai_summary_generated_at=datetime.now(timezone.utc) if ai_summary else None,
+            ai_summary="",
+            ai_summary_generated_at=None,
         )
         session.add(law_change)
+        await session.flush()
         logger.info(f"NEW: {ris_doc_id} - {change_data.get('short_title', '')[:50]} ({change_data.get('law_type', '')})")
-        return True
+        return law_change.id
     except Exception as e:
         logger.error(f"Error storing {ris_doc_id}: {e}")
-        return False
+        return None
+
+
+async def _generate_ai_summaries(entry_ids: list[int]):
+    """Generate AI summaries in parallel batches for newly stored entries."""
+    BATCH_SIZE = 10  # concurrent requests
+
+    logger.info(f"Generating AI summaries for {len(entry_ids)} entries...")
+    generated = 0
+
+    async with async_session() as session:
+        for i in range(0, len(entry_ids), BATCH_SIZE):
+            batch_ids = entry_ids[i : i + BATCH_SIZE]
+
+            result = await session.execute(
+                select(LawChange).where(LawChange.id.in_(batch_ids))
+            )
+            entries = list(result.scalars().all())
+
+            tasks = [
+                generate_law_summary(
+                    title=entry.title,
+                    content_snippet=entry.content_snippet or "",
+                    bgbl_number=entry.bgbl_number or "",
+                    categories=entry.categories or [],
+                )
+                for entry in entries
+            ]
+            summaries = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for entry, summary in zip(entries, summaries):
+                if isinstance(summary, Exception):
+                    logger.warning(f"AI summary failed for {entry.ris_doc_id}: {summary}")
+                    continue
+                if summary:
+                    entry.ai_summary = summary
+                    entry.ai_summary_generated_at = datetime.now(timezone.utc)
+                    generated += 1
+
+            await session.commit()
+
+    logger.info(f"AI summaries done: {generated}/{len(entry_ids)} generated")
 
 
 async def _generate_user_notifications(session: AsyncSession):

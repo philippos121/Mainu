@@ -1,10 +1,11 @@
 """Law change routes — browse, search, get details, scan, debug."""
 
+import asyncio
 import logging
 import traceback
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -224,6 +225,7 @@ async def get_law_change(
 
 @router.post("/scan")
 async def trigger_scan(
+    background_tasks: BackgroundTasks,
     date_from: date = Query(default=None),
     date_to: date = Query(default=None),
     keywords: str = Query(""),
@@ -231,7 +233,11 @@ async def trigger_scan(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Manually trigger a scan of the RIS API (Bundesrecht + Landesrecht + Judikatur)."""
+    """Manually trigger a scan of the RIS API (Bundesrecht + Landesrecht + Judikatur).
+
+    Stores entries immediately WITHOUT AI summaries to avoid timeouts.
+    AI summaries are generated in the background afterward.
+    """
     if date_from is None:
         date_from = date.today() - timedelta(days=90)
     if date_to is None:
@@ -243,6 +249,7 @@ async def trigger_scan(
     errors = []
     scanned_total = 0
     duplicates_total = 0
+    new_entry_ids: list[int] = []
 
     # Scan Bundesrecht (Federal Law)
     if source_type in ("all", "laws"):
@@ -262,13 +269,11 @@ async def trigger_scan(
             scanned_total += len(changes)
             for change_data in changes:
                 try:
-                    # Don't pass date range — ImRisSeit already filters on the API side.
-                    # The post-filter would incorrectly drop results because Aenderungsdatum
-                    # (law change date) differs from "last modified in RIS".
-                    count = await _store_and_count(db, change_data)
-                    if count == 1:
+                    entry_id = await _store_without_ai(db, change_data)
+                    if entry_id is not None:
                         created_bund += 1
-                    elif count == 0:
+                        new_entry_ids.append(entry_id)
+                    elif entry_id is None:
                         duplicates_total += 1
                 except Exception as e:
                     err_msg = f"Bundesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
@@ -295,10 +300,11 @@ async def trigger_scan(
             scanned_total += len(changes)
             for change_data in changes:
                 try:
-                    count = await _store_and_count(db, change_data)
-                    if count == 1:
+                    entry_id = await _store_without_ai(db, change_data)
+                    if entry_id is not None:
                         created_land += 1
-                    elif count == 0:
+                        new_entry_ids.append(entry_id)
+                    elif entry_id is None:
                         duplicates_total += 1
                 except Exception as e:
                     err_msg = f"Landesrecht store error for {change_data.get('ris_doc_id', '?')}: {e}"
@@ -325,10 +331,11 @@ async def trigger_scan(
                 scanned_total += len(rulings)
                 for ruling_data in rulings:
                     try:
-                        count = await _store_and_count(db, ruling_data)
-                        if count == 1:
+                        entry_id = await _store_without_ai(db, ruling_data)
+                        if entry_id is not None:
                             created_rulings += 1
-                        elif count == 0:
+                            new_entry_ids.append(entry_id)
+                        elif entry_id is None:
                             duplicates_total += 1
                     except Exception as e:
                         err_msg = f"Judikatur store error for {ruling_data.get('ris_doc_id', '?')}: {e}"
@@ -348,6 +355,11 @@ async def trigger_scan(
     if errors:
         message += f". {len(errors)} Fehler aufgetreten."
 
+    # Generate AI summaries in the background (non-blocking)
+    if new_entry_ids:
+        background_tasks.add_task(_generate_ai_summaries_bg, new_entry_ids)
+        message += f" KI-Zusammenfassungen werden im Hintergrund erstellt ({len(new_entry_ids)} Einträge)."
+
     return {
         "message": message,
         "bundesrecht_created": created_bund,
@@ -362,46 +374,22 @@ async def trigger_scan(
     }
 
 
-async def _store_and_count(
+async def _store_without_ai(
     db: AsyncSession,
     change_data: dict,
-    date_from: date | None = None,
-    date_to: date | None = None,
-) -> int:
-    """Store a change if new; return 1 if created, 0 if duplicate, -1 if filtered out."""
+) -> int | None:
+    """Store a change without AI summary. Returns the new entry's ID, or None if duplicate."""
     ris_doc_id = change_data.get("ris_doc_id", "")
     if not ris_doc_id:
         logger.warning("Skipping entry without ris_doc_id")
-        return -1
-
-    # Post-filter by date range if provided (API may not support exact date filtering)
-    if date_from or date_to:
-        change_date = change_data.get("change_date")
-        if change_date:
-            cd = change_date.date() if isinstance(change_date, datetime) else change_date
-            if date_from and cd < date_from:
-                return -1
-            if date_to and cd > date_to:
-                return -1
+        return None
 
     # Check for duplicate
     existing = await db.execute(
         select(LawChange).where(LawChange.ris_doc_id == ris_doc_id)
     )
     if existing.scalar_one_or_none():
-        return 0
-
-    # Generate AI summary (non-blocking: store even if this fails)
-    try:
-        ai_summary = await generate_law_summary(
-            title=change_data["title"],
-            content_snippet=change_data.get("content_snippet", ""),
-            bgbl_number=change_data.get("bgbl_number", ""),
-            categories=change_data.get("categories", []),
-        )
-    except Exception as e:
-        logger.warning(f"AI summary failed for {ris_doc_id}: {e}")
-        ai_summary = ""
+        return None
 
     law_change = LawChange(
         ris_doc_id=ris_doc_id,
@@ -417,12 +405,57 @@ async def _store_and_count(
         content_snippet=change_data.get("content_snippet", ""),
         court_name=change_data.get("court_name"),
         case_number=change_data.get("case_number"),
-        ai_summary=ai_summary,
-        ai_summary_generated_at=datetime.now(timezone.utc) if ai_summary else None,
+        ai_summary="",
+        ai_summary_generated_at=None,
     )
     db.add(law_change)
+    await db.flush()  # Assign ID without committing
     logger.info(f"NEW: {ris_doc_id} — {change_data.get('short_title', '')[:60]} ({change_data.get('law_type', '')})")
-    return 1
+    return law_change.id
+
+
+async def _generate_ai_summaries_bg(entry_ids: list[int]):
+    """Background task: generate AI summaries in parallel for newly stored entries."""
+    from app.core.database import async_session
+
+    BATCH_SIZE = 10  # concurrent OpenAI requests at a time
+
+    logger.info(f"Background AI summary generation started for {len(entry_ids)} entries")
+    generated = 0
+
+    async with async_session() as db:
+        for i in range(0, len(entry_ids), BATCH_SIZE):
+            batch_ids = entry_ids[i : i + BATCH_SIZE]
+
+            result = await db.execute(
+                select(LawChange).where(LawChange.id.in_(batch_ids))
+            )
+            entries = list(result.scalars().all())
+
+            # Generate summaries in parallel
+            tasks = [
+                generate_law_summary(
+                    title=entry.title,
+                    content_snippet=entry.content_snippet or "",
+                    bgbl_number=entry.bgbl_number or "",
+                    categories=entry.categories or [],
+                )
+                for entry in entries
+            ]
+            summaries = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for entry, summary in zip(entries, summaries):
+                if isinstance(summary, Exception):
+                    logger.warning(f"AI summary failed for {entry.ris_doc_id}: {summary}")
+                    continue
+                if summary:
+                    entry.ai_summary = summary
+                    entry.ai_summary_generated_at = datetime.now(timezone.utc)
+                    generated += 1
+
+            await db.commit()
+
+    logger.info(f"Background AI summary generation done: {generated}/{len(entry_ids)} generated")
 
 
 # ──────────────────────────────────────

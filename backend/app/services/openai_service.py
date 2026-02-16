@@ -50,7 +50,7 @@ Antworte auf Deutsch."""
     try:
         client = _get_client()
         response = await client.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-4.1-nano",
             messages=[
                 {
                     "role": "system",
@@ -90,7 +90,7 @@ Formatiere die Zusammenfassung übersichtlich mit Aufzählungspunkten. Antworte 
     try:
         client = _get_client()
         response = await client.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-4.1-nano",
             messages=[
                 {
                     "role": "system",
