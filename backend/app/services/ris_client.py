@@ -234,11 +234,20 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
             data_keys = list(first.get("Data", {}).keys())
             meta_keys = list(first.get("Data", {}).get("Metadaten", {}).keys())
             logger.info(f"First doc Data keys: {data_keys}, Metadaten keys: {meta_keys}")
-            # Log deeper structure
+            # Log deeper structure (including BrKons/LrKons sub-dicts)
             for mk in meta_keys:
                 child = first.get("Data", {}).get("Metadaten", {}).get(mk, {})
                 if isinstance(child, dict):
-                    logger.info(f"  Metadaten.{mk} keys: {list(child.keys())[:15]}")
+                    child_keys = list(child.keys())[:15]
+                    logger.info(f"  Metadaten.{mk} keys: {child_keys}")
+                    for ck in ("BrKons", "LrKons"):
+                        sub = child.get(ck)
+                        if isinstance(sub, dict):
+                            logger.info(f"    {mk}.{ck} keys: {list(sub.keys())[:15]}")
+            # Log first parsed result for verification
+            first_m = _collect_metadata(first.get("Data", {}).get("Metadaten", {}))
+            logger.info(f"  Merged metadata keys: {list(first_m.keys())[:20]}")
+            logger.info(f"  ID={first_m.get('ID','?')}, Kurztitel={first_m.get('Kurztitel','?')}")
 
         for i, ref in enumerate(references):
             try:
@@ -263,15 +272,15 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
 def _collect_metadata(metadata: dict) -> dict:
     """Merge all metadata sections into a single flat dict.
 
-    The v2.6 API returns metadata split into sections:
+    Actual v2.6 API structure (confirmed from live logs):
       Metadaten:
-        Technisch: {Dokumentnummer, DokumentUrl, Applikation, ...}
-        Allgemein: {Kurztitel, Langtitel, Typ, Indexe, Schlagworte, ...}
-        Bundesrecht: {Aenderungsdatum, Inkrafttretensdatum, Kundmachungsorgan, ...}
-        (or Landesrecht: {...})
+        Technisch: {ID, Applikation, Organ, ImportTimestamp}
+        Allgemein: {Veroeffentlicht, Geaendert, DokumentUrl}
+        Bundesrecht: {Kurztitel, Eli, BrKons: {Langtitel, Aenderungsdatum, ...}}
+        (or Landesrecht: {Kurztitel, Titel, Bundesland, LrKons: {...}})
 
-    We merge all sections so field access is simple. Later sections
-    override earlier ones (Bundesrecht-specific fields take precedence).
+    We merge all sections (including BrKons/LrKons sub-dicts) so field
+    access is simple. Later sections override earlier ones.
     """
     merged: dict = {}
 
@@ -302,9 +311,10 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
     metadata = data_entry.get("Metadaten", {})
     m = _collect_metadata(metadata)
 
-    # Dokumentnummer can be in: m (from Technisch), Data, or ref top-level
+    # v2.6 uses "ID" in Technisch section; older formats may use "Dokumentnummer"
     doc_id = (
-        m.get("Dokumentnummer", "")
+        m.get("ID", "")
+        or m.get("Dokumentnummer", "")
         or data_entry.get("Dokumentnummer", "")
         or ref.get("Dokumentnummer", "")
     )
@@ -313,6 +323,7 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
 
     title = (
         m.get("Langtitel", "")
+        or m.get("Titel", "")
         or m.get("Kurztitel", "")
         or data_entry.get("Kurztitel", "")
         or doc_id
@@ -340,12 +351,18 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
     if isinstance(bgbl, dict):
         bgbl = str(bgbl)
 
-    # Dates
+    # Dates — v2.6: Aenderungsdatum in BrKons, Geaendert/Veroeffentlicht in Allgemein
     change_date_str = (
         m.get("Aenderungsdatum", "") or m.get("Inkrafttretensdatum", "")
+        or m.get("Geaendert", "")
         or m.get("Unterzeichnungsdatum", "") or data_entry.get("Aenderungsdatum", "") or ""
     )
-    pub_date_str = m.get("Veroeffentlichungsdatum", "") or data_entry.get("Veroeffentlichungsdatum", "") or change_date_str
+    pub_date_str = (
+        m.get("Veroeffentlicht", "")
+        or m.get("Veroeffentlichungsdatum", "")
+        or data_entry.get("Veroeffentlichungsdatum", "")
+        or change_date_str
+    )
 
     # URL — check multiple locations
     doc_url = (
@@ -450,7 +467,8 @@ def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, 
     m = _collect_jud_metadata(metadata, applikation)
 
     doc_id = (
-        m.get("Dokumentnummer", "")
+        m.get("ID", "")
+        or m.get("Dokumentnummer", "")
         or data_entry.get("Dokumentnummer", "")
         or ref.get("Dokumentnummer", "")
     )

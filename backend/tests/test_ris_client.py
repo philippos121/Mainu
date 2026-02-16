@@ -26,69 +26,84 @@ SAMPLE_V26_RESPONSE = {
                     "Data": {
                         "Metadaten": {
                             "Technisch": {
-                                "Dokumentnummer": "NOR40262001",
+                                "ID": "NOR40262001",
+                                "Applikation": "BrKons",
+                                "Organ": "BMI",
+                                "ImportTimestamp": "2024-06-15T10:00:00",
+                            },
+                            "Allgemein": {
+                                "Veroeffentlicht": "2024-06-01T00:00:00",
+                                "Geaendert": "2024-06-15T00:00:00",
                                 "DokumentUrl": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BrKons&Dokumentnummer=NOR40262001",
-                                "Applikation": "BrKons",
                             },
-                            "Allgemein": {
+                            "Bundesrecht": {
                                 "Kurztitel": "MeldeG-DVO",
-                                "Langtitel": "Verordnung des Bundesministers für Inneres zur Durchführung des Meldegesetzes 1991 (Meldegesetz-Durchführungsverordnung – MeldeG-DVO)",
-                                "Typ": "V",
-                                "Indexe": "03/04 Innere Angelegenheiten; 01/01 Allgemeines Bürgerrecht",
-                                "Schlagworte": "Meldepflicht, Unterkunft, Hauptwohnsitz",
-                                "ArtikelParagraphAnlage": "§ 1 Abs. 1",
-                            },
-                            "Bundesrecht": {
-                                "Aenderungsdatum": "2024-06-01T00:00:00",
-                                "Inkrafttretensdatum": "2024-07-01T00:00:00",
-                                "Aenderung": "BGBl. II Nr. 155/2024",
-                                "Kundmachungsorgan": "BGBl. Nr. 468/1991",
+                                "Eli": "eli/bund/bgbl/1991/468",
+                                "BrKons": {
+                                    "Langtitel": "Verordnung des Bundesministers für Inneres zur Durchführung des Meldegesetzes 1991",
+                                    "Aenderungsdatum": "2024-06-01T00:00:00",
+                                    "Inkrafttretensdatum": "2024-07-01T00:00:00",
+                                    "Aenderung": "BGBl. II Nr. 155/2024",
+                                    "Typ": "V",
+                                    "Indexe": "03/04 Innere Angelegenheiten; 01/01 Allgemeines Bürgerrecht",
+                                    "Schlagworte": "Meldepflicht, Unterkunft, Hauptwohnsitz",
+                                    "ArtikelParagraphAnlage": "§ 1 Abs. 1",
+                                },
                             },
                         },
+                        "Dokumentliste": {},
                     },
                 },
                 {
                     "Data": {
                         "Metadaten": {
                             "Technisch": {
-                                "Dokumentnummer": "NOR40260002",
+                                "ID": "NOR40260002",
+                                "Applikation": "BrKons",
+                            },
+                            "Allgemein": {
+                                "Geaendert": "2023-02-01T00:00:00",
                                 "DokumentUrl": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BrKons&Dokumentnummer=NOR40260002",
-                                "Applikation": "BrKons",
-                            },
-                            "Allgemein": {
-                                "Kurztitel": "ABGB",
-                                "Langtitel": "Allgemeines bürgerliches Gesetzbuch",
-                                "Typ": "BG",
-                                "Indexe": "22/01 Zivilrecht",
-                                "Schlagworte": "Zivilrecht, Vertragsrecht",
                             },
                             "Bundesrecht": {
-                                "Aenderungsdatum": "2023-01-01T00:00:00",
-                                "Aenderung": "BGBl. I Nr. 200/2023",
+                                "Kurztitel": "ABGB",
+                                "BrKons": {
+                                    "Langtitel": "Allgemeines bürgerliches Gesetzbuch",
+                                    "Aenderungsdatum": "2023-01-01T00:00:00",
+                                    "Aenderung": "BGBl. I Nr. 200/2023",
+                                    "Typ": "BG",
+                                    "Indexe": "22/01 Zivilrecht",
+                                    "Schlagworte": "Zivilrecht, Vertragsrecht",
+                                },
                             },
                         },
+                        "Dokumentliste": {},
                     },
                 },
                 {
                     "Data": {
                         "Metadaten": {
                             "Technisch": {
-                                "Dokumentnummer": "NOR40261003",
-                                "DokumentUrl": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BrKons&Dokumentnummer=NOR40261003",
+                                "ID": "NOR40261003",
                                 "Applikation": "BrKons",
                             },
                             "Allgemein": {
-                                "Kurztitel": "StGB",
-                                "Langtitel": "Strafgesetzbuch",
-                                "Typ": "BG",
-                                "Indexe": "21/01 Strafrecht allgemein",
-                                "Schlagworte": "Strafrecht, Betrug, Cyberkriminalität",
+                                "Geaendert": "2024-03-20T00:00:00",
+                                "DokumentUrl": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BrKons&Dokumentnummer=NOR40261003",
                             },
                             "Bundesrecht": {
-                                "Inkrafttretensdatum": "2024-03-15T00:00:00",
-                                "Aenderung": "BGBl. I Nr. 50/2024",
+                                "Kurztitel": "StGB",
+                                "BrKons": {
+                                    "Langtitel": "Strafgesetzbuch",
+                                    "Inkrafttretensdatum": "2024-03-15T00:00:00",
+                                    "Aenderung": "BGBl. I Nr. 50/2024",
+                                    "Typ": "BG",
+                                    "Indexe": "21/01 Strafrecht allgemein",
+                                    "Schlagworte": "Strafrecht, Betrug, Cyberkriminalität",
+                                },
                             },
                         },
+                        "Dokumentliste": {},
                     },
                 },
             ]
@@ -182,8 +197,8 @@ class TestCollectMetadata:
         """Metadaten with Technisch/Allgemein/Bundesrecht sections."""
         meta = SAMPLE_V26_RESPONSE["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"][0]["Data"]["Metadaten"]
         m = _collect_metadata(meta)
-        # From Technisch
-        assert m.get("Dokumentnummer") == "NOR40262001"
+        # From Technisch (v2.6 uses "ID", not "Dokumentnummer")
+        assert m.get("ID") == "NOR40262001"
         # From Allgemein
         assert m.get("Kurztitel") == "MeldeG-DVO"
         assert "Meldepflicht" in m.get("Schlagworte", "")
