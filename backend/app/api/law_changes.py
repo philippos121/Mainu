@@ -233,6 +233,7 @@ async def trigger_scan(
     keywords: str = Query(""),
     source_type: str = Query("all", description="Was scannen: 'laws', 'rulings', oder 'all'"),
     categories: str = Query("", description="Komma-getrennte Rechtsgebiets-Slugs, z.B. 'strafrecht,zivilrecht'"),
+    court_sources: str = Query("", description="Komma-getrennte Gerichts-Keys, z.B. 'justiz,vfgh'. Leer = alle."),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -339,10 +340,15 @@ async def trigger_scan(
                 await db.commit()
         logger.info(f"Landesrecht: {created_land} new entries stored")
 
-    # Scan Judikatur (Court Rulings - all court sources)
+    # Scan Judikatur (Court Rulings - selected or all court sources)
     if source_type in ("all", "rulings"):
-        logger.info(f"Scanning Judikatur from {date_from} to {date_to}")
-        for source_key in COURT_SOURCES:
+        # Filter court sources if specified
+        if court_sources:
+            selected_courts = [k.strip() for k in court_sources.split(",") if k.strip() in COURT_SOURCES]
+        else:
+            selected_courts = list(COURT_SOURCES.keys())
+        logger.info(f"Scanning Judikatur from {date_from} to {date_to}, courts={selected_courts}")
+        for source_key in selected_courts:
             for page_num in range(1, 6):
                 raw = await fetch_court_rulings(
                     court_source=source_key,
@@ -502,6 +508,8 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
                     content_snippet=entry.content_snippet or "",
                     bgbl_number=entry.bgbl_number or "",
                     categories=entry.categories or [],
+                    court_name=entry.court_name or "",
+                    case_number=entry.case_number or "",
                 )
                 for entry in worthy_entries
             ]

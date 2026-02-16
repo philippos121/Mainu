@@ -24,43 +24,74 @@ async def generate_law_summary(
     content_snippet: str,
     bgbl_number: str = "",
     categories: list[str] | None = None,
+    court_name: str = "",
+    case_number: str = "",
 ) -> str:
-    """Generate a concise German-language summary of a law change using GPT."""
+    """Generate a concise German-language summary of a law change or court ruling using GPT."""
     if not settings.OPENAI_API_KEY:
         return "KI-Zusammenfassung nicht verfügbar (API-Key fehlt)."
 
-    categories_text = ", ".join(categories) if categories else "Keine Kategorien"
+    categories_text = ", ".join(categories) if categories else ""
+    is_ruling = bool(court_name or case_number)
 
-    prompt = f"""Du bist ein österreichischer Rechtsexperte. Fasse die folgende Rechtsänderung
-klar und verständlich auf Deutsch zusammen. Die Zusammenfassung soll für juristische Laien
-verständlich sein, aber trotzdem präzise.
+    if is_ruling:
+        prompt = f"""Analysiere die folgende gerichtliche Entscheidung und fasse sie
+fachlich-präzise zusammen. Schreibe wie ein wissenschaftlicher Mitarbeiter an einem
+österreichischen Gericht — sachlich, juristisch korrekt, ohne Floskeln.
+
+Gericht: {court_name}
+Geschäftszahl: {case_number}
+Titel/Betreff: {title}
+Schlagworte: {categories_text}
+Entscheidungstext (Auszug): {content_snippet}
+
+Fasse zusammen:
+- Sachverhalt und Kernfrage in 1-2 Sätzen
+- Entscheidung und tragende Begründung des Gerichts
+- Rechtliche Bedeutung / Leitsatz
+
+Beginne NICHT mit „Die Entscheidung betrifft" o.ä. — formuliere abwechslungsreich und
+inhaltlich prägnant. Antworte auf Deutsch, max. 4-5 Sätze."""
+        system_msg = (
+            "Du bist ein erfahrener österreichischer Jurist und wissenschaftlicher Mitarbeiter. "
+            "Du erstellst prägnante, fachlich fundierte Zusammenfassungen von Gerichtsentscheidungen. "
+            "Vermeide Phrasen wie 'Die Änderung betrifft' oder 'Es handelt sich um'. "
+            "Schreibe abwechslungsreich und substanziell."
+        )
+    else:
+        prompt = f"""Analysiere die folgende Rechtsänderung und fasse sie fachlich-präzise zusammen.
+Schreibe wie ein wissenschaftlicher Mitarbeiter in einer Kanzlei — sachlich, juristisch
+korrekt, substanziell.
 
 Titel: {title}
 BGBl-Nummer: {bgbl_number}
-Kategorien/Schlagworte: {categories_text}
-Inhaltsausschnitt: {content_snippet}
+Rechtsgebiet: {categories_text}
+Gesetzestext (Auszug): {content_snippet}
 
-Bitte erstelle:
-1. Eine kurze Zusammenfassung (2-3 Sätze) was sich geändert hat
-2. Wen betrifft diese Änderung?
-3. Ab wann gilt die Änderung?
+Fasse zusammen:
+- Was wird geändert und warum? (materieller Regelungsinhalt)
+- Wer ist betroffen und welche Rechtsfolgen ergeben sich?
+- Inkrafttreten, sofern erkennbar
 
-Antworte auf Deutsch."""
+Beginne NICHT mit „Die Änderung betrifft" o.ä. — formuliere abwechslungsreich und
+inhaltlich prägnant. Antworte auf Deutsch, max. 4-5 Sätze."""
+        system_msg = (
+            "Du bist ein erfahrener österreichischer Jurist und wissenschaftlicher Mitarbeiter. "
+            "Du erstellst prägnante, fachlich fundierte Zusammenfassungen von Gesetzesänderungen. "
+            "Vermeide Phrasen wie 'Die Änderung betrifft' oder 'Es handelt sich um'. "
+            "Schreibe abwechslungsreich und substanziell."
+        )
 
     try:
         client = _get_client()
         response = await client.chat.completions.create(
             model="gpt-4.1-nano",
             messages=[
-                {
-                    "role": "system",
-                    "content": "Du bist ein Experte für österreichisches Recht und erstellst "
-                    "verständliche Zusammenfassungen von Rechtsänderungen.",
-                },
+                {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=500,
-            temperature=0.3,
+            max_tokens=600,
+            temperature=0.5,
         )
         return response.choices[0].message.content or ""
     except Exception as e:

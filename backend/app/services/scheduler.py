@@ -280,6 +280,8 @@ async def _generate_ai_summaries(entry_ids: list[int]):
                     content_snippet=entry.content_snippet or "",
                     bgbl_number=entry.bgbl_number or "",
                     categories=entry.categories or [],
+                    court_name=entry.court_name or "",
+                    case_number=entry.case_number or "",
                 )
                 for entry in entries
             ]

@@ -122,6 +122,7 @@
         </v-col>
         <v-col cols="12" md="3">
           <v-select
+            v-if="scanSourceType !== 'rulings'"
             v-model="scanCategories"
             :items="rechtsgebiete"
             item-title="label"
@@ -134,8 +135,23 @@
             closable-chips
             clearable
             hide-details
-            :disabled="scanSourceType === 'rulings'"
             :placeholder="scanCategories.length === 0 ? 'Alle Gebiete' : ''"
+          />
+          <v-select
+            v-else
+            v-model="scanCourtSources"
+            :items="courtSourceOptions"
+            item-title="label"
+            item-value="key"
+            label="Gerichte"
+            variant="outlined"
+            density="compact"
+            multiple
+            chips
+            closable-chips
+            clearable
+            hide-details
+            :placeholder="scanCourtSources.length === 0 ? 'Alle Gerichte' : ''"
           />
         </v-col>
         <v-col cols="12" md="2">
@@ -161,8 +177,7 @@
         </v-col>
       </v-row>
       <div class="text-caption text-medium-emphasis mt-2">
-        Hinweis: Rechtsgebiete-Filter gilt nur für Gesetze (Bundes-/Landesrecht).
-        Für Gerichtsurteile wird immer alles im Zeitraum gescannt.
+        Rechtsgebiete-Filter gilt für Gesetze. Bei Urteilen wählen Sie die gewünschten Gerichte.
       </div>
       <v-alert v-if="scanResult" :type="scanResult.type" variant="tonal" class="mt-3" closable @click:close="scanResult = null">
         {{ scanResult.message }}
@@ -236,10 +251,19 @@ const scanCategories = ref([])
 const scanKeywords = ref('')
 const scanResult = ref(null)
 
+const scanCourtSources = ref([])
 const scanSourceTypes = [
   { label: 'Alles', value: 'all' },
   { label: 'Nur Gesetze', value: 'laws' },
   { label: 'Nur Urteile', value: 'rulings' },
+]
+
+const courtSourceOptions = [
+  { key: 'justiz', label: 'Ordentliche Gerichte (OGH, OLG, LG, BG)' },
+  { key: 'vfgh', label: 'Verfassungsgerichtshof (VfGH)' },
+  { key: 'vwgh', label: 'Verwaltungsgerichtshof (VwGH)' },
+  { key: 'bvwg', label: 'Bundesverwaltungsgericht (BVwG)' },
+  { key: 'lvwg', label: 'Landesverwaltungsgerichte (LVwG)' },
 ]
 
 // Static Rechtsgebiete for scan filter (matches backend LEGAL_CATEGORIES)
@@ -318,6 +342,7 @@ async function triggerScan() {
       source_type: scanSourceType.value,
     }
     if (scanCategories.value.length > 0) params.categories = scanCategories.value.join(',')
+    if (scanCourtSources.value.length > 0) params.court_sources = scanCourtSources.value.join(',')
     if (scanKeywords.value) params.keywords = scanKeywords.value
 
     const { data } = await api.post('/law-changes/scan', null, { params, timeout: 300000 })
