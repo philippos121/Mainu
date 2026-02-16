@@ -231,8 +231,14 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
         if references:
             # Log structure of first doc for debugging
             first = references[0]
+            data_keys = list(first.get("Data", {}).keys())
             meta_keys = list(first.get("Data", {}).get("Metadaten", {}).keys())
-            logger.info(f"First doc Metadaten keys: {meta_keys}")
+            logger.info(f"First doc Data keys: {data_keys}, Metadaten keys: {meta_keys}")
+            # Log deeper structure
+            for mk in meta_keys:
+                child = first.get("Data", {}).get("Metadaten", {}).get(mk, {})
+                if isinstance(child, dict):
+                    logger.info(f"  Metadaten.{mk} keys: {list(child.keys())[:15]}")
 
         for i, ref in enumerate(references):
             try:
@@ -241,6 +247,8 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
                     results.append(parsed)
                 else:
                     skipped += 1
+                    if i == 0:
+                        logger.warning(f"First doc skipped! ref keys: {list(ref.keys())}, Data keys: {list(ref.get('Data', {}).keys())}")
             except Exception as e:
                 skipped += 1
                 logger.warning(f"Error parsing {law_type} doc #{i}: {e}")
@@ -252,56 +260,54 @@ def parse_ris_response(data: dict, law_source: str = "bundesrecht") -> list[dict
     return results
 
 
-def _dig_metadata(metadata: dict) -> dict:
-    """Find the innermost metadata dict with actual fields.
+def _collect_metadata(metadata: dict) -> dict:
+    """Merge all metadata sections into a single flat dict.
 
-    The RIS API nests metadata differently depending on the document type:
-      - Metadaten.Bundesrecht.BrKons.{Kurztitel, ...}
-      - Metadaten.Bundesrecht.{Kurztitel, ...}
-      - Metadaten.Landesrecht.LrKons.{Kurztitel, ...}
-      - Metadaten.{Kurztitel, ...}
+    The v2.6 API returns metadata split into sections:
+      Metadaten:
+        Technisch: {Dokumentnummer, DokumentUrl, Applikation, ...}
+        Allgemein: {Kurztitel, Langtitel, Typ, Indexe, Schlagworte, ...}
+        Bundesrecht: {Aenderungsdatum, Inkrafttretensdatum, Kundmachungsorgan, ...}
+        (or Landesrecht: {...})
 
-    We walk down the tree until we find a dict containing known field names.
+    We merge all sections so field access is simple. Later sections
+    override earlier ones (Bundesrecht-specific fields take precedence).
     """
-    known_fields = {"Kurztitel", "Langtitel", "Aenderungsdatum", "Inkrafttretensdatum", "Typ", "Schlagworte"}
+    merged: dict = {}
 
-    # Check if metadata itself has the fields
-    if known_fields & set(metadata.keys()):
-        return metadata
+    # Priority order: Technisch (lowest) → Allgemein → Bundesrecht/Landesrecht (highest)
+    for section_key in ("Technisch", "Allgemein", "Bundesrecht", "Landesrecht", "BrKons", "LrKons"):
+        section = metadata.get(section_key)
+        if isinstance(section, dict):
+            merged.update(section)
+            # Also check one level deeper (e.g., Bundesrecht.BrKons)
+            for subkey in ("BrKons", "LrKons"):
+                subsection = section.get(subkey)
+                if isinstance(subsection, dict):
+                    merged.update(subsection)
 
-    # Walk one level: Bundesrecht, Landesrecht, BrKons, LrKons
-    for key in ("Bundesrecht", "Landesrecht", "BrKons", "LrKons"):
-        child = metadata.get(key)
-        if not isinstance(child, dict):
-            continue
-        if known_fields & set(child.keys()):
-            return child
-        # Walk two levels: Bundesrecht.BrKons, Landesrecht.LrKons
-        for subkey in ("BrKons", "LrKons"):
-            grandchild = child.get(subkey)
-            if isinstance(grandchild, dict) and (known_fields & set(grandchild.keys())):
-                return grandchild
+    # If metadata itself has known fields directly (fallback for other formats)
+    known_fields = {"Kurztitel", "Langtitel", "Aenderungsdatum", "Dokumentnummer"}
+    if not merged or not (known_fields & set(merged.keys())):
+        # Try the old format: metadata has the fields directly
+        if known_fields & set(metadata.keys()):
+            merged.update(metadata)
 
-    # Fallback: return first non-empty child dict
-    for key in ("Bundesrecht", "Landesrecht", "BrKons", "LrKons"):
-        child = metadata.get(key)
-        if isinstance(child, dict) and child:
-            # Check its children too
-            for v in child.values():
-                if isinstance(v, dict) and (known_fields & set(v.keys())):
-                    return v
-            return child
-
-    return {}
+    return merged
 
 
 def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
     """Parse a single OgdDocumentReference."""
     data_entry = ref.get("Data", {})
     metadata = data_entry.get("Metadaten", {})
-    m = _dig_metadata(metadata)
+    m = _collect_metadata(metadata)
 
-    doc_id = data_entry.get("Dokumentnummer", "") or ref.get("Dokumentnummer", "")
+    # Dokumentnummer can be in: m (from Technisch), Data, or ref top-level
+    doc_id = (
+        m.get("Dokumentnummer", "")
+        or data_entry.get("Dokumentnummer", "")
+        or ref.get("Dokumentnummer", "")
+    )
     if not doc_id:
         return None
 
@@ -341,8 +347,13 @@ def _parse_single_law_document(ref: dict, law_type: str) -> dict | None:
     )
     pub_date_str = m.get("Veroeffentlichungsdatum", "") or data_entry.get("Veroeffentlichungsdatum", "") or change_date_str
 
-    # URL
-    doc_url = ref.get("DokumentUrl", "") or data_entry.get("DokumentUrl", "") or ""
+    # URL — check multiple locations
+    doc_url = (
+        m.get("DokumentUrl", "")
+        or ref.get("DokumentUrl", "")
+        or data_entry.get("DokumentUrl", "")
+        or ""
+    )
 
     # Keywords
     schlagworte = m.get("Schlagworte", "") or ""
@@ -407,35 +418,42 @@ def parse_judikatur_response(data: dict, court_source: str = "justiz") -> list[d
     return results
 
 
-def _dig_jud_metadata(metadata: dict, applikation: str) -> dict:
-    """Find innermost Judikatur metadata dict."""
-    known = {"Geschaeftszahl", "Entscheidungsdatum", "Gericht", "Norm"}
+def _collect_jud_metadata(metadata: dict, applikation: str) -> dict:
+    """Merge all Judikatur metadata sections into a flat dict.
 
-    if known & set(metadata.keys()):
-        return metadata
+    Same v2.6 structure: Technisch + Allgemein + Judikatur (or app-specific).
+    """
+    merged: dict = {}
 
-    jud = metadata.get("Judikatur", {})
-    if isinstance(jud, dict):
-        if known & set(jud.keys()):
-            return jud
-        inner = jud.get(applikation)
-        if isinstance(inner, dict) and inner:
-            return inner
+    for section_key in ("Technisch", "Allgemein", "Judikatur", applikation):
+        section = metadata.get(section_key)
+        if isinstance(section, dict):
+            merged.update(section)
+            # Check one level deeper (e.g., Judikatur.Justiz)
+            inner = section.get(applikation)
+            if isinstance(inner, dict):
+                merged.update(inner)
 
-    direct = metadata.get(applikation)
-    if isinstance(direct, dict) and direct:
-        return direct
+    # Fallback: metadata has the fields directly
+    known = {"Geschaeftszahl", "Entscheidungsdatum", "Dokumentnummer"}
+    if not merged or not (known & set(merged.keys())):
+        if known & set(metadata.keys()):
+            merged.update(metadata)
 
-    return jud if isinstance(jud, dict) else {}
+    return merged
 
 
 def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, court_source: str) -> dict | None:
     """Parse a single Judikatur document."""
     data_entry = ref.get("Data", {})
     metadata = data_entry.get("Metadaten", {})
-    m = _dig_jud_metadata(metadata, applikation)
+    m = _collect_jud_metadata(metadata, applikation)
 
-    doc_id = data_entry.get("Dokumentnummer", "") or ref.get("Dokumentnummer", "")
+    doc_id = (
+        m.get("Dokumentnummer", "")
+        or data_entry.get("Dokumentnummer", "")
+        or ref.get("Dokumentnummer", "")
+    )
     if not doc_id:
         return None
 
@@ -453,7 +471,7 @@ def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, 
     decision_date_str = m.get("Entscheidungsdatum", "") or data_entry.get("Entscheidungsdatum", "") or ""
     decision_date = _parse_date(decision_date_str)
 
-    doc_url = ref.get("DokumentUrl", "") or data_entry.get("DokumentUrl", "") or ""
+    doc_url = m.get("DokumentUrl", "") or ref.get("DokumentUrl", "") or data_entry.get("DokumentUrl", "") or ""
 
     schlagworte = m.get("Schlagworte", "") or ""
     if isinstance(schlagworte, list):
