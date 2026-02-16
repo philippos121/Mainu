@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../services/api'
 import router from '../router'
+import { useNotificationStore } from './notifications'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('lexwatch_token') || '')
@@ -73,6 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem('lexwatch_token')
     localStorage.removeItem('lexwatch_user')
+    useNotificationStore().$reset()
     router.push('/login')
   }
 

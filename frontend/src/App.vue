@@ -95,7 +95,7 @@
 
     <!-- Main Content -->
     <v-main>
-      <router-view />
+      <router-view :key="authStore.user?.id || 'anon'" />
     </v-main>
   </v-app>
 </template>
