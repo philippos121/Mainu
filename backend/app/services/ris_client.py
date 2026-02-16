@@ -510,54 +510,61 @@ def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, 
     metadata = data_entry.get("Metadaten", {})
     m = _collect_jud_metadata(metadata, applikation)
 
+    # Helper: coerce metadata value to string (API may return lists/dicts/ints)
+    def _s(val):
+        if val is None:
+            return ""
+        if isinstance(val, str):
+            return val
+        if isinstance(val, list):
+            return ", ".join(str(v) for v in val)
+        return str(val)
+
     doc_id = (
-        m.get("ID", "")
-        or m.get("Dokumentnummer", "")
-        or data_entry.get("Dokumentnummer", "")
-        or ref.get("Dokumentnummer", "")
-        or _extract_id_from_url(m.get("DokumentUrl", ""))
-        or _extract_id_from_url(ref.get("DokumentUrl", ""))
-        or _extract_id_from_url(data_entry.get("DokumentUrl", ""))
+        _s(m.get("ID"))
+        or _s(m.get("Dokumentnummer"))
+        or _s(data_entry.get("Dokumentnummer"))
+        or _s(ref.get("Dokumentnummer"))
+        or _extract_id_from_url(_s(m.get("DokumentUrl")))
+        or _extract_id_from_url(_s(ref.get("DokumentUrl")))
+        or _extract_id_from_url(_s(data_entry.get("DokumentUrl")))
     )
     if not doc_id:
         return None
 
-    case_number = m.get("Geschaeftszahl", "") or data_entry.get("Geschaeftszahl", "") or ""
-    court_name = m.get("Gericht", "") or data_entry.get("Gericht", "") or source.get("label", court_source)
-    title = m.get("Kurztitel", "") or data_entry.get("Kurztitel", "") or m.get("Betreff", "") or f"{court_name} {case_number}"
-    short_title = m.get("Kurztitel", "") or data_entry.get("Kurztitel", "") or f"{court_name} {case_number}"
+    case_number = _s(m.get("Geschaeftszahl")) or _s(data_entry.get("Geschaeftszahl")) or ""
+    court_name = _s(m.get("Gericht")) or _s(data_entry.get("Gericht")) or source.get("label", court_source)
+    title = _s(m.get("Kurztitel")) or _s(data_entry.get("Kurztitel")) or _s(m.get("Betreff")) or f"{court_name} {case_number}"
+    short_title = _s(m.get("Kurztitel")) or _s(data_entry.get("Kurztitel")) or f"{court_name} {case_number}"
 
-    normen = m.get("Norm", "") or ""
-    if isinstance(normen, list):
-        normen = "; ".join(str(n) for n in normen)
-    if isinstance(normen, dict):
-        normen = str(normen)
+    normen = _s(m.get("Norm"))
 
-    decision_date_str = m.get("Entscheidungsdatum", "") or data_entry.get("Entscheidungsdatum", "") or ""
+    decision_date_str = _s(m.get("Entscheidungsdatum")) or _s(data_entry.get("Entscheidungsdatum")) or ""
     decision_date = _parse_date(decision_date_str)
 
-    doc_url = m.get("DokumentUrl", "") or ref.get("DokumentUrl", "") or data_entry.get("DokumentUrl", "") or ""
+    doc_url = _s(m.get("DokumentUrl")) or _s(ref.get("DokumentUrl")) or _s(data_entry.get("DokumentUrl")) or ""
 
-    schlagworte = m.get("Schlagworte", "") or ""
-    if isinstance(schlagworte, list):
-        schlagworte = ", ".join(str(s) for s in schlagworte)
-    categories = [s.strip() for s in schlagworte.split(",") if s.strip()] if isinstance(schlagworte, str) and schlagworte else []
+    schlagworte = _s(m.get("Schlagworte"))
+    categories = [s.strip() for s in schlagworte.split(",") if s.strip()] if schlagworte else []
 
-    rechtssatz = m.get("Rechtssatz", "") or ""
-    if isinstance(rechtssatz, list):
-        rechtssatz = " ".join(str(r) for r in rechtssatz)
+    rechtssatz = _s(m.get("Rechtssatz"))
 
-    content_snippet = rechtssatz or (schlagworte if isinstance(schlagworte, str) else "")
+    content_snippet = rechtssatz or schlagworte
     if normen and content_snippet:
         content_snippet = f"Normen: {normen}. {content_snippet}"
     elif normen:
         content_snippet = f"Normen: {normen}"
 
-    index_list = m.get("Indexe", "") or ""
-    indices = [i.strip() for i in index_list.split(";") if i.strip()] if isinstance(index_list, str) else (index_list if isinstance(index_list, list) else [])
+    index_list = m.get("Indexe", "")
+    if isinstance(index_list, list):
+        indices = [str(i).strip() for i in index_list if str(i).strip()]
+    elif isinstance(index_list, str) and index_list:
+        indices = [i.strip() for i in index_list.split(";") if i.strip()]
+    else:
+        indices = []
 
     return {
-        "ris_doc_id": doc_id,
+        "ris_doc_id": str(doc_id),
         "title": title,
         "short_title": short_title,
         "law_type": "Judikatur",

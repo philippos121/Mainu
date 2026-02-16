@@ -357,7 +357,7 @@ async def trigger_scan(
                         elif entry_id is None:
                             duplicates_total += 1
                     except Exception as e:
-                        err_msg = f"Judikatur store error for {ruling_data.get('ris_doc_id', '?')}: {e}"
+                        err_msg = f"Judikatur store error for {ruling_data.get('ris_doc_id', '?')}: {type(e).__name__}: {e}"
                         logger.error(err_msg)
                         errors.append(err_msg)
                 await db.commit()
