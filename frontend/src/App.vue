@@ -5,7 +5,7 @@
       <v-app-bar-nav-icon @click="drawer = !drawer" class="d-lg-none" />
 
       <v-toolbar-title class="d-flex align-center">
-        <v-icon icon="mdi-scale-balance" size="28" color="accent" class="mr-2" />
+        <img :src="logoUrl" alt="LexWatch" class="app-logo mr-2" />
         <span class="text-h6 font-weight-bold">LexWatch</span>
         <v-chip size="x-small" color="accent" variant="flat" class="ml-2">AT</v-chip>
       </v-toolbar-title>
@@ -106,6 +106,7 @@ import { useDisplay, useTheme } from 'vuetify'
 import { useAuthStore } from './stores/auth'
 import { useNotificationStore } from './stores/notifications'
 import NotificationPanel from './components/NotificationPanel.vue'
+import logoUrl from './assets/logo.svg'
 
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
@@ -147,6 +148,12 @@ onMounted(() => {
 .nav-drawer-glass {
   background: rgba(18, 24, 41, 0.95) !important;
   border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.app-logo {
+  height: 32px;
+  width: 32px;
+  flex-shrink: 0;
 }
 
 /* Scrollbar */

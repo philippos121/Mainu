@@ -410,28 +410,34 @@ async def _store_without_ai(
     if existing.scalar_one_or_none():
         return None
 
+    # Helper: ensure value is a string (API sometimes returns dicts/lists)
+    def _s(val, default=""):
+        if val is None:
+            return default
+        return str(val) if not isinstance(val, str) else val
+
     # Truncate fields that have VARCHAR length limits in the DB
-    short_title = (change_data.get("short_title", "") or "")[:500]
-    law_type = (change_data.get("law_type", "") or "")[:100]
-    court_name = change_data.get("court_name")
+    short_title = _s(change_data.get("short_title", ""))[:500]
+    law_type = _s(change_data.get("law_type", ""))[:100]
+    court_name = _s(change_data.get("court_name"), None)
     if court_name:
         court_name = court_name[:255]
-    case_number = change_data.get("case_number")
+    case_number = _s(change_data.get("case_number"), None)
     if case_number:
         case_number = case_number[:255]
 
     law_change = LawChange(
-        ris_doc_id=ris_doc_id[:255],
-        title=change_data.get("title", ""),
+        ris_doc_id=_s(ris_doc_id)[:255],
+        title=_s(change_data.get("title", "")),
         short_title=short_title,
         law_type=law_type,
-        bgbl_number=change_data.get("bgbl_number", ""),
+        bgbl_number=_s(change_data.get("bgbl_number", "")),
         categories=change_data.get("categories", []),
         index_numbers=change_data.get("index_numbers", []),
         change_date=change_data.get("change_date"),
         publication_date=change_data.get("publication_date"),
-        document_url=change_data.get("document_url", ""),
-        content_snippet=change_data.get("content_snippet", ""),
+        document_url=_s(change_data.get("document_url", "")),
+        content_snippet=_s(change_data.get("content_snippet", "")),
         court_name=court_name,
         case_number=case_number,
         ai_summary="",

@@ -1,4 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#1a237e"/>
-  <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="36" fill="white" font-family="serif" font-weight="bold">§</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <path d="M32 3 L58 16 L58 35 C58 48 45 59 32 63 C19 59 6 48 6 35 L6 16 Z"
+        fill="url(#sg)" stroke="url(#bg)" stroke-width="1.8"/>
+  <text x="32" y="40" text-anchor="middle" dominant-baseline="central"
+        font-family="Georgia, serif" font-weight="700"
+        font-size="32" fill="url(#tg)">§</text>
+  <line x1="16" y1="50" x2="48" y2="50" stroke="#ffab00" stroke-width="2.5"
+        stroke-linecap="round" opacity="0.9"/>
+  <defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a237e"/>
+      <stop offset="100%" stop-color="#0d47a1"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5c6bc0" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#42a5f5" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#bbdefb"/>
+    </linearGradient>
+  </defs>
 </svg>

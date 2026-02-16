@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Shield background -->
+  <path d="M20 2 L36 10 L36 22 C36 30 28 37 20 39 C12 37 4 30 4 22 L4 10 Z"
+        fill="url(#shield-grad)" stroke="url(#border-grad)" stroke-width="1.2"/>
+  <!-- Paragraph symbol -->
+  <text x="20" y="25" text-anchor="middle" dominant-baseline="central"
+        font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="20" fill="url(#text-grad)">§</text>
+  <!-- Scan line accent -->
+  <line x1="10" y1="31" x2="30" y2="31" stroke="#ffab00" stroke-width="1.5"
+        stroke-linecap="round" opacity="0.9"/>
+  <defs>
+    <linearGradient id="shield-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a237e"/>
+      <stop offset="100%" stop-color="#0d47a1"/>
+    </linearGradient>
+    <linearGradient id="border-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5c6bc0" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#42a5f5" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="text-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#bbdefb"/>
+    </linearGradient>
+  </defs>
+</svg>

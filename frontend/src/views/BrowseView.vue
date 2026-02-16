@@ -123,7 +123,7 @@
         <v-col cols="12" md="3">
           <v-select
             v-model="scanCategories"
-            :items="categories"
+            :items="rechtsgebiete"
             item-title="label"
             item-value="slug"
             label="Rechtsgebiete"
@@ -230,6 +230,34 @@ const scanSourceTypes = [
   { label: 'Alles', value: 'all' },
   { label: 'Nur Gesetze', value: 'laws' },
   { label: 'Nur Urteile', value: 'rulings' },
+]
+
+// Static Rechtsgebiete for scan filter (matches backend LEGAL_CATEGORIES)
+const rechtsgebiete = [
+  { slug: 'verfassungsrecht', label: 'Verfassungsrecht' },
+  { slug: 'verwaltungsrecht_allgemein', label: 'Verwaltungsrecht – Allg. Teil' },
+  { slug: 'aeusseres', label: 'Äußeres' },
+  { slug: 'finanzrecht', label: 'Finanzrecht' },
+  { slug: 'gesundheit', label: 'Gesundheit' },
+  { slug: 'justiz', label: 'Justiz' },
+  { slug: 'landesverteidigung', label: 'Landesverteidigung' },
+  { slug: 'land_forstwirtschaft', label: 'Land- und Forstwirtschaft' },
+  { slug: 'soziales', label: 'Soziales' },
+  { slug: 'unterricht_kunst_kultur', label: 'Unterricht, Kunst und Kultur' },
+  { slug: 'verkehr', label: 'Verkehr' },
+  { slug: 'wirtschaft', label: 'Wirtschaft' },
+  { slug: 'wissenschaft_forschung', label: 'Wissenschaft und Forschung' },
+  { slug: 'arbeit', label: 'Arbeit' },
+  { slug: 'umwelt', label: 'Umwelt' },
+  { slug: 'sport', label: 'Sport' },
+  { slug: 'buergerrecht', label: 'Bürgerrecht' },
+  { slug: 'medien', label: 'Medien' },
+  { slug: 'bauten', label: 'Bauten' },
+  { slug: 'mietrecht', label: 'Mietrecht' },
+  { slug: 'strafrecht', label: 'Strafrecht' },
+  { slug: 'zivilrecht', label: 'Zivilrecht' },
+  { slug: 'datenschutz', label: 'Datenschutz' },
+  { slug: 'eu_recht', label: 'EU-Recht' },
 ]
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
