@@ -282,6 +282,7 @@ async def _generate_ai_summaries(entry_ids: list[int]):
                     categories=entry.categories or [],
                     court_name=entry.court_name or "",
                     case_number=entry.case_number or "",
+                    index_numbers=entry.index_numbers or [],
                 )
                 for entry in entries
             ]

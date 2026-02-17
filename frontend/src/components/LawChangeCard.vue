@@ -55,7 +55,7 @@
       <span v-if="change.ai_summary" class="text-caption text-accent">KI-Zusammenfassung</span>
       <v-spacer />
       <v-icon
-        :icon="change.law_type === 'Judikatur' ? 'mdi-gavel' : 'mdi-file-document'"
+        :icon="isRuling ? 'mdi-gavel' : 'mdi-file-document'"
         size="16"
         class="text-medium-emphasis mr-1"
       />
@@ -71,12 +71,13 @@ const props = defineProps({
   change: { type: Object, required: true },
 })
 
+const isRuling = computed(() => !['Bundesrecht', 'Landesrecht'].includes(props.change.law_type))
+
 const lawTypeColor = computed(() => {
   switch (props.change.law_type) {
     case 'Bundesrecht': return 'primary'
     case 'Landesrecht': return 'secondary'
-    case 'Judikatur': return 'warning'
-    default: return 'info'
+    default: return 'warning'
   }
 })
 

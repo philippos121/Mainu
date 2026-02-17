@@ -498,7 +498,6 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
 
     logger.info(f"Background AI summary generation started for {len(entry_ids)} entries")
     generated = 0
-    skipped = 0
 
     async with async_session() as db:
         for i in range(0, len(entry_ids), BATCH_SIZE):
@@ -509,17 +508,10 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
             )
             entries = list(result.scalars().all())
 
-            # Filter: only generate summaries for entries with enough content
-            worthy_entries = [
-                entry for entry in entries
-                if len(entry.content_snippet or "") > 30 or len(entry.title or "") > 20
-            ]
-            skipped += len(entries) - len(worthy_entries)
-
-            if not worthy_entries:
+            if not entries:
                 continue
 
-            # Generate summaries in parallel
+            # Generate summaries for ALL stored entries
             tasks = [
                 generate_law_summary(
                     title=entry.title,
@@ -528,12 +520,13 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
                     categories=entry.categories or [],
                     court_name=entry.court_name or "",
                     case_number=entry.case_number or "",
+                    index_numbers=entry.index_numbers or [],
                 )
-                for entry in worthy_entries
+                for entry in entries
             ]
             summaries = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for entry, summary in zip(worthy_entries, summaries):
+            for entry, summary in zip(entries, summaries):
                 if isinstance(summary, Exception):
                     logger.warning(f"AI summary failed for {entry.ris_doc_id}: {summary}")
                     continue
@@ -544,7 +537,7 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
 
             await db.commit()
 
-    logger.info(f"Background AI summary generation done: {generated}/{len(entry_ids)} generated, {skipped} skipped (insufficient content)")
+    logger.info(f"Background AI summary generation done: {generated}/{len(entry_ids)} generated")
 
 
 # ──────────────────────────────────────

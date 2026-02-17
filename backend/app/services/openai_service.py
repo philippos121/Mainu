@@ -26,72 +26,82 @@ async def generate_law_summary(
     categories: list[str] | None = None,
     court_name: str = "",
     case_number: str = "",
+    index_numbers: list[str] | None = None,
 ) -> str:
     """Generate a concise German-language summary of a law change or court ruling using GPT."""
     if not settings.OPENAI_API_KEY:
         return "KI-Zusammenfassung nicht verfügbar (API-Key fehlt)."
 
     categories_text = ", ".join(categories) if categories else ""
+    indices_text = ", ".join(index_numbers) if index_numbers else ""
     is_ruling = bool(court_name or case_number)
 
     if is_ruling:
-        prompt = f"""Analysiere die folgende gerichtliche Entscheidung und fasse sie
-fachlich-präzise zusammen. Schreibe wie ein wissenschaftlicher Mitarbeiter an einem
-österreichischen Gericht — sachlich, juristisch korrekt, ohne Floskeln.
+        prompt = f"""Du erhältst Metadaten einer österreichischen Gerichtsentscheidung aus dem RIS.
+Erstelle eine fachlich-präzise Zusammenfassung. Stütze dich ausschließlich auf die
+unten stehenden Informationen — erfinde NICHTS dazu. Falls die Daten nur Normen und
+Schlagworte enthalten, erkläre, welche Rechtsfragen sich daraus ergeben und welche
+Normen angewandt wurden.
 
 Gericht: {court_name}
 Geschäftszahl: {case_number}
 Titel/Betreff: {title}
-Schlagworte: {categories_text}
-Entscheidungstext (Auszug): {content_snippet}
+Schlagworte/Kategorien: {categories_text}
+Indexe: {indices_text}
+Rechtssatz / Inhalt: {content_snippet}
 
-Fasse zusammen:
-- Sachverhalt und Kernfrage in 1-2 Sätzen
-- Entscheidung und tragende Begründung des Gerichts
-- Rechtliche Bedeutung / Leitsatz
+Fasse zusammen (max. 4-5 Sätze):
+1. Welche Rechtsfrage wurde entschieden? (basierend auf Normen und Schlagworten)
+2. Welches Gericht hat entschieden und zu welcher Geschäftszahl?
+3. Kernaussage / Leitsatz, soweit aus den Daten ableitbar
 
-Beginne NICHT mit „Die Entscheidung betrifft" o.ä. — formuliere abwechslungsreich und
-inhaltlich prägnant. Antworte auf Deutsch, max. 4-5 Sätze."""
+WICHTIG: Erfinde keinen Sachverhalt und keine Begründung, die nicht aus den Daten hervorgeht.
+Beginne NICHT mit „Die Entscheidung betrifft" oder „Es handelt sich um".
+Antworte auf Deutsch."""
         system_msg = (
-            "Du bist ein erfahrener österreichischer Jurist und wissenschaftlicher Mitarbeiter. "
-            "Du erstellst prägnante, fachlich fundierte Zusammenfassungen von Gerichtsentscheidungen. "
-            "Vermeide Phrasen wie 'Die Änderung betrifft' oder 'Es handelt sich um'. "
-            "Schreibe abwechslungsreich und substanziell."
+            "Du bist ein erfahrener österreichischer Jurist. Du fasst Gerichtsentscheidungen "
+            "zusammen, die du aus RIS-Metadaten erhältst. Du arbeitest STRENG auf Basis der "
+            "gegebenen Daten — du erfindest nie Fakten oder Sachverhalte. Wenn wenig Information "
+            "vorliegt, erklärst du die relevanten Normen und den rechtlichen Kontext. "
+            "Vermeide Phrasen wie 'Die Änderung betrifft' oder 'Es handelt sich um'."
         )
     else:
-        prompt = f"""Analysiere die folgende Rechtsänderung und fasse sie fachlich-präzise zusammen.
-Schreibe wie ein wissenschaftlicher Mitarbeiter in einer Kanzlei — sachlich, juristisch
-korrekt, substanziell.
+        prompt = f"""Du erhältst Metadaten einer österreichischen Rechtsänderung aus dem RIS.
+Erstelle eine fachlich-präzise Zusammenfassung. Stütze dich ausschließlich auf die
+unten stehenden Informationen — erfinde NICHTS dazu.
 
 Titel: {title}
 BGBl-Nummer: {bgbl_number}
 Rechtsgebiet: {categories_text}
-Gesetzestext (Auszug): {content_snippet}
+Indexe: {indices_text}
+Gesetzestext / Schlagworte: {content_snippet}
 
-Fasse zusammen:
-- Was wird geändert und warum? (materieller Regelungsinhalt)
-- Wer ist betroffen und welche Rechtsfolgen ergeben sich?
-- Inkrafttreten, sofern erkennbar
+Fasse zusammen (max. 4-5 Sätze):
+1. Was wird geändert? (materieller Regelungsinhalt, basierend auf Titel und Schlagworten)
+2. Welches Rechtsgebiet und welche Normen sind betroffen?
+3. Inkrafttreten oder BGBl-Nummer, sofern erkennbar
 
-Beginne NICHT mit „Die Änderung betrifft" o.ä. — formuliere abwechslungsreich und
-inhaltlich prägnant. Antworte auf Deutsch, max. 4-5 Sätze."""
+WICHTIG: Erfinde keine Details, die nicht aus den Daten hervorgehen.
+Beginne NICHT mit „Die Änderung betrifft" oder „Es handelt sich um".
+Antworte auf Deutsch."""
         system_msg = (
-            "Du bist ein erfahrener österreichischer Jurist und wissenschaftlicher Mitarbeiter. "
-            "Du erstellst prägnante, fachlich fundierte Zusammenfassungen von Gesetzesänderungen. "
-            "Vermeide Phrasen wie 'Die Änderung betrifft' oder 'Es handelt sich um'. "
-            "Schreibe abwechslungsreich und substanziell."
+            "Du bist ein erfahrener österreichischer Jurist. Du fasst Gesetzesänderungen "
+            "zusammen, die du aus RIS-Metadaten erhältst. Du arbeitest STRENG auf Basis der "
+            "gegebenen Daten — du erfindest nie Details. Wenn wenig Information vorliegt, "
+            "erklärst du die relevanten Normen und den rechtlichen Kontext. "
+            "Vermeide Phrasen wie 'Die Änderung betrifft' oder 'Es handelt sich um'."
         )
 
     try:
         client = _get_client()
         response = await client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=600,
-            temperature=0.5,
+            temperature=0.3,
         )
         return response.choices[0].message.content or ""
     except Exception as e:

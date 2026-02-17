@@ -519,7 +519,11 @@ def _collect_jud_metadata(metadata: dict, applikation: str) -> dict:
 
 
 def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, court_source: str) -> dict | None:
-    """Parse a single Judikatur document."""
+    """Parse a single Judikatur document.
+
+    law_type is set to the specific court source label (e.g. "Justiz", "BVwG")
+    so the browse view can filter by individual court type.
+    """
     data_entry = ref.get("Data", {})
     metadata = data_entry.get("Metadaten", {})
     m = _collect_jud_metadata(metadata, applikation)
@@ -581,7 +585,7 @@ def _parse_single_judikatur_document(ref: dict, source: dict, applikation: str, 
         "ris_doc_id": str(doc_id),
         "title": title,
         "short_title": short_title,
-        "law_type": "Judikatur",
+        "law_type": source.get("label", "Judikatur"),
         "bgbl_number": case_number,
         "categories": categories,
         "index_numbers": indices,

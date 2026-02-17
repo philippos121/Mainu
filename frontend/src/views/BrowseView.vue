@@ -235,11 +235,15 @@ const dateFrom = ref(defaultDateFrom())
 const dateTo = ref(todayStr())
 const categories = ref([])
 
-// Source type filter options
+// Source type filter options (law_type values stored in DB)
 const sourceTypes = [
   { label: 'Bundesrecht', value: 'Bundesrecht' },
   { label: 'Landesrecht', value: 'Landesrecht' },
-  { label: 'Judikatur', value: 'Judikatur' },
+  { label: 'Ordentliche Gerichte (OGH, OLG, …)', value: 'Ordentliche Gerichte (OGH, OLG, …)' },
+  { label: 'VfGH', value: 'Verfassungsgerichtshof (VfGH)' },
+  { label: 'VwGH', value: 'Verwaltungsgerichtshof (VwGH)' },
+  { label: 'BVwG', value: 'Bundesverwaltungsgericht (BVwG)' },
+  { label: 'LVwG', value: 'Landesverwaltungsgerichte (LVwG)' },
 ]
 
 // Historical scan
@@ -354,10 +358,21 @@ async function triggerScan() {
     // Map scan source type to browse source type filter
     if (scanSourceType.value === 'laws') {
       selectedSourceType.value = 'Bundesrecht'
-      // Only apply category filter for law scans (Rechtsgebiete doesn't apply to rulings)
       selectedCategory.value = scanCategories.value.length === 1 ? scanCategories.value[0] : ''
     } else if (scanSourceType.value === 'rulings') {
-      selectedSourceType.value = 'Judikatur'
+      // Map court source key → law_type label stored in DB
+      const courtKeyToLabel = {
+        justiz: 'Ordentliche Gerichte (OGH, OLG, …)',
+        vfgh: 'Verfassungsgerichtshof (VfGH)',
+        vwgh: 'Verwaltungsgerichtshof (VwGH)',
+        bvwg: 'Bundesverwaltungsgericht (BVwG)',
+        lvwg: 'Landesverwaltungsgerichte (LVwG)',
+      }
+      if (scanCourtSources.value.length === 1) {
+        selectedSourceType.value = courtKeyToLabel[scanCourtSources.value[0]] || ''
+      } else {
+        selectedSourceType.value = ''
+      }
       selectedCategory.value = ''
     } else {
       selectedSourceType.value = ''

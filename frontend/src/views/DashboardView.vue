@@ -90,8 +90,8 @@
                   class="rounded-lg mb-2 change-item"
                 >
                   <template v-slot:prepend>
-                    <v-avatar :color="change.law_type === 'Judikatur' ? 'warning' : 'primary'" variant="tonal" size="40">
-                      <v-icon size="20">{{ change.law_type === 'Judikatur' ? 'mdi-gavel' : 'mdi-file-document' }}</v-icon>
+                    <v-avatar :color="isRuling(change) ? 'warning' : 'primary'" variant="tonal" size="40">
+                      <v-icon size="20">{{ isRuling(change) ? 'mdi-gavel' : 'mdi-file-document' }}</v-icon>
                     </v-avatar>
                   </template>
                   <v-list-item-title class="font-weight-medium">
@@ -102,7 +102,7 @@
                   </v-list-item-subtitle>
                   <template v-slot:append>
                     <div class="text-right">
-                      <v-chip size="x-small" :color="change.law_type === 'Judikatur' ? 'warning' : 'primary'" variant="tonal" class="mb-1">
+                      <v-chip size="x-small" :color="isRuling(change) ? 'warning' : 'primary'" variant="tonal" class="mb-1">
                         {{ change.law_type }}
                       </v-chip>
                       <div v-if="change.court_name" class="text-caption text-warning">
@@ -231,6 +231,10 @@ function formatDate(dateStr) {
     month: '2-digit',
     year: 'numeric',
   })
+}
+
+function isRuling(change) {
+  return !['Bundesrecht', 'Landesrecht'].includes(change.law_type)
 }
 
 function getCategoryLabel(slug) {

@@ -12,8 +12,8 @@
           <!-- Main content -->
           <v-card elevation="0" class="card-glass pa-6">
             <div class="d-flex align-center mb-4">
-              <v-avatar :color="change.law_type === 'Judikatur' ? 'warning' : 'primary'" variant="tonal" size="48" class="mr-4">
-                <v-icon size="24">{{ change.law_type === 'Judikatur' ? 'mdi-gavel' : 'mdi-file-document' }}</v-icon>
+              <v-avatar :color="isRuling ? 'warning' : 'primary'" variant="tonal" size="48" class="mr-4">
+                <v-icon size="24">{{ isRuling ? 'mdi-gavel' : 'mdi-file-document' }}</v-icon>
               </v-avatar>
               <div>
                 <div class="d-flex align-center ga-2 mb-1">
@@ -101,7 +101,7 @@
                 <v-list-item-subtitle>{{ change.case_number }}</v-list-item-subtitle>
               </v-list-item>
 
-              <v-list-item v-if="change.bgbl_number && change.law_type !== 'Judikatur'">
+              <v-list-item v-if="change.bgbl_number && !isRuling">
                 <template v-slot:prepend>
                   <v-icon icon="mdi-newspaper" size="20" class="mr-3" />
                 </template>
@@ -116,12 +116,12 @@
                   <v-icon icon="mdi-calendar-edit" size="20" class="mr-3" />
                 </template>
                 <v-list-item-title class="text-caption text-medium-emphasis">
-                  {{ change.law_type === 'Judikatur' ? 'Entscheidungsdatum' : 'Änderungsdatum' }}
+                  {{ isRuling ? 'Entscheidungsdatum' : 'Änderungsdatum' }}
                 </v-list-item-title>
                 <v-list-item-subtitle>{{ formatDate(change.change_date) }}</v-list-item-subtitle>
               </v-list-item>
 
-              <v-list-item v-if="change.publication_date && change.law_type !== 'Judikatur'">
+              <v-list-item v-if="change.publication_date && !isRuling">
                 <template v-slot:prepend>
                   <v-icon icon="mdi-calendar-check" size="20" class="mr-3" />
                 </template>
@@ -180,12 +180,13 @@ const route = useRoute()
 const change = ref(null)
 const loading = ref(true)
 
+const isRuling = computed(() => change.value && !['Bundesrecht', 'Landesrecht'].includes(change.value.law_type))
+
 const lawTypeColor = computed(() => {
   switch (change.value?.law_type) {
     case 'Bundesrecht': return 'primary'
     case 'Landesrecht': return 'secondary'
-    case 'Judikatur': return 'warning'
-    default: return 'info'
+    default: return 'warning'
   }
 })
 
