@@ -553,26 +553,45 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
 
 @router.get("/notifications/list", response_model=NotificationListResponse)
 async def list_notifications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get all notifications for the current user."""
-    query = (
-        select(Notification)
-        .where(Notification.user_id == user.id)
-        .order_by(desc(Notification.created_at))
-        .limit(100)
-    )
+    """Get notifications for the current user, with pagination and date range."""
+    base = select(Notification).where(Notification.user_id == user.id)
+
+    if date_from:
+        base = base.where(
+            Notification.created_at >= datetime.combine(date_from, datetime.min.time()).replace(tzinfo=timezone.utc)
+        )
+    if date_to:
+        base = base.where(
+            Notification.created_at <= datetime.combine(date_to, datetime.max.time()).replace(tzinfo=timezone.utc)
+        )
+
+    # Total count (for pagination)
+    count_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    # Paginated results
+    query = base.order_by(desc(Notification.created_at))
+    query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     items = [NotificationResponse.model_validate(n) for n in result.scalars().all()]
 
+    # Global unread count (not limited by filters)
     unread_count_q = select(func.count()).where(
         Notification.user_id == user.id,
         Notification.is_read.is_(False),
     )
     unread_count = (await db.execute(unread_count_q)).scalar() or 0
 
-    return NotificationListResponse(items=items, total=len(items), unread_count=unread_count)
+    return NotificationListResponse(
+        items=items, total=total, unread_count=unread_count, page=page, page_size=page_size
+    )
 
 
 @router.post("/notifications/{notification_id}/read")

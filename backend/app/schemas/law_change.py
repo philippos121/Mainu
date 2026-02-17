@@ -49,3 +49,5 @@ class NotificationListResponse(BaseModel):
     items: list[NotificationResponse]
     total: int
     unread_count: int
+    page: int = 1
+    page_size: int = 50

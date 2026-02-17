@@ -32,6 +32,12 @@ const routes = [
     meta: { auth: true },
   },
   {
+    path: '/updates',
+    name: 'Updates',
+    component: () => import('../views/UpdatesView.vue'),
+    meta: { auth: true },
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('../views/ProfileView.vue'),

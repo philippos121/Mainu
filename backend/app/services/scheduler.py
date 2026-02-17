@@ -302,7 +302,11 @@ async def _generate_ai_summaries(entry_ids: list[int]):
 
 
 async def _generate_user_notifications(session: AsyncSession):
-    """Create notifications for users based on their interests."""
+    """Create notifications for users based on their interests.
+
+    When a match is found, the law_change is also copied into the user's
+    personal collection (user_id set) so the detail view works.
+    """
     users = await session.execute(select(User).where(User.is_active.is_(True)))
 
     yesterday = datetime.now(timezone.utc) - timedelta(days=1)
@@ -311,30 +315,65 @@ async def _generate_user_notifications(session: AsyncSession):
         if not user.interests and not user.keywords:
             continue
 
-        # Build query for matching law changes
-        query = select(LawChange).where(LawChange.created_at >= yesterday)
+        # Query system-level entries (user_id IS NULL) created in last 24h
+        query = select(LawChange).where(
+            LawChange.created_at >= yesterday,
+            LawChange.user_id.is_(None),
+        )
 
         recent_changes = await session.execute(query)
         changes = recent_changes.scalars().all()
+        user_id = user.id  # extract to plain int (avoid lazy-load after commit)
 
         for change in changes:
-            # Check if change matches user interests
             if not _matches_user_interests(change, user):
                 continue
 
-            # Check if notification already exists
+            # Ensure user has a personal copy of this law_change
+            existing_copy = await session.execute(
+                select(LawChange).where(
+                    LawChange.ris_doc_id == change.ris_doc_id,
+                    LawChange.user_id == user_id,
+                )
+            )
+            user_entry = existing_copy.scalar_one_or_none()
+
+            if not user_entry:
+                user_entry = LawChange(
+                    ris_doc_id=change.ris_doc_id,
+                    user_id=user_id,
+                    title=change.title,
+                    short_title=change.short_title,
+                    law_type=change.law_type,
+                    bgbl_number=change.bgbl_number,
+                    categories=change.categories or [],
+                    index_numbers=change.index_numbers or [],
+                    change_date=change.change_date,
+                    publication_date=change.publication_date,
+                    effective_date=change.effective_date,
+                    document_url=change.document_url,
+                    content_snippet=change.content_snippet,
+                    court_name=change.court_name,
+                    case_number=change.case_number,
+                    ai_summary=change.ai_summary,
+                    ai_summary_generated_at=change.ai_summary_generated_at,
+                )
+                session.add(user_entry)
+                await session.flush()
+
+            # Check if notification already exists for the user's copy
             existing_notif = await session.execute(
                 select(Notification).where(
-                    Notification.user_id == user.id,
-                    Notification.law_change_id == change.id,
+                    Notification.user_id == user_id,
+                    Notification.law_change_id == user_entry.id,
                 )
             )
             if existing_notif.scalar_one_or_none():
                 continue
 
             notification = Notification(
-                user_id=user.id,
-                law_change_id=change.id,
+                user_id=user_id,
+                law_change_id=user_entry.id,
                 title=change.short_title or change.title,
                 summary=change.ai_summary[:500] if change.ai_summary else "",
             )

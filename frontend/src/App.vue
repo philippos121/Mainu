@@ -69,6 +69,16 @@
           to="/feed"
         />
         <v-list-item
+          prepend-icon="mdi-bell-outline"
+          title="Tägliche Updates"
+          value="updates"
+          to="/updates"
+        >
+          <template v-if="notificationStore.unreadCount > 0" v-slot:append>
+            <v-badge :content="notificationStore.unreadCount" color="error" inline />
+          </template>
+        </v-list-item>
+        <v-list-item
           prepend-icon="mdi-magnify"
           title="Alle Änderungen"
           value="browse"
