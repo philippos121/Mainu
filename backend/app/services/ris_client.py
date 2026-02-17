@@ -68,6 +68,20 @@ COURT_SOURCES = {
     "lvwg": {"label": "Landesverwaltungsgerichte (LVwG)", "applikation": "Lvwg"},
 }
 
+# Map Rechtsgebiet categories → relevant court sources for ruling scans.
+# Categories not listed here have no specific court mapping → scan all courts.
+CATEGORY_TO_COURT_SOURCES: dict[str, list[str]] = {
+    # Justiz / Privatrecht → ordentliche Gerichte only
+    "justiz": ["justiz"],
+    "zivilrecht": ["justiz"],
+    "strafrecht": ["justiz"],
+    "mietrecht": ["justiz"],
+    # Verfassungsrecht → VfGH
+    "verfassungsrecht": ["vfgh"],
+    # Verwaltungsrecht → Verwaltungsgerichte
+    "verwaltungsrecht_allgemein": ["vwgh", "bvwg", "lvwg"],
+}
+
 
 def _map_date_range_to_im_ris_seit(date_from: date | None) -> str | None:
     """Map a date_from to the best-fitting ImRisSeit enum value."""

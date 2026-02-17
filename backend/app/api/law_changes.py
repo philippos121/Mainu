@@ -22,6 +22,7 @@ from app.schemas.law_change import (
 )
 from app.services.openai_service import generate_law_summary
 from app.services.ris_client import (
+    CATEGORY_TO_COURT_SOURCES,
     COURT_SOURCES,
     debug_ris_api_raw,
     fetch_court_rulings,
@@ -340,11 +341,20 @@ async def trigger_scan(
                 await db.commit()
         logger.info(f"Landesrecht: {created_land} new entries stored")
 
-    # Scan Judikatur (Court Rulings - selected or all court sources)
+    # Scan Judikatur (Court Rulings - selected or category-derived court sources)
     if source_type in ("all", "rulings"):
-        # Filter court sources if specified
         if court_sources:
+            # Explicit court source selection (from frontend court selector)
             selected_courts = [k.strip() for k in court_sources.split(",") if k.strip() in COURT_SOURCES]
+        elif categories:
+            # Derive court sources from selected Rechtsgebiete categories
+            derived: set[str] = set()
+            for slug in categories.split(","):
+                slug = slug.strip()
+                courts_for_cat = CATEGORY_TO_COURT_SOURCES.get(slug)
+                if courts_for_cat:
+                    derived.update(courts_for_cat)
+            selected_courts = list(derived) if derived else list(COURT_SOURCES.keys())
         else:
             selected_courts = list(COURT_SOURCES.keys())
         logger.info(f"Scanning Judikatur from {date_from} to {date_to}, courts={selected_courts}")
@@ -387,10 +397,18 @@ async def trigger_scan(
     if errors:
         message += f". {len(errors)} Fehler aufgetreten."
 
-    # Generate AI summaries in the background (non-blocking)
+    # Generate AI summaries in the background — cap at 100 to avoid overloading OpenAI
+    MAX_AI_SUMMARIES = 100
     if new_entry_ids:
-        background_tasks.add_task(_generate_ai_summaries_bg, new_entry_ids)
-        message += f" KI-Zusammenfassungen werden im Hintergrund erstellt ({len(new_entry_ids)} Einträge)."
+        ai_ids = new_entry_ids[:MAX_AI_SUMMARIES]
+        background_tasks.add_task(_generate_ai_summaries_bg, ai_ids)
+        if len(new_entry_ids) > MAX_AI_SUMMARIES:
+            message += (
+                f" KI-Zusammenfassungen werden für die ersten {MAX_AI_SUMMARIES} "
+                f"von {len(new_entry_ids)} Einträgen erstellt."
+            )
+        else:
+            message += f" KI-Zusammenfassungen werden im Hintergrund erstellt ({len(ai_ids)} Einträge)."
 
     return {
         "message": message,
