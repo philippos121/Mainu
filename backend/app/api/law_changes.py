@@ -347,17 +347,22 @@ async def trigger_scan(
             # Explicit court source selection (from frontend court selector)
             selected_courts = [k.strip() for k in court_sources.split(",") if k.strip() in COURT_SOURCES]
         elif categories:
-            # Derive court sources from selected Rechtsgebiete categories
+            # Derive court sources from selected Rechtsgebiete categories.
+            # Only courts that are explicitly mapped from the selected categories are scanned.
+            # If selected categories have no court mapping → skip rulings entirely
+            # (user selected law-specific categories like Finanzrecht).
             derived: set[str] = set()
             for slug in categories.split(","):
                 slug = slug.strip()
                 courts_for_cat = CATEGORY_TO_COURT_SOURCES.get(slug)
                 if courts_for_cat:
                     derived.update(courts_for_cat)
-            selected_courts = list(derived) if derived else list(COURT_SOURCES.keys())
+            selected_courts = list(derived)
+            if not selected_courts:
+                logger.info("Skipping Judikatur scan: selected categories have no court mappings")
         else:
             selected_courts = list(COURT_SOURCES.keys())
-        logger.info(f"Scanning Judikatur from {date_from} to {date_to}, courts={selected_courts}")
+        logger.info(f"Scanning Judikatur from {date_from} to {date_to}, courts={selected_courts or 'none (skipped)'}")
         for source_key in selected_courts:
             for page_num in range(1, 6):
                 raw = await fetch_court_rulings(

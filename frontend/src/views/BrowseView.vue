@@ -127,7 +127,7 @@
             :items="rechtsgebiete"
             item-title="label"
             item-value="slug"
-            label="Rechtsgebiete"
+            label="Rechtsgebiete (Gesetze)"
             variant="outlined"
             density="compact"
             multiple
@@ -138,12 +138,12 @@
             :placeholder="scanCategories.length === 0 ? 'Alle Gebiete' : ''"
           />
           <v-select
-            v-else
+            v-if="scanSourceType !== 'laws'"
             v-model="scanCourtSources"
             :items="courtSourceOptions"
             item-title="label"
             item-value="key"
-            label="Gerichte"
+            label="Gerichte (Urteile)"
             variant="outlined"
             density="compact"
             multiple
@@ -152,6 +152,7 @@
             clearable
             hide-details
             :placeholder="scanCourtSources.length === 0 ? 'Alle Gerichte' : ''"
+            :class="scanSourceType === 'all' ? 'mt-2' : ''"
           />
         </v-col>
         <v-col cols="12" md="2">
@@ -177,7 +178,7 @@
         </v-col>
       </v-row>
       <div class="text-caption text-medium-emphasis mt-2">
-        Rechtsgebiete-Filter gilt für Gesetze. Bei Urteilen wählen Sie die gewünschten Gerichte.
+        Rechtsgebiete-Filter gilt für Gesetze und leitet Gerichte für Urteile ab (Justiz/Zivilrecht/Strafrecht → OGH/OLG/LG; Verfassungsrecht → VfGH; Verwaltungsrecht → VwGH/BVwG/LVwG). Gerichte direkt auswählen für Urteil-only-Scans.
       </div>
       <v-alert v-if="scanResult" :type="scanResult.type" variant="tonal" class="mt-3" closable @click:close="scanResult = null">
         {{ scanResult.message }}
@@ -356,25 +357,25 @@ async function triggerScan() {
     dateFrom.value = scanDateFrom.value
     dateTo.value = scanDateTo.value
     // Map scan source type to browse source type filter
+    const courtKeyToLabel = {
+      justiz: 'Ordentliche Gerichte (OGH, OLG, …)',
+      vfgh: 'Verfassungsgerichtshof (VfGH)',
+      vwgh: 'Verwaltungsgerichtshof (VwGH)',
+      bvwg: 'Bundesverwaltungsgericht (BVwG)',
+      lvwg: 'Landesverwaltungsgerichte (LVwG)',
+    }
     if (scanSourceType.value === 'laws') {
-      selectedSourceType.value = 'Bundesrecht'
+      // Both Bundesrecht + Landesrecht were scanned — clear source type to show both
+      selectedSourceType.value = ''
       selectedCategory.value = scanCategories.value.length === 1 ? scanCategories.value[0] : ''
     } else if (scanSourceType.value === 'rulings') {
-      // Map court source key → law_type label stored in DB
-      const courtKeyToLabel = {
-        justiz: 'Ordentliche Gerichte (OGH, OLG, …)',
-        vfgh: 'Verfassungsgerichtshof (VfGH)',
-        vwgh: 'Verwaltungsgerichtshof (VwGH)',
-        bvwg: 'Bundesverwaltungsgericht (BVwG)',
-        lvwg: 'Landesverwaltungsgerichte (LVwG)',
-      }
-      if (scanCourtSources.value.length === 1) {
-        selectedSourceType.value = courtKeyToLabel[scanCourtSources.value[0]] || ''
-      } else {
-        selectedSourceType.value = ''
-      }
+      // Filter to the specific court type if exactly one was selected
+      selectedSourceType.value = scanCourtSources.value.length === 1
+        ? (courtKeyToLabel[scanCourtSources.value[0]] || '')
+        : ''
       selectedCategory.value = ''
     } else {
+      // 'all' mode — show everything matching the date range
       selectedSourceType.value = ''
       selectedCategory.value = ''
     }
