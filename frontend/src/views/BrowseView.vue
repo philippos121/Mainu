@@ -354,8 +354,11 @@ async function triggerScan() {
     scanResult.value = { type: data.errors?.length ? 'warning' : 'success', message: data.message }
     // Apply scan parameters as browse filters so only relevant results show
     search.value = scanKeywords.value || ''
-    dateFrom.value = scanDateFrom.value
-    dateTo.value = scanDateTo.value
+    // Clear date filters after scan: entries without change_date (common for
+    // Landesrecht) use created_at as fallback, which is "now" and would be
+    // outside a historical scan range. Clearing lets users see everything.
+    dateFrom.value = ''
+    dateTo.value = ''
     // Map scan source type to browse source type filter
     const courtKeyToLabel = {
       justiz: 'Ordentliche Gerichte (OGH, OLG, …)',
