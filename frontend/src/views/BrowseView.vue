@@ -307,7 +307,13 @@ function debouncedFetch() {
   debounceTimer = setTimeout(fetchChanges, 400)
 }
 
+// Generation counter: prevents stale responses from overwriting fresh ones.
+// When multiple fetchChanges() fire concurrently (e.g. reactive watchers
+// triggering during bulk filter updates), only the latest call wins.
+let fetchGen = 0
+
 async function fetchChanges() {
+  const gen = ++fetchGen
   loading.value = true
   try {
     const params = { page: page.value, page_size: pageSize }
@@ -318,12 +324,17 @@ async function fetchChanges() {
     if (dateTo.value) params.date_to = dateTo.value
 
     const { data } = await api.get('/law-changes', { params })
+    if (gen !== fetchGen) return // stale response, discard
     changes.value = data.items
     total.value = data.total
-  } catch {
-    // Ignore
+  } catch (e) {
+    if (gen === fetchGen) {
+      console.error('fetchChanges failed:', e)
+      changes.value = []
+      total.value = 0
+    }
   } finally {
-    loading.value = false
+    if (gen === fetchGen) loading.value = false
   }
 }
 
@@ -352,37 +363,19 @@ async function triggerScan() {
 
     const { data } = await api.post('/law-changes/scan', null, { params, timeout: 300000 })
     scanResult.value = { type: data.errors?.length ? 'warning' : 'success', message: data.message }
-    // Apply scan parameters as browse filters so only relevant results show
-    search.value = scanKeywords.value || ''
-    // Clear date filters after scan: entries without change_date (common for
-    // Landesrecht) use created_at as fallback, which is "now" and would be
-    // outside a historical scan range. Clearing lets users see everything.
+    // After scan: clear ALL browse filters so newly stored entries are visible.
+    // Scan categories are RIS index numbers, NOT the Schlagworte strings stored
+    // in the DB, so using them as browse category filters would never match.
+    // Dates are cleared because Landesrecht entries often have no change_date
+    // (COALESCE falls back to created_at = now, which is outside historical ranges).
+    search.value = ''
+    selectedCategory.value = ''
+    selectedSourceType.value = ''
     dateFrom.value = ''
     dateTo.value = ''
-    // Map scan source type to browse source type filter
-    const courtKeyToLabel = {
-      justiz: 'Ordentliche Gerichte (OGH, OLG, …)',
-      vfgh: 'Verfassungsgerichtshof (VfGH)',
-      vwgh: 'Verwaltungsgerichtshof (VwGH)',
-      bvwg: 'Bundesverwaltungsgericht (BVwG)',
-      lvwg: 'Landesverwaltungsgerichte (LVwG)',
-    }
-    if (scanSourceType.value === 'laws') {
-      // Both Bundesrecht + Landesrecht were scanned — clear source type to show both
-      selectedSourceType.value = ''
-      selectedCategory.value = scanCategories.value.length === 1 ? scanCategories.value[0] : ''
-    } else if (scanSourceType.value === 'rulings') {
-      // Filter to the specific court type if exactly one was selected
-      selectedSourceType.value = scanCourtSources.value.length === 1
-        ? (courtKeyToLabel[scanCourtSources.value[0]] || '')
-        : ''
-      selectedCategory.value = ''
-    } else {
-      // 'all' mode — show everything matching the date range
-      selectedSourceType.value = ''
-      selectedCategory.value = ''
-    }
     page.value = 1
+    // Single explicit fetch — stale reactive-watcher fetches are discarded
+    // by the generation counter in fetchChanges().
     await fetchChanges()
   } catch (e) {
     scanResult.value = { type: 'error', message: 'Scan fehlgeschlagen: ' + (e.response?.data?.detail || e.message) }
