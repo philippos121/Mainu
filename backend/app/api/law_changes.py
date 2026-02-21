@@ -20,7 +20,7 @@ from app.schemas.law_change import (
     NotificationListResponse,
     NotificationResponse,
 )
-from app.services.openai_service import generate_law_summary
+from app.services.openai_service import generate_law_summary, has_meaningful_content
 from app.services.ris_client import (
     CATEGORY_TO_COURT_SOURCES,
     COURT_SOURCES,
@@ -516,7 +516,22 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
             if not entries:
                 continue
 
-            # Generate summaries for ALL stored entries
+            # Only generate summaries for entries with meaningful content.
+            # Entries without content still show up in browse — they just won't have an AI summary.
+            worthy = [
+                e for e in entries
+                if has_meaningful_content(
+                    e.content_snippet or "",
+                    e.categories or [],
+                    is_ruling=bool(e.court_name or e.case_number),
+                )
+            ]
+            skipped = len(entries) - len(worthy)
+            if skipped:
+                logger.info(f"Skipping AI summary for {skipped} entries with insufficient content")
+            if not worthy:
+                continue
+
             tasks = [
                 generate_law_summary(
                     title=entry.title,
@@ -527,11 +542,11 @@ async def _generate_ai_summaries_bg(entry_ids: list[int]):
                     case_number=entry.case_number or "",
                     index_numbers=entry.index_numbers or [],
                 )
-                for entry in entries
+                for entry in worthy
             ]
             summaries = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for entry, summary in zip(entries, summaries):
+            for entry, summary in zip(worthy, summaries):
                 if isinstance(summary, Exception):
                     logger.warning(f"AI summary failed for {entry.ris_doc_id}: {summary}")
                     continue

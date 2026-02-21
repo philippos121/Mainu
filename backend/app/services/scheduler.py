@@ -12,7 +12,7 @@ from app.core.database import async_session
 from app.models.law_change import LawChange
 from app.models.notification import Notification
 from app.models.user import User
-from app.services.openai_service import generate_law_summary
+from app.services.openai_service import generate_law_summary, has_meaningful_content
 from app.services.ris_client import (
     COURT_SOURCES,
     LEGAL_CATEGORIES,
@@ -274,6 +274,19 @@ async def _generate_ai_summaries(entry_ids: list[int]):
             )
             entries = list(result.scalars().all())
 
+            worthy = [
+                e for e in entries
+                if has_meaningful_content(
+                    e.content_snippet or "",
+                    e.categories or [],
+                    is_ruling=bool(e.court_name or e.case_number),
+                )
+            ]
+            if len(entries) - len(worthy):
+                logger.info(f"Skipping {len(entries) - len(worthy)} entries: insufficient content")
+            if not worthy:
+                continue
+
             tasks = [
                 generate_law_summary(
                     title=entry.title,
@@ -284,11 +297,11 @@ async def _generate_ai_summaries(entry_ids: list[int]):
                     case_number=entry.case_number or "",
                     index_numbers=entry.index_numbers or [],
                 )
-                for entry in entries
+                for entry in worthy
             ]
             summaries = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for entry, summary in zip(entries, summaries):
+            for entry, summary in zip(worthy, summaries):
                 if isinstance(summary, Exception):
                     logger.warning(f"AI summary failed for {entry.ris_doc_id}: {summary}")
                     continue
