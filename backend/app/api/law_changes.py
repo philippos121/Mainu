@@ -77,13 +77,17 @@ async def list_law_changes(
         query = query.where(LawChange.categories.any(category))
     if source_type:
         query = query.where(LawChange.law_type == source_type)
+    # Use change_date when available, fall back to created_at for entries
+    # where the RIS API didn't provide a date (common for Landesrecht).
+    effective_date = func.coalesce(LawChange.change_date, LawChange.created_at)
+
     if date_from:
         query = query.where(
-            LawChange.change_date >= datetime.combine(date_from, datetime.min.time()).replace(tzinfo=timezone.utc)
+            effective_date >= datetime.combine(date_from, datetime.min.time()).replace(tzinfo=timezone.utc)
         )
     if date_to:
         query = query.where(
-            LawChange.change_date <= datetime.combine(date_to, datetime.max.time()).replace(tzinfo=timezone.utc)
+            effective_date <= datetime.combine(date_to, datetime.max.time()).replace(tzinfo=timezone.utc)
         )
 
     # Total count
@@ -91,7 +95,7 @@ async def list_law_changes(
     total = (await db.execute(count_q)).scalar() or 0
 
     # Paginated results
-    query = query.order_by(desc(LawChange.change_date), desc(LawChange.id))
+    query = query.order_by(desc(effective_date), desc(LawChange.id))
     query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await db.execute(query)
