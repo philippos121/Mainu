@@ -22,13 +22,21 @@
       </button>
       <div id="settings-body" class="settings-body">
         <label for="api-url">API Endpoint</label>
-        <input id="api-url" type="url" placeholder="https://api.aissociate.example.com/v1/ask" />
+        <input id="api-url" type="url" placeholder="https://api.openai.com/v1/chat/completions" />
 
         <label for="api-key">API Key</label>
         <div class="key-input-wrapper">
           <input id="api-key" type="password" placeholder="sk-..." />
           <button id="toggle-key-visibility" class="icon-btn" title="Show/hide key">&#128065;</button>
         </div>
+
+        <label for="model-select">Model</label>
+        <select id="model-select">
+          <option value="gpt-4o">GPT-4o (recommended)</option>
+          <option value="gpt-4o-mini">GPT-4o Mini (faster)</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo</option>
+          <option value="gpt-4">GPT-4</option>
+        </select>
 
         <label for="language-select">Response Language</label>
         <select id="language-select">

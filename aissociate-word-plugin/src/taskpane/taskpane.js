@@ -3,6 +3,15 @@
 (function () {
   "use strict";
 
+  const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+
+  const LEGAL_SYSTEM_PROMPT =
+    "You are AI:ssociate, an expert legal AI assistant. " +
+    "You help lawyers and legal professionals analyze contracts, clauses, and legal documents. " +
+    "Provide clear, concise, and accurate legal analysis. Identify risks, obligations, key terms, " +
+    "and potential issues. When asked to respond in a specific language, always comply. " +
+    "Format your response in plain text suitable for a Word comment (no markdown).";
+
   // ── State ──────────────────────────────────────────────────────────
   let currentSelection = "";
   let currentResponse = "";
@@ -27,20 +36,21 @@
 
   // ── Settings ───────────────────────────────────────────────────────
   function loadSettings() {
-    $("api-url").value = localStorage.getItem("aissociate_api_url") || "";
+    $("api-url").value =
+      localStorage.getItem("aissociate_api_url") || OPENAI_ENDPOINT;
     $("api-key").value = localStorage.getItem("aissociate_api_key") || "";
-    $("language-select").value = localStorage.getItem("aissociate_language") || "auto";
+    $("model-select").value =
+      localStorage.getItem("aissociate_model") || "gpt-4o";
+    $("language-select").value =
+      localStorage.getItem("aissociate_language") || "auto";
   }
 
   function saveSettings() {
-    const url = $("api-url").value.trim();
+    const url = $("api-url").value.trim() || OPENAI_ENDPOINT;
     const key = $("api-key").value.trim();
+    const model = $("model-select").value;
     const lang = $("language-select").value;
 
-    if (!url) {
-      showStatus("settings-status", "Please enter an API endpoint.", "error");
-      return;
-    }
     if (!key) {
       showStatus("settings-status", "Please enter an API key.", "error");
       return;
@@ -48,6 +58,7 @@
 
     localStorage.setItem("aissociate_api_url", url);
     localStorage.setItem("aissociate_api_key", key);
+    localStorage.setItem("aissociate_model", model);
     localStorage.setItem("aissociate_language", lang);
     showStatus("settings-status", "Settings saved.", "success");
     updateAskButton();
@@ -55,7 +66,6 @@
 
   // ── Events ─────────────────────────────────────────────────────────
   function bindEvents() {
-    // Settings toggle
     $("settings-toggle").addEventListener("click", () => {
       const panel = $("settings-panel");
       const expanded = !panel.classList.contains("collapsed");
@@ -65,28 +75,16 @@
 
     $("save-settings").addEventListener("click", saveSettings);
 
-    // Key visibility toggle
     $("toggle-key-visibility").addEventListener("click", () => {
       const input = $("api-key");
       input.type = input.type === "password" ? "text" : "password";
     });
 
-    // Grab selection
     $("grab-selection-btn").addEventListener("click", refreshSelection);
-
-    // Ask button
     $("ask-btn").addEventListener("click", askQuestion);
-
-    // Insert as comment
     $("insert-comment-btn").addEventListener("click", insertComment);
-
-    // Copy response
     $("copy-response-btn").addEventListener("click", copyResponse);
-
-    // Clear history
     $("clear-history-btn").addEventListener("click", clearHistory);
-
-    // Enable ask button when typing
     $("question-input").addEventListener("input", updateAskButton);
   }
 
@@ -108,7 +106,8 @@
               : currentSelection;
           preview.innerHTML = `<div class="selected-text">${escapeHtml(truncated)}</div>`;
         } else {
-          preview.innerHTML = '<p class="placeholder">Select text in your document to get started.</p>';
+          preview.innerHTML =
+            '<p class="placeholder">Select text in your document to get started.</p>';
         }
         updateAskButton();
       });
@@ -118,20 +117,20 @@
     }
   }
 
-  // ── Ask AI ─────────────────────────────────────────────────────────
+  // ── Ask AI (OpenAI Chat Completions) ───────────────────────────────
   async function askQuestion() {
-    const apiUrl = localStorage.getItem("aissociate_api_url");
+    const apiUrl =
+      localStorage.getItem("aissociate_api_url") || OPENAI_ENDPOINT;
     const apiKey = localStorage.getItem("aissociate_api_key");
+    const model = localStorage.getItem("aissociate_model") || "gpt-4o";
     const language = localStorage.getItem("aissociate_language") || "auto";
 
-    if (!apiUrl || !apiKey) {
-      // Auto-expand settings
+    if (!apiKey) {
       $("settings-panel").classList.remove("collapsed");
-      showStatus("settings-status", "Please configure API settings first.", "error");
+      showStatus("settings-status", "Please configure your API key first.", "error");
       return;
     }
 
-    // Re-grab selection in case it changed
     await refreshSelection();
 
     if (!currentSelection) {
@@ -144,6 +143,15 @@
 
     setLoading(true);
 
+    const langInstruction =
+      language !== "auto"
+        ? ` Please respond in ${languageLabel(language)}.`
+        : "";
+
+    const userMessage =
+      `Legal text for analysis:\n"""\n${currentSelection}\n"""\n\n` +
+      `Question: ${question}${langInstruction}`;
+
     try {
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -152,32 +160,31 @@
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          question: question,
-          context: currentSelection,
-          source: "word-plugin",
-          options: {
-            language: language,
-            detail_level: "detailed",
-          },
+          model: model,
+          messages: [
+            { role: "system", content: LEGAL_SYSTEM_PROMPT },
+            { role: "user", content: userMessage },
+          ],
+          temperature: 0.3,
+          max_tokens: 1024,
         }),
       });
 
       if (!response.ok) {
-        const errorBody = await response.text().catch(() => "");
-        throw new Error(
-          `API error ${response.status}${errorBody ? ": " + errorBody : ""}`
-        );
+        const errorBody = await response.json().catch(() => ({}));
+        const msg = errorBody?.error?.message || `HTTP ${response.status}`;
+        throw new Error(msg);
       }
 
       const data = await response.json();
-      currentResponse = data.answer || data.response || data.text || JSON.stringify(data, null, 2);
+      currentResponse =
+        data?.choices?.[0]?.message?.content?.trim() ||
+        "No response received.";
 
-      // Show response
       $("response-content").textContent = currentResponse;
       $("response-panel").classList.remove("hidden");
       $("comment-status").classList.add("hidden");
 
-      // Add to history
       addToHistory(question, currentResponse);
     } catch (err) {
       $("response-content").textContent = "Error: " + err.message;
@@ -200,17 +207,15 @@
 
         const commentText = `[AI:ssociate] ${currentResponse}`;
 
-        // Word JS API 1.4+ supports insertComment
         if (selection.insertComment) {
           selection.insertComment(commentText);
           await context.sync();
           showStatus("comment-status", "Comment inserted successfully.", "success");
         } else {
-          // Fallback: copy to clipboard with instruction
           await navigator.clipboard.writeText(commentText);
           showStatus(
             "comment-status",
-            "Your Word version doesn't support programmatic comments. Response copied to clipboard — paste it as a comment manually (Ctrl+Alt+M).",
+            "Your Word version doesn't support programmatic comments. Response copied — paste manually (Ctrl+Alt+M).",
             "error"
           );
         }
@@ -228,11 +233,8 @@
       const btn = $("copy-response-btn");
       const original = btn.textContent;
       btn.textContent = "Copied!";
-      setTimeout(() => {
-        btn.textContent = original;
-      }, 1500);
+      setTimeout(() => { btn.textContent = original; }, 1500);
     } catch {
-      // Fallback
       const ta = document.createElement("textarea");
       ta.value = currentResponse;
       document.body.appendChild(ta);
@@ -253,12 +255,7 @@
   }
 
   function addToHistory(question, answer) {
-    history.unshift({
-      question,
-      answer,
-      timestamp: new Date().toISOString(),
-    });
-    // Keep last 50
+    history.unshift({ question, answer, timestamp: new Date().toISOString() });
     if (history.length > 50) history = history.slice(0, 50);
     localStorage.setItem("aissociate_history", JSON.stringify(history));
     renderHistory();
@@ -284,11 +281,9 @@
       )
       .join("");
 
-    // Click to restore
     list.querySelectorAll("li").forEach((li) => {
       li.addEventListener("click", () => {
-        const idx = parseInt(li.dataset.index, 10);
-        const item = history[idx];
+        const item = history[parseInt(li.dataset.index, 10)];
         if (item) {
           $("question-input").value = item.question;
           currentResponse = item.answer;
@@ -307,11 +302,9 @@
 
   // ── Helpers ────────────────────────────────────────────────────────
   function updateAskButton() {
-    const hasSettings =
-      localStorage.getItem("aissociate_api_url") &&
-      localStorage.getItem("aissociate_api_key");
+    const hasKey = !!localStorage.getItem("aissociate_api_key");
     const hasQuestion = $("question-input").value.trim().length > 0;
-    $("ask-btn").disabled = !(hasSettings && hasQuestion);
+    $("ask-btn").disabled = !(hasKey && hasQuestion);
   }
 
   function setLoading(loading) {
@@ -326,7 +319,12 @@
     el.textContent = message;
     el.className = `status-msg ${type}`;
     el.classList.remove("hidden");
-    setTimeout(() => el.classList.add("hidden"), 5000);
+    setTimeout(() => el.classList.add("hidden"), 6000);
+  }
+
+  function languageLabel(code) {
+    const map = { en: "English", de: "German", fr: "French" };
+    return map[code] || code;
   }
 
   function escapeHtml(str) {
