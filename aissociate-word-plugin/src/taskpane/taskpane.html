@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI:ssociate</title>
+  <link rel="stylesheet" href="taskpane.css" />
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="logo">AI<span class="logo-colon">:</span>ssociate</h1>
+      <p class="subtitle">Legal AI Assistant</p>
+    </header>
+
+    <!-- Settings panel (collapsible) -->
+    <div id="settings-panel" class="panel collapsed">
+      <button id="settings-toggle" class="settings-toggle" aria-expanded="false">
+        Settings <span class="chevron">&#9660;</span>
+      </button>
+      <div id="settings-body" class="settings-body">
+        <label for="api-url">API Endpoint</label>
+        <input id="api-url" type="url" placeholder="https://api.aissociate.example.com/v1/ask" />
+
+        <label for="api-key">API Key</label>
+        <div class="key-input-wrapper">
+          <input id="api-key" type="password" placeholder="sk-..." />
+          <button id="toggle-key-visibility" class="icon-btn" title="Show/hide key">&#128065;</button>
+        </div>
+
+        <label for="language-select">Response Language</label>
+        <select id="language-select">
+          <option value="auto">Auto-detect</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Fran&ccedil;ais</option>
+        </select>
+
+        <button id="save-settings" class="btn btn-secondary">Save Settings</button>
+        <p id="settings-status" class="status-msg hidden"></p>
+      </div>
+    </div>
+
+    <!-- Main interaction area -->
+    <div class="panel">
+      <div id="selection-preview" class="selection-preview">
+        <p class="placeholder">Select text in your document to get started.</p>
+      </div>
+
+      <label for="question-input">Your Question</label>
+      <textarea
+        id="question-input"
+        rows="3"
+        placeholder="e.g. What are the key risks in this clause?"
+      ></textarea>
+
+      <div class="btn-row">
+        <button id="ask-btn" class="btn btn-primary" disabled>
+          <span id="ask-btn-text">Ask AI:ssociate</span>
+          <span id="ask-spinner" class="spinner hidden"></span>
+        </button>
+        <button id="grab-selection-btn" class="btn btn-outline" title="Refresh selected text">
+          &#8635; Grab Selection
+        </button>
+      </div>
+    </div>
+
+    <!-- Response area -->
+    <div id="response-panel" class="panel hidden">
+      <h2>Response</h2>
+      <div id="response-content" class="response-content"></div>
+      <div class="btn-row">
+        <button id="insert-comment-btn" class="btn btn-secondary">Insert as Comment</button>
+        <button id="copy-response-btn" class="btn btn-outline">Copy</button>
+      </div>
+      <p id="comment-status" class="status-msg hidden"></p>
+    </div>
+
+    <!-- History -->
+    <div id="history-panel" class="panel hidden">
+      <h2>History</h2>
+      <ul id="history-list" class="history-list"></ul>
+      <button id="clear-history-btn" class="btn btn-outline btn-sm">Clear History</button>
+    </div>
+  </div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>

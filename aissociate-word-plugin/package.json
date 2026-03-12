@@ -1,0 +1,32 @@
+{
+  "name": "aissociate-word-plugin",
+  "version": "1.0.0",
+  "description": "Microsoft Word Add-in for AI:ssociate — a legal AI assistant. Select text, ask questions, get answers as comments.",
+  "scripts": {
+    "start": "webpack serve --config webpack.config.js --mode development",
+    "build": "webpack --config webpack.config.js --mode production",
+    "dev": "webpack serve --config webpack.config.js --mode development --open",
+    "sideload": "npx office-addin-dev-certs install && npm start",
+    "validate": "npx office-addin-manifest validate manifest.xml",
+    "lint": "eslint src/"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.0.0",
+    "html-webpack-plugin": "^5.6.0",
+    "copy-webpack-plugin": "^12.0.0",
+    "css-loader": "^6.10.0",
+    "style-loader": "^3.3.4",
+    "office-addin-dev-certs": "^1.13.0"
+  },
+  "keywords": [
+    "word",
+    "office-add-in",
+    "legal",
+    "ai",
+    "aissociate"
+  ],
+  "license": "MIT"
+}
