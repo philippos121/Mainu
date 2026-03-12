@@ -1,0 +1,71 @@
+╔═══════════════════════════════════════════════════════╗
+║        AI:ssociate — Legal AI for Microsoft Word      ║
+╚═══════════════════════════════════════════════════════╝
+
+WHAT IT DOES
+  Select any text in Word, ask a legal question,
+  and get an AI answer inserted as a Word comment.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SETUP (one time only — takes 2 minutes)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1 — Start the server
+  Windows:   Double-click  START-Windows.bat
+  Mac:       Double-click  START-Mac.sh
+             (If blocked: right-click → Open)
+
+  ✓ Leave this window open the whole time you use Word.
+
+STEP 2 — Sideload the add-in into Word (one time only)
+
+  WINDOWS:
+    1. Open Word
+    2. File → Options → Trust Center → Trust Center Settings
+    3. Click "Trusted Add-in Catalogs"
+    4. Catalog Url: type  http://localhost:3000
+    5. Click "Add Catalog" → check "Show in Menu" → OK → OK
+    6. Restart Word
+    7. Insert → My Add-ins → Shared Folder → AI:ssociate → Add
+
+  MAC:
+    1. Open Finder → Go → Go to Folder → paste this path:
+       ~/Library/Containers/com.microsoft.Word/Data/Documents/wef/
+       (Create the "wef" folder if it does not exist)
+    2. Copy  manifest.xml  into that folder
+    3. Restart Word
+    4. Insert → My Add-ins → AI:ssociate
+
+STEP 3 — Enter your API key
+  1. In Word, click "Open Panel" in the AI:ssociate ribbon group
+  2. Expand Settings
+  3. Paste your OpenAI API key (starts with sk-...)
+  4. Click Save Settings
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DAILY USE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every time you want to use the plugin:
+  1. Double-click START-Windows.bat (or START-Mac.sh)
+  2. Open your Word document
+  3. Select text → type your question → Ask AI:ssociate
+  4. Click "Insert as Comment" to save the answer in Word
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Panel shows blank / not loading
+  → Make sure START script is running first
+
+  "401 Unauthorized" error
+  → Check your API key in Settings
+
+  "Ask AI:ssociate" button stays grey
+  → Save your API key in Settings, then select some text
+
+  Add-in doesn't appear in Word
+  → Restart Word with the START script already running
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

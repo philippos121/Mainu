@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI:ssociate</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  <style>
+    :root {
+      --primary: #1a3a5c;
+      --primary-light: #2a5a8c;
+      --accent: #d4a843;
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --text: #1e1e1e;
+      --text-muted: #6b7280;
+      --border: #e0e3e8;
+      --success: #16a34a;
+      --error: #dc2626;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", -apple-system, sans-serif; font-size: 13px; color: var(--text); background: var(--bg); line-height: 1.5; overflow-y: auto; }
+    #app { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .header { text-align: center; padding: 8px 0 2px; }
+    .logo { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .logo-colon { color: var(--accent); }
+    .subtitle { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    .panel h2 { font-size: 12px; font-weight: 600; color: var(--primary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .settings-toggle { width: 100%; background: none; border: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0; }
+    .settings-toggle:hover { color: var(--primary); }
+    .chevron { font-size: 10px; transition: transform 0.2s; }
+    .panel.collapsed .settings-body { display: none; }
+    .panel.collapsed .chevron { transform: rotate(-90deg); }
+    .settings-body { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    label { font-size: 12px; font-weight: 600; color: var(--text); }
+    input[type="url"], input[type="password"], input[type="text"], textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 12px; background: var(--bg); color: var(--text); transition: border-color 0.15s; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 2px rgba(26,58,92,.1); }
+    textarea { resize: vertical; min-height: 60px; }
+    .key-input-wrapper { display: flex; gap: 6px; }
+    .key-input-wrapper input { flex: 1; }
+    .icon-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 4px 8px; font-size: 14px; }
+    .icon-btn:hover { background: var(--border); }
+    .selection-preview { background: var(--bg); border: 1px dashed var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; max-height: 100px; overflow-y: auto; font-size: 12px; }
+    .selection-preview .placeholder { color: var(--text-muted); font-style: italic; text-align: center; }
+    .selected-text { white-space: pre-wrap; word-break: break-word; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border: none; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s, opacity 0.15s; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-light); }
+    .btn-secondary { background: var(--accent); color: var(--primary); }
+    .btn-secondary:hover:not(:disabled) { background: #c69a35; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover:not(:disabled) { background: var(--bg); }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .response-content { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 12px; line-height: 1.6; max-height: 280px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; margin-bottom: 10px; }
+    .history-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; max-height: 180px; overflow-y: auto; }
+    .history-list li { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 11px; cursor: pointer; }
+    .history-list li:hover { background: var(--border); }
+    .history-q { font-weight: 600; color: var(--primary); margin-bottom: 2px; }
+    .history-a { color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .status-msg { font-size: 11px; margin-top: 6px; padding: 4px 0; }
+    .status-msg.success { color: var(--success); }
+    .status-msg.error { color: var(--error); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header class="header">
+    <h1 class="logo">AI<span class="logo-colon">:</span>ssociate</h1>
+    <p class="subtitle">Legal AI Assistant</p>
+  </header>
+
+  <div id="settings-panel" class="panel collapsed">
+    <button id="settings-toggle" class="settings-toggle" aria-expanded="false">
+      Settings <span class="chevron">&#9660;</span>
+    </button>
+    <div class="settings-body">
+      <label for="api-key">OpenAI API Key</label>
+      <div class="key-input-wrapper">
+        <input id="api-key" type="password" placeholder="sk-..." />
+        <button id="toggle-key-visibility" class="icon-btn" title="Show/hide">&#128065;</button>
+      </div>
+
+      <label for="model-select">Model</label>
+      <select id="model-select">
+        <option value="gpt-4o">GPT-4o (recommended)</option>
+        <option value="gpt-4o-mini">GPT-4o Mini (faster)</option>
+        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+        <option value="gpt-4">GPT-4</option>
+      </select>
+
+      <label for="language-select">Response Language</label>
+      <select id="language-select">
+        <option value="auto">Auto-detect</option>
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+        <option value="fr">Français</option>
+      </select>
+
+      <button id="save-settings" class="btn btn-secondary">Save Settings</button>
+      <p id="settings-status" class="status-msg hidden"></p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div id="selection-preview" class="selection-preview">
+      <p class="placeholder">Select text in your document to get started.</p>
+    </div>
+    <label for="question-input">Your Question</label>
+    <textarea id="question-input" rows="3" placeholder="e.g. What are the key risks in this clause?"></textarea>
+    <div class="btn-row">
+      <button id="ask-btn" class="btn btn-primary" disabled>
+        <span id="ask-btn-text">Ask AI:ssociate</span>
+        <span id="ask-spinner" class="spinner hidden"></span>
+      </button>
+      <button id="grab-selection-btn" class="btn btn-outline">&#8635; Grab Selection</button>
+    </div>
+  </div>
+
+  <div id="response-panel" class="panel hidden">
+    <h2>Response</h2>
+    <div id="response-content" class="response-content"></div>
+    <div class="btn-row">
+      <button id="insert-comment-btn" class="btn btn-secondary">Insert as Comment</button>
+      <button id="copy-response-btn" class="btn btn-outline">Copy</button>
+    </div>
+    <p id="comment-status" class="status-msg hidden"></p>
+  </div>
+
+  <div id="history-panel" class="panel hidden">
+    <h2>History</h2>
+    <ul id="history-list" class="history-list"></ul>
+    <button id="clear-history-btn" class="btn btn-outline btn-sm">Clear History</button>
+  </div>
+</div>
+
+<script>
+/* global Office, Word */
+(function () {
+  "use strict";
+
+  const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+  const SYSTEM_PROMPT =
+    "You are AI:ssociate, an expert legal AI assistant. Help lawyers analyze contracts, " +
+    "clauses, and legal documents. Provide clear, accurate legal analysis. Identify risks, " +
+    "obligations, key terms, and issues. Format your response in plain text suitable for a " +
+    "Word comment (no markdown symbols).";
+
+  let currentSelection = "";
+  let currentResponse = "";
+  let history = [];
+
+  const $ = (id) => document.getElementById(id);
+
+  Office.onReady(({ host }) => {
+    if (host === Office.HostType.Word) {
+      loadSettings();
+      loadHistory();
+      bindEvents();
+      refreshSelection();
+      // Auto-open settings if no key saved
+      if (!localStorage.getItem("aissociate_api_key")) {
+        $("settings-panel").classList.remove("collapsed");
+      }
+    }
+  });
+
+  function loadSettings() {
+    $("api-key").value = localStorage.getItem("aissociate_api_key") || "";
+    $("model-select").value = localStorage.getItem("aissociate_model") || "gpt-4o";
+    $("language-select").value = localStorage.getItem("aissociate_language") || "auto";
+  }
+
+  function saveSettings() {
+    const key = $("api-key").value.trim();
+    if (!key) { showStatus("settings-status", "Please enter your API key.", "error"); return; }
+    localStorage.setItem("aissociate_api_key", key);
+    localStorage.setItem("aissociate_model", $("model-select").value);
+    localStorage.setItem("aissociate_language", $("language-select").value);
+    showStatus("settings-status", "Saved!", "success");
+    updateAskButton();
+  }
+
+  function bindEvents() {
+    $("settings-toggle").addEventListener("click", () => {
+      $("settings-panel").classList.toggle("collapsed");
+    });
+    $("save-settings").addEventListener("click", saveSettings);
+    $("toggle-key-visibility").addEventListener("click", () => {
+      $("api-key").type = $("api-key").type === "password" ? "text" : "password";
+    });
+    $("grab-selection-btn").addEventListener("click", refreshSelection);
+    $("ask-btn").addEventListener("click", askQuestion);
+    $("insert-comment-btn").addEventListener("click", insertComment);
+    $("copy-response-btn").addEventListener("click", copyResponse);
+    $("clear-history-btn").addEventListener("click", clearHistory);
+    $("question-input").addEventListener("input", updateAskButton);
+  }
+
+  async function refreshSelection() {
+    try {
+      await Word.run(async (ctx) => {
+        const sel = ctx.document.getSelection();
+        sel.load("text");
+        await ctx.sync();
+        currentSelection = sel.text.trim();
+        const preview = $("selection-preview");
+        if (currentSelection) {
+          const t = currentSelection.length > 500 ? currentSelection.substring(0, 500) + "…" : currentSelection;
+          preview.innerHTML = `<div class="selected-text">${esc(t)}</div>`;
+        } else {
+          preview.innerHTML = '<p class="placeholder">Select text in your document to get started.</p>';
+        }
+        updateAskButton();
+      });
+    } catch {
+      $("selection-preview").innerHTML = '<p class="placeholder">Could not read selection.</p>';
+    }
+  }
+
+  async function askQuestion() {
+    const apiKey = localStorage.getItem("aissociate_api_key");
+    const model = localStorage.getItem("aissociate_model") || "gpt-4o";
+    const language = localStorage.getItem("aissociate_language") || "auto";
+    if (!apiKey) {
+      $("settings-panel").classList.remove("collapsed");
+      showStatus("settings-status", "Please enter your API key first.", "error");
+      return;
+    }
+    await refreshSelection();
+    if (!currentSelection) {
+      showStatus("comment-status", "Please select text in your document first.", "error");
+      return;
+    }
+    const question = $("question-input").value.trim();
+    if (!question) return;
+
+    setLoading(true);
+    const langNote = language !== "auto" ? ` Respond in ${({en:"English",de:"German",fr:"French"})[language]}.` : "";
+    const userMsg = `Legal text:\n"""\n${currentSelection}\n"""\n\nQuestion: ${question}${langNote}`;
+
+    try {
+      const res = await fetch(OPENAI_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userMsg }
+          ],
+          temperature: 0.3,
+          max_tokens: 1024
+        })
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e?.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      currentResponse = data?.choices?.[0]?.message?.content?.trim() || "No response received.";
+      $("response-content").textContent = currentResponse;
+      $("response-panel").classList.remove("hidden");
+      $("comment-status").classList.add("hidden");
+      addToHistory(question, currentResponse);
+    } catch (err) {
+      $("response-content").textContent = "Error: " + err.message;
+      $("response-panel").classList.remove("hidden");
+      currentResponse = "";
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function insertComment() {
+    if (!currentResponse) return;
+    try {
+      await Word.run(async (ctx) => {
+        const sel = ctx.document.getSelection();
+        sel.load("text");
+        await ctx.sync();
+        const text = `[AI:ssociate] ${currentResponse}`;
+        if (sel.insertComment) {
+          sel.insertComment(text);
+          await ctx.sync();
+          showStatus("comment-status", "Comment inserted successfully.", "success");
+        } else {
+          await navigator.clipboard.writeText(text);
+          showStatus("comment-status", "Copied to clipboard — paste as a comment (Ctrl+Alt+M).", "error");
+        }
+      });
+    } catch (err) {
+      showStatus("comment-status", "Failed: " + err.message, "error");
+    }
+  }
+
+  async function copyResponse() {
+    if (!currentResponse) return;
+    try {
+      await navigator.clipboard.writeText(currentResponse);
+      const btn = $("copy-response-btn");
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+    } catch { /* ignore */ }
+  }
+
+  function loadHistory() {
+    try { history = JSON.parse(localStorage.getItem("aissociate_history") || "[]"); } catch { history = []; }
+    renderHistory();
+  }
+
+  function addToHistory(question, answer) {
+    history.unshift({ question, answer, timestamp: new Date().toISOString() });
+    if (history.length > 50) history = history.slice(0, 50);
+    localStorage.setItem("aissociate_history", JSON.stringify(history));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = $("history-list");
+    const panel = $("history-panel");
+    if (!history.length) { panel.classList.add("hidden"); return; }
+    panel.classList.remove("hidden");
+    list.innerHTML = history.map((item, i) =>
+      `<li data-index="${i}"><div class="history-q">${esc(item.question)}</div><div class="history-a">${esc(item.answer)}</div></li>`
+    ).join("");
+    list.querySelectorAll("li").forEach(li => {
+      li.addEventListener("click", () => {
+        const item = history[parseInt(li.dataset.index, 10)];
+        if (item) {
+          $("question-input").value = item.question;
+          currentResponse = item.answer;
+          $("response-content").textContent = item.answer;
+          $("response-panel").classList.remove("hidden");
+        }
+      });
+    });
+  }
+
+  function clearHistory() {
+    history = [];
+    localStorage.removeItem("aissociate_history");
+    renderHistory();
+  }
+
+  function updateAskButton() {
+    $("ask-btn").disabled = !(localStorage.getItem("aissociate_api_key") && $("question-input").value.trim());
+  }
+
+  function setLoading(on) {
+    $("ask-btn").disabled = on;
+    $("ask-btn-text").textContent = on ? "Thinking…" : "Ask AI:ssociate";
+    $("ask-spinner").classList.toggle("hidden", !on);
+    $("question-input").disabled = on;
+  }
+
+  function showStatus(id, msg, type) {
+    const el = $(id);
+    el.textContent = msg;
+    el.className = `status-msg ${type}`;
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), 6000);
+  }
+
+  function esc(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+})();
+</script>
+</body>
+</html>

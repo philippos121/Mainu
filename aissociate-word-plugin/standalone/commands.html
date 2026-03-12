@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  <script>
+  /* global Office, Word */
+  const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+  const SYSTEM_PROMPT =
+    "You are AI:ssociate, an expert legal AI assistant. Provide concise legal analysis " +
+    "suitable for a Word comment (no markdown). Identify key risks, obligations, and notable clauses.";
+
+  Office.onReady(() => {
+    Office.actions.associate("askAboutSelection", askAboutSelection);
+  });
+
+  async function askAboutSelection(event) {
+    const apiKey = localStorage.getItem("aissociate_api_key") || "";
+    const model  = localStorage.getItem("aissociate_model") || "gpt-4o";
+    if (!apiKey) { event.completed(); return; }
+
+    try {
+      await Word.run(async (ctx) => {
+        const sel = ctx.document.getSelection();
+        sel.load("text");
+        await ctx.sync();
+        const text = sel.text.trim();
+        if (!text) { event.completed(); return; }
+
+        const res = await fetch(OPENAI_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: `Legal text:\n"""\n${text}\n"""\n\nProvide a concise analysis: key risks, obligations, and notable clauses.` }
+            ],
+            temperature: 0.3,
+            max_tokens: 512
+          })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const answer = data?.choices?.[0]?.message?.content?.trim() || "No response.";
+        if (sel.insertComment) { sel.insertComment(`[AI:ssociate] ${answer}`); await ctx.sync(); }
+        event.completed();
+      });
+    } catch { event.completed(); }
+  }
+  </script>
+</head>
+<body></body>
+</html>
