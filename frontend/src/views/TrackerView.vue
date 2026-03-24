@@ -56,7 +56,7 @@
               size="large"
               block
               :loading="loading"
-              @click="search"
+              @click="searchFresh"
             >
               <v-icon start>mdi-magnify</v-icon>
               Suchen
@@ -184,7 +184,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import api from '../services/api'
 
 const docType = ref('gesetze')
@@ -198,6 +198,14 @@ const error = ref('')
 const results = ref([])
 const totalHits = ref(0)
 const page = ref(1)
+
+// Reset page and re-search when switching document type
+watch(docType, () => {
+  if (searched.value) {
+    page.value = 1
+    search()
+  }
+})
 
 const categoryLabel = computed(() => {
   if (!selectedCategory.value) return 'Alle Rechtsgebiete'
@@ -238,6 +246,11 @@ async function loadFilters() {
   } catch (e) {
     error.value = 'Filter konnten nicht geladen werden.'
   }
+}
+
+async function searchFresh() {
+  page.value = 1
+  await search()
 }
 
 async function search() {

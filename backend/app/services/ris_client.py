@@ -5,6 +5,7 @@ Supports two document types:
   - Gerichtsentscheidungen (Judikatur from all court sources)
 """
 
+import asyncio
 import logging
 from datetime import date, timedelta
 
@@ -65,14 +66,24 @@ COURT_SOURCES = [
 ]
 
 # Map Rechtsgebiet index → relevant court Applikation(en).
-# Unmapped indices → query all courts.
+# Every category is mapped to either specific courts or all courts.
+# When courts are narrowed, we rely on the court type for relevance.
+# When querying all courts (broad topics), we add Suchworte to filter.
 INDEX_TO_COURTS: dict[str, list[str]] = {
-    "1": ["Vfgh"],                            # Verfassungsrecht
-    "2": ["Vwgh", "Bvwg", "Lvwg"],            # Verwaltungsrecht
-    "6": ["Justiz"],                           # Justiz
-    "20": ["Justiz"],                          # Mietrecht
-    "21": ["Justiz"],                          # Strafrecht
-    "22": ["Justiz"],                          # Zivilrecht
+    "1": ["Vfgh"],                            # Verfassungsrecht → Constitutional Court
+    "2": ["Vwgh", "Bvwg", "Lvwg"],            # Verwaltungsrecht → Admin courts
+    "6": ["Justiz"],                           # Justiz → Ordinary courts
+    "20": ["Justiz"],                          # Mietrecht → Ordinary courts
+    "21": ["Justiz"],                          # Strafrecht → Ordinary courts
+    "22": ["Justiz"],                          # Zivilrecht → Ordinary courts
+    "23": ["Vwgh", "Bvwg"],                    # Datenschutz → Admin courts
+}
+
+# For Rechtsgebiete with no specific court mapping, the Judikatur endpoint
+# has no Index/Rechtsgebiet parameter. We use Suchworte (keyword search)
+# with the category label to filter results by topic.
+_INDEX_TO_LABEL: dict[str, str] = {
+    cat["index"]: cat["label"] for cat in LEGAL_CATEGORIES
 }
 
 # DokumenteProSeite enum
@@ -111,37 +122,54 @@ async def search_gerichtsentscheidungen(
     """Search Judikatur (Gerichtsentscheidungen).
 
     Uses: /Judikatur?Applikation=...&EntscheidungsdatumVon=...
-    The Judikatur endpoint uses date range instead of ImRisSeit.
-    We query the court(s) mapped to the selected Rechtsgebiet.
+    The Judikatur endpoint has no Index/Rechtsgebiet parameter.
+    Strategy:
+      - If the Rechtsgebiet maps to specific courts → query only those courts
+      - If not → query all courts with Suchworte=<Rechtsgebiet label> as keyword filter
+      - If no Rechtsgebiet selected → query all courts unfiltered
+    All court queries run in parallel.
     """
-    # Convert ImRisSeit to a date range
     days = _timeframe_to_days(im_ris_seit)
     date_from = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    # Determine which courts to query
+    has_court_mapping = index in INDEX_TO_COURTS
     courts = INDEX_TO_COURTS.get(index, [c["applikation"] for c in COURT_SOURCES])
 
-    all_results: list[dict] = []
-    total_hits = 0
+    # Build Suchworte: use category label as keyword when no court mapping exists
+    # and a specific Rechtsgebiet was selected
+    suchworte = ""
+    if index and not has_court_mapping:
+        suchworte = _INDEX_TO_LABEL.get(index, "")
 
-    for court in courts:
-        params = {
+    async def _query_court(court: str) -> tuple[list[dict], int]:
+        params: dict = {
             "Applikation": court,
             "DokumenteProSeite": DOCS_PER_PAGE,
             "Seitennummer": page,
             "EntscheidungsdatumVon": date_from,
         }
+        if suchworte:
+            params["Suchworte"] = suchworte
+
         url = f"{settings.RIS_API_BASE_URL}/Judikatur"
         data = await _fetch(url, params)
-
         refs = _extract_refs(data)
         hits = _extract_hits(data)
-        total_hits += hits
-
+        results = []
         for ref in refs:
             parsed = _parse_judikatur_doc(ref, court)
             if parsed:
-                all_results.append(parsed)
+                results.append(parsed)
+        return results, hits
+
+    # Query all courts in parallel
+    court_results = await asyncio.gather(*[_query_court(c) for c in courts])
+
+    all_results: list[dict] = []
+    total_hits = 0
+    for results, hits in court_results:
+        all_results.extend(results)
+        total_hits += hits
 
     return {"results": all_results, "total_hits": total_hits}
 
