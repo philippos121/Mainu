@@ -1,44 +1,73 @@
 <template>
   <v-app>
-    <v-app-bar elevation="0" class="app-bar-glass">
-      <v-toolbar-title class="d-flex align-center">
-        <v-icon color="primary" class="mr-2">mdi-scale-balance</v-icon>
-        <span class="text-h6 font-weight-bold">RIS Tracker</span>
-        <v-chip size="x-small" color="accent" variant="flat" class="ml-2">AT</v-chip>
-      </v-toolbar-title>
+    <!-- Dark navy sidebar strip -->
+    <v-navigation-drawer
+      permanent
+      rail
+      color="secondary"
+      class="sidebar-rail"
+    >
+      <div class="d-flex flex-column align-center py-4" style="height: 100%">
+        <!-- Logo -->
+        <div class="sidebar-logo mb-6">
+          <span class="text-h5 font-weight-black" style="color: #0C7C7C">R</span>
+        </div>
 
-      <v-spacer />
+        <!-- Nav icons -->
+        <v-btn icon variant="text" size="small" class="mb-2 sidebar-icon" to="/">
+          <v-icon color="white" size="20">mdi-scale-balance</v-icon>
+        </v-btn>
+        <v-btn icon variant="text" size="small" class="mb-2 sidebar-icon">
+          <v-icon color="rgba(255,255,255,0.5)" size="20">mdi-file-document-outline</v-icon>
+        </v-btn>
+        <v-btn icon variant="text" size="small" class="mb-2 sidebar-icon">
+          <v-icon color="rgba(255,255,255,0.5)" size="20">mdi-gavel</v-icon>
+        </v-btn>
 
-      <v-btn icon @click="toggleTheme">
-        <v-icon>{{ isDark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-      </v-btn>
-    </v-app-bar>
+        <v-spacer />
 
-    <v-main>
+        <v-btn icon variant="text" size="small" class="sidebar-icon">
+          <v-icon color="rgba(255,255,255,0.5)" size="20">mdi-cog-outline</v-icon>
+        </v-btn>
+      </div>
+    </v-navigation-drawer>
+
+    <v-main class="main-content">
       <router-view />
     </v-main>
   </v-app>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useTheme } from 'vuetify'
-
-const theme = useTheme()
-const isDark = computed(() => theme.global.current.value.dark)
-
-function toggleTheme() {
-  theme.global.name.value = isDark.value ? 'risLight' : 'risDark'
-}
 </script>
 
 <style>
-.app-bar-glass {
-  background: rgba(18, 24, 41, 0.8) !important;
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+/* Global styles matching aissociate.at aesthetic */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+.sidebar-rail {
+  border-right: none !important;
+}
+
+.sidebar-logo {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-icon:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.main-content {
+  background: #F5F6F8 !important;
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -46,7 +75,12 @@ function toggleTheme() {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
+}
+
+/* Override Vuetify card borders to be softer */
+.v-card--variant-outlined {
+  border-color: rgba(0, 0, 0, 0.08) !important;
 }
 </style>

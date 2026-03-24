@@ -12,37 +12,40 @@ const vuetify = createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: 'risDark',
+    defaultTheme: 'aissociate',
     themes: {
-      risLight: {
+      aissociate: {
         dark: false,
         colors: {
-          primary: '#1a237e',
-          secondary: '#0d47a1',
-          accent: '#ff6f00',
-          background: '#f5f5f5',
-          surface: '#ffffff',
-          error: '#c62828',
-          success: '#2e7d32',
-          warning: '#f57f17',
-          info: '#0277bd',
+          primary: '#0C7C7C',
+          secondary: '#1E2A3A',
+          accent: '#E8742A',
+          background: '#F5F6F8',
+          surface: '#FFFFFF',
+          'surface-variant': '#F0F1F3',
+          error: '#C62828',
+          success: '#2E7D32',
+          warning: '#E8742A',
+          info: '#0C7C7C',
+          'on-primary': '#FFFFFF',
+          'on-secondary': '#FFFFFF',
+          'on-accent': '#FFFFFF',
         },
       },
-      risDark: {
-        dark: true,
-        colors: {
-          primary: '#5c6bc0',
-          secondary: '#42a5f5',
-          accent: '#ffab00',
-          background: '#0a0e1a',
-          surface: '#121829',
-          'surface-variant': '#1a2035',
-          error: '#ef5350',
-          success: '#66bb6a',
-          warning: '#ffa726',
-          info: '#29b6f6',
-        },
-      },
+    },
+  },
+  defaults: {
+    VBtn: {
+      rounded: 'lg',
+    },
+    VCard: {
+      rounded: 'lg',
+    },
+    VSelect: {
+      rounded: 'lg',
+    },
+    VChip: {
+      rounded: 'lg',
     },
   },
 })
