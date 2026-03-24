@@ -1,5 +1,4 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
@@ -13,9 +12,9 @@ const vuetify = createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: 'lexwatchDark',
+    defaultTheme: 'risDark',
     themes: {
-      lexwatchLight: {
+      risLight: {
         dark: false,
         colors: {
           primary: '#1a237e',
@@ -29,7 +28,7 @@ const vuetify = createVuetify({
           info: '#0277bd',
         },
       },
-      lexwatchDark: {
+      risDark: {
         dark: true,
         colors: {
           primary: '#5c6bc0',
@@ -49,7 +48,6 @@ const vuetify = createVuetify({
 })
 
 const app = createApp(App)
-app.use(createPinia())
 app.use(router)
 app.use(vuetify)
 app.mount('#app')
