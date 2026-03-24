@@ -8,6 +8,7 @@ import 'vuetify/styles'
 import App from './App.vue'
 import router from './router'
 
+// Exact aissociate.at color palette
 const vuetify = createVuetify({
   components,
   directives,
@@ -17,16 +18,16 @@ const vuetify = createVuetify({
       aissociate: {
         dark: false,
         colors: {
-          primary: '#0C7C7C',
-          secondary: '#1E2A3A',
-          accent: '#E8742A',
-          background: '#F5F6F8',
+          primary: '#007993',         // navy-600
+          secondary: '#0a5062',       // navy-800
+          accent: '#ef6007',          // apricot-600
+          background: '#F9FAFB',      // gray-50
           surface: '#FFFFFF',
-          'surface-variant': '#F0F1F3',
-          error: '#C62828',
-          success: '#2E7D32',
-          warning: '#E8742A',
-          info: '#0C7C7C',
+          'surface-variant': '#f1fbfb', // navy-50
+          error: '#d6313f',           // crimson-500
+          success: '#008e4a',         // emerald-600
+          warning: '#ef6007',         // apricot-600
+          info: '#007993',            // navy-600
           'on-primary': '#FFFFFF',
           'on-secondary': '#FFFFFF',
           'on-accent': '#FFFFFF',
@@ -35,18 +36,10 @@ const vuetify = createVuetify({
     },
   },
   defaults: {
-    VBtn: {
-      rounded: 'lg',
-    },
-    VCard: {
-      rounded: 'lg',
-    },
-    VSelect: {
-      rounded: 'lg',
-    },
-    VChip: {
-      rounded: 'lg',
-    },
+    VBtn: { rounded: 'lg' },
+    VCard: { rounded: 'lg' },
+    VSelect: { rounded: 'lg' },
+    VChip: { rounded: 'lg' },
   },
 })
 

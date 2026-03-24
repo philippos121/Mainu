@@ -1,33 +1,37 @@
 <template>
   <v-app>
-    <!-- Dark navy sidebar strip -->
+    <!-- Dark navy sidebar strip (aissociate-style) -->
     <v-navigation-drawer
       permanent
       rail
-      color="secondary"
       class="sidebar-rail"
+      style="background: #0f3d49"
     >
       <div class="d-flex flex-column align-center py-4" style="height: 100%">
-        <!-- Logo -->
+        <!-- Logo area -->
         <div class="sidebar-logo mb-6">
-          <span class="text-h5 font-weight-black" style="color: #0C7C7C">R</span>
+          <img v-if="hasWhiteLogo" src="/logo-white.svg" alt="Logo" style="width: 28px; height: 28px" />
+          <v-icon v-else color="#16a6c5" size="28">mdi-scale-balance</v-icon>
         </div>
 
         <!-- Nav icons -->
         <v-btn icon variant="text" size="small" class="mb-2 sidebar-icon" to="/">
-          <v-icon color="white" size="20">mdi-scale-balance</v-icon>
+          <v-icon color="white" size="20">mdi-magnify</v-icon>
+          <v-tooltip activator="parent" location="end">Suche</v-tooltip>
         </v-btn>
         <v-btn icon variant="text" size="small" class="mb-2 sidebar-icon">
-          <v-icon color="rgba(255,255,255,0.5)" size="20">mdi-file-document-outline</v-icon>
+          <v-icon color="rgba(255,255,255,0.4)" size="20">mdi-file-document-outline</v-icon>
+          <v-tooltip activator="parent" location="end">Gesetze</v-tooltip>
         </v-btn>
         <v-btn icon variant="text" size="small" class="mb-2 sidebar-icon">
-          <v-icon color="rgba(255,255,255,0.5)" size="20">mdi-gavel</v-icon>
+          <v-icon color="rgba(255,255,255,0.4)" size="20">mdi-gavel</v-icon>
+          <v-tooltip activator="parent" location="end">Entscheidungen</v-tooltip>
         </v-btn>
 
         <v-spacer />
 
         <v-btn icon variant="text" size="small" class="sidebar-icon">
-          <v-icon color="rgba(255,255,255,0.5)" size="20">mdi-cog-outline</v-icon>
+          <v-icon color="rgba(255,255,255,0.4)" size="20">mdi-cog-outline</v-icon>
         </v-btn>
       </div>
     </v-navigation-drawer>
@@ -39,12 +43,25 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+
+const hasWhiteLogo = ref(false)
+
+onMounted(() => {
+  // Check if white logo exists
+  const img = new Image()
+  img.onload = () => { hasWhiteLogo.value = true }
+  img.onerror = () => { hasWhiteLogo.value = false }
+  img.src = '/logo-white.svg'
+})
 </script>
 
 <style>
-/* Global styles matching aissociate.at aesthetic */
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Global font - IBM Plex Sans like aissociate */
+body, .v-application {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
 .sidebar-rail {
@@ -64,23 +81,26 @@ body {
 }
 
 .main-content {
-  background: #F5F6F8 !important;
+  background: #F9FAFB !important;
 }
 
-/* Scrollbar */
+/* Scrollbar matching aissociate */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 0.3rem;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f1f1;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 3px;
+  background: #888;
+  border-radius: 0.3rem;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
-/* Override Vuetify card borders to be softer */
+/* Softer card borders */
 .v-card--variant-outlined {
-  border-color: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
 }
 </style>
