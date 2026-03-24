@@ -16,10 +16,13 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # ── Rechtsgebiete ──
-# The RIS Index uses two-digit Hauptgruppen (10-99) from the
-# "Systematisches Verzeichnis des Bundesrechts" which maps to 9 Sachgebiete.
-# We use Suchworte (keyword search) instead of Index for filtering,
-# because the Index numbering is complex and doesn't map to user-friendly categories.
+# The RIS "Systematisches Verzeichnis des Bundesrechts" uses two-digit
+# Hauptgruppen (10-99) organized in 9 Sachgebiete.
+# The Index parameter is a FulltextSearchExpression, so "20" matches all
+# entries under Hauptgruppe 20, and "20/05" matches that specific Untergruppe.
+#
+# For Bundesrecht: we use the correct Index values (precise categorical match).
+# For Judikatur: we use Suchworte (keyword search) since Judikatur has no Index.
 
 LEGAL_CATEGORIES = [
     {"id": "verfassungsrecht", "label": "Verfassungsrecht"},
@@ -40,25 +43,47 @@ LEGAL_CATEGORIES = [
     {"id": "europarecht", "label": "EU-Recht / Völkerrecht"},
 ]
 
-# Suchworte (keyword search terms) for each Rechtsgebiet.
-# Used for both Bundesrecht and Judikatur filtering.
+# Map category → Index Hauptgruppe(n) for Bundesrecht.
+# Format: two-digit codes from the Systematisches Verzeichnis des Bundesrechts.
+# Some categories map to multiple Hauptgruppen for comprehensive coverage.
+_CATEGORY_INDEX: dict[str, str] = {
+    "verfassungsrecht": "10",       # HG 10: Verfassungsrecht
+    "privatrecht": "20",            # HG 20: Allg. bürgerliches Recht (ABGB)
+    "strafrecht": "25",             # HG 25: Strafrecht
+    "verwaltungsrecht": "40",       # HG 40: Verwaltungsverfahren
+    "finanzrecht": "32",            # HG 32: Steuerrecht
+    "arbeitsrecht": "60",           # HG 60: Arbeitsrecht
+    "wirtschaftsrecht": "50",       # HG 50: Gewerberecht
+    "mietrecht": "20/05",           # HG 20/05: Wohn- und Mietrecht
+    "umweltrecht": "84",            # HG 84: Umweltschutz
+    "verkehrsrecht": "90",          # HG 90: Straßenverkehrsrecht
+    "gesundheitsrecht": "83",       # HG 83: Gesundheitsrecht
+    "medienrecht": "16",            # HG 16: Medienrecht
+    "datenschutz": "10/10",         # HG 10/10: Grundrechte, Datenschutz
+    "bildungsrecht": "70",          # HG 70: Schulrecht
+    "familienrecht": "20/02",       # HG 20/02: Familienrecht
+    "europarecht": "10/15",         # HG 10/15: Europäische Integration
+}
+
+# Suchworte (keyword search terms) for Judikatur filtering.
+# Judikatur endpoint has no Index parameter.
 _CATEGORY_KEYWORDS: dict[str, str] = {
     "verfassungsrecht": "Verfassungsrecht",
     "privatrecht": "Zivilrecht ABGB",
     "strafrecht": "Strafrecht StGB",
     "verwaltungsrecht": "Verwaltungsrecht",
-    "finanzrecht": "Finanzrecht Steuer",
+    "finanzrecht": "Steuerrecht Abgabe",
     "arbeitsrecht": "Arbeitsrecht Sozialversicherung",
     "wirtschaftsrecht": "Gewerberecht Wirtschaft",
-    "mietrecht": "Mietrecht Wohnrecht MRG",
+    "mietrecht": "Mietrecht MRG",
     "umweltrecht": "Umweltrecht",
     "verkehrsrecht": "Verkehrsrecht StVO",
     "gesundheitsrecht": "Gesundheit",
     "medienrecht": "Medienrecht Rundfunk",
-    "datenschutz": "Datenschutz DSGVO",
-    "bildungsrecht": "Unterricht Wissenschaft Kultur",
-    "familienrecht": "Familienrecht Personenrecht",
-    "europarecht": "EU-Recht Völkerrecht",
+    "datenschutz": "Datenschutz",
+    "bildungsrecht": "Unterricht Wissenschaft",
+    "familienrecht": "Familienrecht",
+    "europarecht": "Europarecht",
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -107,8 +132,9 @@ async def search_gesetze(
 ) -> dict:
     """Search Bundesrecht (Gesetze und Verordnungen).
 
-    Uses: /Bundesrecht?Applikation=BrKons&Suchworte=...&ImRisSeit=...
-    Filters by Rechtsgebiet via Suchworte (keyword search).
+    Uses: /Bundesrecht?Applikation=BrKons&Index=...&ImRisSeit=...
+    Filters by Rechtsgebiet via Index (two-digit Hauptgruppe from the
+    Systematisches Verzeichnis des Bundesrechts).
     """
     params: dict = {
         "Applikation": "BrKons",
@@ -117,9 +143,9 @@ async def search_gesetze(
         "ImRisSeit": im_ris_seit,
     }
     if category:
-        keywords = _CATEGORY_KEYWORDS.get(category, "")
-        if keywords:
-            params["Suchworte"] = keywords
+        index_val = _CATEGORY_INDEX.get(category, "")
+        if index_val:
+            params["Index"] = index_val
 
     url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
     return await _fetch(url, params)
