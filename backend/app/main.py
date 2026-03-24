@@ -54,22 +54,22 @@ async def get_courts():
 
 @app.get("/api/search/gesetze")
 async def api_search_gesetze(
-    index: str = Query("", description="Rechtsgebiet index (1-24), empty for all"),
+    category: str = Query("", description="Rechtsgebiet ID, empty for all"),
     im_ris_seit: str = Query("EinemMonat", description="Timeframe filter"),
     page: int = Query(1, ge=1),
 ):
     """Search Gesetze und Verordnungen (Bundesrecht consolidated)."""
-    raw = await search_gesetze(index=index, im_ris_seit=im_ris_seit, page=page)
+    raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
     return parse_bundesrecht_response(raw)
 
 
 @app.get("/api/search/gerichtsentscheidungen")
 async def api_search_gerichtsentscheidungen(
-    index: str = Query("", description="Rechtsgebiet index (1-24), empty for all"),
+    category: str = Query("", description="Rechtsgebiet ID, empty for all"),
     im_ris_seit: str = Query("EinemMonat", description="Timeframe filter"),
     page: int = Query(1, ge=1),
 ):
     """Search Gerichtsentscheidungen (court decisions)."""
     return await search_gerichtsentscheidungen(
-        index=index, im_ris_seit=im_ris_seit, page=page
+        category=category, im_ris_seit=im_ris_seit, page=page
     )

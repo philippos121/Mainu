@@ -29,7 +29,7 @@
               v-model="selectedCategory"
               :items="categories"
               item-title="label"
-              item-value="index"
+              item-value="id"
               label="Rechtsgebiet"
               variant="outlined"
               density="comfortable"
@@ -209,7 +209,7 @@ watch(docType, () => {
 
 const categoryLabel = computed(() => {
   if (!selectedCategory.value) return 'Alle Rechtsgebiete'
-  const cat = categories.value.find(c => c.index === selectedCategory.value)
+  const cat = categories.value.find(c => c.id === selectedCategory.value)
   return cat ? cat.label : ''
 })
 
@@ -267,7 +267,7 @@ async function search() {
     page: page.value,
   }
   if (selectedCategory.value) {
-    params.index = selectedCategory.value
+    params.category = selectedCategory.value
   }
 
   try {

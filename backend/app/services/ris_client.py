@@ -15,34 +15,51 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# ── Rechtsgebiete (Index values for Bundesrecht) ──
+# ── Rechtsgebiete ──
+# The RIS Index uses two-digit Hauptgruppen (10-99) from the
+# "Systematisches Verzeichnis des Bundesrechts" which maps to 9 Sachgebiete.
+# We use Suchworte (keyword search) instead of Index for filtering,
+# because the Index numbering is complex and doesn't map to user-friendly categories.
 
 LEGAL_CATEGORIES = [
-    {"index": "1", "label": "Verfassungsrecht"},
-    {"index": "2", "label": "Verwaltungsrecht – Allgemeiner Teil"},
-    {"index": "3", "label": "Äußeres"},
-    {"index": "4", "label": "Finanzrecht"},
-    {"index": "5", "label": "Gesundheit"},
-    {"index": "6", "label": "Justiz"},
-    {"index": "7", "label": "Landesverteidigung"},
-    {"index": "8", "label": "Land- und Forstwirtschaft"},
-    {"index": "9", "label": "Soziales"},
-    {"index": "10", "label": "Unterricht, Kunst und Kultur"},
-    {"index": "11", "label": "Verkehr"},
-    {"index": "12", "label": "Wirtschaft"},
-    {"index": "13", "label": "Wissenschaft und Forschung"},
-    {"index": "14", "label": "Arbeit"},
-    {"index": "15", "label": "Umwelt"},
-    {"index": "16", "label": "Sport"},
-    {"index": "17", "label": "Bürgerrecht"},
-    {"index": "18", "label": "Medien"},
-    {"index": "19", "label": "Bauten"},
-    {"index": "20", "label": "Mietrecht"},
-    {"index": "21", "label": "Strafrecht"},
-    {"index": "22", "label": "Zivilrecht"},
-    {"index": "23", "label": "Datenschutz"},
-    {"index": "24", "label": "EU-Recht"},
+    {"id": "verfassungsrecht", "label": "Verfassungsrecht"},
+    {"id": "privatrecht", "label": "Privatrecht / Zivilrecht"},
+    {"id": "strafrecht", "label": "Strafrecht"},
+    {"id": "verwaltungsrecht", "label": "Verwaltungsrecht"},
+    {"id": "finanzrecht", "label": "Finanzrecht / Steuerrecht"},
+    {"id": "arbeitsrecht", "label": "Arbeitsrecht / Sozialrecht"},
+    {"id": "wirtschaftsrecht", "label": "Wirtschaftsrecht / Gewerberecht"},
+    {"id": "mietrecht", "label": "Mietrecht / Wohnrecht"},
+    {"id": "umweltrecht", "label": "Umweltrecht"},
+    {"id": "verkehrsrecht", "label": "Verkehrsrecht"},
+    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht"},
+    {"id": "medienrecht", "label": "Medienrecht"},
+    {"id": "datenschutz", "label": "Datenschutzrecht"},
+    {"id": "bildungsrecht", "label": "Bildung / Wissenschaft / Kultur"},
+    {"id": "familienrecht", "label": "Familienrecht / Personenrecht"},
+    {"id": "europarecht", "label": "EU-Recht / Völkerrecht"},
 ]
+
+# Suchworte (keyword search terms) for each Rechtsgebiet.
+# Used for both Bundesrecht and Judikatur filtering.
+_CATEGORY_KEYWORDS: dict[str, str] = {
+    "verfassungsrecht": "Verfassungsrecht",
+    "privatrecht": "Zivilrecht ABGB",
+    "strafrecht": "Strafrecht StGB",
+    "verwaltungsrecht": "Verwaltungsrecht",
+    "finanzrecht": "Finanzrecht Steuer",
+    "arbeitsrecht": "Arbeitsrecht Sozialversicherung",
+    "wirtschaftsrecht": "Gewerberecht Wirtschaft",
+    "mietrecht": "Mietrecht Wohnrecht MRG",
+    "umweltrecht": "Umweltrecht",
+    "verkehrsrecht": "Verkehrsrecht StVO",
+    "gesundheitsrecht": "Gesundheit",
+    "medienrecht": "Medienrecht Rundfunk",
+    "datenschutz": "Datenschutz DSGVO",
+    "bildungsrecht": "Unterricht Wissenschaft Kultur",
+    "familienrecht": "Familienrecht Personenrecht",
+    "europarecht": "EU-Recht Völkerrecht",
+}
 
 # ── Timeframe options (ImRisSeit enum) ──
 
@@ -65,25 +82,16 @@ COURT_SOURCES = [
     {"applikation": "Lvwg", "label": "Landesverwaltungsgerichte (LVwG)"},
 ]
 
-# Map Rechtsgebiet index → relevant court Applikation(en).
-# Every category is mapped to either specific courts or all courts.
-# When courts are narrowed, we rely on the court type for relevance.
-# When querying all courts (broad topics), we add Suchworte to filter.
-INDEX_TO_COURTS: dict[str, list[str]] = {
-    "1": ["Vfgh"],                            # Verfassungsrecht → Constitutional Court
-    "2": ["Vwgh", "Bvwg", "Lvwg"],            # Verwaltungsrecht → Admin courts
-    "6": ["Justiz"],                           # Justiz → Ordinary courts
-    "20": ["Justiz"],                          # Mietrecht → Ordinary courts
-    "21": ["Justiz"],                          # Strafrecht → Ordinary courts
-    "22": ["Justiz"],                          # Zivilrecht → Ordinary courts
-    "23": ["Vwgh", "Bvwg"],                    # Datenschutz → Admin courts
-}
-
-# For Rechtsgebiete with no specific court mapping, the Judikatur endpoint
-# has no Index/Rechtsgebiet parameter. We use Suchworte (keyword search)
-# with the category label to filter results by topic.
-_INDEX_TO_LABEL: dict[str, str] = {
-    cat["index"]: cat["label"] for cat in LEGAL_CATEGORIES
+# Map Rechtsgebiet → relevant court Applikation(en) for Judikatur.
+# Unmapped categories → query all courts with Suchworte.
+CATEGORY_TO_COURTS: dict[str, list[str]] = {
+    "verfassungsrecht": ["Vfgh"],
+    "verwaltungsrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "privatrecht": ["Justiz"],
+    "strafrecht": ["Justiz"],
+    "mietrecht": ["Justiz"],
+    "familienrecht": ["Justiz"],
+    "datenschutz": ["Vwgh", "Bvwg"],
 }
 
 # DokumenteProSeite enum
@@ -93,53 +101,52 @@ DOCS_PER_PAGE = "Twenty"
 # ── API Calls ──
 
 async def search_gesetze(
-    index: str,
+    category: str,
     im_ris_seit: str,
     page: int = 1,
 ) -> dict:
     """Search Bundesrecht (Gesetze und Verordnungen).
 
-    Uses: /Bundesrecht?Applikation=BrKons&Index=...&ImRisSeit=...
+    Uses: /Bundesrecht?Applikation=BrKons&Suchworte=...&ImRisSeit=...
+    Filters by Rechtsgebiet via Suchworte (keyword search).
     """
-    params = {
+    params: dict = {
         "Applikation": "BrKons",
         "DokumenteProSeite": DOCS_PER_PAGE,
         "Seitennummer": page,
         "ImRisSeit": im_ris_seit,
     }
-    if index:
-        params["Index"] = index
+    if category:
+        keywords = _CATEGORY_KEYWORDS.get(category, "")
+        if keywords:
+            params["Suchworte"] = keywords
 
     url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
     return await _fetch(url, params)
 
 
 async def search_gerichtsentscheidungen(
-    index: str,
+    category: str,
     im_ris_seit: str,
     page: int = 1,
 ) -> dict:
     """Search Judikatur (Gerichtsentscheidungen).
 
-    Uses: /Judikatur?Applikation=...&EntscheidungsdatumVon=...
-    The Judikatur endpoint has no Index/Rechtsgebiet parameter.
+    Uses: /Judikatur?Applikation=...&EntscheidungsdatumVon=...&Suchworte=...
     Strategy:
       - If the Rechtsgebiet maps to specific courts → query only those courts
-      - If not → query all courts with Suchworte=<Rechtsgebiet label> as keyword filter
+      - Always use Suchworte with category keywords for topic filtering
       - If no Rechtsgebiet selected → query all courts unfiltered
     All court queries run in parallel.
     """
     days = _timeframe_to_days(im_ris_seit)
     date_from = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    has_court_mapping = index in INDEX_TO_COURTS
-    courts = INDEX_TO_COURTS.get(index, [c["applikation"] for c in COURT_SOURCES])
+    has_court_mapping = category in CATEGORY_TO_COURTS
+    courts = CATEGORY_TO_COURTS.get(category, [c["applikation"] for c in COURT_SOURCES])
 
-    # Build Suchworte: use category label as keyword when no court mapping exists
-    # and a specific Rechtsgebiet was selected
-    suchworte = ""
-    if index and not has_court_mapping:
-        suchworte = _INDEX_TO_LABEL.get(index, "")
+    # Always use keywords for topic filtering
+    suchworte = _CATEGORY_KEYWORDS.get(category, "") if category else ""
 
     async def _query_court(court: str) -> tuple[list[dict], int]:
         params: dict = {
@@ -181,7 +188,17 @@ async def _fetch(url: str, params: dict) -> dict:
         try:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # Log hit count and first doc structure for debugging
+            refs = _extract_refs(data)
+            hits = _extract_hits(data)
+            logger.info(f"RIS API: {hits} hits, {len(refs)} refs returned")
+            if refs:
+                first = refs[0]
+                data_keys = list(first.get("Data", {}).keys())
+                meta_keys = list(first.get("Data", {}).get("Metadaten", {}).keys())
+                logger.info(f"First doc: Data keys={data_keys}, Metadaten keys={meta_keys}")
+            return data
         except httpx.HTTPStatusError as e:
             logger.error(f"RIS HTTP {e.response.status_code}: {e.response.text[:500]}")
             return _empty()
@@ -272,10 +289,13 @@ def _extract_doc_url(m: dict, ref: dict, data_entry: dict) -> str:
 
 
 def _extract_id(m: dict, ref: dict, data_entry: dict) -> str:
-    """Find document ID from multiple possible locations."""
+    """Find document ID from multiple possible locations.
+
+    In v2.6: Metadaten.Technisch.ID is the primary location.
+    """
     doc_id = (
-        _s(m.get("Dokumentnummer"))
-        or _s(m.get("ID"))
+        _s(m.get("ID"))
+        or _s(m.get("Dokumentnummer"))
         or _s(data_entry.get("Dokumentnummer"))
         or _s(ref.get("Dokumentnummer"))
     )
@@ -308,8 +328,8 @@ def parse_bundesrecht_response(data: dict) -> dict:
         title = _s(m.get("Kurztitel")) or _s(m.get("Langtitel")) or _s(m.get("Titel")) or doc_id
         long_title = _s(m.get("Langtitel")) or title
         doc_url = _extract_doc_url(m, ref, data_entry)
-        change_date = _s(m.get("Aenderungsdatum")) or _s(m.get("Inkrafttretensdatum")) or _s(m.get("Geaendert")) or ""
-        bgbl = _s(m.get("Aenderung")) or _s(m.get("Kundmachungsorgan")) or ""
+        change_date = _s(m.get("Inkrafttretensdatum")) or _s(m.get("Aenderungsdatum")) or _s(m.get("Geaendert")) or ""
+        bgbl = _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or ""
         typ = _s(m.get("Typ")) or ""
         artikel = _s(m.get("ArtikelParagraphAnlage")) or ""
 
