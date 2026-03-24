@@ -234,7 +234,7 @@ async def _fetch(url: str, params: dict) -> dict:
 
 
 def _empty() -> dict:
-    return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": []}, "Hits": {"#text": "0"}}}
+    return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": [], "Hits": {"#text": "0"}}}}
 
 
 def _timeframe_to_days(im_ris_seit: str) -> int:
@@ -258,7 +258,11 @@ def _extract_refs(data: dict) -> list[dict]:
 
 
 def _extract_hits(data: dict) -> int:
-    hits = data.get("OgdSearchResult", {}).get("Hits", {})
+    hits = (
+        data.get("OgdSearchResult", {})
+        .get("OgdDocumentResults", {})
+        .get("Hits", {})
+    )
     if isinstance(hits, dict):
         text = hits.get("#text", "0")
     else:
