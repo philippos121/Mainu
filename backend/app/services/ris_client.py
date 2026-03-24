@@ -281,7 +281,20 @@ def _s(val) -> str:
 
 
 def _extract_doc_url(m: dict, ref: dict, data_entry: dict) -> str:
-    """Find DokumentUrl from multiple possible locations."""
+    """Build URL to the specific changed section (Normabschnitt).
+
+    Uses the NOR document ID to build a direct Dokument.wxe link,
+    which opens only the specific changed section, not the full law.
+    Falls back to the ELI DokumentUrl if no NOR ID is available.
+    """
+    doc_id = (
+        _s(m.get("ID"))
+        or _s(m.get("Dokumentnummer"))
+        or _s(data_entry.get("Dokumentnummer"))
+        or _s(ref.get("Dokumentnummer"))
+    )
+    if doc_id and doc_id.startswith("NOR"):
+        return f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_id}"
     return (
         _s(m.get("DokumentUrl"))
         or _s(ref.get("DokumentUrl"))
