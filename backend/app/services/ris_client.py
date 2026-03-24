@@ -530,10 +530,15 @@ def parse_bundesrecht_response(data: dict) -> dict:
         title = _s(m.get("Kurztitel")) or _s(m.get("Langtitel")) or _s(m.get("Titel")) or doc_id
         long_title = _s(m.get("Langtitel")) or title
         doc_url = _extract_doc_url(m, ref, data_entry)
+        # Inkrafttretensdatum = when this version of the law took effect
         change_date = _s(m.get("Inkrafttretensdatum")) or _s(m.get("Aenderungsdatum")) or _s(m.get("Geaendert")) or ""
         bgbl = _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or ""
         typ = _s(m.get("Typ")) or ""
         artikel = _s(m.get("ArtikelParagraphAnlage")) or ""
+        # When the RIS database entry was last updated (metadata refresh)
+        ris_updated = _s(m.get("ZuletztAktualisiert")) or _s(m.get("GeaendertAm")) or ""
+        # Index field from RIS (e.g., "21/01 Handelsrecht")
+        index_text = _s(m.get("Index")) or ""
 
         results.append({
             "id": doc_id,
@@ -544,6 +549,8 @@ def parse_bundesrecht_response(data: dict) -> dict:
             "bgbl": bgbl,
             "typ": typ,
             "artikel": artikel,
+            "ris_updated": ris_updated,
+            "index": index_text,
         })
 
     return {"results": results, "total_hits": total_hits}

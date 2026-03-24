@@ -107,6 +107,15 @@
           <p>Keine Ergebnisse für die gewählten Filter.</p>
         </div>
 
+        <!-- Info banner about ImRisSeit -->
+        <div v-if="results.length > 0" class="info-banner">
+          <v-icon size="16" color="#007993" class="mr-2">mdi-information-outline</v-icon>
+          <span>
+            „Im RIS seit" filtert nach RIS-Datenbankaktualisierungen, nicht zwingend nach
+            inhaltlichen Gesetzesänderungen. Prüfen Sie das Inkrafttretensdatum und BGBl.
+          </span>
+        </div>
+
         <!-- Gesetze Results -->
         <template v-if="docType === 'gesetze'">
           <a
@@ -125,8 +134,13 @@
               <div class="result-meta">
                 <span v-if="item.typ" class="chip chip-teal">{{ item.typ }}</span>
                 <span v-if="item.artikel" class="chip chip-orange">{{ item.artikel }}</span>
-                <span v-if="item.date" class="meta-text">{{ formatDate(item.date) }}</span>
+                <span v-if="item.date" class="meta-text">
+                  <v-icon size="12" class="mr-1">mdi-gavel</v-icon>In Kraft: {{ formatDate(item.date) }}
+                </span>
                 <span v-if="item.bgbl" class="meta-text">· {{ item.bgbl }}</span>
+                <span v-if="item.ris_updated" class="meta-text meta-text-dim">
+                  · <v-icon size="12" class="mr-1">mdi-database-refresh-outline</v-icon>RIS: {{ formatDate(item.ris_updated) }}
+                </span>
               </div>
             </div>
             <v-icon size="14" color="#d1d5db" class="result-ext">mdi-open-in-new</v-icon>
@@ -633,6 +647,19 @@ async function doReport() {
   font-size: 13px;
 }
 
+/* ── Info banner ── */
+.info-banner {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(0, 121, 147, 0.04);
+  border: 1px solid rgba(0, 121, 147, 0.12);
+  border-radius: 10px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
 /* ── Error ── */
 .error-banner {
   background: #fef2f2;
@@ -741,7 +768,8 @@ async function doReport() {
 .chip-teal { background: rgba(0, 121, 147, 0.07); color: #007993; }
 .chip-orange { background: rgba(239, 96, 7, 0.07); color: #ef6007; }
 
-.meta-text { font-size: 12px; color: #9ca3af; }
+.meta-text { font-size: 12px; color: #9ca3af; display: inline-flex; align-items: center; }
+.meta-text-dim { color: #d1d5db; font-size: 11px; }
 
 .result-ext {
   margin-left: 12px;
