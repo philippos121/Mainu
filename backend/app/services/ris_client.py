@@ -41,22 +41,22 @@ LEGAL_CATEGORIES = [
 
 # Suchworte (keyword search terms) for filtering by Rechtsgebiet.
 _CATEGORY_KEYWORDS: dict[str, str] = {
-    "verfassungsrecht": "Verfassungsrecht",
-    "privatrecht": "Zivilrecht ABGB",
-    "strafrecht": "Strafrecht StGB",
-    "verwaltungsrecht": "Verwaltungsrecht",
-    "finanzrecht": "Steuerrecht Abgabe",
-    "arbeitsrecht": "Arbeitsrecht Sozialversicherung",
-    "wirtschaftsrecht": "Gewerberecht Wirtschaft",
-    "mietrecht": "Mietrecht MRG",
-    "umweltrecht": "Umweltrecht",
-    "verkehrsrecht": "Verkehrsrecht StVO",
+    "verfassungsrecht": "Verfassung",
+    "privatrecht": "ABGB",
+    "strafrecht": "Strafrecht",
+    "verwaltungsrecht": "Verwaltung",
+    "finanzrecht": "Steuer",
+    "arbeitsrecht": "Arbeit",
+    "wirtschaftsrecht": "Gewerbe",
+    "mietrecht": "Miet",
+    "umweltrecht": "Umwelt",
+    "verkehrsrecht": "Verkehr",
     "gesundheitsrecht": "Gesundheit",
-    "medienrecht": "Medienrecht Rundfunk",
+    "medienrecht": "Medien",
     "datenschutz": "Datenschutz",
-    "bildungsrecht": "Unterricht Wissenschaft",
-    "familienrecht": "Familienrecht",
-    "europarecht": "Europarecht",
+    "bildungsrecht": "Unterricht",
+    "familienrecht": "Familie",
+    "europarecht": "Europa",
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
