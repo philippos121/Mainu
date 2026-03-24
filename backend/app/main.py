@@ -1,9 +1,12 @@
 """RIS Tracker — Austrian Legal Change Tracker."""
 
 import logging
+from datetime import date
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from pydantic import BaseModel
 
 from app.services.ris_client import (
     LEGAL_CATEGORIES,
@@ -13,12 +16,13 @@ from app.services.ris_client import (
     search_gerichtsentscheidungen,
     parse_bundesrecht_response,
 )
+from app.services.openai_service import summarise_results, generate_report_markdown
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="RIS Tracker API",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 app.add_middleware(
@@ -73,3 +77,154 @@ async def api_search_gerichtsentscheidungen(
     return await search_gerichtsentscheidungen(
         category=category, im_ris_seit=im_ris_seit, page=page
     )
+
+
+# ── GPT Summary & Report endpoints ──
+
+
+class SummaryRequest(BaseModel):
+    api_key: str
+    results: list[dict]
+    doc_type: str = "gesetze"
+
+
+class ReportRequest(BaseModel):
+    api_key: str
+    results: list[dict]
+    doc_type: str = "gesetze"
+    category_label: str = "Alle Rechtsgebiete"
+    timeframe_label: str = ""
+    total_hits: int = 0
+
+
+@app.post("/api/summarise")
+async def api_summarise(req: SummaryRequest):
+    """Generate a GPT summary of search results. API key provided by frontend."""
+    if not req.api_key or len(req.api_key) < 10:
+        raise HTTPException(status_code=400, detail="Bitte geben Sie einen gültigen OpenAI API-Key ein.")
+    if not req.results:
+        raise HTTPException(status_code=400, detail="Keine Ergebnisse zum Zusammenfassen.")
+    try:
+        summary = await summarise_results(
+            results=req.results,
+            doc_type=req.doc_type,
+            api_key=req.api_key,
+        )
+        return {"summary": summary}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/report")
+async def api_report(req: ReportRequest):
+    """Generate a scientific summary report. Returns markdown text."""
+    if not req.api_key or len(req.api_key) < 10:
+        raise HTTPException(status_code=400, detail="Bitte geben Sie einen gültigen OpenAI API-Key ein.")
+    if not req.results:
+        raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
+    try:
+        report_md = await generate_report_markdown(
+            results=req.results,
+            doc_type=req.doc_type,
+            category_label=req.category_label,
+            timeframe_label=req.timeframe_label,
+            total_hits=req.total_hits,
+            api_key=req.api_key,
+        )
+
+        # Build an HTML report for download
+        today = date.today().strftime("%d.%m.%Y")
+        html = _markdown_to_html(report_md, today, req.category_label, req.timeframe_label)
+        return {"report_markdown": report_md, "report_html": html}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def _markdown_to_html(md: str, date_str: str, category: str, timeframe: str) -> str:
+    """Convert markdown report to a styled HTML document for download."""
+    # Simple markdown → HTML conversion (bold, headers, lists)
+    import re
+    html_body = md
+    # Headers
+    html_body = re.sub(r'^#{3}\s+(.+)$', r'<h3>\1</h3>', html_body, flags=re.MULTILINE)
+    html_body = re.sub(r'^#{2}\s+(.+)$', r'<h2>\1</h2>', html_body, flags=re.MULTILINE)
+    html_body = re.sub(r'^#{1}\s+(.+)$', r'<h1>\1</h1>', html_body, flags=re.MULTILINE)
+    # Bold
+    html_body = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html_body)
+    # Italic
+    html_body = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html_body)
+    # List items
+    html_body = re.sub(r'^[-•]\s+(.+)$', r'<li>\1</li>', html_body, flags=re.MULTILINE)
+    # Numbered list
+    html_body = re.sub(r'^\d+\.\s+(.+)$', r'<li>\1</li>', html_body, flags=re.MULTILINE)
+    # Paragraphs
+    html_body = re.sub(r'\n\n', '</p><p>', html_body)
+    html_body = f'<p>{html_body}</p>'
+    # Wrap <li> in <ul>
+    html_body = re.sub(r'((?:<li>.*?</li>\s*)+)', r'<ul>\1</ul>', html_body, flags=re.DOTALL)
+
+    return f"""<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>RIS Tracker — Wissenschaftlicher Bericht</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&display=swap');
+  body {{
+    font-family: 'IBM Plex Serif', Georgia, serif;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 0 24px;
+    color: #1a1a1a;
+    line-height: 1.7;
+    font-size: 15px;
+  }}
+  .header {{
+    border-bottom: 2px solid #007993;
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }}
+  .header h1 {{
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: #007993;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0 0 4px;
+  }}
+  .header .meta {{
+    font-size: 13px;
+    color: #6b7280;
+  }}
+  h1 {{ font-size: 22px; color: #0f3d49; margin-top: 28px; }}
+  h2 {{ font-size: 18px; color: #007993; margin-top: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }}
+  h3 {{ font-size: 15px; color: #374151; margin-top: 20px; }}
+  strong {{ color: #0f3d49; }}
+  ul {{ padding-left: 20px; }}
+  li {{ margin-bottom: 6px; }}
+  .footer {{
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 12px;
+    color: #9ca3af;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }}
+  @media print {{
+    body {{ margin: 20px; font-size: 12px; }}
+  }}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>RIS Tracker — Wissenschaftlicher Bericht</h1>
+  <div class="meta">Rechtsgebiet: {category} · Zeitraum: {timeframe} · Erstellt am {date_str}</div>
+</div>
+{html_body}
+<div class="footer">
+  Datenquelle: Rechtsinformationssystem des Bundes (RIS) — data.bka.gv.at<br>
+  Erstellt mit RIS Tracker · Zusammenfassung generiert durch GPT · {date_str}
+</div>
+</body>
+</html>"""

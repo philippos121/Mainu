@@ -21,42 +21,178 @@ logger = logging.getLogger(__name__)
 # and Judikatur filtering.
 
 LEGAL_CATEGORIES = [
-    {"id": "verfassungsrecht", "label": "Verfassungsrecht"},
-    {"id": "privatrecht", "label": "Privatrecht / Zivilrecht"},
-    {"id": "strafrecht", "label": "Strafrecht"},
-    {"id": "verwaltungsrecht", "label": "Verwaltungsrecht"},
-    {"id": "finanzrecht", "label": "Finanzrecht / Steuerrecht"},
-    {"id": "arbeitsrecht", "label": "Arbeitsrecht / Sozialrecht"},
-    {"id": "wirtschaftsrecht", "label": "Wirtschaftsrecht / Gewerberecht"},
-    {"id": "mietrecht", "label": "Mietrecht / Wohnrecht"},
-    {"id": "umweltrecht", "label": "Umweltrecht"},
-    {"id": "verkehrsrecht", "label": "Verkehrsrecht"},
-    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht"},
-    {"id": "medienrecht", "label": "Medienrecht"},
-    {"id": "datenschutz", "label": "Datenschutzrecht"},
-    {"id": "bildungsrecht", "label": "Bildung / Wissenschaft / Kultur"},
-    {"id": "familienrecht", "label": "Familienrecht / Personenrecht"},
-    {"id": "europarecht", "label": "EU-Recht / Völkerrecht"},
+    # ── Öffentliches Recht ──
+    {"id": "verfassungsrecht", "label": "Verfassungsrecht", "group": "Öffentliches Recht"},
+    {"id": "verwaltungsrecht_allg", "label": "Allgemeines Verwaltungsrecht", "group": "Öffentliches Recht"},
+    {"id": "verwaltungsverfahren", "label": "Verwaltungsverfahrensrecht", "group": "Öffentliches Recht"},
+    {"id": "grundrechte", "label": "Grund- und Menschenrechte", "group": "Öffentliches Recht"},
+    {"id": "wahlrecht", "label": "Wahl- und Parteienrecht", "group": "Öffentliches Recht"},
+    {"id": "beamtenrecht", "label": "Beamten- und Dienstrecht", "group": "Öffentliches Recht"},
+    # ── Privatrecht / Zivilrecht ──
+    {"id": "zivilrecht_allg", "label": "Allgemeines Zivilrecht (ABGB)", "group": "Privatrecht"},
+    {"id": "vertragsrecht", "label": "Vertragsrecht / Schuldrecht", "group": "Privatrecht"},
+    {"id": "sachenrecht", "label": "Sachenrecht", "group": "Privatrecht"},
+    {"id": "familienrecht", "label": "Familienrecht", "group": "Privatrecht"},
+    {"id": "erbrecht", "label": "Erbrecht", "group": "Privatrecht"},
+    {"id": "personenrecht", "label": "Personenrecht / Namensrecht", "group": "Privatrecht"},
+    {"id": "konsumentenschutz", "label": "Konsumentenschutzrecht", "group": "Privatrecht"},
+    # ── Strafrecht ──
+    {"id": "strafrecht_allg", "label": "Allgemeines Strafrecht (StGB)", "group": "Strafrecht"},
+    {"id": "strafprozess", "label": "Strafprozessrecht (StPO)", "group": "Strafrecht"},
+    {"id": "verwaltungsstrafrecht", "label": "Verwaltungsstrafrecht", "group": "Strafrecht"},
+    {"id": "jugendstrafrecht", "label": "Jugendstrafrecht", "group": "Strafrecht"},
+    {"id": "finanzstrafrecht", "label": "Finanzstrafrecht", "group": "Strafrecht"},
+    # ── Wirtschaftsrecht ──
+    {"id": "unternehmensrecht", "label": "Unternehmensrecht (UGB)", "group": "Wirtschaftsrecht"},
+    {"id": "gesellschaftsrecht", "label": "Gesellschaftsrecht (GmbHG, AktG)", "group": "Wirtschaftsrecht"},
+    {"id": "gewerberecht", "label": "Gewerberecht (GewO)", "group": "Wirtschaftsrecht"},
+    {"id": "wettbewerbsrecht", "label": "Wettbewerbs- und Kartellrecht", "group": "Wirtschaftsrecht"},
+    {"id": "insolvenzrecht", "label": "Insolvenzrecht", "group": "Wirtschaftsrecht"},
+    {"id": "vergaberecht", "label": "Vergaberecht", "group": "Wirtschaftsrecht"},
+    {"id": "kapitalmarktrecht", "label": "Bank- und Kapitalmarktrecht", "group": "Wirtschaftsrecht"},
+    # ── Arbeits- und Sozialrecht ──
+    {"id": "arbeitsrecht", "label": "Arbeitsrecht", "group": "Arbeits- und Sozialrecht"},
+    {"id": "sozialversicherung", "label": "Sozialversicherungsrecht", "group": "Arbeits- und Sozialrecht"},
+    {"id": "kollektivvertrag", "label": "Kollektivvertragsrecht", "group": "Arbeits- und Sozialrecht"},
+    {"id": "arbeitnehmerschutz", "label": "ArbeitnehmerInnenschutz", "group": "Arbeits- und Sozialrecht"},
+    # ── Finanz- und Steuerrecht ──
+    {"id": "einkommensteuer", "label": "Einkommensteuer / Lohnsteuer", "group": "Steuerrecht"},
+    {"id": "umsatzsteuer", "label": "Umsatzsteuer", "group": "Steuerrecht"},
+    {"id": "koerperschaftsteuer", "label": "Körperschaftsteuer", "group": "Steuerrecht"},
+    {"id": "abgabenordnung", "label": "Bundesabgabenordnung (BAO)", "group": "Steuerrecht"},
+    {"id": "gebührenrecht", "label": "Gebühren- und Verkehrsteuern", "group": "Steuerrecht"},
+    {"id": "finanzausgleich", "label": "Finanzausgleich / Haushaltsrecht", "group": "Steuerrecht"},
+    # ── Bau, Miet- und Wohnrecht ──
+    {"id": "mietrecht", "label": "Mietrecht (MRG)", "group": "Immobilienrecht"},
+    {"id": "wohnungseigentum", "label": "Wohnungseigentumsrecht (WEG)", "group": "Immobilienrecht"},
+    {"id": "baurecht", "label": "Baurecht / Raumordnung", "group": "Immobilienrecht"},
+    {"id": "grundbuchrecht", "label": "Grundbuchrecht", "group": "Immobilienrecht"},
+    # ── Umwelt und Verkehr ──
+    {"id": "umweltrecht", "label": "Umweltrecht / Klimaschutz", "group": "Umwelt & Verkehr"},
+    {"id": "naturschutz", "label": "Naturschutzrecht", "group": "Umwelt & Verkehr"},
+    {"id": "wasserrecht", "label": "Wasserrecht", "group": "Umwelt & Verkehr"},
+    {"id": "verkehrsrecht", "label": "Verkehrsrecht (StVO, KFG)", "group": "Umwelt & Verkehr"},
+    {"id": "luftfahrtrecht", "label": "Luftfahrt- und Eisenbahnrecht", "group": "Umwelt & Verkehr"},
+    # ── Gesundheit und Soziales ──
+    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht", "group": "Gesundheit & Soziales"},
+    {"id": "arzneimittelrecht", "label": "Arzneimittel- und Medizinprodukterecht", "group": "Gesundheit & Soziales"},
+    {"id": "lebensmittelrecht", "label": "Lebensmittelrecht", "group": "Gesundheit & Soziales"},
+    {"id": "pflegerecht", "label": "Pflege- und Betreuungsrecht", "group": "Gesundheit & Soziales"},
+    # ── Medien, IT und Datenschutz ──
+    {"id": "datenschutz", "label": "Datenschutzrecht (DSGVO, DSG)", "group": "Medien & IT"},
+    {"id": "medienrecht", "label": "Medienrecht", "group": "Medien & IT"},
+    {"id": "telekommunikation", "label": "Telekommunikationsrecht", "group": "Medien & IT"},
+    {"id": "ecommerce", "label": "E-Commerce / Digitale Dienste", "group": "Medien & IT"},
+    {"id": "urheberrecht", "label": "Urheberrecht / Geistiges Eigentum", "group": "Medien & IT"},
+    # ── Bildung, Wissenschaft, Kultur ──
+    {"id": "schulrecht", "label": "Schulrecht", "group": "Bildung & Kultur"},
+    {"id": "hochschulrecht", "label": "Hochschul- und Universitätsrecht", "group": "Bildung & Kultur"},
+    {"id": "forschungsrecht", "label": "Forschung und Wissenschaft", "group": "Bildung & Kultur"},
+    {"id": "kulturrecht", "label": "Kunst- und Kulturrecht", "group": "Bildung & Kultur"},
+    {"id": "sportrecht", "label": "Sportrecht", "group": "Bildung & Kultur"},
+    # ── Sicherheit und Verteidigung ──
+    {"id": "sicherheitspolizei", "label": "Sicherheitspolizeirecht", "group": "Sicherheit"},
+    {"id": "fremdenrecht", "label": "Fremden- und Asylrecht", "group": "Sicherheit"},
+    {"id": "waffenrecht", "label": "Waffenrecht", "group": "Sicherheit"},
+    {"id": "landesverteidigung", "label": "Landesverteidigung / Heeresrecht", "group": "Sicherheit"},
+    # ── Internationales und EU-Recht ──
+    {"id": "europarecht", "label": "EU-Recht / Unionsrecht", "group": "Internationales"},
+    {"id": "voelkerrecht", "label": "Völkerrecht / Staatsverträge", "group": "Internationales"},
+    # ── Verfahrensrecht ──
+    {"id": "zivilprozess", "label": "Zivilprozessrecht (ZPO)", "group": "Verfahrensrecht"},
+    {"id": "exekutionsrecht", "label": "Exekutionsrecht", "group": "Verfahrensrecht"},
+    {"id": "schiedsrecht", "label": "Schieds- und Mediationsrecht", "group": "Verfahrensrecht"},
+    # ── Agrar und Forst ──
+    {"id": "agrarrecht", "label": "Agrar- und Forstrecht", "group": "Land- und Forstwirtschaft"},
+    {"id": "tierschutz", "label": "Tierschutzrecht", "group": "Land- und Forstwirtschaft"},
 ]
 
 # Suchworte (keyword search terms) for filtering by Rechtsgebiet.
 _CATEGORY_KEYWORDS: dict[str, str] = {
-    "verfassungsrecht": "Verfassung",
-    "privatrecht": "ABGB",
-    "strafrecht": "Strafrecht",
-    "verwaltungsrecht": "Verwaltung",
-    "finanzrecht": "Steuer",
-    "arbeitsrecht": "Arbeit",
-    "wirtschaftsrecht": "Gewerbe",
-    "mietrecht": "Miet",
-    "umweltrecht": "Umwelt",
-    "verkehrsrecht": "Verkehr",
-    "gesundheitsrecht": "Gesundheit",
-    "medienrecht": "Medien",
-    "datenschutz": "Datenschutz",
-    "bildungsrecht": "Unterricht",
-    "familienrecht": "Familie",
-    "europarecht": "Europa",
+    # Öffentliches Recht
+    "verfassungsrecht": "Verfassung B-VG",
+    "verwaltungsrecht_allg": "Verwaltung",
+    "verwaltungsverfahren": "AVG Verwaltungsverfahren",
+    "grundrechte": "Grundrechte EMRK",
+    "wahlrecht": "Wahl Parteiengesetz",
+    "beamtenrecht": "Beamten Dienstrecht BDG",
+    # Privatrecht
+    "zivilrecht_allg": "ABGB Zivilrecht",
+    "vertragsrecht": "Vertrag Schuldrecht",
+    "sachenrecht": "Sachenrecht Eigentum",
+    "familienrecht": "Familie Ehe Kindschaft",
+    "erbrecht": "Erbrecht Testament",
+    "personenrecht": "Person Name Geschäftsfähigkeit",
+    "konsumentenschutz": "Konsumentenschutz KSchG",
+    # Strafrecht
+    "strafrecht_allg": "StGB Strafrecht",
+    "strafprozess": "StPO Strafprozess",
+    "verwaltungsstrafrecht": "VStG Verwaltungsstrafe",
+    "jugendstrafrecht": "Jugendgerichtsgesetz JGG",
+    "finanzstrafrecht": "Finanzstrafgesetz FinStrG",
+    # Wirtschaftsrecht
+    "unternehmensrecht": "UGB Unternehmensgesetzbuch",
+    "gesellschaftsrecht": "GmbH Aktiengesellschaft Gesellschaft",
+    "gewerberecht": "Gewerbeordnung GewO",
+    "wettbewerbsrecht": "Wettbewerb Kartell UWG",
+    "insolvenzrecht": "Insolvenz Konkurs",
+    "vergaberecht": "Vergabe BVergG",
+    "kapitalmarktrecht": "Bank Kapitalmarkt BWG",
+    # Arbeits- und Sozialrecht
+    "arbeitsrecht": "Arbeit Arbeitsrecht",
+    "sozialversicherung": "Sozialversicherung ASVG",
+    "kollektivvertrag": "Kollektivvertrag ArbVG",
+    "arbeitnehmerschutz": "ArbeitnehmerInnenschutz ASchG",
+    # Steuerrecht
+    "einkommensteuer": "Einkommensteuer EStG Lohnsteuer",
+    "umsatzsteuer": "Umsatzsteuer UStG",
+    "koerperschaftsteuer": "Körperschaftsteuer KStG",
+    "abgabenordnung": "Bundesabgabenordnung BAO",
+    "gebührenrecht": "Gebühren Verkehrsteuern GebG",
+    "finanzausgleich": "Finanzausgleich Haushaltsrecht",
+    # Immobilienrecht
+    "mietrecht": "Mietrecht MRG",
+    "wohnungseigentum": "Wohnungseigentum WEG",
+    "baurecht": "Bauordnung Raumordnung",
+    "grundbuchrecht": "Grundbuch",
+    # Umwelt & Verkehr
+    "umweltrecht": "Umwelt Klimaschutz",
+    "naturschutz": "Naturschutz",
+    "wasserrecht": "Wasserrecht WRG",
+    "verkehrsrecht": "StVO Verkehr KFG",
+    "luftfahrtrecht": "Luftfahrt Eisenbahn",
+    # Gesundheit
+    "gesundheitsrecht": "Gesundheit Krankenanstalten",
+    "arzneimittelrecht": "Arzneimittel Medizinprodukte",
+    "lebensmittelrecht": "Lebensmittel LMSVG",
+    "pflegerecht": "Pflege Betreuung",
+    # Medien & IT
+    "datenschutz": "Datenschutz DSGVO DSG",
+    "medienrecht": "Medien MedienG",
+    "telekommunikation": "Telekommunikation TKG",
+    "ecommerce": "E-Commerce ECG",
+    "urheberrecht": "Urheberrecht Markenrecht Patent",
+    # Bildung & Kultur
+    "schulrecht": "Schule SchUG",
+    "hochschulrecht": "Universität Hochschule UG",
+    "forschungsrecht": "Forschung Wissenschaft FOG",
+    "kulturrecht": "Kunst Kultur Denkmalschutz",
+    "sportrecht": "Sport BSFG",
+    # Sicherheit
+    "sicherheitspolizei": "Sicherheitspolizei SPG",
+    "fremdenrecht": "Fremde Asyl FPG",
+    "waffenrecht": "Waffen Waffengesetz",
+    "landesverteidigung": "Landesverteidigung Wehrgesetz",
+    # Internationales
+    "europarecht": "Europa Unionsrecht EU",
+    "voelkerrecht": "Völkerrecht Staatsvertrag",
+    # Verfahrensrecht
+    "zivilprozess": "ZPO Zivilprozess",
+    "exekutionsrecht": "Exekution EO",
+    "schiedsrecht": "Schiedsgericht Mediation",
+    # Agrar
+    "agrarrecht": "Agrar Forst Landwirtschaft",
+    "tierschutz": "Tierschutz TSchG",
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -83,13 +219,64 @@ COURT_SOURCES = [
 # Map Rechtsgebiet → relevant court Applikation(en) for Judikatur.
 # Unmapped categories → query all courts with Suchworte.
 CATEGORY_TO_COURTS: dict[str, list[str]] = {
+    # Öffentliches Recht
     "verfassungsrecht": ["Vfgh"],
-    "verwaltungsrecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "privatrecht": ["Justiz"],
-    "strafrecht": ["Justiz"],
-    "mietrecht": ["Justiz"],
+    "grundrechte": ["Vfgh"],
+    "verwaltungsrecht_allg": ["Vwgh", "Bvwg", "Lvwg"],
+    "verwaltungsverfahren": ["Vwgh", "Bvwg", "Lvwg"],
+    "verwaltungsstrafrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "beamtenrecht": ["Vwgh", "Bvwg"],
+    # Privatrecht
+    "zivilrecht_allg": ["Justiz"],
+    "vertragsrecht": ["Justiz"],
+    "sachenrecht": ["Justiz"],
     "familienrecht": ["Justiz"],
+    "erbrecht": ["Justiz"],
+    "personenrecht": ["Justiz"],
+    "konsumentenschutz": ["Justiz"],
+    # Strafrecht
+    "strafrecht_allg": ["Justiz"],
+    "strafprozess": ["Justiz"],
+    "jugendstrafrecht": ["Justiz"],
+    "finanzstrafrecht": ["Justiz", "Vwgh"],
+    # Immobilien
+    "mietrecht": ["Justiz"],
+    "wohnungseigentum": ["Justiz"],
+    "grundbuchrecht": ["Justiz"],
+    # Arbeitsrecht
+    "arbeitsrecht": ["Justiz"],
+    "kollektivvertrag": ["Justiz"],
+    # Verfahrensrecht
+    "zivilprozess": ["Justiz"],
+    "exekutionsrecht": ["Justiz"],
+    "schiedsrecht": ["Justiz"],
+    # Datenschutz & IT
     "datenschutz": ["Vwgh", "Bvwg"],
+    "telekommunikation": ["Vwgh", "Bvwg"],
+    # Sicherheit
+    "fremdenrecht": ["Vwgh", "Bvwg"],
+    "sicherheitspolizei": ["Vwgh", "Bvwg"],
+    # Steuerrecht
+    "einkommensteuer": ["Vwgh", "Bvwg"],
+    "umsatzsteuer": ["Vwgh", "Bvwg"],
+    "koerperschaftsteuer": ["Vwgh", "Bvwg"],
+    "abgabenordnung": ["Vwgh", "Bvwg"],
+    "gebührenrecht": ["Vwgh", "Bvwg"],
+    # Umwelt & Bau
+    "umweltrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "naturschutz": ["Vwgh", "Bvwg", "Lvwg"],
+    "wasserrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "baurecht": ["Vwgh", "Bvwg", "Lvwg"],
+    # Wirtschaft
+    "vergaberecht": ["Vwgh", "Bvwg"],
+    "gewerberecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "insolvenzrecht": ["Justiz"],
+    "gesellschaftsrecht": ["Justiz"],
+    "unternehmensrecht": ["Justiz"],
+    "wettbewerbsrecht": ["Justiz"],
+    "kapitalmarktrecht": ["Justiz"],
+    # Sozialversicherung
+    "sozialversicherung": ["Vwgh", "Bvwg"],
 }
 
 # DokumenteProSeite enum

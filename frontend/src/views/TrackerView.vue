@@ -19,18 +19,12 @@
             :class="['toggle-btn', docType === 'gesetze' && 'toggle-active']"
             @click="docType = 'gesetze'"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px">
-              <circle cx="12" cy="5" r="3"/><path d="M12 8v4m-5 4l5-4 5 4m-10 0v4h10v-4"/>
-            </svg>
             Gesetze
           </button>
           <button
             :class="['toggle-btn', docType === 'gerichtsentscheidungen' && 'toggle-active']"
             @click="docType = 'gerichtsentscheidungen'"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            </svg>
             Entscheidungen
           </button>
         </div>
@@ -42,7 +36,7 @@
           <div class="filter-field">
             <v-select
               v-model="selectedCategory"
-              :items="categories"
+              :items="groupedCategories"
               item-title="label"
               item-value="id"
               label="Rechtsgebiet"
@@ -54,7 +48,21 @@
               placeholder="Alle Rechtsgebiete"
               color="#007993"
               base-color="#9ca3af"
-            />
+            >
+              <template #item="{ item, props }">
+                <v-list-subheader
+                  v-if="item.raw.isGroupHeader"
+                  class="category-group-header"
+                >
+                  {{ item.raw.label }}
+                </v-list-subheader>
+                <v-list-item
+                  v-else
+                  v-bind="props"
+                  class="category-item"
+                />
+              </template>
+            </v-select>
           </div>
           <div class="filter-field">
             <v-select
@@ -72,10 +80,8 @@
             />
           </div>
           <button class="search-btn" :disabled="loading" @click="searchFresh">
-            <svg v-if="!loading" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
             <span v-if="loading" class="spinner"></span>
+            <v-icon v-else size="18" class="mr-2">mdi-magnify</v-icon>
             Suchen
           </button>
         </div>
@@ -97,9 +103,7 @@
 
         <!-- Empty state -->
         <div v-if="results.length === 0" class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/>
-          </svg>
+          <v-icon size="48" color="#d1d5db">mdi-file-search-outline</v-icon>
           <p>Keine Ergebnisse für die gewählten Filter.</p>
         </div>
 
@@ -114,7 +118,7 @@
             class="result-card"
           >
             <div class="result-icon result-icon-teal">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="5" r="3"/><path d="M12 8v4m-5 4l5-4 5 4m-10 0v4h10v-4"/></svg>
+              <v-icon color="#007993" size="18">mdi-scale-balance</v-icon>
             </div>
             <div class="result-body">
               <div class="result-title">{{ item.title }}</div>
@@ -125,9 +129,7 @@
                 <span v-if="item.bgbl" class="meta-text">· {{ item.bgbl }}</span>
               </div>
             </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="result-ext">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
+            <v-icon size="14" color="#d1d5db" class="result-ext">mdi-open-in-new</v-icon>
           </a>
         </template>
 
@@ -142,7 +144,7 @@
             class="result-card"
           >
             <div class="result-icon result-icon-orange">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <v-icon color="#ef6007" size="18">mdi-gavel</v-icon>
             </div>
             <div class="result-body">
               <div class="result-title">{{ item.title }}</div>
@@ -153,9 +155,7 @@
                 <span v-if="item.date" class="meta-text">{{ formatDate(item.date) }}</span>
               </div>
             </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="result-ext">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
+            <v-icon size="14" color="#d1d5db" class="result-ext">mdi-open-in-new</v-icon>
           </a>
         </template>
 
@@ -169,6 +169,80 @@
             active-color="#007993"
             @update:model-value="search"
           />
+        </div>
+
+        <!-- ── AI Actions bar ── -->
+        <div v-if="results.length > 0" class="ai-actions-bar">
+          <div class="ai-actions-header">
+            <v-icon color="#007993" size="20" class="mr-2">mdi-brain</v-icon>
+            <span class="ai-actions-title">AI-Analyse</span>
+          </div>
+
+          <!-- API Key Input -->
+          <div class="api-key-row">
+            <v-text-field
+              v-model="apiKey"
+              :type="showApiKey ? 'text' : 'password'"
+              label="OpenAI API-Key"
+              variant="outlined"
+              density="compact"
+              hide-details
+              placeholder="sk-..."
+              prepend-inner-icon="mdi-key-variant"
+              color="#007993"
+              base-color="#9ca3af"
+              class="api-key-input"
+            >
+              <template #append-inner>
+                <v-btn
+                  icon
+                  variant="text"
+                  size="x-small"
+                  @click="showApiKey = !showApiKey"
+                >
+                  <v-icon size="18">{{ showApiKey ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+                </v-btn>
+              </template>
+            </v-text-field>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="ai-buttons">
+            <button
+              class="ai-btn ai-btn-summary"
+              :disabled="!apiKey || summarising"
+              @click="doSummarise"
+            >
+              <span v-if="summarising" class="spinner spinner-sm"></span>
+              <v-icon v-else size="16" class="mr-1">mdi-text-box-outline</v-icon>
+              {{ summarising ? 'Zusammenfassung wird erstellt...' : 'Zusammenfassung erstellen' }}
+            </button>
+            <button
+              class="ai-btn ai-btn-report"
+              :disabled="!apiKey || generatingReport"
+              @click="doReport"
+            >
+              <span v-if="generatingReport" class="spinner spinner-sm"></span>
+              <v-icon v-else size="16" class="mr-1">mdi-file-download-outline</v-icon>
+              {{ generatingReport ? 'Bericht wird erstellt...' : 'Wissenschaftlichen Bericht herunterladen' }}
+            </button>
+          </div>
+
+          <!-- Summary display -->
+          <div v-if="summaryText" class="summary-box">
+            <div class="summary-box-header">
+              <v-icon color="#007993" size="18" class="mr-2">mdi-text-box-check-outline</v-icon>
+              <span class="summary-box-title">GPT-Zusammenfassung</span>
+              <v-spacer />
+              <button class="summary-close" @click="summaryText = ''">&times;</button>
+            </div>
+            <div class="summary-box-content" v-html="renderMarkdown(summaryText)"></div>
+          </div>
+
+          <!-- Summary error -->
+          <div v-if="summaryError" class="error-banner mt-3">
+            {{ summaryError }}
+          </div>
         </div>
       </div>
 
@@ -197,6 +271,20 @@ const results = ref([])
 const totalHits = ref(0)
 const page = ref(1)
 
+// AI features
+const apiKey = ref(localStorage.getItem('ris_openai_key') || '')
+const showApiKey = ref(false)
+const summarising = ref(false)
+const summaryText = ref('')
+const summaryError = ref('')
+const generatingReport = ref(false)
+
+// Persist API key
+watch(apiKey, (v) => {
+  if (v) localStorage.setItem('ris_openai_key', v)
+  else localStorage.removeItem('ris_openai_key')
+})
+
 onMounted(() => {
   loadFilters()
   const img = new Image()
@@ -210,6 +298,20 @@ watch(docType, () => {
     page.value = 1
     search()
   }
+})
+
+// Build grouped categories for the dropdown
+const groupedCategories = computed(() => {
+  const items = []
+  let lastGroup = null
+  for (const cat of categories.value) {
+    if (cat.group && cat.group !== lastGroup) {
+      items.push({ label: cat.group, isGroupHeader: true, id: `__group_${cat.group}` })
+      lastGroup = cat.group
+    }
+    items.push({ ...cat, isGroupHeader: false })
+  }
+  return items.filter(i => !i.isGroupHeader)
 })
 
 const categoryLabel = computed(() => {
@@ -235,6 +337,22 @@ function formatDate(dateStr) {
   } catch { return dateStr }
 }
 
+function renderMarkdown(md) {
+  if (!md) return ''
+  let html = md
+  html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>')
+  html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  html = html.replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+  html = html.replace(/\n\n/g, '</p><p>')
+  html = `<p>${html}</p>`
+  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/gs, '<ul>$1</ul>')
+  return html
+}
+
 async function loadFilters() {
   try {
     const [catRes, tfRes] = await Promise.all([
@@ -250,6 +368,8 @@ async function loadFilters() {
 
 async function searchFresh() {
   page.value = 1
+  summaryText.value = ''
+  summaryError.value = ''
   await search()
 }
 
@@ -280,6 +400,59 @@ async function search() {
     totalHits.value = 0
   } finally {
     loading.value = false
+  }
+}
+
+async function doSummarise() {
+  if (!apiKey.value || !results.value.length) return
+  summarising.value = true
+  summaryText.value = ''
+  summaryError.value = ''
+
+  try {
+    const resp = await api.post('/summarise', {
+      api_key: apiKey.value,
+      results: results.value,
+      doc_type: docType.value,
+    })
+    summaryText.value = resp.data.summary
+  } catch (e) {
+    summaryError.value = e.response?.data?.detail || 'Fehler bei der Zusammenfassung.'
+  } finally {
+    summarising.value = false
+  }
+}
+
+async function doReport() {
+  if (!apiKey.value || !results.value.length) return
+  generatingReport.value = true
+  summaryError.value = ''
+
+  try {
+    const resp = await api.post('/report', {
+      api_key: apiKey.value,
+      results: results.value,
+      doc_type: docType.value,
+      category_label: categoryLabel.value,
+      timeframe_label: timeframeLabel.value,
+      total_hits: totalHits.value,
+    })
+
+    // Download as HTML file
+    const blob = new Blob([resp.data.report_html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const dateStr = new Date().toISOString().split('T')[0]
+    a.download = `RIS_Bericht_${dateStr}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    summaryError.value = e.response?.data?.detail || 'Fehler beim Erstellen des Berichts.'
+  } finally {
+    generatingReport.value = false
   }
 }
 </script>
@@ -420,14 +593,8 @@ async function search() {
   min-height: 48px;
 }
 
-.search-btn:hover {
-  background: #c64708;
-}
-
-.search-btn:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
+.search-btn:hover { background: #c64708; }
+.search-btn:disabled { opacity: 0.7; cursor: wait; }
 
 .spinner {
   display: inline-block;
@@ -440,8 +607,30 @@ async function search() {
   margin-right: 8px;
 }
 
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  margin-right: 6px;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Category group headers ── */
+.category-group-header {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #007993 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 16px 4px !important;
+  min-height: auto !important;
+}
+
+.category-item {
+  font-size: 13px;
 }
 
 /* ── Error ── */
@@ -510,20 +699,10 @@ async function search() {
   margin-top: 1px;
 }
 
-.result-icon-teal {
-  background: rgba(0, 121, 147, 0.07);
-  color: #007993;
-}
+.result-icon-teal { background: rgba(0, 121, 147, 0.07); }
+.result-icon-orange { background: rgba(239, 96, 7, 0.07); }
 
-.result-icon-orange {
-  background: rgba(239, 96, 7, 0.07);
-  color: #ef6007;
-}
-
-.result-body {
-  flex: 1;
-  min-width: 0;
-}
+.result-body { flex: 1; min-width: 0; }
 
 .result-title {
   font-size: 14px;
@@ -559,25 +738,156 @@ async function search() {
   white-space: nowrap;
 }
 
-.chip-teal {
-  background: rgba(0, 121, 147, 0.07);
-  color: #007993;
-}
+.chip-teal { background: rgba(0, 121, 147, 0.07); color: #007993; }
+.chip-orange { background: rgba(239, 96, 7, 0.07); color: #ef6007; }
 
-.chip-orange {
-  background: rgba(239, 96, 7, 0.07);
-  color: #ef6007;
-}
-
-.meta-text {
-  font-size: 12px;
-  color: #9ca3af;
-}
+.meta-text { font-size: 12px; color: #9ca3af; }
 
 .result-ext {
   margin-left: 12px;
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+/* ── AI Actions Bar ── */
+.ai-actions-bar {
+  margin-top: 32px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.ai-actions-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.ai-actions-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f3d49;
+}
+
+.api-key-row {
+  margin-bottom: 16px;
+}
+
+.api-key-input {
+  max-width: 480px;
+}
+
+.ai-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.ai-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-btn-summary {
+  background: #007993;
+  color: white;
+}
+.ai-btn-summary:hover:not(:disabled) {
+  background: #006577;
+}
+
+.ai-btn-report {
+  background: #0f3d49;
+  color: white;
+}
+.ai-btn-report:hover:not(:disabled) {
+  background: #0a2e37;
+}
+
+/* ── Summary Box ── */
+.summary-box {
+  margin-top: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.summary-box-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(0, 121, 147, 0.04);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.summary-box-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #007993;
+}
+
+.summary-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #9ca3af;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+.summary-close:hover { color: #374151; }
+
+.summary-box-content {
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #374151;
+}
+
+.summary-box-content :deep(h2) {
+  font-size: 16px;
+  color: #007993;
+  margin: 16px 0 8px;
+}
+
+.summary-box-content :deep(h3) {
+  font-size: 15px;
+  color: #0f3d49;
+  margin: 14px 0 6px;
+}
+
+.summary-box-content :deep(h4) {
+  font-size: 14px;
+  color: #374151;
+  margin: 12px 0 4px;
+}
+
+.summary-box-content :deep(strong) {
+  color: #0f3d49;
+}
+
+.summary-box-content :deep(ul) {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.summary-box-content :deep(li) {
+  margin-bottom: 4px;
 }
 
 /* ── Empty ── */
@@ -613,11 +923,10 @@ async function search() {
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .filter-fields {
-    flex-direction: column;
-  }
-  .search-btn {
-    width: 100%;
-  }
+  .filter-fields { flex-direction: column; }
+  .search-btn { width: 100%; }
+  .ai-buttons { flex-direction: column; }
+  .ai-btn { width: 100%; justify-content: center; }
+  .api-key-input { max-width: 100%; }
 }
 </style>
