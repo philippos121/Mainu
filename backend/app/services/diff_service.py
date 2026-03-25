@@ -1,17 +1,15 @@
 """Service for fetching and comparing versions of RIS Bundesrecht provisions.
 
-Correct approach (validated against API docs):
+Correct approach:
+1. Fetch current text from the RIS website using the specific NOR from search results.
+2. Fetch previous text using the same NOR page + FassungVom URL parameter
+   (Inkrafttretensdatum - 1 day). The RIS website shows the version that was
+   valid on that date.
+3. Compare the two texts with word-level diff.
 
-1. Query API: Gesetzesnummer + ArtikelParagraphAnlage → get current NOR number
-2. Query API: same + Fassung.FassungVom=(Inkrafttreten - 1 day) → get PREVIOUS NOR number
-3. If NOR numbers differ → real change. Fetch text for each NOR from website.
-4. If NOR numbers same → metadata-only update.
-5. Compute word-level diff.
-
-Text comes from the RIS website (ris.bka.gv.at/Dokument.wxe) because:
-- The API JSON does NOT contain document text, only metadata + ContentUrls
-- ContentUrls may not respect FassungVom (always serve current version)
-- Each NOR number has its own website page with the correct version text
+Key insight: The BrKons API always returns the same consolidated NOR number
+regardless of FassungVom. So we CANNOT compare NOR numbers to detect changes.
+We must compare actual TEXT CONTENT.
 """
 
 import difflib
@@ -22,21 +20,17 @@ from datetime import datetime, timedelta
 
 import httpx
 
-from app.core.config import settings
-
 logger = logging.getLogger(__name__)
 
-_BROWSER_HEADERS = {
+_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "de-AT,de;q=0.9,en;q=0.5",
 }
 
-BASE_URL = settings.RIS_API_BASE_URL
+_RIS_DOC_BASE = "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen"
 
-
-# ── Public API ──
 
 async def fetch_provision_diff(
     doc_id: str,
@@ -44,300 +38,154 @@ async def fetch_provision_diff(
     artikel: str,
     inkrafttreten: str,
 ) -> dict:
-    """Fetch current + previous version of a provision and return diff.
+    """Fetch current + previous version and return diff.
 
-    Args:
-        doc_id: NOR number of the found document (from search results)
-        gesetzesnummer: Law number (for FassungVom query to find previous version)
-        artikel: Section identifier (for FassungVom query)
-        inkrafttreten: Inkrafttretensdatum of the found version
+    Uses the RIS website with &FassungVom parameter to get historical versions.
     """
-    logger.info(f"=== DIFF START: NOR={doc_id}, GesNr={gesetzesnummer}, Art={artikel}, Inkraft={inkrafttreten}")
-
-    # 1. If no doc_id, look it up via API
-    if not doc_id and gesetzesnummer and artikel:
-        current_meta = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=None)
-        if current_meta:
-            doc_id = current_meta.get("nor_id", "")
-            if not inkrafttreten:
-                inkrafttreten = current_meta.get("inkrafttreten", "")
-        logger.info(f"Looked up NOR from API: {doc_id}")
+    logger.info(f"=== DIFF: NOR={doc_id}, GesNr={gesetzesnummer}, Art={artikel}, Inkraft={inkrafttreten}")
 
     if not doc_id:
-        return _error_result("Dokumentnummer (NOR) konnte nicht ermittelt werden.")
+        return _error_result("Dokumentnummer (NOR) fehlt.")
 
-    # 2. Fetch text for the FOUND document (the one from search results)
-    current_text = await _fetch_text_for_nor(doc_id)
+    # 1. Fetch CURRENT text from the specific NOR page
+    current_url = f"{_RIS_DOC_BASE}&Dokumentnummer={doc_id}"
+    current_text = await _fetch_text_from_url(current_url)
     if not current_text:
-        return _error_result(f"Text für {doc_id} konnte nicht von der RIS-Website geladen werden.")
+        return _error_result(f"Text für {doc_id} konnte nicht geladen werden.")
 
-    # 2. Find previous version: FassungVom = Inkrafttretensdatum - 1 day
+    # 2. Compute FassungVom = Inkrafttretensdatum - 1 day
     fassung_vom = _day_before(inkrafttreten)
     if not fassung_vom:
         return {
-            "current": {"text": current_text, "info": "", "date": inkrafttreten, "nor_id": doc_id},
+            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
             "previous": None,
-            "diff_html": '<p class="diff-info">Inkrafttretensdatum konnte nicht bestimmt werden.</p>'
-                         + f'<div class="diff-current">{html_module.escape(current_text)}</div>',
+            "diff_html": _no_previous_html("Inkrafttretensdatum konnte nicht geparst werden.", current_text),
             "has_changes": False,
         }
 
-    logger.info(f"Querying previous version: FassungVom={fassung_vom}")
-    prev_meta = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=fassung_vom)
-    prev_nor = prev_meta.get("nor_id", "") if prev_meta else ""
-    logger.info(f"Previous version: NOR={prev_nor or 'none'} (current={doc_id})")
+    # 3. Fetch PREVIOUS text using same NOR + FassungVom
+    #    The RIS website shows the version valid on the given date.
+    prev_url = f"{_RIS_DOC_BASE}&Dokumentnummer={doc_id}&FassungVom={fassung_vom}"
+    logger.info(f"Fetching previous version: {prev_url}")
+    prev_text = await _fetch_text_from_url(prev_url)
 
-    # 3. Compare NOR numbers
-    if not prev_nor or prev_nor == doc_id:
-        if prev_nor == doc_id:
-            msg = (
-                f"Die Fassung vom {fassung_vom} hat dieselbe Dokumentnummer ({doc_id}). "
-                f"Das Inkrafttretensdatum ({inkrafttreten}) liegt vor dem Suchzeitraum — "
-                "es handelt sich um ein reines RIS-Metadaten-Update, "
-                "keine inhaltliche Gesetzesänderung."
-            )
-        else:
-            msg = "Keine Vorversion gefunden — möglicherweise die Erstfassung."
-        return {
-            "current": {"text": current_text, "info": "", "date": inkrafttreten, "nor_id": doc_id},
-            "previous": None,
-            "diff_html": f'<p class="diff-info">{msg}</p>'
-                         + f'<div class="diff-current">{html_module.escape(current_text)}</div>',
-            "has_changes": False,
-        }
-
-    # 4. Different NOR → real change! Fetch previous version text.
-    logger.info(f"Real change detected! Current={doc_id}, Previous={prev_nor}")
-    prev_text = await _fetch_text_for_nor(prev_nor)
-    if not prev_text:
-        return _error_result(f"Text für Vorversion ({prev_nor}) konnte nicht geladen werden.")
-
-    # 5. Compute diff
-    if current_text.strip() == prev_text.strip():
-        diff_html = (
-            f'<p class="diff-info">Identischer Text trotz verschiedener Dokumentnummern '
-            f'({doc_id} vs {prev_nor}).</p>'
-            f'<div class="diff-current">{html_module.escape(current_text)}</div>'
+    # 4. If previous text is empty, try with Gesetzesnummer + Paragraf on RIS search
+    if not prev_text and gesetzesnummer and artikel:
+        paragraf = artikel.replace("§", "").strip()
+        prev_url2 = (
+            f"https://www.ris.bka.gv.at/NormDokument.wxe"
+            f"?Abfrage=Bundesnormen&Gesetzesnummer={gesetzesnummer}"
+            f"&Paragraf={paragraf}&FassungVom={fassung_vom}"
         )
-        has_changes = False
-    else:
-        diff_html = _compute_word_diff(prev_text, current_text)
-        has_changes = True
+        logger.info(f"Fallback: {prev_url2}")
+        prev_text = await _fetch_text_from_url(prev_url2)
 
+    # 5. Compare
+    if not prev_text:
+        return {
+            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
+            "previous": None,
+            "diff_html": _no_previous_html(
+                f"Keine Fassung für den {fassung_vom} verfügbar — "
+                "möglicherweise die Erstfassung.", current_text
+            ),
+            "has_changes": False,
+        }
+
+    if current_text.strip() == prev_text.strip():
+        return {
+            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
+            "previous": None,
+            "diff_html": (
+                f'<p class="diff-info">Kein Textunterschied zwischen der aktuellen '
+                f'Fassung und der Fassung vom {fassung_vom}. Reines RIS-Metadaten-Update.</p>'
+                f'<div class="diff-current">{html_module.escape(current_text)}</div>'
+            ),
+            "has_changes": False,
+        }
+
+    # Real change!
+    diff_html = _compute_word_diff(prev_text, current_text)
     return {
-        "current": {"text": current_text, "info": "", "date": inkrafttreten, "nor_id": doc_id},
-        "previous": {
-            "text": prev_text,
-            "info": prev_meta.get("bgbl", ""),
-            "date": prev_meta.get("inkrafttreten", ""),
-            "nor_id": prev_nor,
-        },
+        "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
+        "previous": {"text": prev_text, "date": f"Fassung vom {fassung_vom}"},
         "diff_html": diff_html,
-        "has_changes": has_changes,
+        "has_changes": True,
     }
 
 
 async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
-    """DEBUG: show current version + FassungVom comparison."""
+    """DEBUG endpoint."""
+    from app.core.config import settings
     result = {}
 
-    current = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=None)
-    result["current"] = current
-    current_nor = (current or {}).get("nor_id", "")
-    inkraft = (current or {}).get("inkrafttreten", "")
-
-    # Try FassungVom = Inkrafttreten - 1 day
-    fv = _day_before(inkraft)
-    if fv:
-        prev = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=fv)
-        prev_nor = (prev or {}).get("nor_id", "")
-        result["fassung_vom"] = fv
-        result["previous"] = prev
-        result["nor_differs"] = prev_nor != current_nor and prev_nor != ""
-        result["is_metadata_update"] = prev_nor == current_nor
-
-    if current_nor:
-        text = await _fetch_text_for_nor(current_nor)
-        result["current_text_length"] = len(text) if text else 0
-        result["current_text_preview"] = (text[:300] + "...") if text and len(text) > 300 else text
-
-    return result
-
-
-# ── API version metadata ──
-
-async def _get_version_metadata(
-    gesetzesnummer: str,
-    artikel: str,
-    fassung_vom: str | None,
-) -> dict | None:
-    """Query the RIS API and extract the NOR number + metadata for a version."""
+    # Try API query
     params = {
         "Applikation": "BrKons",
         "Gesetzesnummer": gesetzesnummer,
         "ArtikelParagraphAnlage": artikel,
         "DokumenteProSeite": "Ten",
-        "Seitennummer": "1",
     }
-    if fassung_vom:
-        params["Fassung.FassungVom"] = fassung_vom
-
-    url = f"{BASE_URL}/Bundesrecht"
-    logger.info(f"API query: {url} params={params}")
-
+    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.get(url, params=params)
-            resp.raise_for_status()
             data = resp.json()
+            refs = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("OgdDocumentReference", [])
+            if isinstance(refs, dict):
+                refs = [refs]
+            result["api_hits"] = len(refs)
+            if refs:
+                ref = refs[0]
+                d = ref.get("Data", {})
+                m = d.get("Metadaten", {})
+                result["api_data_keys"] = list(d.keys())
+                result["api_meta_keys"] = list(m.keys())
+                # Flatten
+                flat = {}
+                for k in ("Technisch", "Allgemein", "Bundesrecht"):
+                    s = m.get(k)
+                    if isinstance(s, list) and s:
+                        s = s[0]
+                    if isinstance(s, dict):
+                        flat.update(s)
+                        for sk in ("BrKons",):
+                            ss = s.get(sk)
+                            if isinstance(ss, list) and ss:
+                                ss = ss[0]
+                            if isinstance(ss, dict):
+                                flat.update(ss)
+                result["flat_metadata"] = {k: str(v)[:200] for k, v in flat.items()}
         except Exception as e:
-            logger.error(f"API error: {e}")
-            return None
+            result["api_error"] = str(e)
 
-    refs = _extract_refs(data)
-    hits = _extract_hits(data)
-    logger.info(f"API response: {hits} hits, {len(refs)} refs")
-
-    if not refs:
-        return None
-
-    ref = refs[0]
-    data_entry = ref.get("Data", {})
-    m = _flatten_metadata(data_entry)
-
-    nor_id = (
-        _s(m.get("ID"))
-        or _s(m.get("Dokumentnummer"))
-        or _s(data_entry.get("Dokumentnummer"))
-        or ""
-    )
-    inkrafttreten = _s(m.get("Inkrafttretensdatum")) or ""
-    bgbl = _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or ""
-
-    # Also extract ContentUrls for logging
-    content_urls = _extract_content_urls(data_entry)
-
-    logger.info(f"Extracted: NOR={nor_id}, Inkraft={inkrafttreten}, BGBl={bgbl}, ContentUrls={len(content_urls)}")
-
-    return {
-        "nor_id": nor_id,
-        "inkrafttreten": inkrafttreten,
-        "bgbl": bgbl,
-        "content_urls": content_urls,
-    }
+    return result
 
 
-# ── Text fetching from RIS website ──
+# ── Text fetching ──
 
-async def _fetch_text_for_nor(nor_id: str) -> str:
-    """Fetch legal text for a specific NOR document from the RIS website."""
-    if not nor_id:
-        return ""
-
-    url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={nor_id}"
-    logger.info(f"Fetching website text: {url}")
-
-    async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_BROWSER_HEADERS) as client:
+async def _fetch_text_from_url(url: str) -> str:
+    """Fetch a RIS website page and extract the legal text."""
+    logger.info(f"Fetching: {url}")
+    async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
         try:
             resp = await client.get(url)
             resp.raise_for_status()
             text = _extract_text_from_page(resp.text)
             text = _remove_accessible_duplicates(text)
-            logger.info(f"Website text for {nor_id}: {len(text)} chars")
+            logger.info(f"Extracted: {len(text)} chars from {url}")
             return text
         except Exception as e:
-            logger.error(f"Website fetch error for {nor_id}: {e}")
+            logger.error(f"Fetch error: {e}")
             return ""
 
 
-# ── Response parsing ──
-
-def _extract_refs(data: dict) -> list[dict]:
-    refs = (
-        data.get("OgdSearchResult", {})
-        .get("OgdDocumentResults", {})
-        .get("OgdDocumentReference", [])
-    )
-    if isinstance(refs, dict):
-        refs = [refs]
-    return refs or []
-
-
-def _extract_hits(data: dict) -> int:
-    hits = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("Hits", {})
-    if isinstance(hits, dict):
-        text = hits.get("#text", "0")
-    else:
-        text = str(hits)
-    try:
-        return int(text)
-    except (ValueError, TypeError):
-        return 0
-
-
-def _flatten_metadata(data_entry: dict) -> dict:
-    metadata = data_entry.get("Metadaten", {})
-    merged = {}
-    for key in ("Technisch", "Allgemein", "Bundesrecht"):
-        section = metadata.get(key)
-        if isinstance(section, list) and section:
-            section = section[0]
-        if isinstance(section, dict):
-            merged.update(section)
-            for sub_key in ("BrKons", "LrKons"):
-                sub = section.get(sub_key)
-                if isinstance(sub, list) and sub:
-                    sub = sub[0]
-                if isinstance(sub, dict):
-                    merged.update(sub)
-    return merged
-
-
-def _extract_content_urls(data_entry: dict) -> list[str]:
-    urls = []
-    _walk_urls(data_entry, urls, 0)
-    return urls
-
-
-def _walk_urls(obj, urls, depth):
-    if depth > 10:
-        return
-    if isinstance(obj, dict):
-        if "Url" in obj and isinstance(obj["Url"], str) and obj["Url"].startswith("http"):
-            urls.append(obj["Url"])
-        if "ContentUrl" in obj:
-            val = obj["ContentUrl"]
-            if isinstance(val, str) and val.startswith("http"):
-                urls.append(val)
-            elif isinstance(val, list):
-                for item in val:
-                    if isinstance(item, dict) and "Url" in item:
-                        urls.append(item["Url"])
-                    elif isinstance(item, str) and item.startswith("http"):
-                        urls.append(item)
-        for v in obj.values():
-            _walk_urls(v, urls, depth + 1)
-    elif isinstance(obj, list):
-        for item in obj:
-            _walk_urls(item, urls, depth + 1)
-
-
-def _s(val) -> str:
-    if val is None:
-        return ""
-    if isinstance(val, str):
-        return val
-    if isinstance(val, list):
-        return ", ".join(str(v) for v in val)
-    return str(val)
-
-
-# ── Website text extraction ──
-
 def _extract_text_from_page(page_html: str) -> str:
+    """Extract legal text from a RIS website page."""
     if not page_html or len(page_html) < 200:
         return ""
 
+    # Strategy 1: Find >Text</tag> then content until next section
     section_labels = [
         "Schlagworte", "Zuletzt aktualisiert",
         "Dokumentnummer", "European Legislation Identifier",
@@ -354,6 +202,7 @@ def _extract_text_from_page(page_html: str) -> str:
         if len(text) > 20:
             return text
 
+    # Strategy 2: Largest block with legal patterns
     blocks = re.findall(r'<(?:td|div)[^>]*>(.*?)</(?:td|div)>', page_html, re.DOTALL)
     best = ""
     for block in blocks:
@@ -363,6 +212,8 @@ def _extract_text_from_page(page_html: str) -> str:
                 best = cleaned
     return best
 
+
+# ── Text processing ──
 
 def _remove_accessible_duplicates(text: str) -> str:
     text = re.sub(r'(§\s*\d+[a-z]?\.?)\s*Paragraph\s*\d+[a-z]?,?\s*', r'\1 ', text)
@@ -376,13 +227,11 @@ def _remove_accessible_duplicates(text: str) -> str:
     return text.strip()
 
 
-# ── Diff computation ──
-
 def _compute_word_diff(old_text: str, new_text: str) -> str:
     old_words = old_text.split()
     new_words = new_text.split()
     if not old_words and not new_words:
-        return "<p class='diff-info'>Beide Versionen sind leer.</p>"
+        return '<p class="diff-info">Beide Versionen sind leer.</p>'
 
     matcher = difflib.SequenceMatcher(None, old_words, new_words)
     parts = []
@@ -399,15 +248,11 @@ def _compute_word_diff(old_text: str, new_text: str) -> str:
     return " ".join(parts)
 
 
-def _format_no_previous(text: str) -> str:
+def _no_previous_html(msg: str, current_text: str) -> str:
     return (
-        '<p class="diff-info">Keine Vorversion gefunden.</p>'
-        f'<div class="diff-current">{html_module.escape(text)}</div>'
+        f'<p class="diff-info">{html_module.escape(msg)}</p>'
+        f'<div class="diff-current">{html_module.escape(current_text)}</div>'
     )
-
-
-def _format_no_date() -> str:
-    return '<p class="diff-info">Inkrafttretensdatum konnte nicht bestimmt werden — Vergleich nicht möglich.</p>'
 
 
 def _error_result(msg: str) -> dict:
@@ -415,18 +260,6 @@ def _error_result(msg: str) -> dict:
         "current": None, "previous": None,
         "diff_html": f'<p class="diff-info">{html_module.escape(msg)}</p>',
         "has_changes": False,
-    }
-
-
-def _text_only_result(nor_id: str, meta: dict) -> dict:
-    return {
-        "current": {
-            "text": "",
-            "info": meta.get("bgbl", ""),
-            "date": meta.get("inkrafttreten", ""),
-            "nor_id": nor_id,
-        },
-        "previous": None,
     }
 
 
