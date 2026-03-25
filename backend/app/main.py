@@ -92,13 +92,21 @@ async def api_diff(
     inkrafttreten: str = Query("", description="Inkrafttretensdatum"),
 ):
     """Fetch current and previous version of a provision and compute diff."""
-    result = await fetch_provision_diff(
-        doc_id=doc_id,
-        gesetzesnummer=gesetzesnummer,
-        artikel=artikel,
-        inkrafttreten=inkrafttreten,
-    )
-    return result
+    try:
+        result = await fetch_provision_diff(
+            doc_id=doc_id,
+            gesetzesnummer=gesetzesnummer,
+            artikel=artikel,
+            inkrafttreten=inkrafttreten,
+        )
+        return result
+    except Exception as e:
+        logging.error(f"Diff error: {e}", exc_info=True)
+        return {
+            "current": None, "previous": None,
+            "diff_html": f'<p class="diff-info">Serverfehler: {str(e)[:200]}</p>',
+            "has_changes": False,
+        }
 
 
 @app.get("/api/debug/doc")
