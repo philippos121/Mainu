@@ -87,7 +87,7 @@ async def fetch_provision_diff(doc_id: str) -> dict:
         "current": {
             "text": current["text"],
             "info": meta.get("Kundmachungsorgan", ""),
-            "date": inkrafttreten,
+            "date": meta.get("Inkrafttretensdatum", ""),
         },
         "previous": {
             "text": prev["text"],
