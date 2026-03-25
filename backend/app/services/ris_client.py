@@ -463,17 +463,22 @@ async def _fetch(url: str, params: dict) -> dict:
             return _empty()
 
 
-def _is_expired(ausserkraft_str: str) -> bool:
-    """Check if a provision has expired (Ausserkrafttretensdatum < today)."""
+def _is_expired_before(ausserkraft_str: str, days_ago: int) -> bool:
+    """Check if a provision expired BEFORE the search timeframe.
+
+    Returns True only if Ausserkrafttretensdatum < (today - days_ago).
+    Provisions that expired WITHIN the timeframe are still relevant changes.
+    """
     if not ausserkraft_str:
         return False
     s = ausserkraft_str.strip()
     if s in ("9999-12-31", "31.12.9999"):
         return False
+    cutoff = date.today() - timedelta(days=days_ago)
     for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y-%m-%dT%H:%M:%S"):
         try:
             dt = datetime.strptime(s.split("+")[0], fmt)
-            return dt.date() < date.today()
+            return dt.date() < cutoff
         except ValueError:
             continue
     return False
@@ -599,8 +604,12 @@ def _extract_id(m: dict, ref: dict, data_entry: dict) -> str:
     return doc_id
 
 
-def parse_bundesrecht_response(data: dict) -> dict:
-    """Parse Bundesrecht API response into a list of result dicts."""
+def parse_bundesrecht_response(data: dict, timeframe_days: int = 31) -> dict:
+    """Parse Bundesrecht API response into a list of result dicts.
+
+    Filters out provisions that expired BEFORE the search timeframe.
+    Provisions expiring WITHIN the timeframe are kept (that's a relevant change).
+    """
     refs = _extract_refs(data)
     total_hits = _extract_hits(data)
     results = []
@@ -631,8 +640,9 @@ def parse_bundesrecht_response(data: dict) -> dict:
         # Außerkrafttretensdatum - if set and in the past, provision is no longer in force
         ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
 
-        # Skip expired provisions — they clutter results with metadata-only updates
-        if _is_expired(ausserkraft):
+        # Skip provisions that expired BEFORE the search timeframe.
+        # If it expired WITHIN the timeframe, that's a relevant change to show.
+        if _is_expired_before(ausserkraft, timeframe_days):
             continue
 
         results.append({

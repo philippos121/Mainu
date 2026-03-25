@@ -15,6 +15,7 @@ from app.services.ris_client import (
     search_gesetze,
     search_gerichtsentscheidungen,
     parse_bundesrecht_response,
+    _timeframe_to_days,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
 from app.services.diff_service import fetch_provision_diff, debug_document  # noqa: E402
@@ -65,7 +66,8 @@ async def api_search_gesetze(
 ):
     """Search Gesetze und Verordnungen (Bundesrecht consolidated)."""
     raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
-    return parse_bundesrecht_response(raw)
+    days = _timeframe_to_days(im_ris_seit)
+    return parse_bundesrecht_response(raw, timeframe_days=days)
 
 
 @app.get("/api/search/gerichtsentscheidungen")
