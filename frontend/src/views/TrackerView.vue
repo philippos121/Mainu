@@ -138,9 +138,9 @@
                     · <v-icon size="12" class="mr-1">mdi-database-refresh-outline</v-icon>RIS: {{ formatDate(item.ris_updated) }}
                   </span>
                 </div>
-                <!-- Diff toggle button (only for NOR documents) -->
+                <!-- Diff toggle button (when we have Gesetzesnummer + Artikel) -->
                 <button
-                  v-if="item.id && item.id.startsWith('NOR')"
+                  v-if="item.gesetzesnummer && item.artikel"
                   class="diff-toggle-btn"
                   :class="{ 'diff-toggle-active': diffOpen[item.id] }"
                   @click.stop="toggleDiff(item)"
@@ -444,8 +444,9 @@ async function toggleDiff(item) {
   diffErrors.value[id] = ''
   try {
     const resp = await api.get('/diff', { params: {
-      doc_id: id,
-      ris_updated: item.ris_updated || '',
+      gesetzesnummer: item.gesetzesnummer,
+      artikel: item.artikel,
+      inkrafttreten: item.date || '',
     } })
     diffData.value[id] = resp.data
   } catch (e) {

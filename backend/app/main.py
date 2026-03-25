@@ -17,7 +17,7 @@ from app.services.ris_client import (
     parse_bundesrecht_response,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
-from app.services.diff_service import fetch_provision_diff, debug_document
+from app.services.diff_service import fetch_provision_diff, debug_document  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
@@ -85,24 +85,28 @@ async def api_search_gerichtsentscheidungen(
 
 @app.get("/api/diff")
 async def api_diff(
-    doc_id: str = Query(..., description="NOR document number"),
-    ris_updated: str = Query("", description="Zuletzt aktualisiert am date (DD.MM.YYYY)"),
+    gesetzesnummer: str = Query(..., description="Gesetzesnummer (e.g. 10001702)"),
+    artikel: str = Query(..., description="ArtikelParagraphAnlage (e.g. § 123)"),
+    inkrafttreten: str = Query("", description="Inkrafttretensdatum"),
 ):
-    """Fetch current and previous version of a Bundesrecht provision and compute diff."""
-    if not doc_id or not doc_id.startswith("NOR"):
-        raise HTTPException(status_code=400, detail="Ungültige Dokumentnummer (NOR-Nummer erforderlich).")
-    result = await fetch_provision_diff(doc_id, ris_updated=ris_updated)
-    if result.get("error"):
-        raise HTTPException(status_code=404, detail=result["error"])
+    """Fetch current and previous version of a provision and compute diff."""
+    if not gesetzesnummer or not artikel:
+        raise HTTPException(status_code=400, detail="Gesetzesnummer und Artikel sind erforderlich.")
+    result = await fetch_provision_diff(
+        gesetzesnummer=gesetzesnummer,
+        artikel=artikel,
+        inkrafttreten=inkrafttreten,
+    )
     return result
 
 
 @app.get("/api/debug/doc")
 async def api_debug_doc(
-    doc_id: str = Query(..., description="NOR document number"),
+    gesetzesnummer: str = Query(..., description="Gesetzesnummer"),
+    artikel: str = Query("", description="ArtikelParagraphAnlage"),
 ):
-    """DEBUG: Show raw API response structure and website HTML for a document."""
-    return await debug_document(doc_id)
+    """DEBUG: Show raw API response for a provision."""
+    return await debug_document(gesetzesnummer=gesetzesnummer, artikel=artikel)
 
 
 # ── GPT Summary & Report endpoints ──
