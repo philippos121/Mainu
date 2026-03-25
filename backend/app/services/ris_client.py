@@ -660,7 +660,42 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 31) -> dict:
             "ausserkraft": ausserkraft,
         })
 
+    # Deduplicate: if an expired version AND a newer version of the same
+    # Gesetzesnummer + Artikel exist, keep only the newer one.
+    # This avoids showing both the old and new § 275 when only the new one was amended.
+    results = _dedup_provisions(results)
+
     return {"results": results, "total_hits": total_hits}
+
+
+def _dedup_provisions(results: list[dict]) -> list[dict]:
+    """Remove expired provisions when a newer version of the same § exists."""
+    # Group by (gesetzesnummer, artikel)
+    from collections import defaultdict
+    groups: dict[tuple, list[dict]] = defaultdict(list)
+    for r in results:
+        key = (r.get("gesetzesnummer", ""), r.get("artikel", ""))
+        if key[0] and key[1]:
+            groups[key].append(r)
+
+    # Find IDs to remove
+    remove_ids = set()
+    for key, group in groups.items():
+        if len(group) <= 1:
+            continue
+        # Sort by date descending
+        sorted_g = sorted(group, key=lambda x: x.get("date", ""), reverse=True)
+        newest = sorted_g[0]
+        for older in sorted_g[1:]:
+            # If the older version has an ausserkraft date, it's superseded
+            if older.get("ausserkraft"):
+                remove_ids.add(older["id"])
+
+    if remove_ids:
+        logger.info(f"Dedup: removing {len(remove_ids)} superseded provisions: {remove_ids}")
+        results = [r for r in results if r["id"] not in remove_ids]
+
+    return results
 
 
 def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
