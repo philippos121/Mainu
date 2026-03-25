@@ -128,6 +128,9 @@
                   {{ item.title }}
                 </a>
                 <div class="result-meta">
+                  <span v-if="isExpired(item)" class="chip chip-expired">
+                    <v-icon size="10" class="mr-1">mdi-close-circle</v-icon>Außer Kraft seit {{ formatDate(item.ausserkraft) }}
+                  </span>
                   <span v-if="item.typ" class="chip chip-teal">{{ item.typ }}</span>
                   <span v-if="item.artikel" class="chip chip-orange">{{ item.artikel }}</span>
                   <span v-if="item.date" class="meta-text">
@@ -386,6 +389,20 @@ const timeframeLabel = computed(() => {
   return tf ? tf.label : ''
 })
 
+function isExpired(item) {
+  if (!item.ausserkraft) return false
+  try {
+    let d = item.ausserkraft
+    if (d.includes('.')) {
+      const [day, month, year] = d.split('.')
+      d = `${year}-${month}-${day}`
+    }
+    if (d.includes('T')) d = d.split('T')[0]
+    if (d === '9999-12-31') return false // Standard "no expiry"
+    return new Date(d) < new Date()
+  } catch { return false }
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return ''
   try {
@@ -444,6 +461,7 @@ async function toggleDiff(item) {
   diffErrors.value[id] = ''
   try {
     const resp = await api.get('/diff', { params: {
+      doc_id: item.id,
       gesetzesnummer: item.gesetzesnummer,
       artikel: item.artikel,
       inkrafttreten: item.date || '',
@@ -853,6 +871,7 @@ async function doReport() {
 
 .chip-teal { background: rgba(0, 121, 147, 0.07); color: #007993; }
 .chip-orange { background: rgba(239, 96, 7, 0.07); color: #ef6007; }
+.chip-expired { background: #fef2f2; color: #991b1b; display: inline-flex; align-items: center; }
 
 .meta-text { font-size: 12px; color: #9ca3af; display: inline-flex; align-items: center; }
 .meta-text-dim { color: #d1d5db; font-size: 11px; }

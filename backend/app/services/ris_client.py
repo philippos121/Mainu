@@ -610,6 +610,8 @@ def parse_bundesrecht_response(data: dict) -> dict:
         index_text = _s(m.get("Index")) or ""
         # Gesetzesnummer for version comparison
         gesetzesnummer = _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or ""
+        # Außerkrafttretensdatum - if set and in the past, provision is no longer in force
+        ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
 
         results.append({
             "id": doc_id,
@@ -623,6 +625,7 @@ def parse_bundesrecht_response(data: dict) -> dict:
             "ris_updated": ris_updated,
             "index": index_text,
             "gesetzesnummer": gesetzesnummer,
+            "ausserkraft": ausserkraft,
         })
 
     return {"results": results, "total_hits": total_hits}

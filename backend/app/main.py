@@ -85,14 +85,14 @@ async def api_search_gerichtsentscheidungen(
 
 @app.get("/api/diff")
 async def api_diff(
-    gesetzesnummer: str = Query(..., description="Gesetzesnummer (e.g. 10001702)"),
-    artikel: str = Query(..., description="ArtikelParagraphAnlage (e.g. § 123)"),
+    doc_id: str = Query(..., description="NOR document number from search results"),
+    gesetzesnummer: str = Query(..., description="Gesetzesnummer"),
+    artikel: str = Query(..., description="ArtikelParagraphAnlage"),
     inkrafttreten: str = Query("", description="Inkrafttretensdatum"),
 ):
     """Fetch current and previous version of a provision and compute diff."""
-    if not gesetzesnummer or not artikel:
-        raise HTTPException(status_code=400, detail="Gesetzesnummer und Artikel sind erforderlich.")
     result = await fetch_provision_diff(
+        doc_id=doc_id,
         gesetzesnummer=gesetzesnummer,
         artikel=artikel,
         inkrafttreten=inkrafttreten,
