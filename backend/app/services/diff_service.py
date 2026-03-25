@@ -54,7 +54,19 @@ async def fetch_provision_diff(
     """
     logger.info(f"=== DIFF START: NOR={doc_id}, GesNr={gesetzesnummer}, Art={artikel}, Inkraft={inkrafttreten}")
 
-    # 1. Fetch text for the FOUND document (the one from search results)
+    # 1. If no doc_id, look it up via API
+    if not doc_id and gesetzesnummer and artikel:
+        current_meta = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=None)
+        if current_meta:
+            doc_id = current_meta.get("nor_id", "")
+            if not inkrafttreten:
+                inkrafttreten = current_meta.get("inkrafttreten", "")
+        logger.info(f"Looked up NOR from API: {doc_id}")
+
+    if not doc_id:
+        return _error_result("Dokumentnummer (NOR) konnte nicht ermittelt werden.")
+
+    # 2. Fetch text for the FOUND document (the one from search results)
     current_text = await _fetch_text_for_nor(doc_id)
     if not current_text:
         return _error_result(f"Text für {doc_id} konnte nicht von der RIS-Website geladen werden.")
