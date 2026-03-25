@@ -17,6 +17,7 @@ from app.services.ris_client import (
     parse_bundesrecht_response,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
+from app.services.diff_service import fetch_provision_diff
 
 logging.basicConfig(level=logging.INFO)
 
@@ -77,6 +78,22 @@ async def api_search_gerichtsentscheidungen(
     return await search_gerichtsentscheidungen(
         category=category, im_ris_seit=im_ris_seit, page=page
     )
+
+
+# ── Version Diff endpoint ──
+
+
+@app.get("/api/diff")
+async def api_diff(
+    doc_id: str = Query(..., description="NOR document number"),
+):
+    """Fetch current and previous version of a Bundesrecht provision and compute diff."""
+    if not doc_id or not doc_id.startswith("NOR"):
+        raise HTTPException(status_code=400, detail="Ungültige Dokumentnummer (NOR-Nummer erforderlich).")
+    result = await fetch_provision_diff(doc_id)
+    if result.get("error"):
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 
 # ── GPT Summary & Report endpoints ──

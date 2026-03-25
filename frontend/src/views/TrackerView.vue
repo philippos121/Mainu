@@ -118,33 +118,74 @@
 
         <!-- Gesetze Results -->
         <template v-if="docType === 'gesetze'">
-          <a
-            v-for="item in results"
-            :key="item.id"
-            :href="item.url"
-            target="_blank"
-            rel="noopener"
-            class="result-card"
-          >
-            <div class="result-icon result-icon-teal">
-              <v-icon color="#007993" size="18">mdi-scale-balance</v-icon>
-            </div>
-            <div class="result-body">
-              <div class="result-title">{{ item.title }}</div>
-              <div class="result-meta">
-                <span v-if="item.typ" class="chip chip-teal">{{ item.typ }}</span>
-                <span v-if="item.artikel" class="chip chip-orange">{{ item.artikel }}</span>
-                <span v-if="item.date" class="meta-text">
-                  <v-icon size="12" class="mr-1">mdi-gavel</v-icon>In Kraft: {{ formatDate(item.date) }}
-                </span>
-                <span v-if="item.bgbl" class="meta-text">· {{ item.bgbl }}</span>
-                <span v-if="item.ris_updated" class="meta-text meta-text-dim">
-                  · <v-icon size="12" class="mr-1">mdi-database-refresh-outline</v-icon>RIS: {{ formatDate(item.ris_updated) }}
-                </span>
+          <div v-for="item in results" :key="item.id" class="result-wrapper">
+            <div class="result-card">
+              <div class="result-icon result-icon-teal">
+                <v-icon color="#007993" size="18">mdi-scale-balance</v-icon>
               </div>
+              <div class="result-body">
+                <a :href="item.url" target="_blank" rel="noopener" class="result-title-link">
+                  {{ item.title }}
+                </a>
+                <div class="result-meta">
+                  <span v-if="item.typ" class="chip chip-teal">{{ item.typ }}</span>
+                  <span v-if="item.artikel" class="chip chip-orange">{{ item.artikel }}</span>
+                  <span v-if="item.date" class="meta-text">
+                    <v-icon size="12" class="mr-1">mdi-gavel</v-icon>In Kraft: {{ formatDate(item.date) }}
+                  </span>
+                  <span v-if="item.bgbl" class="meta-text">· {{ item.bgbl }}</span>
+                  <span v-if="item.ris_updated" class="meta-text meta-text-dim">
+                    · <v-icon size="12" class="mr-1">mdi-database-refresh-outline</v-icon>RIS: {{ formatDate(item.ris_updated) }}
+                  </span>
+                </div>
+                <!-- Diff toggle button (only for NOR documents) -->
+                <button
+                  v-if="item.id && item.id.startsWith('NOR')"
+                  class="diff-toggle-btn"
+                  :class="{ 'diff-toggle-active': diffOpen[item.id] }"
+                  @click.stop="toggleDiff(item)"
+                >
+                  <span v-if="diffLoading[item.id]" class="spinner spinner-sm"></span>
+                  <v-icon v-else size="14" class="mr-1">
+                    {{ diffOpen[item.id] ? 'mdi-chevron-up' : 'mdi-compare' }}
+                  </v-icon>
+                  {{ diffLoading[item.id] ? 'Lade Versionen...' :
+                     diffOpen[item.id] ? 'Vergleich schließen' : 'Änderungen anzeigen' }}
+                </button>
+              </div>
+              <a :href="item.url" target="_blank" rel="noopener" class="result-ext-link">
+                <v-icon size="14" color="#d1d5db">mdi-open-in-new</v-icon>
+              </a>
             </div>
-            <v-icon size="14" color="#d1d5db" class="result-ext">mdi-open-in-new</v-icon>
-          </a>
+            <!-- Inline diff display -->
+            <div v-if="diffOpen[item.id] && diffData[item.id]" class="diff-panel">
+              <div v-if="diffData[item.id].has_changes" class="diff-versions">
+                <div class="diff-version-info">
+                  <span class="diff-label diff-label-old">Vorversion</span>
+                  <span v-if="diffData[item.id].previous" class="diff-date">
+                    In Kraft: {{ formatDate(diffData[item.id].previous.date) }}
+                    <span v-if="diffData[item.id].previous.info"> · {{ diffData[item.id].previous.info }}</span>
+                  </span>
+                </div>
+                <div class="diff-version-info">
+                  <span class="diff-label diff-label-new">Aktuelle Fassung</span>
+                  <span v-if="diffData[item.id].current" class="diff-date">
+                    In Kraft: {{ formatDate(diffData[item.id].current.date) }}
+                    <span v-if="diffData[item.id].current.info"> · {{ diffData[item.id].current.info }}</span>
+                  </span>
+                </div>
+              </div>
+              <div class="diff-legend" v-if="diffData[item.id].has_changes">
+                <span class="diff-legend-item"><span class="diff-del-sample">&nbsp;</span> Entfernt</span>
+                <span class="diff-legend-item"><span class="diff-ins-sample">&nbsp;</span> Hinzugefügt</span>
+              </div>
+              <div class="diff-content" v-html="diffData[item.id].diff_html"></div>
+            </div>
+            <!-- Diff error -->
+            <div v-if="diffOpen[item.id] && diffErrors[item.id]" class="diff-error">
+              {{ diffErrors[item.id] }}
+            </div>
+          </div>
         </template>
 
         <!-- Gerichtsentscheidungen Results -->
@@ -285,6 +326,12 @@ const results = ref([])
 const totalHits = ref(0)
 const page = ref(1)
 
+// Diff / version comparison
+const diffOpen = ref({})     // { [docId]: true/false }
+const diffData = ref({})     // { [docId]: { current, previous, diff_html, has_changes } }
+const diffLoading = ref({})  // { [docId]: true/false }
+const diffErrors = ref({})   // { [docId]: "error message" }
+
 // AI features
 const apiKey = ref(localStorage.getItem('ris_openai_key') || '')
 const showApiKey = ref(false)
@@ -380,10 +427,40 @@ async function loadFilters() {
   }
 }
 
+async function toggleDiff(item) {
+  const id = item.id
+  if (diffOpen.value[id]) {
+    diffOpen.value[id] = false
+    return
+  }
+  // Already loaded?
+  if (diffData.value[id]) {
+    diffOpen.value[id] = true
+    return
+  }
+  // Fetch diff
+  diffOpen.value[id] = true
+  diffLoading.value[id] = true
+  diffErrors.value[id] = ''
+  try {
+    const resp = await api.get('/diff', { params: { doc_id: id } })
+    diffData.value[id] = resp.data
+  } catch (e) {
+    diffErrors.value[id] = e.response?.data?.detail || 'Fehler beim Laden der Versionen.'
+    diffOpen.value[id] = true // keep open to show error
+  } finally {
+    diffLoading.value[id] = false
+  }
+}
+
 async function searchFresh() {
   page.value = 1
   summaryText.value = ''
   summaryError.value = ''
+  // Reset diff state
+  diffOpen.value = {}
+  diffData.value = {}
+  diffErrors.value = {}
   await search()
 }
 
@@ -628,6 +705,11 @@ async function doReport() {
   margin-right: 6px;
 }
 
+.diff-toggle-btn .spinner-sm {
+  border-color: rgba(0, 121, 147, 0.2);
+  border-top-color: #007993;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -775,6 +857,177 @@ async function doReport() {
   margin-left: 12px;
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+.result-ext-link {
+  margin-left: 12px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.result-title-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.result-title-link:hover {
+  color: #007993;
+}
+
+.result-wrapper {
+  margin-bottom: 8px;
+}
+
+/* ── Diff toggle button ── */
+.diff-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #007993;
+  background: rgba(0, 121, 147, 0.06);
+  border: 1px solid rgba(0, 121, 147, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.diff-toggle-btn:hover {
+  background: rgba(0, 121, 147, 0.12);
+  border-color: rgba(0, 121, 147, 0.25);
+}
+.diff-toggle-active {
+  background: rgba(0, 121, 147, 0.1);
+  border-color: rgba(0, 121, 147, 0.3);
+}
+
+/* ── Diff panel ── */
+.diff-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  padding: 16px 20px;
+  margin-top: -1px;
+}
+
+.diff-versions {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.diff-version-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.diff-label {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.diff-label-old {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.diff-label-new {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.diff-date {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.diff-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.diff-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diff-del-sample {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #fecaca;
+}
+
+.diff-ins-sample {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #bbf7d0;
+}
+
+.diff-content {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #374151;
+  padding: 12px 16px;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.diff-content :deep(.diff-del) {
+  background: #fecaca;
+  color: #991b1b;
+  text-decoration: line-through;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.diff-content :deep(.diff-ins) {
+  background: #bbf7d0;
+  color: #166534;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.diff-content :deep(.diff-info) {
+  color: #6b7280;
+  font-style: italic;
+  margin-bottom: 12px;
+}
+
+.diff-content :deep(.diff-current) {
+  color: #374151;
+}
+
+.diff-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  color: #991b1b;
+  padding: 12px 20px;
+  font-size: 13px;
+  margin-top: -1px;
 }
 
 /* ── AI Actions Bar ── */

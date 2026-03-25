@@ -539,6 +539,8 @@ def parse_bundesrecht_response(data: dict) -> dict:
         ris_updated = _s(m.get("ZuletztAktualisiert")) or _s(m.get("GeaendertAm")) or ""
         # Index field from RIS (e.g., "21/01 Handelsrecht")
         index_text = _s(m.get("Index")) or ""
+        # Gesetzesnummer for version comparison
+        gesetzesnummer = _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or ""
 
         results.append({
             "id": doc_id,
@@ -551,6 +553,7 @@ def parse_bundesrecht_response(data: dict) -> dict:
             "artikel": artikel,
             "ris_updated": ris_updated,
             "index": index_text,
+            "gesetzesnummer": gesetzesnummer,
         })
 
     return {"results": results, "total_hits": total_hits}
