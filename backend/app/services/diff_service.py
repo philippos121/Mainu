@@ -254,16 +254,28 @@ def _unique(lst: list[str]) -> list[str]:
 # ── Text cleanup ──
 
 def _dedup_accessible(text: str) -> str:
+    """Remove RIS accessible text duplicates that survive HTML cleaning."""
+    # Remove "Paragraph NNN," after "§ NNN."
     text = re.sub(r'(§\s*\d+[a-z]?\.?)\s*Paragraph\s*\d+[a-z]?,?\s*', r'\1 ', text)
+    # Remove "Absatz eins/N," after "(N)"
     text = re.sub(
         r'(\(\d+[a-z]?\))\s*Absatz\s*(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+\s*[a-z]?),?\s*',
         r'\1 ', text)
-    text = re.sub(r'Anmerkung,?\s*aus Bundesgesetzblatt[^)]*\)\s*', '', text)
+    # Remove standalone accessible words
     text = re.sub(r'\bParagraph\s+\d+\s*[a-z]?,\s*', '', text)
     text = re.sub(r'\bAbsatz\s+\d+\s*[a-z]?,\s*', '', text)
+    text = re.sub(r'\bAbsatz\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn),\s*', '', text)
     text = re.sub(r'\bZiffer\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+)\s*', '', text)
     text = re.sub(r'\bLitera\s+[a-z]\s*', '', text)
+    # Remove "Anmerkung, aus Bundesgesetzblatt..." blocks
+    text = re.sub(r'Anmerkung,?\s*aus Bundesgesetzblatt[^)]*\)\s*', '', text)
+    # Remove "römisch III." / "römisch zwei." etc. (accessible version of roman numerals)
+    text = re.sub(r'\brömisch\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|[IVXivx]+)\.?\s*', '', text)
+    # Remove "Paragraph/Artikel/Anlage" standalone markers
+    text = re.sub(r'\bParagraph/Artikel/Anlage\s*', '', text)
+    # Clean up double spaces and trailing artifacts
     text = re.sub(r'  +', ' ', text)
+    text = re.sub(r'\n ', '\n', text)
     return text.strip()
 
 
@@ -316,9 +328,35 @@ def _error(msg: str) -> dict:
 
 
 def _clean(text: str) -> str:
+    """Clean HTML to plain text, removing accessible duplicates at the HTML level."""
+    # 1. Remove script/style/noscript blocks
     c = re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+
+    # 2. Remove RIS accessible/screenreader duplicate elements BEFORE stripping tags.
+    # The RIS website renders each legal reference twice:
+    # - Original: <span class="...">§ 123 Abs. 1</span>
+    # - Accessible: <span class="GldPar">Paragraph 123,</span> <span class="GldAbs">Absatz eins,</span>
+    # The accessible spans have classes like GldPar, GldAbs, GldZ, GldLit, GldRom, GldAnl, etc.
+    # They also use class="ScreenReaderText" or similar.
+    # Remove these duplicate spans entirely from the HTML.
+    c = re.sub(r'<span[^>]*class="[^"]*(?:Gld[A-Z][a-z]+|ScreenReader|Barrierefreiheit)[^"]*"[^>]*>.*?</span>',
+               '', c, flags=re.DOTALL | re.IGNORECASE)
+
+    # 3. Also remove <abbr> accessible expansion elements (RIS uses these for abbreviations)
+    # Pattern: <abbr title="Absatz">Abs.</abbr> followed by accessible duplicate
+    # Just keep the <abbr> content, strip the tag
+    c = re.sub(r'<abbr[^>]*>(.*?)</abbr>', r'\1', c, flags=re.DOTALL)
+
+    # 4. Remove stray MainContent div artifacts
+    c = re.sub(r'<div[^>]*id="MainContent[^"]*"[^>]*/?>', '', c)
+
+    # 5. Convert block elements to newlines
     c = re.sub(r'<(?:br|/p|/div|/tr|/li)\s*/?>', '\n', c, flags=re.IGNORECASE)
+
+    # 6. Strip remaining tags
     c = re.sub(r'<[^>]+>', ' ', c)
+
+    # 7. Decode entities and normalize whitespace
     c = html_module.unescape(c)
     c = re.sub(r'[ \t]+', ' ', c)
     c = re.sub(r'\n[ \t]+', '\n', c)
