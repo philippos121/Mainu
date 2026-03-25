@@ -269,44 +269,115 @@ def _dedup_accessible(text: str) -> str:
     text = re.sub(r'\brömisch\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|[IVXivx]+)\.?\s*', '', text)
     text = re.sub(r'\bParagraph/Artikel/Anlage\s*', '', text)
 
-    # Step 2: Remove DUPLICATE SENTENCES (the core accessible text problem).
-    # RIS renders each paragraph twice: original + accessible version.
-    # The accessible version is nearly identical but with "Abs. 1" → empty, etc.
-    # Detect: if two consecutive sentences share >70% of words, the second is a dupe.
-    text = _remove_sentence_dupes(text)
+    # Step 2: Remove accessible rewrites of legal references.
+    # "BGBl. Nr. X/Y" → accessible: "Bundesgesetzblatt Nr. X aus Y,"
+    text = re.sub(r',?\s*Bundesgesetzblatt\s+Nr\.\s*\d+\s+aus\s+\d+,?\s*', ' ', text)
+    # Remove entire accessible duplicate phrases that follow the original.
+    # Pattern: "original phrase ending with period. accessible version of same phrase."
+    # The accessible version strips § and Abs. references, leaving "des des" artifacts.
+    text = re.sub(r'des\s+des\b', 'des', text)  # "des des" → "des" (artifact of § removal)
 
-    # Step 3: Remove trailing HTML artifacts
+    # Step 3: Remove DUPLICATE text blocks (the core accessible text problem).
+    text = _remove_sentence_dupes(text)
+    # Step 3b: Remove remaining duplicates that start mid-sentence (lowercase)
+    text = _remove_lowercase_dupes(text)
+
+    # Step 4: Remove trailing HTML artifacts and "Im RIS seit" metadata
     text = re.sub(r'<div[^>]*$', '', text)
+    text = re.sub(r'\s*Im RIS seit\s+[\d.]+\s*$', '', text)
+    text = re.sub(r'\s*Gesetzesnummer\s+\d+\s*$', '', text)
     text = re.sub(r'  +', ' ', text)
     text = re.sub(r'\n ', '\n', text)
     return text.strip()
 
 
 def _remove_sentence_dupes(text: str) -> str:
-    """Remove duplicate sentences that are accessible rewrites of the previous sentence."""
+    """Remove duplicate text blocks that are accessible rewrites.
+
+    RIS renders each legal paragraph twice: original + accessible.
+    Strategy: split on REAL sentence boundaries (not abbreviation dots),
+    then check for word overlap between consecutive chunks.
+    """
     lines = text.split('\n')
     result = []
     for line in lines:
-        # Within each line, split into sentences and remove duplicates
-        sentences = re.split(r'(?<=\.) (?=[A-Z(§])', line)
-        if len(sentences) <= 1:
+        # Split on real sentence endings:
+        # Period + space + ( or § or uppercase letter that starts a new sentence
+        # But NOT after abbreviations like "Abs.", "Nr.", "BGBl.", "bzw."
+        # Safe split: after ". " when followed by (N), §, or a word of 4+ chars starting uppercase
+        # Split on ". " followed by ( or § or uppercase — but avoid
+        # splitting after abbreviations. Use a simple heuristic:
+        # replace ". " with a marker only when preceded by a long word
+        # Split on ". " followed by ( or § or uppercase.
+        # Avoid splitting after abbreviations (Abs., Nr., BGBl., etc.)
+        # by requiring the preceding word to be at least 3 chars.
+        # Split on sentence boundaries: ". " after a word of 3+ chars,
+        # followed by ( or § or uppercase OR lowercase (for accessible dupes)
+        SEP = "|||SPLIT|||"
+        marked = re.sub(r'(\w\w\w+\.) (?=[(§A-Za-z])', lambda m: m.group(1) + SEP, line)
+        chunks = marked.split(SEP)
+        if len(chunks) <= 1:
             result.append(line)
             continue
 
-        kept = [sentences[0]]
-        for i in range(1, len(sentences)):
-            prev_words = set(re.findall(r'\w+', sentences[i - 1].lower()))
-            curr_words = set(re.findall(r'\w+', sentences[i].lower()))
-            if not curr_words or not prev_words:
-                kept.append(sentences[i])
-                continue
-            overlap = len(prev_words & curr_words) / max(len(curr_words), 1)
-            if overlap > 0.7:
-                # Duplicate — skip it
-                continue
-            else:
-                kept.append(sentences[i])
+        kept = [chunks[0]]
+        for i in range(1, len(chunks)):
+            is_dupe = False
+            for prev in kept:
+                prev_words = set(re.findall(r'\w{3,}', prev.lower()))
+                curr_words = set(re.findall(r'\w{3,}', chunks[i].lower()))
+                if not curr_words or len(curr_words) < 3:
+                    break
+                overlap = len(prev_words & curr_words) / max(len(curr_words), 1)
+                if overlap > 0.65:
+                    is_dupe = True
+                    break
+            if not is_dupe:
+                kept.append(chunks[i])
         result.append(' '.join(kept))
+    return '\n'.join(result)
+
+
+def _remove_lowercase_dupes(text: str) -> str:
+    """Remove duplicate phrases that start with lowercase (missed by sentence splitter).
+
+    Detects: "...überwiegen. im Sinne des des Arbeitsverfassungsgesetzes überwiegen."
+    where the second occurrence repeats content from earlier in the same line.
+    """
+    lines = text.split('\n')
+    result = []
+    for line in lines:
+        words = line.split()
+        if len(words) < 10:
+            result.append(line)
+            continue
+
+        # Check if the second half of the line is a near-duplicate of the first half
+        mid = len(words) // 2
+        first_half_set = set(w.lower() for w in words[:mid] if len(w) >= 3)
+        second_half_set = set(w.lower() for w in words[mid:] if len(w) >= 3)
+
+        if not second_half_set:
+            result.append(line)
+            continue
+
+        overlap = len(first_half_set & second_half_set) / max(len(second_half_set), 1)
+        if overlap > 0.7:
+            # The second half is a near-duplicate → keep only first half
+            # But we need to find the right cut point (after the period)
+            line_text = ' '.join(words)
+            # Find the last ". " that's near the middle
+            best_cut = -1
+            for m in re.finditer(r'\.\s', line_text):
+                pos = m.end()
+                if abs(pos - len(line_text) // 2) < len(line_text) // 3:
+                    best_cut = m.start() + 1  # include the period
+            if best_cut > 0:
+                result.append(line_text[:best_cut].strip())
+            else:
+                result.append(line)
+        else:
+            result.append(line)
     return '\n'.join(result)
 
 
