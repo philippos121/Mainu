@@ -312,21 +312,23 @@ async def search_gesetze(
     im_ris_seit: str,
     page: int = 1,
 ) -> dict:
-    """Search Bundesrecht (Gesetze und Verordnungen).
+    """Search Bundesrecht for provisions that ACTUALLY CHANGED in the timeframe.
+
+    Uses Fassung.VonInkrafttretensdatum/BisInkrafttretensdatum to find
+    provisions with real legislative changes (new Inkrafttreten dates),
+    NOT ImRisSeit which also catches metadata-only updates.
 
     Strategy:
-      - If category has mapped Gesetzesnummern → query each law separately,
-        combine results (much more precise than keyword search)
-      - If no Gesetzesnummern → fall back to Suchworte keyword search
-      - If no category → unfiltered search
+      - Category with Gesetzesnummern → query each law with date range
+      - No category / fallback → use ImRisSeit (broader but less precise)
     """
     gesetze_nummern = _CATEGORY_GESETZE.get(category, []) if category else []
+    days = _timeframe_to_days(im_ris_seit)
 
     if gesetze_nummern:
-        # Query each Gesetzesnummer in parallel
-        return await _search_by_gesetzesnummern(gesetze_nummern, im_ris_seit, page)
+        return await _search_by_gesetzesnummern(gesetze_nummern, days, page)
     else:
-        # Fallback: keyword search
+        # Fallback: keyword/ImRisSeit search
         params: dict = {
             "Applikation": "BrKons",
             "DokumenteProSeite": DOCS_PER_PAGE,
@@ -343,17 +345,21 @@ async def search_gesetze(
 
 async def _search_by_gesetzesnummern(
     gesetz_nrs: list[str],
-    im_ris_seit: str,
+    days: int,
     page: int,
 ) -> dict:
-    """Query multiple Gesetzesnummern in parallel and combine results."""
+    """Query multiple Gesetzesnummern using Inkrafttreten date range."""
+    today = date.today()
+    von = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+    bis = today.strftime("%Y-%m-%d")
 
     async def _query_one(gesetz_nr: str) -> dict:
         params = {
             "Applikation": "BrKons",
             "Gesetzesnummer": gesetz_nr,
-            "ImRisSeit": im_ris_seit,
-            "DokumenteProSeite": DOCS_PER_PAGE,
+            "Fassung.VonInkrafttretensdatum": von,
+            "Fassung.BisInkrafttretensdatum": bis,
+            "DokumenteProSeite": "OneHundred",
             "Seitennummer": page,
         }
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
@@ -620,12 +626,8 @@ def _extract_id(m: dict, ref: dict, data_entry: dict) -> str:
     return doc_id
 
 
-def parse_bundesrecht_response(data: dict, timeframe_days: int = 31) -> dict:
-    """Parse Bundesrecht API response into a list of result dicts.
-
-    Filters out provisions that expired BEFORE the search timeframe.
-    Provisions expiring WITHIN the timeframe are kept (that's a relevant change).
-    """
+def parse_bundesrecht_response(data: dict) -> dict:
+    """Parse Bundesrecht API response into a list of result dicts."""
     refs = _extract_refs(data)
     total_hits = _extract_hits(data)
     results = []
@@ -657,12 +659,8 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 31) -> dict:
         ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
 
         # Skip provisions superseded before taking effect (Ausserkraft < Inkraft)
+        # These were overtaken by a later amendment before they ever became valid.
         if ausserkraft and change_date and _date_before(ausserkraft, change_date):
-            continue
-
-        # Skip provisions that expired BEFORE the search timeframe.
-        # If it expired WITHIN the timeframe, that's a relevant change to show.
-        if _is_expired_before(ausserkraft, timeframe_days):
             continue
 
         results.append({

@@ -66,8 +66,7 @@ async def api_search_gesetze(
 ):
     """Search Gesetze und Verordnungen (Bundesrecht consolidated)."""
     raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
-    days = _timeframe_to_days(im_ris_seit)
-    return parse_bundesrecht_response(raw, timeframe_days=days)
+    return parse_bundesrecht_response(raw)
 
 
 @app.get("/api/search/gerichtsentscheidungen")

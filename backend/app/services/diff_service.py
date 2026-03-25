@@ -37,47 +37,60 @@ async def fetch_provision_diff(
     artikel: str,
     inkrafttreten: str,
 ) -> dict:
-    """Fetch current + previous version and return diff."""
-    logger.info(f"=== DIFF: NOR={doc_id}, Art={artikel}, Inkraft={inkrafttreten}")
+    """Fetch current + previous version and return diff.
+
+    Strategy:
+    1. Fetch current text from RIS website (NOR-specific page).
+    2. Find previous version NOR via API: Gesetzesnummer + ArtikelParagraphAnlage
+       + Fassung.FassungVom = (Inkrafttreten - 1 day).
+    3. Fetch previous text from RIS website.
+    4. Compute word-level diff.
+    """
+    logger.info(f"=== DIFF: NOR={doc_id}, GesNr={gesetzesnummer}, Art={artikel}, Inkraft={inkrafttreten}")
 
     if not doc_id:
         return _error("Dokumentnummer (NOR) fehlt.")
 
-    # 1. Fetch current page → text + Alle Fassungen NOR list
-    page = await _fetch_page(doc_id)
-    if not page or not page["text"]:
+    # 1. Fetch current text from website
+    current_page = await _fetch_page(doc_id)
+    if not current_page or not current_page["text"]:
         return _error(f"Text für {doc_id} konnte nicht geladen werden.")
+    current_text = current_page["text"]
 
-    current_text = page["text"]
-    all_nors = page["version_nors"]
-    logger.info(f"Text: {len(current_text)} chars, Alle Fassungen: {all_nors}")
+    # 2. Find previous version via API FassungVom
+    fassung_vom = _day_before(inkrafttreten)
+    prev_nor = None
+    prev_text = ""
+    prev_inkraft = ""
 
-    # 2. Find previous NOR
-    prev_nor = _next_nor(doc_id, all_nors)
-    if not prev_nor:
-        return {
-            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
-            "previous": None,
-            "diff_html": _no_prev(
-                "Keine Vorversion gefunden (Erstfassung oder einzige Version).",
-                current_text),
-            "has_changes": False,
-        }
+    if fassung_vom and gesetzesnummer and artikel:
+        prev_nor = await _find_prev_nor_via_api(gesetzesnummer, artikel, fassung_vom, doc_id)
 
-    logger.info(f"Previous NOR: {prev_nor}")
+    if prev_nor:
+        logger.info(f"Previous NOR from API: {prev_nor}")
+        prev_page = await _fetch_page(prev_nor)
+        if prev_page and prev_page["text"]:
+            prev_text = prev_page["text"]
+            prev_inkraft = prev_page.get("inkrafttreten", "")
 
-    # 3. Fetch previous version text
-    prev_page = await _fetch_page(prev_nor)
-    prev_text = prev_page["text"] if prev_page else ""
+    # 3. Fallback: try "Alle Fassungen" links from the page
+    if not prev_text and current_page.get("version_nors"):
+        fallback_nor = _next_nor(doc_id, current_page["version_nors"])
+        if fallback_nor:
+            logger.info(f"Fallback: Alle Fassungen NOR {fallback_nor}")
+            fb_page = await _fetch_page(fallback_nor)
+            if fb_page and fb_page["text"]:
+                prev_nor = fallback_nor
+                prev_text = fb_page["text"]
+                prev_inkraft = fb_page.get("inkrafttreten", "")
+
     if not prev_text:
         return {
             "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
             "previous": None,
-            "diff_html": _no_prev(f"Text für Vorversion {prev_nor} nicht ladbar.", current_text),
+            "diff_html": _no_prev("Keine Vorversion gefunden (Erstfassung).", current_text),
             "has_changes": False,
         }
-
-    prev_inkraft = prev_page.get("inkrafttreten", "")
 
     # 4. Diff
     if current_text.strip() == prev_text.strip():
@@ -85,8 +98,7 @@ async def fetch_provision_diff(
             "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
             "previous": {"text": prev_text, "date": prev_inkraft, "nor_id": prev_nor},
             "diff_html": (
-                f'<p class="diff-info">Identischer Text mit Vorversion ({prev_nor}, '
-                f'Inkrafttreten {prev_inkraft}). Redaktionelle/formale Änderung.</p>'
+                f'<p class="diff-info">Identischer Text ({doc_id} vs {prev_nor}).</p>'
                 f'<div class="diff-current">{html_module.escape(current_text)}</div>'
             ),
             "has_changes": False,
@@ -98,6 +110,71 @@ async def fetch_provision_diff(
         "diff_html": _word_diff(prev_text, current_text),
         "has_changes": True,
     }
+
+
+async def _find_prev_nor_via_api(
+    gesetzesnummer: str,
+    artikel: str,
+    fassung_vom: str,
+    current_nor: str,
+) -> str | None:
+    """Find the previous version's NOR via API with FassungVom."""
+    from app.core.config import settings
+
+    params = {
+        "Applikation": "BrKons",
+        "Gesetzesnummer": gesetzesnummer,
+        "ArtikelParagraphAnlage": artikel,
+        "Fassung.FassungVom": fassung_vom,
+        "DokumenteProSeite": "Ten",
+    }
+    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+    logger.info(f"API FassungVom query: {params}")
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.error(f"API error: {e}")
+            return None
+
+    refs = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("OgdDocumentReference", [])
+    if isinstance(refs, dict):
+        refs = [refs]
+    if not refs:
+        return None
+
+    # Extract NOR from first result
+    ref = refs[0]
+    d = ref.get("Data", {})
+    m = {}
+    metadata = d.get("Metadaten", {})
+    for key in ("Technisch", "Allgemein", "Bundesrecht"):
+        section = metadata.get(key)
+        if isinstance(section, list) and section:
+            section = section[0]
+        if isinstance(section, dict):
+            m.update(section)
+            for sub in ("BrKons",):
+                s = section.get(sub)
+                if isinstance(s, list) and s:
+                    s = s[0]
+                if isinstance(s, dict):
+                    m.update(s)
+
+    nor = m.get("ID", "") or m.get("Dokumentnummer", "") or d.get("Dokumentnummer", "")
+    if isinstance(nor, list):
+        nor = ", ".join(str(v) for v in nor)
+
+    # If same NOR as current → no change found
+    if nor == current_nor:
+        logger.info(f"API FassungVom returned same NOR {nor}")
+        return None
+
+    logger.info(f"API FassungVom returned different NOR: {nor}")
+    return nor if nor else None
 
 
 async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
