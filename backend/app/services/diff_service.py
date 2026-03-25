@@ -17,6 +17,7 @@ import difflib
 import html as html_module
 import logging
 import re
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -504,6 +505,20 @@ def _error(msg: str) -> dict:
     return {"current": None, "previous": None,
             "diff_html": f'<p class="diff-info">{html_module.escape(msg)}</p>',
             "has_changes": False}
+
+
+def _day_before(date_str: str) -> str | None:
+    """Parse a date and return the day before as YYYY-MM-DD."""
+    if not date_str:
+        return None
+    date_str = date_str.strip()
+    for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            dt = datetime.strptime(date_str.split("+")[0].split(".000")[0], fmt)
+            return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
 
 
 def _clean(text: str) -> str:
