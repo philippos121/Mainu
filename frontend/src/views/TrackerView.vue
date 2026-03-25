@@ -1042,6 +1042,51 @@ async function doReport() {
   color: #374151;
 }
 
+.diff-content :deep(.diff-sidebyside) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.diff-content :deep(.diff-side) {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.diff-content :deep(.diff-side-old) {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.diff-content :deep(.diff-side-new) {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.diff-content :deep(.diff-side-label) {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diff-content :deep(.diff-side-old .diff-side-label) { color: #991b1b; }
+.diff-content :deep(.diff-side-new .diff-side-label) { color: #166534; }
+
+.diff-content :deep(.diff-side-text) {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 768px) {
+  .diff-content :deep(.diff-sidebyside) {
+    grid-template-columns: 1fr;
+  }
+}
+
 .diff-error {
   background: #fef2f2;
   border: 1px solid #fecaca;

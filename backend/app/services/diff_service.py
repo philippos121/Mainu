@@ -127,26 +127,30 @@ async def _fetch_page(nor: str) -> dict | None:
         try:
             resp = await client.get(url)
             resp.raise_for_status()
-            return _parse(resp.text)
+            return _parse(resp.text, nor)
         except Exception as e:
             logger.error(f"Fetch {nor}: {e}")
             return None
 
 
-def _parse(html: str) -> dict:
+def _parse(html: str, current_nor: str = "") -> dict:
     """Parse RIS page: text, version NORs, metadata."""
     r = {"text": "", "version_nors": [], "inkrafttreten": "", "ausserkrafttreten": ""}
     if not html or len(html) < 200:
         return r
 
     # ── Text ──
+    # Find >Text</tag> then content until next section label
     ends = ["Schlagworte", "Zuletzt aktualisiert", "Dokumentnummer",
             "European Legislation Identifier", "Navigation im Suchergebnis",
             "Zum Seitenanfang"]
     end_pat = "|".join(re.escape(s) for s in ends)
     m = re.search(rf'>\s*Text\s*</[^>]+>(.*?)({end_pat})', html, re.DOTALL | re.IGNORECASE)
     if m:
-        t = _clean(m.group(1))
+        raw = m.group(1)
+        # Remove any stray <div> tags that start with MainContent (page structure artifacts)
+        raw = re.sub(r'<div[^>]*id="MainContent[^"]*"[^>]*/?\s*>?', '', raw)
+        t = _clean(raw)
         if len(t) > 20:
             r["text"] = _dedup_accessible(t)
 
@@ -168,25 +172,57 @@ def _parse(html: str) -> dict:
             r[key] = html_module.unescape(mm.group(1).strip())
 
     # ── Alle Fassungen NORs ──
-    # The section has links like: /eli/rgbl/1906/58/P30g/NOR40275544
-    # or Dokumentnummer=NOR40275544
+    # CRITICAL: Each § on the page has its OWN version list in a
+    # <div class="...documentVersionsDialogBody..."> containing an <ol> with <li> entries.
+    # We must find the div that contains the CURRENT NOR to avoid mixing up
+    # version lists from different paragraphs (ABGB has 1000+ §§).
+    #
+    # HTML structure (from real debug):
+    # <div id="...DocumentVersionList_0_DialogBody_0" class="ui-helper-hidden documentVersionsDialogBody">
+    #   <ol>
+    #     <li class="selectedDocumentVersion">
+    #       <a href="/eli/rgbl/1906/58/P30g/NOR40275544">§ 30g gültig ab 19.02.2026</a>
+    #     </li>
+    #     <li><a href="/eli/rgbl/1906/58/P30g/NOR40181338">§ 30g gültig von ...</a></li>
+    #   </ol>
+    # </div>
     nors = []
 
-    # Strategy 1: Find "Alle Fassungen" section
-    idx = html.find("Alle Fassungen")
-    if idx < 0:
-        idx = html.find("Alle&nbsp;Fassungen")
-    if idx >= 0:
-        chunk = html[idx:idx + 5000]
-        # Extract NOR numbers from /eli/.../NORxxxx links AND Dokumentnummer=NORxxxx
-        found = re.findall(r'/(NOR\d+)', chunk)
-        found += re.findall(r'Dokumentnummer[=%3D]+(NOR\d+)', chunk, re.IGNORECASE)
-        nors = _unique(found)
+    # Strategy 1: Find the documentVersionsDialogBody div containing current NOR
+    if current_nor:
+        # Find all version dialog divs
+        dialog_pattern = r'<div[^>]*class="[^"]*documentVersionsDialogBody[^"]*"[^>]*>(.*?)</div>'
+        dialogs = re.findall(dialog_pattern, html, re.DOTALL | re.IGNORECASE)
+        for dialog_content in dialogs:
+            if current_nor in dialog_content:
+                # This is OUR version list! Extract all NOR numbers from it.
+                found = re.findall(r'/(NOR\d+)', dialog_content)
+                nors = _unique(found)
+                logger.info(f"Found version dialog with current NOR: {nors}")
+                break
 
-    # Strategy 2: links with "gültig" text
+    # Strategy 2: Find "Alle Fassungen" link with current NOR's anchor, then look at nearby dialog
+    if not nors and current_nor:
+        # The "Alle Fassungen" link has href="...#alleFassungen" with the current NOR
+        afl_idx = html.find(f'{current_nor}#alleFassungen')
+        if afl_idx >= 0:
+            # The dialog div is right after this link
+            chunk = html[afl_idx:afl_idx + 5000]
+            found = re.findall(r'/(NOR\d+)', chunk)
+            # Remove current NOR's duplicate from the anchor itself and keep unique
+            nors = _unique(found)
+            logger.info(f"Found via Alle Fassungen anchor: {nors}")
+
+    # Strategy 3: Broader — find all NOR-containing eli links near "selectedDocumentVersion"
     if not nors:
-        found = re.findall(r'/(NOR\d+)"[^>]*>[^<]*(?:gültig|heute)', html)
-        nors = _unique(found)
+        sel_idx = html.find('selectedDocumentVersion')
+        if sel_idx >= 0:
+            # Search within 3000 chars around the selectedDocumentVersion
+            start = max(0, sel_idx - 500)
+            chunk = html[start:start + 4000]
+            found = re.findall(r'/(NOR\d+)', chunk)
+            nors = _unique(found)
+            logger.info(f"Found via selectedDocumentVersion: {nors}")
 
     r["version_nors"] = nors
     logger.info(f"Parsed: text={len(r['text'])}ch, nors={nors}, inkraft={r['inkrafttreten']}")
@@ -235,7 +271,25 @@ def _word_diff(old: str, new: str) -> str:
     ow, nw = old.split(), new.split()
     if not ow and not nw:
         return '<p class="diff-info">Beide Versionen leer.</p>'
+
     sm = difflib.SequenceMatcher(None, ow, nw)
+    ratio = sm.ratio()
+
+    # If similarity < 40%, it's a complete rewrite → show side-by-side
+    if ratio < 0.4:
+        return (
+            '<p class="diff-info">Umfassende Neufassung (weniger als 40% Textübereinstimmung). '
+            'Gegenüberstellung statt Inline-Diff:</p>'
+            '<div class="diff-sidebyside">'
+            f'<div class="diff-side diff-side-old">'
+            f'<div class="diff-side-label">Vorversion</div>'
+            f'<div class="diff-side-text">{html_module.escape(old)}</div></div>'
+            f'<div class="diff-side diff-side-new">'
+            f'<div class="diff-side-label">Neue Fassung</div>'
+            f'<div class="diff-side-text">{html_module.escape(new)}</div></div>'
+            '</div>'
+        )
+
     parts = []
     for op, i1, i2, j1, j2 in sm.get_opcodes():
         if op == "equal":
