@@ -38,13 +38,24 @@ async def debug_document(doc_id: str) -> dict:
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=_HEADERS) as client:
         try:
             resp = await client.get(ris_url)
+            html = resp.text
             result["website_status"] = resp.status_code
-            result["website_body_length"] = len(resp.text)
+            result["website_body_length"] = len(html)
 
-            parsed = _parse_ris_page(resp.text)
+            parsed = _parse_ris_page(html)
             result["parsed_text"] = (parsed["text"][:500] + "...") if len(parsed["text"]) > 500 else parsed["text"]
             result["parsed_text_length"] = len(parsed["text"])
             result["parsed_metadata"] = parsed["metadata"]
+
+            # Show HTML context around key metadata labels
+            for label in ["Gesetzesnummer", "Inkrafttretensdatum", "Kurztitel", "§/Artikel"]:
+                idx = html.find(label)
+                if idx >= 0:
+                    start = max(0, idx - 100)
+                    end = min(len(html), idx + 300)
+                    result[f"html_around_{label}"] = html[start:end]
+                else:
+                    result[f"html_around_{label}"] = "(not found)"
         except Exception as e:
             result["error"] = str(e)
     return result
