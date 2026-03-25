@@ -54,54 +54,48 @@ async def fetch_provision_diff(
     current_nor = current_meta.get("nor_id", "")
     logger.info(f"Current version: NOR={current_nor}, Inkraft={current_meta.get('inkrafttreten')}")
 
-    # 2. Find a FassungVom date that yields a DIFFERENT NOR number.
-    #    The current version's Inkrafttretensdatum tells us when it took effect.
-    #    But ImRisSeit may also surface metadata-only updates where Inkrafttreten is old.
-    #    Strategy: try multiple dates going backwards until we find a different NOR.
-    inkraft = current_meta.get("inkrafttreten", "")
-    candidate_dates = []
+    # 2. Find the PREVIOUS version by querying FassungVom = Inkrafttreten - 1 day.
+    #    This is the ONLY correct approach:
+    #    - If the provision changed, its Inkrafttretensdatum is when the NEW version
+    #      took effect. FassungVom = (Inkrafttreten - 1 day) returns the OLD version.
+    #    - If the NOR number is the SAME → the "change" detected by ImRisSeit was just
+    #      a RIS metadata update, not an actual legislative change.
+    #    - We do NOT try other dates further in the past, because that would show
+    #      an unrelated historical version (e.g. from 1939) instead of the actual
+    #      previous version.
+    inkraft = inkrafttreten or current_meta.get("inkrafttreten", "")
+    fassung_vom = _day_before(inkraft)
 
-    # First candidate: Inkrafttretensdatum - 1 day (if the provision actually changed)
-    d = _day_before(inkrafttreten) or _day_before(inkraft)
-    if d:
-        candidate_dates.append(d)
+    if not fassung_vom:
+        current_text = await _fetch_text_for_nor(current_nor)
+        return {
+            "current": {"text": current_text or "", "info": current_meta.get("bgbl", ""),
+                        "date": inkraft, "nor_id": current_nor},
+            "previous": None,
+            "diff_html": '<p class="diff-info">Inkrafttretensdatum konnte nicht bestimmt werden.</p>'
+                         + (f'<div class="diff-current">{html_module.escape(current_text)}</div>' if current_text else ""),
+            "has_changes": False,
+        }
 
-    # More candidates: yesterday, 1 week ago, 1 month ago, 6 months ago, 1 year ago
-    now = datetime.now()
-    for delta_days in [1, 7, 30, 180, 365]:
-        cd = (now - timedelta(days=delta_days)).strftime("%Y-%m-%d")
-        if cd not in candidate_dates:
-            candidate_dates.append(cd)
+    logger.info(f"Querying FassungVom={fassung_vom} (Inkrafttreten={inkraft} minus 1 day)")
+    prev_meta = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=fassung_vom)
+    prev_nor = prev_meta.get("nor_id", "") if prev_meta else ""
 
-    logger.info(f"Candidate FassungVom dates: {candidate_dates}")
-
-    # 3. Try each date until we find a different NOR number
-    prev_meta = None
-    prev_nor = ""
-    used_fassung_vom = ""
-    for fassung_vom in candidate_dates:
-        logger.info(f"Trying FassungVom={fassung_vom}...")
-        meta = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=fassung_vom)
-        if meta and meta.get("nor_id") and meta["nor_id"] != current_nor:
-            prev_meta = meta
-            prev_nor = meta["nor_id"]
-            used_fassung_vom = fassung_vom
-            logger.info(f"Found different NOR! FassungVom={fassung_vom} → NOR={prev_nor}")
-            break
-        elif meta:
-            logger.info(f"FassungVom={fassung_vom} → same NOR={meta.get('nor_id')}")
-
-    logger.info(f"Previous version result: NOR={prev_nor or 'none found'}")
+    logger.info(f"Previous version result: NOR={prev_nor or 'none'} (current={current_nor})")
 
     # 4. Compare NOR numbers
-    if not prev_nor:
-        # Same document → metadata-only update or no previous version
+    if not prev_nor or prev_nor == current_nor:
+        # Same NOR or no result → metadata-only update, NOT a real legislative change
         current_text = await _fetch_text_for_nor(current_nor)
-        msg = (
-            f"Alle geprüften Fassungsdaten ({', '.join(candidate_dates[:3])}...) "
-            f"ergeben dieselbe Dokumentnummer ({current_nor}). "
-            "Entweder ist dies die Erstfassung oder ein reines RIS-Metadaten-Update."
-        )
+        if prev_nor == current_nor:
+            msg = (
+                f"Die Fassung vom {fassung_vom} hat dieselbe Dokumentnummer ({current_nor}) "
+                f"wie die aktuelle Fassung. Das Inkrafttretensdatum ({inkraft}) liegt vor dem "
+                "Suchzeitraum — es handelt sich um ein reines RIS-Metadaten-Update, "
+                "keine inhaltliche Gesetzesänderung."
+            )
+        else:
+            msg = "Keine Vorversion gefunden — möglicherweise die Erstfassung."
         return {
             "current": {
                 "text": current_text or "",
@@ -156,46 +150,28 @@ async def fetch_provision_diff(
 
 
 async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
-    """DEBUG: show what the API returns across multiple dates."""
+    """DEBUG: show current version + FassungVom comparison."""
     result = {}
-    now = datetime.now()
 
-    # Current version
     current = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=None)
     result["current"] = current
     current_nor = (current or {}).get("nor_id", "")
+    inkraft = (current or {}).get("inkrafttreten", "")
 
-    # Try multiple dates and show NOR for each
-    versions = {}
-    for label, delta in [("yesterday", 1), ("1_week", 7), ("1_month", 30),
-                         ("3_months", 90), ("6_months", 180), ("1_year", 365),
-                         ("2_years", 730)]:
-        fv = (now - timedelta(days=delta)).strftime("%Y-%m-%d")
-        meta = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=fv)
-        nor = (meta or {}).get("nor_id", "")
-        versions[label] = {
-            "fassung_vom": fv,
-            "nor_id": nor,
-            "inkrafttreten": (meta or {}).get("inkrafttreten", ""),
-            "differs_from_current": nor != current_nor and nor != "",
-        }
+    # Try FassungVom = Inkrafttreten - 1 day
+    fv = _day_before(inkraft)
+    if fv:
+        prev = await _get_version_metadata(gesetzesnummer, artikel, fassung_vom=fv)
+        prev_nor = (prev or {}).get("nor_id", "")
+        result["fassung_vom"] = fv
+        result["previous"] = prev
+        result["nor_differs"] = prev_nor != current_nor and prev_nor != ""
+        result["is_metadata_update"] = prev_nor == current_nor
 
-    result["versions"] = versions
-
-    # Fetch text for current NOR
     if current_nor:
         text = await _fetch_text_for_nor(current_nor)
         result["current_text_length"] = len(text) if text else 0
         result["current_text_preview"] = (text[:300] + "...") if text and len(text) > 300 else text
-
-    # Fetch text for first differing NOR
-    for v in versions.values():
-        if v["differs_from_current"] and v["nor_id"]:
-            prev_text = await _fetch_text_for_nor(v["nor_id"])
-            result["prev_nor_id"] = v["nor_id"]
-            result["prev_text_length"] = len(prev_text) if prev_text else 0
-            result["prev_text_preview"] = (prev_text[:300] + "...") if prev_text and len(prev_text) > 300 else prev_text
-            break
 
     return result
 
