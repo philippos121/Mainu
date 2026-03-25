@@ -463,6 +463,22 @@ async def _fetch(url: str, params: dict) -> dict:
             return _empty()
 
 
+def _date_before(date_a: str, date_b: str) -> bool:
+    """Check if date_a < date_b (provision superseded before taking effect)."""
+    def _parse(s):
+        s = s.strip()
+        for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                return datetime.strptime(s.split("+")[0], fmt).date()
+            except ValueError:
+                continue
+        return None
+    a, b = _parse(date_a), _parse(date_b)
+    if a and b:
+        return a < b
+    return False
+
+
 def _is_expired_before(ausserkraft_str: str, days_ago: int) -> bool:
     """Check if a provision expired BEFORE the search timeframe.
 
@@ -639,6 +655,10 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 31) -> dict:
         gesetzesnummer = _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or ""
         # Außerkrafttretensdatum - if set and in the past, provision is no longer in force
         ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
+
+        # Skip provisions superseded before taking effect (Ausserkraft < Inkraft)
+        if ausserkraft and change_date and _date_before(ausserkraft, change_date):
+            continue
 
         # Skip provisions that expired BEFORE the search timeframe.
         # If it expired WITHIN the timeframe, that's a relevant change to show.
