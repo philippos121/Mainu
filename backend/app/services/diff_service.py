@@ -1,25 +1,20 @@
 """Service for fetching and comparing versions of RIS Bundesrecht provisions.
 
-All data comes from the RIS website (ris.bka.gv.at) since the OGD API
-does not return results for Dokumentnummer queries with BrKons.
+All data comes from the RIS website (ris.bka.gv.at).
 
 Strategy:
 1. Fetch the NOR document page from the RIS website.
-2. Extract text + metadata (Gesetzesnummer, Artikel, Inkrafttretensdatum).
-3. Find previous version via OGD API FassungVom query.
-4. Fetch previous version text from website too.
-5. Compute word-level diff.
+2. Extract text + metadata + "Alle Fassungen" version links.
+3. Fetch the previous version's page using the NOR ID from the version links.
+4. Compute word-level diff.
 """
 
 import difflib
 import html as html_module
 import logging
 import re
-from datetime import timedelta
 
 import httpx
-
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +41,7 @@ async def debug_document(doc_id: str) -> dict:
             result["parsed_text"] = (parsed["text"][:500] + "...") if len(parsed["text"]) > 500 else parsed["text"]
             result["parsed_text_length"] = len(parsed["text"])
             result["parsed_metadata"] = parsed["metadata"]
+            result["version_nor_ids"] = parsed.get("version_nor_ids", [])
 
             # Show HTML context around key metadata labels
             for label in ["Gesetzesnummer", "Inkrafttretensdatum", "Kurztitel", "§/Artikel"]:
@@ -64,7 +60,7 @@ async def debug_document(doc_id: str) -> dict:
 async def fetch_provision_diff(doc_id: str) -> dict:
     """Fetch current + previous version, return diff."""
 
-    # 1. Fetch current document from website
+    # 1. Fetch current document page (text + metadata + version links)
     current = await _fetch_document_from_website(doc_id)
     if not current or not current.get("text"):
         return _error_result(
@@ -72,20 +68,12 @@ async def fetch_provision_diff(doc_id: str) -> dict:
         )
 
     meta = current["metadata"]
+    version_nor_ids = current.get("version_nor_ids", [])
 
-    # 2. Find and fetch previous version
+    # 2. Find previous version from "Alle Fassungen" links
     prev = None
-    gesetzesnr = meta.get("Gesetzesnummer", "")
-    artikel = meta.get("ArtikelParagraphAnlage", "")
-    inkrafttreten = meta.get("Inkrafttretensdatum", "")
-
-    if gesetzesnr and artikel and inkrafttreten:
-        prev = await _find_previous_version(
-            gesetzesnummer=gesetzesnr,
-            artikel=artikel,
-            current_inkrafttreten=inkrafttreten,
-            current_doc_id=doc_id,
-        )
+    if version_nor_ids:
+        prev = await _find_previous_from_versions(doc_id, version_nor_ids)
 
     # 3. Compute diff
     if prev and prev.get("text"):
@@ -142,8 +130,8 @@ async def _fetch_document_from_website(doc_id: str) -> dict | None:
 
 
 def _parse_ris_page(page_html: str) -> dict:
-    """Parse a RIS Bundesrecht document page: extract text and metadata."""
-    result = {"text": "", "metadata": {}}
+    """Parse a RIS Bundesrecht document page: extract text, metadata, and version links."""
+    result = {"text": "", "metadata": {}, "version_nor_ids": []}
 
     if not page_html or len(page_html) < 200:
         return result
@@ -207,6 +195,43 @@ def _parse_ris_page(page_html: str) -> dict:
                     result["metadata"][key] = val
 
     logger.info(f"Parsed metadata: {result['metadata']}")
+
+    # ── Extract "Alle Fassungen" version links ──
+    # The RIS page has links like:
+    #   <a href="...Dokumentnummer=NOR40069839...">§ 123 gültig ab 01.01.2007...</a>
+    # in the "Alle Fassungen" section. We extract all NOR IDs (ordered newest-first).
+    nor_ids = []
+
+    # Find the "Alle Fassungen" section and extract NOR numbers from links
+    fassungen_idx = page_html.find("Alle Fassungen")
+    if fassungen_idx >= 0:
+        # Look at a chunk of HTML after "Alle Fassungen"
+        fassungen_chunk = page_html[fassungen_idx:fassungen_idx + 5000]
+        # Extract all NOR document numbers from links in this section
+        nor_matches = re.findall(r'Dokumentnummer=(NOR\d+)', fassungen_chunk)
+        # Deduplicate while preserving order
+        seen = set()
+        for nor in nor_matches:
+            if nor not in seen:
+                seen.add(nor)
+                nor_ids.append(nor)
+        logger.info(f"Alle Fassungen NOR IDs: {nor_ids}")
+
+    # Also look for NOR IDs in links with "gültig" text (version links anywhere on page)
+    if not nor_ids:
+        version_links = re.findall(
+            r'Dokumentnummer=(NOR\d+)[^"]*"[^>]*>[^<]*gültig',
+            page_html
+        )
+        seen = set()
+        for nor in version_links:
+            if nor not in seen:
+                seen.add(nor)
+                nor_ids.append(nor)
+        if nor_ids:
+            logger.info(f"Version links NOR IDs (fallback): {nor_ids}")
+
+    result["version_nor_ids"] = nor_ids
 
     # ── Extract the legal text ──
     # Strategy 1: Find ">Text<" label, then grab content until next section
@@ -273,71 +298,55 @@ def _remove_accessible_duplicates(text: str) -> str:
     return text.strip()
 
 
-# ── Previous version lookup ──
+# ── Previous version lookup (from "Alle Fassungen" links) ──
 
-async def _find_previous_version(
-    gesetzesnummer: str,
-    artikel: str,
-    current_inkrafttreten: str,
+async def _find_previous_from_versions(
     current_doc_id: str,
+    version_nor_ids: list[str],
 ) -> dict | None:
-    """Find the previous version using OGD API FassungVom, then fetch text from website."""
-    fassung_vom = _day_before(current_inkrafttreten)
-    if not fassung_vom:
-        logger.warning(f"Cannot parse Inkrafttretensdatum: {current_inkrafttreten}")
-        return None
+    """Find the previous version from the list of NOR IDs extracted from
+    the "Alle Fassungen" section of the RIS document page.
 
-    # Query OGD API for the version valid on the day before current Inkrafttreten
-    params = {
-        "Applikation": "BrKons",
-        "Gesetzesnummer": gesetzesnummer,
-        "ArtikelParagraphAnlage": artikel,
-        "FassungVom": fassung_vom,
-        "DokumenteProSeite": "One",
-    }
-    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
-
-    logger.info(f"Fetching previous version: GesNr={gesetzesnummer}, Art={artikel}, FassungVom={fassung_vom}")
-    data = await _fetch_ris(url, params)
-    if not data:
-        return None
-
-    refs = _extract_refs(data)
-    if not refs:
-        logger.info("No previous version found via FassungVom")
-        return None
-
-    ref = refs[0]
-    data_entry = ref.get("Data", {})
-    metadata = data_entry.get("Metadaten", {})
-    m = _collect_flat_metadata(metadata)
-
-    prev_id = (
-        _s(m.get("ID"))
-        or _s(m.get("Dokumentnummer"))
-        or _s(data_entry.get("Dokumentnummer"))
-        or ""
-    )
-
-    if prev_id == current_doc_id:
-        logger.info(f"Previous version is same document ({prev_id}), metadata-only update")
-        return None
+    The list is ordered newest-first. The current doc is one of them;
+    the next entry after it is the previous version.
+    """
+    # Find the current document in the list, take the next one
+    prev_id = None
+    for i, nor_id in enumerate(version_nor_ids):
+        if nor_id == current_doc_id and i + 1 < len(version_nor_ids):
+            prev_id = version_nor_ids[i + 1]
+            break
 
     if not prev_id:
-        logger.info("Could not determine previous version document ID")
+        # Maybe the current doc wasn't found in the list (e.g. "heute" link)
+        # Try the second entry if the first entry is likely the current
+        if len(version_nor_ids) >= 2:
+            if version_nor_ids[0] == current_doc_id:
+                prev_id = version_nor_ids[1]
+            else:
+                # The first entry might be the "heute" version which is the same
+                # Try to find any different NOR ID
+                for nor_id in version_nor_ids:
+                    if nor_id != current_doc_id:
+                        prev_id = nor_id
+                        break
+
+    if not prev_id:
+        logger.info(f"No previous version found in Alle Fassungen (versions: {version_nor_ids})")
         return None
 
-    logger.info(f"Previous version found: {prev_id}")
+    logger.info(f"Previous version from Alle Fassungen: {prev_id}")
 
-    # Fetch text from website
+    # Fetch the previous version's text from its website page
     prev_doc = await _fetch_document_from_website(prev_id)
     if not prev_doc or not prev_doc.get("text"):
+        logger.info(f"Could not fetch text for previous version {prev_id}")
         return None
 
     return {
         "text": prev_doc["text"],
-        "inkrafttreten": _s(m.get("Inkrafttretensdatum")) or prev_doc["metadata"].get("Inkrafttretensdatum", ""),
-        "bgbl": _s(m.get("Kundmachungsorgan")) or prev_doc["metadata"].get("Kundmachungsorgan", ""),
+        "inkrafttreten": prev_doc["metadata"].get("Inkrafttretensdatum", ""),
+        "bgbl": prev_doc["metadata"].get("Kundmachungsorgan", ""),
         "doc_id": prev_id,
     }
 
@@ -395,69 +404,3 @@ def _clean_html(text: str) -> str:
     return clean.strip()
 
 
-def _day_before(date_str: str) -> str | None:
-    if not date_str:
-        return None
-    import datetime as dt
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%d.%m.%Y"):
-        try:
-            parsed = dt.datetime.strptime(date_str.split("+")[0].split(".000")[0], fmt)
-            prev = parsed - timedelta(days=1)
-            return prev.strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return None
-
-
-def _s(val) -> str:
-    if val is None:
-        return ""
-    if isinstance(val, str):
-        return val
-    if isinstance(val, list):
-        return ", ".join(str(v) for v in val)
-    return str(val)
-
-
-def _collect_flat_metadata(metadata: dict) -> dict:
-    merged: dict = {}
-    for key in ("Technisch", "Allgemein", "Bundesrecht", "BrKons"):
-        section = metadata.get(key)
-        if isinstance(section, list) and section and isinstance(section[0], dict):
-            section = section[0]
-        if isinstance(section, dict):
-            merged.update(section)
-            for subkey in ("BrKons", "LrKons"):
-                sub = section.get(subkey)
-                if isinstance(sub, list) and sub and isinstance(sub[0], dict):
-                    sub = sub[0]
-                if isinstance(sub, dict):
-                    merged.update(sub)
-    known = {"Kurztitel", "Langtitel", "Dokumentnummer", "Gesetzesnummer"}
-    if not merged or not (known & set(merged.keys())):
-        if known & set(metadata.keys()):
-            merged.update(metadata)
-    return merged
-
-
-def _extract_refs(data: dict) -> list[dict]:
-    refs = (
-        data.get("OgdSearchResult", {})
-        .get("OgdDocumentResults", {})
-        .get("OgdDocumentReference", [])
-    )
-    if isinstance(refs, dict):
-        refs = [refs]
-    return refs or []
-
-
-async def _fetch_ris(url: str, params: dict) -> dict | None:
-    logger.info(f"RIS API: {url} params={params}")
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            return resp.json()
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error(f"RIS API error: {e}")
-            return None
