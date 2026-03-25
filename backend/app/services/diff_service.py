@@ -1,17 +1,17 @@
 """Service for fetching and comparing versions of RIS Bundesrecht provisions.
 
 Strategy:
-1. Fetch the current NOR document via the OGD API to get metadata
-   (Gesetzesnummer, ArtikelParagraphAnlage, Inkrafttretensdatum)
-   AND the ContentUrl pointing to the actual document text.
-2. Fetch the document text from the ContentUrl (HTML/XML).
-3. Use Gesetzesnummer + ArtikelParagraphAnlage + FassungVom (one day before
-   current Inkrafttretensdatum) to find the previous version.
-4. Compute a word-level diff between old and new text.
+1. Fetch the NOR document page from the RIS website (most reliable source
+   of full text).
+2. Extract metadata (Gesetzesnummer, ArtikelParagraphAnlage, Inkrafttretensdatum)
+   from the OGD API.
+3. Find previous version via FassungVom = day before current Inkrafttretensdatum.
+4. Compute word-level diff.
 """
 
 import difflib
 import html as html_module
+import json
 import logging
 import re
 from datetime import timedelta
@@ -22,73 +22,170 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-
-async def fetch_provision_diff(doc_id: str) -> dict:
-    """Fetch current + previous version of a Bundesrecht provision, return diff."""
-
-    # 1. Fetch the current document metadata + content
-    current_doc = await _fetch_full_document(doc_id)
-    if not current_doc or not current_doc.get("text"):
-        return {
-            "current": None,
-            "previous": None,
-            "diff_html": "<p class='diff-info'>Dokumenttext konnte nicht geladen werden. "
-                         "Möglicherweise stellt die RIS-API keinen Volltext für dieses "
-                         "Dokument bereit.</p>",
-            "has_changes": False,
-        }
-
-    # 2. Find the previous version
-    prev_doc = None
-    if current_doc.get("gesetzesnummer") and current_doc.get("artikel"):
-        prev_doc = await _fetch_previous_version(
-            gesetzesnummer=current_doc["gesetzesnummer"],
-            artikel=current_doc["artikel"],
-            current_inkrafttreten=current_doc.get("inkrafttreten", ""),
-            current_doc_id=doc_id,
-        )
-
-    # 3. Compute diff
-    if prev_doc and prev_doc.get("text"):
-        diff_html = _compute_word_diff(prev_doc["text"], current_doc["text"])
-        has_changes = prev_doc["text"].strip() != current_doc["text"].strip()
-    else:
-        diff_html = _format_no_previous(current_doc["text"])
-        has_changes = False
-
-    return {
-        "current": {
-            "text": current_doc["text"],
-            "info": current_doc.get("bgbl", ""),
-            "date": current_doc.get("inkrafttreten", ""),
-        },
-        "previous": {
-            "text": prev_doc["text"],
-            "info": prev_doc.get("bgbl", ""),
-            "date": prev_doc.get("inkrafttreten", ""),
-        } if prev_doc and prev_doc.get("text") else None,
-        "diff_html": diff_html,
-        "has_changes": has_changes,
-    }
+# Realistic browser headers to avoid being blocked
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "de-AT,de;q=0.9,en;q=0.5",
+}
 
 
-async def _fetch_full_document(doc_id: str) -> dict | None:
-    """Fetch a Bundesrecht document: metadata from API + text from ContentUrl."""
+async def debug_document(doc_id: str) -> dict:
+    """DEBUG endpoint: return raw data from both API and website for a document."""
+    result = {}
+
+    # 1. OGD API response
     params = {
         "Applikation": "BrKons",
         "Dokumentnummer": doc_id,
         "DokumenteProSeite": "One",
     }
     url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+    api_data = await _fetch_ris(url, params)
+    if api_data:
+        refs = _extract_refs(api_data)
+        if refs:
+            ref = refs[0]
+            data_entry = ref.get("Data", {})
+            result["api_data_keys"] = list(data_entry.keys())
+            result["api_metadaten_keys"] = list(data_entry.get("Metadaten", {}).keys())
 
-    logger.info(f"Fetching document: {doc_id}")
+            # Show full Metadaten structure (abbreviated)
+            metadata = data_entry.get("Metadaten", {})
+            flat = _collect_flat_metadata(metadata)
+            result["api_flat_metadata"] = {k: str(v)[:200] for k, v in flat.items()}
+
+            # Show Dokumentliste structure
+            if "Dokumentliste" in data_entry:
+                result["api_dokumentliste"] = _deep_summarize(data_entry["Dokumentliste"])
+
+            # Show all other top-level Data fields (first 500 chars)
+            for key in data_entry:
+                if key not in ("Metadaten", "Dokumentliste"):
+                    val = data_entry[key]
+                    if isinstance(val, str):
+                        result[f"api_data_{key}"] = val[:500]
+                    else:
+                        result[f"api_data_{key}"] = _deep_summarize(val)
+
+            # Try content URL extraction
+            content_urls = _extract_content_urls(data_entry)
+            result["content_urls"] = content_urls
+
+            # Fetch first content URL if available
+            if content_urls:
+                async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=_HEADERS) as client:
+                    try:
+                        resp = await client.get(content_urls[0])
+                        result["content_url_status"] = resp.status_code
+                        result["content_url_body_preview"] = resp.text[:1000]
+                    except Exception as e:
+                        result["content_url_error"] = str(e)
+        else:
+            result["api_error"] = "No OgdDocumentReference in response"
+    else:
+        result["api_error"] = "API request failed"
+
+    # 2. RIS Website response
+    ris_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_id}"
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=_HEADERS) as client:
+        try:
+            resp = await client.get(ris_url)
+            result["website_status"] = resp.status_code
+            result["website_url_final"] = str(resp.url)
+            result["website_body_length"] = len(resp.text)
+            result["website_body_preview"] = resp.text[:2000]
+
+            # Try text extraction
+            extracted = _extract_ris_page_text(resp.text)
+            result["website_extracted_text"] = extracted[:1000] if extracted else "(empty)"
+            result["website_extracted_length"] = len(extracted) if extracted else 0
+        except Exception as e:
+            result["website_error"] = str(e)
+
+    return result
+
+
+async def fetch_provision_diff(doc_id: str) -> dict:
+    """Fetch current + previous version of a Bundesrecht provision, return diff."""
+
+    # 1. Fetch metadata from OGD API
+    meta = await _fetch_metadata(doc_id)
+    if not meta:
+        return _error_result("Dokument-Metadaten konnten nicht aus RIS geladen werden.")
+
+    # 2. Fetch the text from the RIS website (most reliable)
+    current_text = await _fetch_text_from_website(doc_id)
+    if not current_text:
+        return _error_result(
+            "Dokumenttext konnte nicht von der RIS-Website geladen werden. "
+            "Bitte versuchen Sie es später erneut."
+        )
+
+    # 3. Find the previous version
+    prev_text = None
+    prev_meta = None
+    if meta.get("gesetzesnummer") and meta.get("artikel") and meta.get("inkrafttreten"):
+        prev_result = await _fetch_previous_version(
+            gesetzesnummer=meta["gesetzesnummer"],
+            artikel=meta["artikel"],
+            current_inkrafttreten=meta["inkrafttreten"],
+            current_doc_id=doc_id,
+        )
+        if prev_result:
+            prev_text = prev_result.get("text")
+            prev_meta = prev_result
+
+    # 4. Compute diff
+    if prev_text:
+        diff_html = _compute_word_diff(prev_text, current_text)
+        has_changes = prev_text.strip() != current_text.strip()
+    else:
+        diff_html = _format_no_previous(current_text)
+        has_changes = False
+
+    return {
+        "current": {
+            "text": current_text,
+            "info": meta.get("bgbl", ""),
+            "date": meta.get("inkrafttreten", ""),
+        },
+        "previous": {
+            "text": prev_text,
+            "info": prev_meta.get("bgbl", "") if prev_meta else "",
+            "date": prev_meta.get("inkrafttreten", "") if prev_meta else "",
+        } if prev_text else None,
+        "diff_html": diff_html,
+        "has_changes": has_changes,
+    }
+
+
+def _error_result(msg: str) -> dict:
+    return {
+        "current": None,
+        "previous": None,
+        "diff_html": f'<p class="diff-info">{html_module.escape(msg)}</p>',
+        "has_changes": False,
+    }
+
+
+# ── Metadata from OGD API ──
+
+async def _fetch_metadata(doc_id: str) -> dict | None:
+    """Fetch document metadata from the RIS OGD API."""
+    params = {
+        "Applikation": "BrKons",
+        "Dokumentnummer": doc_id,
+        "DokumenteProSeite": "One",
+    }
+    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
     data = await _fetch_ris(url, params)
     if not data:
         return None
 
     refs = _extract_refs(data)
     if not refs:
-        logger.warning(f"No document found for {doc_id}")
         return None
 
     ref = refs[0]
@@ -96,50 +193,121 @@ async def _fetch_full_document(doc_id: str) -> dict | None:
     metadata = data_entry.get("Metadaten", {})
     m = _collect_flat_metadata(metadata)
 
-    # Log the full structure for debugging
-    logger.info(f"Document {doc_id} Data keys: {list(data_entry.keys())}")
-    if "Dokumentliste" in data_entry:
-        logger.info(f"Dokumentliste: {_summarize_structure(data_entry['Dokumentliste'])}")
-
-    # Extract metadata
-    gesetzesnummer = _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or ""
-    artikel = _s(m.get("ArtikelParagraphAnlage")) or _s(data_entry.get("ArtikelParagraphAnlage")) or ""
-    inkrafttreten = _s(m.get("Inkrafttretensdatum")) or _s(data_entry.get("Inkrafttretensdatum")) or ""
-    bgbl = _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or ""
-
-    # Try multiple strategies to get the text content
-    text = ""
-
-    # Strategy 1: Direct content fields in Data
-    text = _try_direct_text(data_entry)
-
-    # Strategy 2: ContentUrl from Dokumentliste
-    if not text:
-        content_urls = _extract_content_urls(data_entry)
-        for content_url in content_urls:
-            logger.info(f"Fetching content from: {content_url}")
-            fetched = await _fetch_content_url(content_url)
-            if fetched:
-                text = fetched
-                break
-
-    # Strategy 3: Fetch directly from ris.bka.gv.at document page
-    if not text:
-        ris_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_id}"
-        logger.info(f"Fetching from RIS website: {ris_url}")
-        text = await _fetch_ris_website(ris_url)
-
-    logger.info(f"Document {doc_id}: gesetzesnr={gesetzesnummer}, "
-                f"artikel={artikel}, inkraft={inkrafttreten}, text_len={len(text)}")
-
     return {
-        "text": text,
-        "gesetzesnummer": gesetzesnummer,
-        "artikel": artikel,
-        "inkrafttreten": inkrafttreten,
-        "bgbl": bgbl,
+        "gesetzesnummer": _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or "",
+        "artikel": _s(m.get("ArtikelParagraphAnlage")) or _s(data_entry.get("ArtikelParagraphAnlage")) or "",
+        "inkrafttreten": _s(m.get("Inkrafttretensdatum")) or _s(data_entry.get("Inkrafttretensdatum")) or "",
+        "bgbl": _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or "",
     }
 
+
+# ── Text from RIS Website (primary strategy) ──
+
+async def _fetch_text_from_website(doc_id: str) -> str:
+    """Fetch the legal text from the RIS website HTML page."""
+    ris_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_id}"
+    logger.info(f"Fetching text from RIS website: {ris_url}")
+
+    async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
+        try:
+            resp = await client.get(ris_url)
+            resp.raise_for_status()
+            page_html = resp.text
+            logger.info(f"RIS website response: status={resp.status_code}, length={len(page_html)}")
+
+            text = _extract_ris_page_text(page_html)
+            if text:
+                logger.info(f"Extracted text length: {len(text)}")
+                return text
+
+            logger.warning(f"Could not extract text from RIS page for {doc_id}")
+            return ""
+        except Exception as e:
+            logger.error(f"Failed to fetch RIS website for {doc_id}: {e}")
+            return ""
+
+
+def _extract_ris_page_text(page_html: str) -> str:
+    """Extract the legal text from a RIS Bundesrecht HTML page.
+
+    The RIS website structure typically has:
+    - Table rows with headers like "Text", "Beachte", etc.
+    - The text content is in <td> or <div> elements following the "Text" header
+    """
+    if not page_html or len(page_html) < 100:
+        return ""
+
+    # Strategy 1: Find content between "Text" label and next section label
+    # RIS uses <td> with class "Titel" containing "Text", followed by content <td>
+    # Pattern: look for >Text< followed by content until next section
+    section_labels = [
+        "Schlagworte", "Zuletzt aktualisiert", "Gesetzesnummer",
+        "Dokumentnummer", "European Legislation Identifier",
+        "Beachte", "Anmerkung", "Navigation im Suchergebnis",
+    ]
+    end_pattern = "|".join(re.escape(label) for label in section_labels)
+
+    # Try finding "Text" as a section header, then grab everything until next section
+    # Pattern: >Text</...> ... content ... <next section>
+    patterns = [
+        # Table-based layout: <td>Text</td> ... content ... <td>NextSection</td>
+        rf'>\s*Text\s*</(?:td|th|div|h\d|span)[^>]*>(.*?)(?:{end_pattern})',
+        # Heading-based: <h2>Text</h2> content
+        rf'<h[23][^>]*>\s*Text\s*</h[23]>(.*?)(?:<h[23]|{end_pattern})',
+        # Class-based: class="..Text.." or id containing Text
+        rf'class="[^"]*Titel[^"]*"[^>]*>\s*Text\s*<.*?</(?:td|div)>(.*?)(?:{end_pattern})',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, page_html, re.DOTALL | re.IGNORECASE)
+        if match:
+            extracted = _clean_html(match.group(1))
+            if extracted and len(extracted.strip()) > 20:
+                logger.info(f"Text extracted with pattern: {pattern[:50]}...")
+                return extracted.strip()
+
+    # Strategy 2: Look for the largest block of continuous text in the page
+    # (excluding navigation, headers, footers)
+    # Find all <td> or <div> elements with substantial text content
+    blocks = re.findall(r'<(?:td|div)[^>]*>(.*?)</(?:td|div)>', page_html, re.DOTALL)
+    best_block = ""
+    for block in blocks:
+        cleaned = _clean_html(block)
+        # Legal text typically contains paragraphs with (1), (2) etc.
+        if len(cleaned) > len(best_block) and len(cleaned) > 100:
+            # Check if it looks like legal text (has paragraph numbers or § references)
+            if re.search(r'\(\d+\)|§\s*\d+|Abs\.|Art\.|Gesetz', cleaned):
+                best_block = cleaned
+
+    if best_block:
+        logger.info(f"Text extracted via largest legal text block: {len(best_block)} chars")
+        return best_block.strip()
+
+    # Strategy 3: Just grab everything between <body> tags, clean it,
+    # and look for the legal text portion
+    body_match = re.search(r'<body[^>]*>(.*?)</body>', page_html, re.DOTALL | re.IGNORECASE)
+    if body_match:
+        body_text = _clean_html(body_match.group(1))
+        # Find the "Text" section marker and grab text after it
+        text_idx = body_text.find("Text\n")
+        if text_idx == -1:
+            text_idx = body_text.find("Text ")
+        if text_idx > 0:
+            after_text = body_text[text_idx + 5:]
+            # Cut at next known section
+            for label in section_labels:
+                cut_idx = after_text.find(label)
+                if cut_idx > 0:
+                    after_text = after_text[:cut_idx]
+                    break
+            if len(after_text.strip()) > 20:
+                logger.info(f"Text extracted from body via 'Text' marker: {len(after_text)} chars")
+                return after_text.strip()
+
+    return ""
+
+
+# ── Previous version ──
 
 async def _fetch_previous_version(
     gesetzesnummer: str,
@@ -153,7 +321,6 @@ async def _fetch_previous_version(
         logger.warning(f"Cannot parse Inkrafttretensdatum: {current_inkrafttreten}")
         return None
 
-    # Fetch previous version via FassungVom
     params = {
         "Applikation": "BrKons",
         "Gesetzesnummer": gesetzesnummer,
@@ -170,7 +337,7 @@ async def _fetch_previous_version(
 
     refs = _extract_refs(data)
     if not refs:
-        logger.info("No previous version found")
+        logger.info("No previous version found via FassungVom")
         return None
 
     ref = refs[0]
@@ -185,155 +352,24 @@ async def _fetch_previous_version(
         or ""
     )
 
-    # Check it's actually a different version
     if prev_id == current_doc_id:
         logger.info(f"Previous version is same document ({prev_id}), no actual change")
         return None
 
-    # Fetch text for previous version too
-    prev_full = await _fetch_full_document(prev_id) if prev_id else None
-    if not prev_full or not prev_full.get("text"):
+    if not prev_id:
+        return None
+
+    # Fetch text for previous version from website too
+    prev_text = await _fetch_text_from_website(prev_id)
+    if not prev_text:
         return None
 
     return {
-        "text": prev_full["text"],
+        "text": prev_text,
         "inkrafttreten": _s(m.get("Inkrafttretensdatum")) or "",
         "bgbl": _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or "",
         "doc_id": prev_id,
     }
-
-
-# ── Text extraction strategies ──
-
-def _try_direct_text(data_entry: dict) -> str:
-    """Try to extract text from direct fields in the API response."""
-    for key in ("Dokumentinhalt", "Inhalt", "Text"):
-        val = data_entry.get(key)
-        if val and isinstance(val, str) and len(val.strip()) > 20:
-            return _clean_html(val)
-        if isinstance(val, dict):
-            inner = val.get("#text", "")
-            if inner and len(inner.strip()) > 20:
-                return _clean_html(inner)
-    return ""
-
-
-def _extract_content_urls(data_entry: dict) -> list[str]:
-    """Extract ContentUrls from the Dokumentliste section."""
-    urls = []
-
-    dok_liste = data_entry.get("Dokumentliste")
-    if not dok_liste:
-        return urls
-
-    # Dokumentliste can be dict or list
-    if isinstance(dok_liste, dict):
-        dok_liste = [dok_liste]
-    if not isinstance(dok_liste, list):
-        return urls
-
-    for entry in dok_liste:
-        if not isinstance(entry, dict):
-            continue
-
-        # ContentReference can be nested
-        content_refs = entry.get("ContentReference", [])
-        if isinstance(content_refs, dict):
-            content_refs = [content_refs]
-        if not isinstance(content_refs, list):
-            continue
-
-        for cr in content_refs:
-            if not isinstance(cr, dict):
-                continue
-            cr_urls = cr.get("Urls", {})
-            if isinstance(cr_urls, dict):
-                content_url = cr_urls.get("ContentUrl", "")
-                if content_url:
-                    urls.append(content_url)
-
-    # Also check directly under Data
-    if not urls:
-        content_refs = data_entry.get("ContentReference", [])
-        if isinstance(content_refs, dict):
-            content_refs = [content_refs]
-        if isinstance(content_refs, list):
-            for cr in content_refs:
-                if isinstance(cr, dict):
-                    cr_urls = cr.get("Urls", {})
-                    if isinstance(cr_urls, dict):
-                        url = cr_urls.get("ContentUrl", "")
-                        if url:
-                            urls.append(url)
-
-    return urls
-
-
-async def _fetch_content_url(url: str) -> str:
-    """Fetch document content from a RIS ContentUrl (HTML or XML)."""
-    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            content = resp.text
-            if not content or len(content.strip()) < 30:
-                return ""
-            return _clean_html(content)
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error(f"Failed to fetch ContentUrl {url}: {e}")
-            return ""
-
-
-async def _fetch_ris_website(url: str) -> str:
-    """Fetch and extract legal text from the RIS website HTML page."""
-    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            page_html = resp.text
-
-            # Extract the main document text section
-            # RIS website uses <div class="ContentBlock"> or <div id="TextBlock">
-            # or <div class="judmark"> for the actual legal text
-            text = _extract_ris_page_text(page_html)
-            if text and len(text.strip()) > 20:
-                return text
-            return ""
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error(f"Failed to fetch RIS website {url}: {e}")
-            return ""
-
-
-def _extract_ris_page_text(page_html: str) -> str:
-    """Extract the legal text from a RIS website HTML page."""
-    # Try to find the main content area
-    # Pattern 1: <h2>Text</h2> followed by content until next <h2>
-    text_match = re.search(
-        r'<h2[^>]*>\s*Text\s*</h2>(.*?)(?=<h2|<div\s+class="[^"]*FooterBlock)',
-        page_html, re.DOTALL | re.IGNORECASE
-    )
-    if text_match:
-        return _clean_html(text_match.group(1))
-
-    # Pattern 2: Look for RISDocument or ContentBlock divs
-    for pattern in [
-        r'<div[^>]*class="[^"]*RISDocument[^"]*"[^>]*>(.*?)</div>',
-        r'<div[^>]*class="[^"]*ContentBlock[^"]*"[^>]*>(.*?)</div>',
-        r'<div[^>]*id="TextBlock"[^>]*>(.*?)</div>',
-    ]:
-        match = re.search(pattern, page_html, re.DOTALL | re.IGNORECASE)
-        if match and len(match.group(1).strip()) > 50:
-            return _clean_html(match.group(1))
-
-    # Pattern 3: Find the largest <p> block or text block between known markers
-    # Look for content between "Text" header and "Schlagworte" or "Beachte"
-    for end_marker in ["Schlagworte", "Beachte", "Zuletzt aktualisiert"]:
-        pattern = rf'Text\s*</(?:h2|td|div)>(.*?)(?:{end_marker})'
-        match = re.search(pattern, page_html, re.DOTALL | re.IGNORECASE)
-        if match and len(match.group(1).strip()) > 50:
-            return _clean_html(match.group(1))
-
-    return ""
 
 
 # ── Diff computation ──
@@ -368,7 +404,6 @@ def _compute_word_diff(old_text: str, new_text: str) -> str:
 
 
 def _format_no_previous(text: str) -> str:
-    """Format when no previous version is available."""
     escaped = html_module.escape(text)
     return (
         '<p class="diff-info">Keine Vorversion gefunden — '
@@ -378,27 +413,46 @@ def _format_no_previous(text: str) -> str:
     )
 
 
+# ── Content URL extraction (secondary strategy) ──
+
+def _extract_content_urls(data_entry: dict) -> list[str]:
+    """Extract ContentUrls from Dokumentliste."""
+    urls = []
+    _walk_for_content_urls(data_entry, urls, depth=0)
+    return urls
+
+
+def _walk_for_content_urls(obj, urls: list, depth: int):
+    """Recursively walk structure to find ContentUrl fields."""
+    if depth > 8:
+        return
+    if isinstance(obj, dict):
+        if "ContentUrl" in obj:
+            val = obj["ContentUrl"]
+            if isinstance(val, str) and val.startswith("http"):
+                urls.append(val)
+        for v in obj.values():
+            _walk_for_content_urls(v, urls, depth + 1)
+    elif isinstance(obj, list):
+        for item in obj:
+            _walk_for_content_urls(item, urls, depth + 1)
+
+
 # ── Helpers ──
 
 def _clean_html(text: str) -> str:
     """Strip HTML tags and normalize whitespace."""
-    # Remove script/style blocks
-    clean = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    # Replace <br>, <p>, <div> with newlines
-    clean = re.sub(r'<(?:br|/p|/div|/tr)[^>]*>', '\n', clean, flags=re.IGNORECASE)
-    # Remove remaining tags
+    clean = re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(r'<(?:br|/p|/div|/tr|/li)\s*/?>', '\n', clean, flags=re.IGNORECASE)
     clean = re.sub(r'<[^>]+>', ' ', clean)
-    # Decode HTML entities
     clean = html_module.unescape(clean)
-    # Normalize whitespace (but keep paragraph breaks)
     clean = re.sub(r'[ \t]+', ' ', clean)
-    clean = re.sub(r'\n\s*\n', '\n\n', clean)
-    clean = clean.strip()
-    return clean
+    clean = re.sub(r'\n[ \t]+', '\n', clean)
+    clean = re.sub(r'\n{3,}', '\n\n', clean)
+    return clean.strip()
 
 
 def _day_before(date_str: str) -> str | None:
-    """Parse a date string and return the day before as YYYY-MM-DD."""
     if not date_str:
         return None
     import datetime as dt
@@ -423,7 +477,6 @@ def _s(val) -> str:
 
 
 def _collect_flat_metadata(metadata: dict) -> dict:
-    """Flatten nested metadata sections."""
     merged: dict = {}
     for key in ("Technisch", "Allgemein", "Bundesrecht", "BrKons"):
         section = metadata.get(key)
@@ -455,30 +508,30 @@ def _extract_refs(data: dict) -> list[dict]:
     return refs or []
 
 
-def _summarize_structure(obj, depth=0) -> str:
-    """Summarize a nested dict/list structure for logging."""
-    if depth > 3:
+def _deep_summarize(obj, depth=0) -> str:
+    """Summarize a nested structure for debug output."""
+    if depth > 4:
         return "..."
     if isinstance(obj, dict):
-        keys = list(obj.keys())[:10]
-        return "{" + ", ".join(f"{k}: {_summarize_structure(obj[k], depth+1)}" for k in keys) + "}"
+        items = []
+        for k in list(obj.keys())[:15]:
+            items.append(f"{k}: {_deep_summarize(obj[k], depth + 1)}")
+        return "{" + ", ".join(items) + "}"
     if isinstance(obj, list):
         if not obj:
             return "[]"
-        return f"[{_summarize_structure(obj[0], depth+1)}... x{len(obj)}]"
+        return f"[{_deep_summarize(obj[0], depth + 1)} ...x{len(obj)}]"
     if isinstance(obj, str):
-        return f'"{obj[:60]}..."' if len(obj) > 60 else f'"{obj}"'
+        return f'"{obj[:100]}"' if len(obj) > 100 else f'"{obj}"'
     return str(obj)
 
 
 async def _fetch_ris(url: str, params: dict) -> dict | None:
-    """Execute HTTP GET against RIS API."""
-    logger.info(f"RIS API: GET {url} params={params}")
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             return resp.json()
         except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error(f"RIS request error: {e}")
+            logger.error(f"RIS API error: {e}")
             return None

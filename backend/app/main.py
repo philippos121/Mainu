@@ -17,7 +17,7 @@ from app.services.ris_client import (
     parse_bundesrecht_response,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
-from app.services.diff_service import fetch_provision_diff
+from app.services.diff_service import fetch_provision_diff, debug_document
 
 logging.basicConfig(level=logging.INFO)
 
@@ -94,6 +94,14 @@ async def api_diff(
     if result.get("error"):
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+@app.get("/api/debug/doc")
+async def api_debug_doc(
+    doc_id: str = Query(..., description="NOR document number"),
+):
+    """DEBUG: Show raw API response structure and website HTML for a document."""
+    return await debug_document(doc_id)
 
 
 # ── GPT Summary & Report endpoints ──
