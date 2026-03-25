@@ -3,11 +3,13 @@
 Supports two document types:
   - Gesetze und Verordnungen (Bundesrecht consolidated)
   - Gerichtsentscheidungen (Judikatur from all court sources)
+
+Filters out expired provisions (Ausserkrafttretensdatum < today).
 """
 
 import asyncio
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 
@@ -461,6 +463,22 @@ async def _fetch(url: str, params: dict) -> dict:
             return _empty()
 
 
+def _is_expired(ausserkraft_str: str) -> bool:
+    """Check if a provision has expired (Ausserkrafttretensdatum < today)."""
+    if not ausserkraft_str:
+        return False
+    s = ausserkraft_str.strip()
+    if s in ("9999-12-31", "31.12.9999"):
+        return False
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            dt = datetime.strptime(s.split("+")[0], fmt)
+            return dt.date() < date.today()
+        except ValueError:
+            continue
+    return False
+
+
 def _empty() -> dict:
     return {"OgdSearchResult": {"OgdDocumentResults": {"OgdDocumentReference": [], "Hits": {"#text": "0"}}}}
 
@@ -612,6 +630,10 @@ def parse_bundesrecht_response(data: dict) -> dict:
         gesetzesnummer = _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or ""
         # Außerkrafttretensdatum - if set and in the past, provision is no longer in force
         ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
+
+        # Skip expired provisions — they clutter results with metadata-only updates
+        if _is_expired(ausserkraft):
+            continue
 
         results.append({
             "id": doc_id,

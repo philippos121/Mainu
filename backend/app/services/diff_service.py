@@ -255,28 +255,59 @@ def _unique(lst: list[str]) -> list[str]:
 
 def _dedup_accessible(text: str) -> str:
     """Remove RIS accessible text duplicates that survive HTML cleaning."""
-    # Remove "Paragraph NNN," after "§ NNN."
+    # Step 1: Remove known accessible marker words
     text = re.sub(r'(§\s*\d+[a-z]?\.?)\s*Paragraph\s*\d+[a-z]?,?\s*', r'\1 ', text)
-    # Remove "Absatz eins/N," after "(N)"
     text = re.sub(
         r'(\(\d+[a-z]?\))\s*Absatz\s*(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+\s*[a-z]?),?\s*',
         r'\1 ', text)
-    # Remove standalone accessible words
     text = re.sub(r'\bParagraph\s+\d+\s*[a-z]?,\s*', '', text)
     text = re.sub(r'\bAbsatz\s+\d+\s*[a-z]?,\s*', '', text)
     text = re.sub(r'\bAbsatz\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn),\s*', '', text)
     text = re.sub(r'\bZiffer\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+)\s*', '', text)
     text = re.sub(r'\bLitera\s+[a-z]\s*', '', text)
-    # Remove "Anmerkung, aus Bundesgesetzblatt..." blocks
     text = re.sub(r'Anmerkung,?\s*aus Bundesgesetzblatt[^)]*\)\s*', '', text)
-    # Remove "römisch III." / "römisch zwei." etc. (accessible version of roman numerals)
     text = re.sub(r'\brömisch\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|[IVXivx]+)\.?\s*', '', text)
-    # Remove "Paragraph/Artikel/Anlage" standalone markers
     text = re.sub(r'\bParagraph/Artikel/Anlage\s*', '', text)
-    # Clean up double spaces and trailing artifacts
+
+    # Step 2: Remove DUPLICATE SENTENCES (the core accessible text problem).
+    # RIS renders each paragraph twice: original + accessible version.
+    # The accessible version is nearly identical but with "Abs. 1" → empty, etc.
+    # Detect: if two consecutive sentences share >70% of words, the second is a dupe.
+    text = _remove_sentence_dupes(text)
+
+    # Step 3: Remove trailing HTML artifacts
+    text = re.sub(r'<div[^>]*$', '', text)
     text = re.sub(r'  +', ' ', text)
     text = re.sub(r'\n ', '\n', text)
     return text.strip()
+
+
+def _remove_sentence_dupes(text: str) -> str:
+    """Remove duplicate sentences that are accessible rewrites of the previous sentence."""
+    lines = text.split('\n')
+    result = []
+    for line in lines:
+        # Within each line, split into sentences and remove duplicates
+        sentences = re.split(r'(?<=\.) (?=[A-Z(§])', line)
+        if len(sentences) <= 1:
+            result.append(line)
+            continue
+
+        kept = [sentences[0]]
+        for i in range(1, len(sentences)):
+            prev_words = set(re.findall(r'\w+', sentences[i - 1].lower()))
+            curr_words = set(re.findall(r'\w+', sentences[i].lower()))
+            if not curr_words or not prev_words:
+                kept.append(sentences[i])
+                continue
+            overlap = len(prev_words & curr_words) / max(len(curr_words), 1)
+            if overlap > 0.7:
+                # Duplicate — skip it
+                continue
+            else:
+                kept.append(sentences[i])
+        result.append(' '.join(kept))
+    return '\n'.join(result)
 
 
 def _word_diff(old: str, new: str) -> str:
