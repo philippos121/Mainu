@@ -107,12 +107,12 @@
           <p>Keine Ergebnisse für die gewählten Filter.</p>
         </div>
 
-        <!-- Info banner about ImRisSeit -->
+        <!-- Info banner -->
         <div v-if="results.length > 0" class="info-banner">
           <v-icon size="16" color="#007993" class="mr-2">mdi-information-outline</v-icon>
           <span>
-            „Im RIS seit" filtert nach RIS-Datenbankaktualisierungen, nicht zwingend nach
-            inhaltlichen Gesetzesänderungen. Prüfen Sie das Inkrafttretensdatum und BGBl.
+            Gefiltert nach Bestimmungen mit Inkrafttreten im gewählten Zeitraum.
+            Klicken Sie „Änderungen anzeigen" für einen Vergleich mit der Vorversion.
           </span>
         </div>
 
@@ -461,14 +461,18 @@ async function toggleDiff(item) {
   diffErrors.value[id] = ''
   try {
     const resp = await api.get('/diff', { params: {
-      doc_id: item.id,
-      gesetzesnummer: item.gesetzesnummer,
-      artikel: item.artikel,
+      doc_id: item.id || '',
+      gesetzesnummer: item.gesetzesnummer || '',
+      artikel: item.artikel || '',
       inkrafttreten: item.date || '',
     } })
     diffData.value[id] = resp.data
   } catch (e) {
-    diffErrors.value[id] = e.response?.data?.detail || 'Fehler beim Laden der Versionen.'
+    const detail = e.response?.data?.detail
+    diffErrors.value[id] = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail) ? detail.map(d => d.msg).join(', ')
+      : 'Fehler beim Laden der Versionen.'
     diffOpen.value[id] = true // keep open to show error
   } finally {
     diffLoading.value[id] = false
