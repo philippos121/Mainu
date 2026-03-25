@@ -142,120 +142,135 @@ async def _fetch_document_from_website(doc_id: str) -> dict | None:
 
 
 def _parse_ris_page(page_html: str) -> dict:
-    """Parse a RIS Bundesrecht document page: extract text and metadata table."""
+    """Parse a RIS Bundesrecht document page: extract text and metadata."""
     result = {"text": "", "metadata": {}}
 
     if not page_html or len(page_html) < 200:
         return result
 
-    # ── Extract metadata from the info table ──
-    # RIS shows metadata as label-value pairs. Labels have class containing
-    # "Titel" or are <th> elements. The structure is typically:
-    #   <td class="...Titel...">Kurztitel</td><td>Unternehmensgesetzbuch</td>
-    # or similar patterns.
+    # ── Extract metadata ──
+    # The RIS website puts metadata as plain text visible on the page.
+    # Strategy: search for known label strings in the cleaned body text
+    # and grab the value after them.
+    #
+    # We also look for the labels in the raw HTML, searching for the label
+    # text followed by some value within nearby tags/text.
 
-    # Pattern: find all label-value pairs in the document info section
-    # Look for patterns like: >LabelText</td> ... <td ...>ValueText</td>
-    meta_patterns = [
-        # <td class="...">Label</td>...<td...>Value</td>
-        (r'<td[^>]*>\s*' + label + r'\s*</td>\s*<td[^>]*>(.*?)</td>')
-        for label in [
-            "Gesetzesnummer", "Kurztitel", "Kundmachungsorgan", "Typ",
-            r"§/Artikel/Anlage", "Inkrafttretensdatum", "Außerkrafttretensdatum",
-            "Abkürzung", "Index", "Beachte",
-        ]
-    ]
+    meta_labels = {
+        "Gesetzesnummer": "Gesetzesnummer",
+        "Kurztitel": "Kurztitel",
+        "Kundmachungsorgan": "Kundmachungsorgan",
+        "Typ": "Typ",
+        "§/Artikel/Anlage": "ArtikelParagraphAnlage",
+        "Inkrafttretensdatum": "Inkrafttretensdatum",
+        "Außerkrafttretensdatum": "Ausserkrafttretensdatum",
+        "Abkürzung": "Abkürzung",
+        "Index": "Index",
+    }
 
-    for label, pattern in zip(
-        ["Gesetzesnummer", "Kurztitel", "Kundmachungsorgan", "Typ",
-         "ArtikelParagraphAnlage", "Inkrafttretensdatum", "Ausserkrafttretensdatum",
-         "Abkürzung", "Index", "Beachte"],
-        meta_patterns
-    ):
-        match = re.search(pattern, page_html, re.DOTALL | re.IGNORECASE)
+    for html_label, key in meta_labels.items():
+        # Find the label in HTML, then grab the next chunk of visible text
+        # The label might be in any tag: <td>, <span>, <div>, <dt>, etc.
+        # Approach: find label position, then look ahead for text content
+        escaped_label = re.escape(html_label)
+        # Pattern: label text followed by closing tag, then value in next element(s)
+        # Handles: >Gesetzesnummer</td><td>10001702</td>
+        #          >Gesetzesnummer</span><span>10001702</span>
+        #          >Gesetzesnummer</div><div>10001702</div>
+        #          and any whitespace/tags between
+        pattern = rf'>\s*{escaped_label}\s*</[^>]+>\s*(?:<[^>]+>\s*)*([^<]+)'
+        match = re.search(pattern, page_html, re.IGNORECASE)
         if match:
-            val = _clean_html(match.group(1)).strip()
-            if val:
-                result["metadata"][label] = val
+            val = match.group(1).strip()
+            # Clean up common artifacts
+            val = html_module.unescape(val)
+            val = val.strip()
+            if val and len(val) < 500:
+                result["metadata"][key] = val
+                continue
 
-    # Fallback: try a more generic approach for metadata
-    # Look for all <td> with class containing "Titel" followed by a value <td>
-    if not result["metadata"].get("Gesetzesnummer"):
-        rows = re.findall(
-            r'<td[^>]*class="[^"]*[Tt]itel[^"]*"[^>]*>(.*?)</td>\s*<td[^>]*>(.*?)</td>',
-            page_html, re.DOTALL
-        )
-        label_map = {
-            "gesetzesnummer": "Gesetzesnummer",
-            "kurztitel": "Kurztitel",
-            "kundmachungsorgan": "Kundmachungsorgan",
-            "typ": "Typ",
-            "§/artikel/anlage": "ArtikelParagraphAnlage",
-            "inkrafttretensdatum": "Inkrafttretensdatum",
-            "abkürzung": "Abkürzung",
-            "index": "Index",
-        }
-        for raw_label, raw_value in rows:
-            clean_label = _clean_html(raw_label).strip().lower()
-            for key, mapped in label_map.items():
-                if key in clean_label:
-                    val = _clean_html(raw_value).strip()
-                    if val and mapped not in result["metadata"]:
-                        result["metadata"][mapped] = val
+        # Fallback: look for label in plain text and grab value on same/next line
+        idx = page_html.find(html_label)
+        if idx < 0 and html_label == "§/Artikel/Anlage":
+            idx = page_html.find("§/Artikel")
+        if idx >= 0:
+            # Get the next 500 chars after the label
+            chunk = page_html[idx + len(html_label):idx + len(html_label) + 500]
+            # Strip HTML tags and get first meaningful text
+            cleaned = re.sub(r'<[^>]+>', ' ', chunk)
+            cleaned = html_module.unescape(cleaned).strip()
+            # Take the first line/value (up to newline or excessive whitespace)
+            val_match = re.match(r'[\s:]*(.+?)(?:\n|$)', cleaned)
+            if val_match:
+                val = val_match.group(1).strip()
+                if val and len(val) < 500:
+                    result["metadata"][key] = val
+
+    logger.info(f"Parsed metadata: {result['metadata']}")
 
     # ── Extract the legal text ──
-    # The text section comes after a "Text" label in the metadata table,
-    # or in a specific content div.
-
-    # Strategy 1: Find the "Text" section in the table structure
-    # The RIS page has: <td>Text</td><td><div>...actual legal text...</div></td>
-    text_match = re.search(
-        r'<td[^>]*>\s*Text\s*</td>\s*<td[^>]*>(.*?)</td>\s*</tr>',
-        page_html, re.DOTALL | re.IGNORECASE
-    )
-    if text_match:
-        raw = text_match.group(1)
-        # Remove any nested <div> id attributes that might be partial HTML
-        raw = re.sub(r'<div[^>]*id="[^"]*"[^>]*/?\s*>', '', raw)
-        text = _clean_html(raw).strip()
-        if len(text) > 20:
-            result["text"] = text
-            return result
-
-    # Strategy 2: Broader — find text between "Text" marker and next known section
+    # Strategy 1: Find ">Text<" label, then grab content until next section
     section_labels = [
-        "Schlagworte", "Zuletzt aktualisiert", "Gesetzesnummer",
+        "Schlagworte", "Zuletzt aktualisiert",
         "Dokumentnummer", "European Legislation Identifier",
         "Navigation im Suchergebnis", "Zum Seitenanfang",
         "Über diese Seite",
     ]
     end_pattern = "|".join(re.escape(label) for label in section_labels)
 
-    # Look for >Text< then grab everything until next section
     text_match = re.search(
-        rf'>\s*Text\s*</(td|th|div|span|h\d)[^>]*>(.*?)({end_pattern})',
+        rf'>\s*Text\s*</[^>]+>(.*?)({end_pattern})',
         page_html, re.DOTALL | re.IGNORECASE
     )
     if text_match:
-        raw = text_match.group(2)
-        raw = re.sub(r'<div[^>]*id="[^"]*"[^>]*/?\s*>', '', raw)
+        raw = text_match.group(1)
         text = _clean_html(raw).strip()
+        # Remove accessible text duplicates:
+        # RIS renders "§ 123." followed by "Paragraph 123,"
+        # and "(1)" followed by "Absatz eins,"
+        text = _remove_accessible_duplicates(text)
         if len(text) > 20:
             result["text"] = text
             return result
 
-    # Strategy 3: Look for the RIS content document div
-    doc_divs = re.findall(
-        r'<div[^>]*class="[^"]*[Dd]ocument[^"]*"[^>]*>(.*?)</div>',
-        page_html, re.DOTALL
-    )
-    for div_content in doc_divs:
-        cleaned = _clean_html(div_content).strip()
-        if len(cleaned) > 100 and re.search(r'\(\d+\)|§\s*\d+|Abs\.', cleaned):
-            result["text"] = cleaned
-            return result
+    # Strategy 2: Find largest text block with legal content patterns
+    blocks = re.findall(r'<(?:td|div)[^>]*>(.*?)</(?:td|div)>', page_html, re.DOTALL)
+    best = ""
+    for block in blocks:
+        cleaned = _clean_html(block)
+        if len(cleaned) > len(best) and len(cleaned) > 100:
+            if re.search(r'\(\d+\)|§\s*\d+|Abs\.|Absatz', cleaned):
+                best = cleaned
+    if best:
+        result["text"] = _remove_accessible_duplicates(best)
 
     return result
+
+
+def _remove_accessible_duplicates(text: str) -> str:
+    """Remove RIS accessible text duplications.
+
+    RIS renders text like:
+      "§ 123. Paragraph 123," → should be just "§ 123."
+      "(1) Absatz eins," → should be just "(1)"
+      "(2) Absatz 2," → should be just "(2)"
+    """
+    # Remove "Paragraph NNN," after "§ NNN."
+    text = re.sub(r'(§\s*\d+[a-z]?\.?)\s*Paragraph\s*\d+[a-z]?,?\s*', r'\1 ', text)
+    # Remove "Absatz eins/zwei/drei/..." after "(N)"
+    text = re.sub(
+        r'(\(\d+\))\s*Absatz\s*(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+),?\s*',
+        r'\1 ', text
+    )
+    # Remove "Anmerkung, aus Bundesgesetzblatt..." duplicates
+    text = re.sub(r'Anmerkung,\s*aus Bundesgesetzblatt[^)]*\)\s*', '', text)
+    # Remove "Paragraph NNN," standalone (without preceding §)
+    text = re.sub(r'\bParagraph\s+\d+,\s*', '', text)
+    # Remove duplicate "Paragraphen X, ff." after "§§ X ff."
+    text = re.sub(r'(§§?\s*\d+[^)]*)\s*Paragraphen\s*\d+[^)]*', r'\1', text)
+    # Normalize multiple spaces
+    text = re.sub(r'  +', ' ', text)
+    return text.strip()
 
 
 # ── Previous version lookup ──

@@ -107,95 +107,112 @@ LEGAL_CATEGORIES = [
     {"id": "tierschutz", "label": "Tierschutzrecht", "group": "Land- und Forstwirtschaft"},
 ]
 
-# Suchworte (keyword search terms) for filtering by Rechtsgebiet.
-# IMPORTANT: RIS Suchworte uses OR for space-separated words.
-# Use specific abbreviations/law names to avoid overly broad matching.
-# Prefer short law name abbreviations (GmbHG, AktG) over generic words.
-_CATEGORY_KEYWORDS: dict[str, str] = {
+# ── Gesetzesnummern per Rechtsgebiet ──
+# Primary search strategy: query specific laws by their Gesetzesnummer.
+# This is far more precise than keyword search (Suchworte).
+# Gesetzesnummern sourced from RIS (data.bka.gv.at).
+_CATEGORY_GESETZE: dict[str, list[str]] = {
     # Öffentliches Recht
-    "verfassungsrecht": "B-VG",
-    "verwaltungsrecht_allg": "AVG VwGVG",
-    "verwaltungsverfahren": "AVG VwGVG",
-    "grundrechte": "EMRK Grundrechte",
-    "wahlrecht": "Nationalrats-Wahlordnung Parteiengesetz",
-    "beamtenrecht": "BDG Dienstrecht",
+    "verfassungsrecht": ["10000138"],  # B-VG
+    "verwaltungsrecht_allg": ["10005768", "20008917"],  # AVG, VwGVG
+    "verwaltungsverfahren": ["10005768", "20008917", "10005788"],  # AVG, VwGVG, VVG
+    "grundrechte": ["10000308"],  # EMRK (BGBl 210/1958)
+    "wahlrecht": ["10001199", "20004474"],  # NRWO, PartG
+    "beamtenrecht": ["10008470", "10008894"],  # BDG, GehG
     # Privatrecht
-    "zivilrecht_allg": "ABGB",
-    "vertragsrecht": "ABGB Schuldrecht",
-    "sachenrecht": "Sachenrecht Grundbuch",
-    "familienrecht": "Ehegesetz Kindschaftsrecht",
-    "erbrecht": "Erbrecht ABGB",
-    "personenrecht": "Personenstandsgesetz",
-    "konsumentenschutz": "KSchG Konsumentenschutz",
+    "zivilrecht_allg": ["10001622"],  # ABGB
+    "vertragsrecht": ["10001622"],  # ABGB (Schuldrecht Teil)
+    "sachenrecht": ["10001622"],  # ABGB (Sachenrecht Teil)
+    "familienrecht": ["10001622", "10001871"],  # ABGB, EheG
+    "erbrecht": ["10001622"],  # ABGB (Erbrecht Teil)
+    "personenrecht": ["10001622", "20004870"],  # ABGB, PStG 2013
+    "konsumentenschutz": ["10002462", "20001629"],  # KSchG, FAGG
     # Strafrecht
-    "strafrecht_allg": "StGB",
-    "strafprozess": "StPO",
-    "verwaltungsstrafrecht": "VStG",
-    "jugendstrafrecht": "JGG",
-    "finanzstrafrecht": "FinStrG",
-    # Wirtschaftsrecht — use ONLY specific law abbreviations
-    "unternehmensrecht": "UGB",
-    "gesellschaftsrecht": "GmbHG AktG GenG",
-    "gewerberecht": "GewO",
-    "wettbewerbsrecht": "UWG KartG",
-    "insolvenzrecht": "IO Insolvenzordnung",
-    "vergaberecht": "BVergG",
-    "kapitalmarktrecht": "BWG WAG BörseG",
+    "strafrecht_allg": ["10002296"],  # StGB
+    "strafprozess": ["10002326"],  # StPO
+    "verwaltungsstrafrecht": ["10005770"],  # VStG
+    "jugendstrafrecht": ["10002825"],  # JGG
+    "finanzstrafrecht": ["10003898"],  # FinStrG
+    # Wirtschaftsrecht
+    "unternehmensrecht": ["10001702"],  # UGB
+    "gesellschaftsrecht": [
+        "10001720",  # GmbHG
+        "10001966",  # AktG
+        "10001702",  # UGB (OG, KG etc.)
+        "10001680",  # GenG
+        "10003917",  # SpaltG
+        "10002855",  # UmwG
+        "10002864",  # FBG
+        "20003410",  # SE-G
+    ],
+    "gewerberecht": ["10007517"],  # GewO
+    "wettbewerbsrecht": ["10002665", "20001766"],  # UWG, KartG 2005
+    "insolvenzrecht": ["20005993"],  # IO
+    "vergaberecht": ["20005249"],  # BVergG 2018
+    "kapitalmarktrecht": ["10004827", "20005583", "10002951"],  # BWG, WAG 2018, BörseG
     # Arbeits- und Sozialrecht
-    "arbeitsrecht": "ArbVG UrlG AZG",
-    "sozialversicherung": "ASVG",
-    "kollektivvertrag": "ArbVG Kollektivvertrag",
-    "arbeitnehmerschutz": "ASchG",
+    "arbeitsrecht": ["10008329", "10008289", "10008238"],  # ArbVG, AZG, UrlG
+    "sozialversicherung": ["10008147"],  # ASVG
+    "kollektivvertrag": ["10008329"],  # ArbVG
+    "arbeitnehmerschutz": ["10008910"],  # ASchG
     # Steuerrecht
-    "einkommensteuer": "EStG",
-    "umsatzsteuer": "UStG",
-    "koerperschaftsteuer": "KStG",
-    "abgabenordnung": "BAO",
-    "gebührenrecht": "GebG GrEStG",
-    "finanzausgleich": "Finanzausgleichsgesetz",
+    "einkommensteuer": ["10004570"],  # EStG
+    "umsatzsteuer": ["10004873"],  # UStG
+    "koerperschaftsteuer": ["10004569"],  # KStG
+    "abgabenordnung": ["10003940"],  # BAO
+    "gebührenrecht": ["10003882", "10003994"],  # GebG, GrEStG
+    "finanzausgleich": ["20010702"],  # FAG 2024
     # Immobilienrecht
-    "mietrecht": "MRG",
-    "wohnungseigentum": "WEG",
-    "baurecht": "Bauordnung Raumordnungsgesetz",
-    "grundbuchrecht": "GBG Grundbuchsgesetz",
+    "mietrecht": ["10002531"],  # MRG
+    "wohnungseigentum": ["10002476"],  # WEG 2002
+    "baurecht": [],  # Landesrecht — Suchworte-Fallback
+    "grundbuchrecht": ["10001940", "10003033"],  # GBG, AllgGAG
     # Umwelt & Verkehr
-    "umweltrecht": "UVP-G Emissionsschutz",
-    "naturschutz": "Naturschutzgesetz",
-    "wasserrecht": "WRG",
-    "verkehrsrecht": "StVO KFG FSG",
-    "luftfahrtrecht": "LFG EisbG",
+    "umweltrecht": ["10010767"],  # UVP-G 2000
+    "naturschutz": [],  # Landesrecht
+    "wasserrecht": ["10010290"],  # WRG
+    "verkehrsrecht": ["10011336", "10011384", "10002967"],  # StVO, KFG, FSG
+    "luftfahrtrecht": ["10011214", "10011319"],  # LFG, EisbG
     # Gesundheit
-    "gesundheitsrecht": "KAKuG Ärztegesetz",
-    "arzneimittelrecht": "AMG Medizinproduktegesetz",
-    "lebensmittelrecht": "LMSVG",
-    "pflegerecht": "GuKG Pflegefondsgesetz",
+    "gesundheitsrecht": ["10005192", "10001519"],  # KAKuG, ÄrzteG
+    "arzneimittelrecht": ["10010441"],  # AMG
+    "lebensmittelrecht": ["20004475"],  # LMSVG
+    "pflegerecht": ["10011026", "20007136"],  # GuKG, BPGG
     # Medien & IT
-    "datenschutz": "DSG DSGVO",
-    "medienrecht": "MedienG",
-    "telekommunikation": "TKG",
-    "ecommerce": "ECG",
-    "urheberrecht": "UrhG MSchG PatG",
+    "datenschutz": ["10001597", "20012122"],  # DSG, DSG-EKV
+    "medienrecht": ["10000719"],  # MedienG
+    "telekommunikation": ["20007849"],  # TKG 2021
+    "ecommerce": ["20001703"],  # ECG
+    "urheberrecht": ["10001848", "10001996", "10002163"],  # UrhG, MSchG, PatG
     # Bildung & Kultur
-    "schulrecht": "SchUG SchOG",
-    "hochschulrecht": "UG Universitätsgesetz",
-    "forschungsrecht": "FOG",
-    "kulturrecht": "DMSG Kunstförderungsgesetz",
-    "sportrecht": "BSFG",
+    "schulrecht": ["10009600", "10009265"],  # SchUG, SchOG
+    "hochschulrecht": ["20002128"],  # UG 2002
+    "forschungsrecht": ["10009514"],  # FOG
+    "kulturrecht": ["10009184"],  # DMSG
+    "sportrecht": ["20005380"],  # BSFG 2017
     # Sicherheit
-    "sicherheitspolizei": "SPG",
-    "fremdenrecht": "FPG BFA-VG AsylG",
-    "waffenrecht": "WaffG",
-    "landesverteidigung": "WG Wehrgesetz",
+    "sicherheitspolizei": ["10005792"],  # SPG
+    "fremdenrecht": ["20004241", "20004240", "20004242"],  # FPG, AsylG 2005, BFA-VG
+    "waffenrecht": ["10006016"],  # WaffG
+    "landesverteidigung": ["10005597"],  # WG 2001
     # Internationales
+    "europarecht": [],  # Suchworte-Fallback
+    "voelkerrecht": [],  # Suchworte-Fallback
+    # Verfahrensrecht
+    "zivilprozess": ["10001699"],  # ZPO
+    "exekutionsrecht": ["10001713"],  # EO
+    "schiedsrecht": ["10001699"],  # ZPO (Vierter Teil)
+    # Agrar
+    "agrarrecht": ["10010371"],  # ForstG
+    "tierschutz": ["20003541"],  # TSchG
+}
+
+# Fallback: Suchworte for categories without Gesetzesnummern
+_CATEGORY_KEYWORDS: dict[str, str] = {
+    "baurecht": "Bauordnung Raumordnung",
+    "naturschutz": "Naturschutz",
     "europarecht": "EU-Recht Unionsrecht",
     "voelkerrecht": "Staatsvertrag Völkerrecht",
-    # Verfahrensrecht
-    "zivilprozess": "ZPO",
-    "exekutionsrecht": "EO",
-    "schiedsrecht": "Schiedsverfahren Mediation",
-    # Agrar
-    "agrarrecht": "ForstG Landwirtschaftsgesetz",
-    "tierschutz": "TSchG",
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -295,22 +312,71 @@ async def search_gesetze(
 ) -> dict:
     """Search Bundesrecht (Gesetze und Verordnungen).
 
-    Uses: /Bundesrecht?Applikation=BrKons&Suchworte=...&ImRisSeit=...
-    Note: Index parameter returns 0 hits for BrKons; Suchworte works.
+    Strategy:
+      - If category has mapped Gesetzesnummern → query each law separately,
+        combine results (much more precise than keyword search)
+      - If no Gesetzesnummern → fall back to Suchworte keyword search
+      - If no category → unfiltered search
     """
-    params: dict = {
-        "Applikation": "BrKons",
-        "DokumenteProSeite": DOCS_PER_PAGE,
-        "Seitennummer": page,
-        "ImRisSeit": im_ris_seit,
-    }
-    if category:
-        keywords = _CATEGORY_KEYWORDS.get(category, "")
-        if keywords:
-            params["Suchworte"] = keywords
+    gesetze_nummern = _CATEGORY_GESETZE.get(category, []) if category else []
 
-    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
-    return await _fetch(url, params)
+    if gesetze_nummern:
+        # Query each Gesetzesnummer in parallel
+        return await _search_by_gesetzesnummern(gesetze_nummern, im_ris_seit, page)
+    else:
+        # Fallback: keyword search
+        params: dict = {
+            "Applikation": "BrKons",
+            "DokumenteProSeite": DOCS_PER_PAGE,
+            "Seitennummer": page,
+            "ImRisSeit": im_ris_seit,
+        }
+        if category:
+            keywords = _CATEGORY_KEYWORDS.get(category, "")
+            if keywords:
+                params["Suchworte"] = keywords
+        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+        return await _fetch(url, params)
+
+
+async def _search_by_gesetzesnummern(
+    gesetz_nrs: list[str],
+    im_ris_seit: str,
+    page: int,
+) -> dict:
+    """Query multiple Gesetzesnummern in parallel and combine results."""
+
+    async def _query_one(gesetz_nr: str) -> dict:
+        params = {
+            "Applikation": "BrKons",
+            "Gesetzesnummer": gesetz_nr,
+            "ImRisSeit": im_ris_seit,
+            "DokumenteProSeite": DOCS_PER_PAGE,
+            "Seitennummer": page,
+        }
+        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+        return await _fetch(url, params)
+
+    raw_results = await asyncio.gather(*[_query_one(nr) for nr in gesetz_nrs])
+
+    # Combine all results
+    all_refs: list[dict] = []
+    total_hits = 0
+    for raw in raw_results:
+        refs = _extract_refs(raw)
+        hits = _extract_hits(raw)
+        all_refs.extend(refs)
+        total_hits += hits
+
+    # Build a combined response structure
+    return {
+        "OgdSearchResult": {
+            "OgdDocumentResults": {
+                "OgdDocumentReference": all_refs,
+                "Hits": {"#text": str(total_hits)},
+            }
+        }
+    }
 
 
 async def search_gerichtsentscheidungen(
