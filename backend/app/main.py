@@ -86,11 +86,12 @@ async def api_search_gerichtsentscheidungen(
 @app.get("/api/diff")
 async def api_diff(
     doc_id: str = Query(..., description="NOR document number"),
+    ris_updated: str = Query("", description="Zuletzt aktualisiert am date (DD.MM.YYYY)"),
 ):
     """Fetch current and previous version of a Bundesrecht provision and compute diff."""
     if not doc_id or not doc_id.startswith("NOR"):
         raise HTTPException(status_code=400, detail="Ungültige Dokumentnummer (NOR-Nummer erforderlich).")
-    result = await fetch_provision_diff(doc_id)
+    result = await fetch_provision_diff(doc_id, ris_updated=ris_updated)
     if result.get("error"):
         raise HTTPException(status_code=404, detail=result["error"])
     return result

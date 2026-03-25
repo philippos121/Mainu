@@ -443,7 +443,10 @@ async function toggleDiff(item) {
   diffLoading.value[id] = true
   diffErrors.value[id] = ''
   try {
-    const resp = await api.get('/diff', { params: { doc_id: id } })
+    const resp = await api.get('/diff', { params: {
+      doc_id: id,
+      ris_updated: item.ris_updated || '',
+    } })
     diffData.value[id] = resp.data
   } catch (e) {
     diffErrors.value[id] = e.response?.data?.detail || 'Fehler beim Laden der Versionen.'
