@@ -3,6 +3,7 @@
 import logging
 from datetime import date
 
+import httpx
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -120,9 +121,9 @@ async def api_debug_doc(
 @app.get("/api/debug/index")
 async def api_debug_index():
     """DEBUG: Test which Index parameter formats work with BrKons."""
+    from app.core.config import settings as cfg
     results = {}
-    base = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
-    from app.core.config import settings as s
+    base = f"{cfg.RIS_API_BASE_URL}/Bundesrecht"
 
     test_cases = [
         ("Index=90", {"Index": "90"}),
