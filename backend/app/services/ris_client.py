@@ -209,19 +209,17 @@ async def search_gesetze(
     im_ris_seit: str,
     page: int = 1,
 ) -> dict:
-    """Search Bundesrecht for provisions that ACTUALLY CHANGED in the timeframe.
-
-    Uses RIS Index (official legal classification) + Fassung.VonInkrafttretensdatum
-    to find provisions with real legislative changes.
+    """Search Bundesrecht using RIS Index + ImRisSeit.
 
     Strategy:
-      - Category with Index mapping → query each Index with Inkrafttreten date range
-      - No category → query all with ImRisSeit fallback
+    1. Try Index parameter (official legal classification) + ImRisSeit
+    2. If 0 hits, fallback to Suchworte (category label) + ImRisSeit
+    3. No category → unfiltered ImRisSeit search
     """
     indices = _CATEGORY_INDEX.get(category, []) if category else []
 
     if indices:
-        return await _search_by_indices(indices, im_ris_seit, page)
+        return await _search_by_indices(indices, im_ris_seit, category, page)
     else:
         # No category selected or unknown → broad search
         params: dict = {
@@ -237,16 +235,27 @@ async def search_gesetze(
 async def _search_by_indices(
     indices: list[str],
     im_ris_seit: str,
+    category: str,
     page: int,
 ) -> dict:
     """Query RIS by Index numbers + ImRisSeit timeframe.
 
-    Uses Index for Rechtsgebiet filtering + ImRisSeit for timeframe.
-    Falls back to Suchworte if Index returns 0 hits.
+    Strategy per index:
+    1. Try Index=XX/YY + ImRisSeit (most precise)
+    2. If 0 hits, try Suchworte with category label (broader but correct)
     """
+    # Get the category label for Suchworte fallback
+    category_label = ""
+    for cat in LEGAL_CATEGORIES:
+        if cat["id"] == category:
+            # Use the main label, strip parenthetical abbreviations
+            category_label = cat["label"].split("(")[0].split("/")[0].strip()
+            break
 
     async def _query_one(index: str) -> dict:
-        # Try Index + ImRisSeit first
+        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+
+        # Try Index parameter first
         params = {
             "Applikation": "BrKons",
             "Index": index,
@@ -254,20 +263,24 @@ async def _search_by_indices(
             "DokumenteProSeite": "OneHundred",
             "Seitennummer": page,
         }
-        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
         result = await _fetch(url, params)
+        hits = _extract_hits(result)
+        logger.info(f"Index={index}: {hits} hits")
 
-        # If 0 hits, try with Suchworte instead of Index
-        if _extract_hits(result) == 0:
-            logger.info(f"Index={index} returned 0 hits, trying Suchworte fallback")
+        if hits > 0:
+            return result
+
+        # Fallback: use category label as Suchworte (NOT the index number)
+        if category_label:
+            logger.info(f"Index={index} returned 0, falling back to Suchworte='{category_label}'")
             params2 = {
                 "Applikation": "BrKons",
-                "Suchworte": index,  # Use the index number as search term
+                "Suchworte": category_label,
                 "ImRisSeit": im_ris_seit,
                 "DokumenteProSeite": "OneHundred",
                 "Seitennummer": page,
             }
-            result = await _fetch(url, params2)
+            return await _fetch(url, params2)
 
         return result
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
