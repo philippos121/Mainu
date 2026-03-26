@@ -19,7 +19,8 @@ from app.services.ris_client import (
     _timeframe_to_days,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
-from app.services.diff_service import fetch_provision_diff, debug_document  # noqa: E402
+from app.services.diff_service import fetch_provision_diff, debug_document
+from app.services.report_builder import build_report
 
 logging.basicConfig(level=logging.INFO)
 
@@ -253,7 +254,7 @@ async def api_report(req: ReportRequest):
 
     try:
         today = date.today().strftime("%d.%m.%Y")
-        html = _build_interactive_report(
+        html = build_report(
             report_md, req.results, today,
             req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
             req.diffs,
