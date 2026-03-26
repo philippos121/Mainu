@@ -219,10 +219,9 @@ async def search_gesetze(
       - No category → query all with ImRisSeit fallback
     """
     indices = _CATEGORY_INDEX.get(category, []) if category else []
-    days = _timeframe_to_days(im_ris_seit)
 
     if indices:
-        return await _search_by_indices(indices, days, page)
+        return await _search_by_indices(indices, im_ris_seit, page)
     else:
         # No category selected or unknown → broad search
         params: dict = {
@@ -237,23 +236,40 @@ async def search_gesetze(
 
 async def _search_by_indices(
     indices: list[str],
-    days: int,
+    im_ris_seit: str,
     page: int,
 ) -> dict:
-    """Query RIS Index numbers using Inkrafttreten date range."""
-    today = date.today()
-    von = (today - timedelta(days=days)).strftime("%Y-%m-%d")
-    bis = today.strftime("%Y-%m-%d")
+    """Query RIS by Index numbers + ImRisSeit timeframe.
+
+    Uses Index for Rechtsgebiet filtering + ImRisSeit for timeframe.
+    Falls back to Suchworte if Index returns 0 hits.
+    """
 
     async def _query_one(index: str) -> dict:
+        # Try Index + ImRisSeit first
         params = {
             "Applikation": "BrKons",
             "Index": index,
-            "Fassung.VonInkrafttretensdatum": von,
-            "Fassung.BisInkrafttretensdatum": bis,
+            "ImRisSeit": im_ris_seit,
             "DokumenteProSeite": "OneHundred",
             "Seitennummer": page,
         }
+        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+        result = await _fetch(url, params)
+
+        # If 0 hits, try with Suchworte instead of Index
+        if _extract_hits(result) == 0:
+            logger.info(f"Index={index} returned 0 hits, trying Suchworte fallback")
+            params2 = {
+                "Applikation": "BrKons",
+                "Suchworte": index,  # Use the index number as search term
+                "ImRisSeit": im_ris_seit,
+                "DokumenteProSeite": "OneHundred",
+                "Seitennummer": page,
+            }
+            result = await _fetch(url, params2)
+
+        return result
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
         return await _fetch(url, params)
 
