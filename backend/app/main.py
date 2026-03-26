@@ -190,19 +190,22 @@ async def api_debug_index():
 
 
 class SummaryRequest(BaseModel):
-    api_key: str
-    results: list[dict]
+    api_key: str = ""
+    results: list = []
     doc_type: str = "gesetze"
 
 
 class ReportRequest(BaseModel):
     api_key: str = ""
-    results: list[dict]
+    results: list = []
     doc_type: str = "gesetze"
     category_label: str = "Alle Rechtsgebiete"
     timeframe_label: str = ""
     total_hits: int = 0
-    diffs: dict = {}  # {doc_id: {diff_html, current, previous}}
+    diffs: dict = {}
+
+    class Config:
+        extra = "allow"  # Accept any extra fields without error
 
 
 @app.post("/api/summarise")
@@ -226,6 +229,7 @@ async def api_summarise(req: SummaryRequest):
 @app.post("/api/report")
 async def api_report(req: ReportRequest):
     """Generate an interactive summary report with optional GPT summary."""
+    logging.info(f"Report request: {len(req.results)} results, {len(req.diffs)} diffs, api_key={'yes' if req.api_key else 'no'}")
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
 

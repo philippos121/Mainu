@@ -590,7 +590,12 @@ async function doReport() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   } catch (e) {
-    summaryError.value = e.response?.data?.detail || 'Fehler beim Erstellen des Berichts.'
+    console.error('Report error:', e.response?.data || e.message || e)
+    const detail = e.response?.data?.detail
+    summaryError.value = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail) ? detail.map(d => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
+      : `Fehler: ${e.response?.status || ''} ${e.message || 'Unbekannt'}`
   } finally {
     generatingReport.value = false
   }
