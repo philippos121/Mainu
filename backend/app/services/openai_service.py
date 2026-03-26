@@ -22,8 +22,6 @@ def _build_result_text(results: list[dict[str, Any]], include_urls: bool = False
             parts.append(f"  §/Artikel: {r['artikel']}")
         if r.get("date"):
             parts.append(f"  Inkrafttreten: {r['date']}")
-        if r.get("ris_updated"):
-            parts.append(f"  RIS-Aktualisierung: {r['ris_updated']}")
         if r.get("typ"):
             parts.append(f"  Typ: {r['typ']}")
         if r.get("bgbl"):
@@ -34,8 +32,6 @@ def _build_result_text(results: list[dict[str, Any]], include_urls: bool = False
             parts.append(f"  GZ: {r['case_number']}")
         if r.get("normen"):
             parts.append(f"  Normen: {r['normen']}")
-        if r.get("index"):
-            parts.append(f"  Index: {r['index']}")
         if include_urls and r.get("url"):
             parts.append(f"  URL: {r['url']}")
         lines.append("\n".join(parts))
@@ -48,10 +44,7 @@ async def summarise_results(
     doc_type: str,
     api_key: str,
 ) -> str:
-    """Call OpenAI Chat Completions to summarise a list of RIS results.
-
-    Returns a German-language markdown summary.
-    """
+    """Call OpenAI Chat Completions to summarise RIS results."""
     if not results:
         return "Keine Ergebnisse zum Zusammenfassen."
 
@@ -59,32 +52,28 @@ async def summarise_results(
     type_label = "Gesetze und Verordnungen" if doc_type == "gesetze" else "Gerichtsentscheidungen"
 
     system_prompt = (
-        "Du bist ein österreichischer Rechtsexperte. Du erhältst eine Liste von "
-        f"einzelnen RIS-Suchergebnissen ({type_label}).\n\n"
-        "WICHTIGE REGELN:\n"
-        "- Fasse NUR die konkret aufgelisteten Bestimmungen/Paragraphen zusammen.\n"
-        "- Fasse NICHT das gesamte Gesetz zusammen, zu dem ein Paragraph gehört.\n"
-        "  Beispiel: Wenn '§ 123 UGB' in der Liste steht, beschreibe NUR § 123 UGB, "
-        "  NICHT das gesamte Unternehmensgesetzbuch.\n"
-        "- Beachte: Das Feld 'Inkrafttreten' zeigt, wann die Fassung in Kraft trat. "
-        "  Das Feld 'RIS-Aktualisierung' zeigt, wann der Eintrag im RIS zuletzt "
-        "  technisch aktualisiert wurde. Eine RIS-Aktualisierung bedeutet NICHT "
-        "  zwingend eine inhaltliche Gesetzesänderung — es kann sich um eine "
-        "  redaktionelle Metadaten-Aktualisierung handeln.\n"
-        "- Wenn das Inkrafttretensdatum deutlich älter ist als der Suchzeitraum, "
-        "  weise darauf hin, dass es sich möglicherweise nur um ein "
-        "  RIS-Metadaten-Update handelt und keine inhaltliche Änderung.\n"
-        "- Strukturiere die Zusammenfassung thematisch nach Rechtsgebieten.\n"
-        "- Verwende Markdown-Formatierung."
+        "Du bist ein erfahrener österreichischer Rechtsanwalt. "
+        "Du analysierst aktuelle Rechtsänderungen für Mandanten.\n\n"
+        "STIL:\n"
+        "- Schreibe in der Sprache eines österreichischen Anwalts (sachlich, präzise, juristisch)\n"
+        "- Fokus auf die zugrundeliegende RECHTSFRAGE jeder Änderung\n"
+        "- Was ist die praktische Relevanz für die Rechtsanwendung?\n"
+        "- Welche Rechtsprobleme werden gelöst oder geschaffen?\n\n"
+        "REGELN:\n"
+        "- Beschreibe NUR die konkret aufgelisteten Bestimmungen\n"
+        "- Fasse NICHT das gesamte Gesetz zusammen\n"
+        "- Identifiziere die zentrale Rechtsfrage jeder Änderung\n"
+        "- Gliedere thematisch nach Rechtsgebieten\n"
+        "- Verwende Markdown-Formatierung"
     )
 
     user_prompt = (
-        f"Fasse die folgenden {len(results)} einzelnen RIS-Suchergebnisse zusammen. "
-        f"Beschreibe nur den Inhalt der jeweils genannten Bestimmung, "
-        f"nicht das gesamte Gesetz:\n\n{result_text}"
+        f"Analysiere als österreichischer Rechtsanwalt die folgenden {len(results)} "
+        f"{type_label}. Fokus auf die zugrundeliegenden Rechtsfragen und "
+        f"die praktische Relevanz:\n\n{result_text}"
     )
 
-    return await _chat(api_key, system_prompt, user_prompt, max_tokens=1500)
+    return await _chat(api_key, system_prompt, user_prompt, max_tokens=2000)
 
 
 async def generate_report_markdown(
@@ -95,7 +84,7 @@ async def generate_report_markdown(
     total_hits: int,
     api_key: str,
 ) -> str:
-    """Generate a scientific-style legal summary report in markdown."""
+    """Generate a legal analysis report in markdown."""
     if not results:
         return "Keine Ergebnisse für den Bericht."
 
@@ -103,43 +92,34 @@ async def generate_report_markdown(
     type_label = "Gesetze und Verordnungen" if doc_type == "gesetze" else "Gerichtsentscheidungen"
 
     system_prompt = (
-        "Du bist ein österreichischer Rechtswissenschaftler und verfasst einen "
-        "wissenschaftlichen Kurzbericht.\n\n"
-        "WICHTIGE REGELN:\n"
-        "- Analysiere NUR die konkret aufgelisteten Bestimmungen/Paragraphen.\n"
-        "- Fasse NICHT das gesamte Gesetz zusammen, zu dem ein Paragraph gehört.\n"
-        "  Wenn '§ 123 UGB' gelistet ist, beschreibe NUR was § 123 UGB regelt, "
-        "  NICHT das gesamte Unternehmensgesetzbuch.\n"
-        "- Beachte: 'Inkrafttreten' = wann die Fassung in Kraft trat. "
-        "  'RIS-Aktualisierung' = wann der RIS-Eintrag zuletzt technisch "
-        "  aktualisiert wurde. Unterscheide klar zwischen inhaltlichen "
-        "  Gesetzesänderungen und bloßen RIS-Metadaten-Updates.\n"
-        "- Wenn Inkrafttretensdaten deutlich vor dem Suchzeitraum liegen, "
-        "  weise im Bericht darauf hin.\n\n"
-        "STRUKTUR des Berichts:\n"
-        "1. **Titel**: Wissenschaftlicher Titel\n"
-        "2. **Zusammenfassung (Abstract)**: 3-5 Sätze Überblick\n"
-        "3. **Methodik**: Datenquelle (RIS OGD API), Zeitraum, Hinweis dass "
-        "   'ImRisSeit' RIS-Datenbankaktualisierungen filtert, nicht zwingend "
-        "   inhaltliche Gesetzesänderungen\n"
-        "4. **Ergebnisse**: Thematisch gegliederte Analyse der einzelnen "
-        "   Bestimmungen — NUR die gelisteten Paragraphen beschreiben\n"
-        "   - Tatsächliche Änderungen vs. Metadaten-Updates unterscheiden\n"
-        "   - Betroffene Rechtsbereiche identifizieren\n"
-        "   - Praktische Auswirkungen erläutern\n"
-        "5. **Schlussfolgerungen**: Trends und Einschätzung\n"
-        "6. **Quellenverzeichnis**: RIS-Fundstellen auflisten\n\n"
-        "Verwende akademischen Stil auf Deutsch. Markdown-Formatierung."
+        "Du bist ein erfahrener österreichischer Rechtsanwalt und verfasst eine "
+        "rechtliche Analyse aktueller Gesetzesänderungen für Mandanten.\n\n"
+        "STIL: Wie ein Kanzlei-Rundschreiben an Mandanten — sachlich, präzise, "
+        "juristisch fundiert, aber verständlich. Wie es eine renommierte "
+        "österreichische Wirtschaftskanzlei formulieren würde.\n\n"
+        "STRUKTUR:\n"
+        "1. **Überblick**: 3-5 Sätze Zusammenfassung der wichtigsten Änderungen\n"
+        "2. **Wesentliche Änderungen**: Für jede wichtige Änderung:\n"
+        "   - Zugrundeliegende Rechtsfrage\n"
+        "   - Was hat sich geändert (Kerngehalt der Novelle)\n"
+        "   - Praktische Auswirkungen (wer ist betroffen, was ist zu tun)\n"
+        "   - Handlungsbedarf für die Praxis\n"
+        "3. **Weitere Änderungen**: Kürzere Darstellung der übrigen Änderungen\n"
+        "4. **Ausblick und Empfehlung**: Trends, offene Fragen, Handlungsempfehlung\n\n"
+        "REGELN:\n"
+        "- Nur die konkret gelisteten Bestimmungen analysieren\n"
+        "- Nicht das gesamte Gesetz zusammenfassen\n"
+        "- Die zugrundeliegende Rechtsfrage ist von zentraler Bedeutung\n"
+        "- BGBl-Nummern und Inkrafttretensdaten angeben\n"
+        "- Markdown-Formatierung"
     )
 
     user_prompt = (
-        f"Erstelle einen wissenschaftlichen Bericht über die folgenden "
-        f"einzelnen RIS-Suchergebnisse.\n\n"
-        f"Rechtsgebiet: {category_label}\n"
-        f"Zeitraum: {timeframe_label}\n"
-        f"Gesamtanzahl Treffer: {total_hits}\n\n"
-        f"Ergebnisse (erste {len(results)}) — beschreibe NUR diese "
-        f"einzelnen Bestimmungen:\n\n{result_text}"
+        f"Erstelle eine rechtliche Analyse der folgenden {total_hits} "
+        f"{type_label} im Rechtsgebiet '{category_label}' "
+        f"(Zeitraum: {timeframe_label}).\n\n"
+        f"Fokus auf die zugrundeliegenden Rechtsfragen und die praktische "
+        f"Relevanz für die Rechtsanwendung:\n\n{result_text}"
     )
 
     return await _chat(api_key, system_prompt, user_prompt, max_tokens=3000)

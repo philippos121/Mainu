@@ -18,143 +18,207 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # ── Rechtsgebiete ──
-# Each category maps to RIS Index numbers (official Austrian legal classification).
-# The Index parameter IS supported for BrKons (contrary to the old comment).
-# Format: "XX/YY" where XX = Hauptgruppe, YY = Untergruppe.
-# Using just "XX" matches all Untergruppen of that Hauptgruppe.
+# Complete Austrian RIS Index (Systematische Dezimalklassifikation des Bundesrechts).
+# Validated: Index=XX/YY works with BrKons API. Index=XX (Hauptgruppe only) returns 0.
 
 LEGAL_CATEGORIES = [
-    # ── Verfassungsrecht ──
-    {"id": "verfassungsrecht", "label": "Verfassungsrecht", "group": "Öffentliches Recht"},
-    {"id": "grundrechte", "label": "Grundrechte / Datenschutz", "group": "Öffentliches Recht"},
-    {"id": "wahlrecht", "label": "Wahl- und Parteienrecht", "group": "Öffentliches Recht"},
-    # ── Verwaltungsrecht ──
-    {"id": "verwaltungsrecht", "label": "Verwaltungsverfahren", "group": "Verwaltungsrecht"},
-    {"id": "sicherheitspolizei", "label": "Sicherheitspolizeirecht", "group": "Verwaltungsrecht"},
-    {"id": "staatsbuergerschaft", "label": "Staatsbürgerschaft / Meldewesen", "group": "Verwaltungsrecht"},
-    {"id": "fremdenrecht", "label": "Fremden- und Asylrecht", "group": "Verwaltungsrecht"},
-    {"id": "beamtenrecht", "label": "Beamten- und Dienstrecht", "group": "Verwaltungsrecht"},
-    # ── Privatrecht ──
+    # ── 0/1: Verfassungsrecht, Äußeres, Verteidigung ──
+    {"id": "verfassungsrecht", "label": "Verfassungsrecht", "group": "Verfassungsrecht"},
+    {"id": "grundrechte", "label": "Grundrechte / Datenschutz / Auskunftspflicht", "group": "Verfassungsrecht"},
+    {"id": "wahlen", "label": "Wahlen / Parteien / Volksbegehren", "group": "Verfassungsrecht"},
+    {"id": "bezuege", "label": "Bezüge / Unvereinbarkeit", "group": "Verfassungsrecht"},
+    {"id": "verfassungsgerichtsbarkeit", "label": "Verfassungs- und Verwaltungsgerichtsbarkeit", "group": "Verfassungsrecht"},
+    {"id": "rechnungshof", "label": "Rechnungshof / Volksanwaltschaft", "group": "Verfassungsrecht"},
+    {"id": "amtshaftung", "label": "Amtshaftung / Organhaftpflicht", "group": "Verfassungsrecht"},
+    {"id": "eu_integration", "label": "Europäische Integration", "group": "Verfassungsrecht"},
+    {"id": "aeusseres", "label": "Äußere Angelegenheiten", "group": "Äußeres & Verteidigung"},
+    {"id": "landesverteidigung", "label": "Landesverteidigung / Heer", "group": "Äußeres & Verteidigung"},
+    {"id": "zivildienst", "label": "Zivildienst", "group": "Äußeres & Verteidigung"},
+    {"id": "voelkerrecht", "label": "Völkerrechtliche Verträge (Verfassung)", "group": "Äußeres & Verteidigung"},
+    # ── 2: Privatrecht ──
     {"id": "zivilrecht", "label": "Bürgerliches Recht (ABGB)", "group": "Privatrecht"},
-    {"id": "handelsrecht", "label": "Handelsrecht / UGB", "group": "Privatrecht"},
-    {"id": "gesellschaftsrecht", "label": "Gesellschaftsrecht (GmbHG, AktG)", "group": "Privatrecht"},
+    {"id": "handelsrecht", "label": "Handelsrecht / Unternehmensrecht (UGB)", "group": "Privatrecht"},
+    {"id": "aktienrecht", "label": "Aktienrecht", "group": "Privatrecht"},
+    {"id": "gmbh_recht", "label": "GmbH-Recht", "group": "Privatrecht"},
     {"id": "genossenschaftsrecht", "label": "Genossenschaftsrecht", "group": "Privatrecht"},
-    {"id": "wertpapierrecht", "label": "Wertpapierrecht", "group": "Privatrecht"},
-    {"id": "immaterialgueter", "label": "Gewerblicher Rechtsschutz / Urheberrecht", "group": "Privatrecht"},
-    # ── Verfahrensrecht ──
-    {"id": "zivilprozess", "label": "Zivilprozessrecht", "group": "Verfahrensrecht"},
+    {"id": "wertpapierrecht", "label": "Wertpapierrecht / Börserecht", "group": "Privatrecht"},
+    {"id": "versicherungsrecht", "label": "Versicherungsrecht", "group": "Privatrecht"},
+    {"id": "zivilprozess", "label": "Zivilprozessrecht (ZPO)", "group": "Verfahrensrecht"},
     {"id": "ausserstreit", "label": "Außerstreitverfahren", "group": "Verfahrensrecht"},
-    {"id": "exekutionsrecht", "label": "Exekutions- und Insolvenzrecht", "group": "Verfahrensrecht"},
-    {"id": "justizverwaltung", "label": "Justizverwaltung / Notariatswesen", "group": "Verfahrensrecht"},
-    # ── Strafrecht ──
-    {"id": "strafrecht", "label": "Strafrecht (StGB)", "group": "Strafrecht"},
-    {"id": "strafprozess", "label": "Strafprozessrecht (StPO)", "group": "Strafrecht"},
-    {"id": "strafvollzug", "label": "Strafvollzug", "group": "Strafrecht"},
-    # ── Finanz- und Steuerrecht ──
-    {"id": "finanzrecht", "label": "Finanzrecht allgemein / Haushaltsrecht", "group": "Steuerrecht"},
-    {"id": "steuerrecht", "label": "Steuerrecht", "group": "Steuerrecht"},
+    {"id": "exekutionsrecht", "label": "Exekutionsrecht", "group": "Verfahrensrecht"},
+    {"id": "insolvenzrecht", "label": "Insolvenzrecht", "group": "Verfahrensrecht"},
+    {"id": "justizverwaltung", "label": "Justizverwaltung", "group": "Verfahrensrecht"},
+    {"id": "notariat", "label": "Notariatswesen", "group": "Verfahrensrecht"},
+    {"id": "urheberrecht", "label": "Urheberrecht", "group": "Gewerblicher Rechtsschutz"},
+    {"id": "patentrecht", "label": "Patentrecht / Markenrecht / Musterschutz", "group": "Gewerblicher Rechtsschutz"},
+    # ── 3: Finanzrecht ──
+    {"id": "finanzrecht_allg", "label": "Finanzrecht allgemein / Haushaltsrecht", "group": "Finanzrecht"},
+    {"id": "abgabenrecht", "label": "Abgabenverfahrensrecht (BAO)", "group": "Finanzrecht"},
+    {"id": "einkommensteuer", "label": "Einkommensteuer / Lohnsteuer (EStG)", "group": "Steuerrecht"},
+    {"id": "koerperschaftsteuer", "label": "Körperschaftsteuer (KStG)", "group": "Steuerrecht"},
+    {"id": "umsatzsteuer", "label": "Umsatzsteuer (UStG)", "group": "Steuerrecht"},
+    {"id": "gebuehrenrecht", "label": "Gebührenrecht / Verkehrsteuern", "group": "Steuerrecht"},
+    {"id": "bewertungsrecht", "label": "Bewertungsrecht", "group": "Steuerrecht"},
     {"id": "zollrecht", "label": "Zollrecht", "group": "Steuerrecht"},
     {"id": "finanzausgleich", "label": "Finanzausgleich", "group": "Steuerrecht"},
-    # ── Arbeits- und Sozialrecht ──
-    {"id": "arbeitsrecht", "label": "Arbeitsrecht", "group": "Arbeits- und Sozialrecht"},
-    {"id": "sozialversicherung", "label": "Sozialversicherungsrecht", "group": "Arbeits- und Sozialrecht"},
-    # ── Gewerbe, Industrie, Verkehr ──
-    {"id": "gewerberecht", "label": "Gewerberecht", "group": "Wirtschaftsrecht"},
+    {"id": "finanzstrafrecht", "label": "Finanzstrafrecht (FinStrG)", "group": "Steuerrecht"},
+    # ── 4: Innere Verwaltung ──
+    {"id": "verwaltungsverfahren", "label": "Verwaltungsverfahren (AVG / VwGVG)", "group": "Verwaltungsrecht"},
+    {"id": "staatsbuergerschaft", "label": "Staatsbürgerschaft / Pass- / Meldewesen", "group": "Verwaltungsrecht"},
+    {"id": "personenstandsrecht", "label": "Personenstandsrecht", "group": "Verwaltungsrecht"},
+    {"id": "sicherheitspolizei", "label": "Sicherheitspolizei (SPG)", "group": "Verwaltungsrecht"},
+    {"id": "fremdenrecht", "label": "Fremden- und Asylrecht (FPG / AsylG)", "group": "Verwaltungsrecht"},
+    {"id": "waffenrecht", "label": "Waffenrecht", "group": "Verwaltungsrecht"},
+    {"id": "vereinsrecht", "label": "Vereins- und Versammlungsrecht", "group": "Verwaltungsrecht"},
+    {"id": "datenschutz", "label": "Datenschutz (DSG / DSGVO)", "group": "Verwaltungsrecht"},
+    # ── 5: Gewerbe, Industrie, Handel, Verkehr ──
+    {"id": "gewerberecht", "label": "Gewerberecht (GewO)", "group": "Wirtschaftsrecht"},
+    {"id": "bergrecht", "label": "Bergrecht", "group": "Wirtschaftsrecht"},
     {"id": "energierecht", "label": "Energierecht", "group": "Wirtschaftsrecht"},
-    {"id": "verkehrsrecht", "label": "Verkehrsrecht", "group": "Wirtschaftsrecht"},
-    # ── Bildung, Wissenschaft ──
-    {"id": "schulrecht", "label": "Schulwesen", "group": "Bildung & Kultur"},
-    {"id": "hochschulrecht", "label": "Hochschulwesen", "group": "Bildung & Kultur"},
-    # ── Gesundheit, Umwelt ──
-    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht", "group": "Gesundheit & Umwelt"},
-    {"id": "umweltrecht", "label": "Naturschutz / Umweltschutz", "group": "Gesundheit & Umwelt"},
+    {"id": "preisrecht", "label": "Preisrecht / Wettbewerbsrecht (UWG / KartG)", "group": "Wirtschaftsrecht"},
+    {"id": "bankrecht", "label": "Bank- und Kapitalmarktrecht (BWG / WAG)", "group": "Wirtschaftsrecht"},
+    {"id": "verkehrsrecht", "label": "Verkehrsrecht (StVO / KFG / FSG)", "group": "Wirtschaftsrecht"},
+    {"id": "schifffahrt", "label": "Schifffahrtsrecht", "group": "Wirtschaftsrecht"},
+    {"id": "luftfahrt", "label": "Luftfahrtrecht", "group": "Wirtschaftsrecht"},
+    {"id": "eisenbahn", "label": "Eisenbahnrecht", "group": "Wirtschaftsrecht"},
+    {"id": "telekommunikation", "label": "Telekommunikation / Medien (TKG / MedienG)", "group": "Wirtschaftsrecht"},
+    {"id": "postrecht", "label": "Postrecht", "group": "Wirtschaftsrecht"},
+    # ── 6: Arbeitsrecht, Dienstrecht, Sozialrecht ──
+    {"id": "arbeitsrecht", "label": "Arbeitsrecht (ArbVG / AZG / UrlG)", "group": "Arbeits- & Sozialrecht"},
+    {"id": "arbeitsschutz", "label": "ArbeitnehmerInnenschutz (ASchG)", "group": "Arbeits- & Sozialrecht"},
+    {"id": "arbeitsmarkt", "label": "Arbeitsmarktrecht / Arbeitslosenversicherung", "group": "Arbeits- & Sozialrecht"},
+    {"id": "beamtendienstrecht", "label": "Beamtendienstrecht (BDG / GehG)", "group": "Arbeits- & Sozialrecht"},
+    {"id": "personalvertretung", "label": "Personalvertretungsrecht", "group": "Arbeits- & Sozialrecht"},
+    {"id": "sozialversicherung", "label": "Sozialversicherungsrecht (ASVG)", "group": "Arbeits- & Sozialrecht"},
+    {"id": "pensionsrecht", "label": "Pensionsrecht", "group": "Arbeits- & Sozialrecht"},
+    {"id": "pflegegeld", "label": "Pflegegeld / Behindertenrecht", "group": "Arbeits- & Sozialrecht"},
+    {"id": "sozialhilfe", "label": "Sozialhilfe / Grundversorgung", "group": "Arbeits- & Sozialrecht"},
+    # ── 7: Unterricht, Wissenschaft, Kultur ──
+    {"id": "schulrecht", "label": "Schulrecht (SchUG / SchOG)", "group": "Bildung & Kultur"},
+    {"id": "hochschulrecht", "label": "Hochschulrecht (UG / FHG)", "group": "Bildung & Kultur"},
+    {"id": "forschung", "label": "Forschung / Wissenschaft (FOG)", "group": "Bildung & Kultur"},
+    {"id": "kulturrecht", "label": "Kunst / Kultur / Denkmalschutz", "group": "Bildung & Kultur"},
+    {"id": "medienfoerderung", "label": "Medienförderung / Pressewesen", "group": "Bildung & Kultur"},
+    {"id": "sportrecht", "label": "Sportrecht", "group": "Bildung & Kultur"},
+    # ── 8: Land-/Forstwirtschaft, Gesundheit, Umwelt ──
     {"id": "landwirtschaft", "label": "Land- und Forstwirtschaft", "group": "Gesundheit & Umwelt"},
-    # ── Äußeres, Landesverteidigung ──
-    {"id": "aeusseres", "label": "Äußere Angelegenheiten", "group": "Internationales"},
-    {"id": "landesverteidigung", "label": "Landesverteidigung", "group": "Internationales"},
+    {"id": "tierschutz", "label": "Tierschutz / Veterinärrecht", "group": "Gesundheit & Umwelt"},
+    {"id": "wasserrecht", "label": "Wasserrecht (WRG)", "group": "Gesundheit & Umwelt"},
+    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht / Krankenanstalten", "group": "Gesundheit & Umwelt"},
+    {"id": "arzneimittelrecht", "label": "Arzneimittelrecht (AMG)", "group": "Gesundheit & Umwelt"},
+    {"id": "lebensmittelrecht", "label": "Lebensmittelrecht (LMSVG)", "group": "Gesundheit & Umwelt"},
+    {"id": "umweltrecht", "label": "Umweltschutz / Klimaschutz (UVP-G)", "group": "Gesundheit & Umwelt"},
+    {"id": "abfallrecht", "label": "Abfallwirtschaft (AWG)", "group": "Gesundheit & Umwelt"},
+    {"id": "chemikalienrecht", "label": "Chemikalienrecht / Gentechnik", "group": "Gesundheit & Umwelt"},
+    # ── 9: Strafrecht ──
+    {"id": "strafrecht", "label": "Strafrecht (StGB)", "group": "Strafrecht"},
+    {"id": "nebenstrafrecht", "label": "Nebenstrafrecht (VStG / SMG)", "group": "Strafrecht"},
+    {"id": "strafprozess", "label": "Strafprozessrecht (StPO)", "group": "Strafrecht"},
+    {"id": "strafvollzug", "label": "Strafvollzug (StVG / JGG)", "group": "Strafrecht"},
+    {"id": "opferschutz", "label": "Opferschutz / Bewährungshilfe", "group": "Strafrecht"},
 ]
 
 # ── RIS Index mapping per Rechtsgebiet ──
 # Uses the official Austrian legal classification (Systematische Dezimalklassifikation).
 # Format: "XX/YY" where XX = Hauptgruppe, YY = Untergruppe.
 # Using just "XX" should match all Untergruppen of that Hauptgruppe.
-# Validated: Index=XX (Hauptgruppe only) returns 0 hits!
-# Only Index=XX/YY (with Untergruppe) works.
-# Also: Titel parameter works for specific laws.
-# Strategy: list all relevant XX/YY Untergruppen per category.
-# Each entry is either {"Index": "XX/YY"} or {"Titel": "LawName"}.
+# Validated: Index=XX/YY works. Index=XX (Hauptgruppe only) returns 0.
+# Fallback: Titel parameter for specific laws.
 _CATEGORY_SEARCH: dict[str, list[dict]] = {
-    # ── Verfassungsrecht ──
-    "verfassungsrecht": [
-        {"Index": "10/01"}, {"Index": "10/02"}, {"Index": "10/03"},
-        {"Index": "10/04"}, {"Index": "10/05"}, {"Index": "10/06"},
-        {"Index": "10/07"}, {"Index": "10/08"}, {"Index": "10/09"},
-        {"Index": "10/10"}, {"Index": "10/11"}, {"Index": "10/12"},
-        {"Index": "10/13"}, {"Index": "10/14"}, {"Index": "10/15"},
-    ],
+    # 0/1: Verfassungsrecht
+    "verfassungsrecht": [{"Index": "10/01"}, {"Index": "10/02"}, {"Index": "10/03"}, {"Index": "10/14"}, {"Index": "10/15"}],
     "grundrechte": [{"Index": "10/10"}, {"Index": "10/11"}],
-    "wahlrecht": [{"Index": "10/04"}, {"Index": "10/12"}],
-    # ── Verwaltungsrecht ──
-    "verwaltungsrecht": [
-        {"Index": "40/01"}, {"Index": "40/02"}, {"Index": "40/03"},
-    ],
-    "sicherheitspolizei": [{"Index": "43/01"}, {"Index": "43/02"}],
-    "staatsbuergerschaft": [{"Index": "41/01"}, {"Index": "41/02"}],
-    "fremdenrecht": [{"Index": "41/02"}, {"Titel": "Fremdenpolizeigesetz"}, {"Titel": "AsylG"}],
-    "beamtenrecht": [{"Index": "62/01"}, {"Index": "62/02"}, {"Index": "62/03"}],
-    # ── Privatrecht ──
+    "wahlen": [{"Index": "10/04"}, {"Index": "10/06"}, {"Index": "10/12"}],
+    "bezuege": [{"Index": "10/05"}],
+    "verfassungsgerichtsbarkeit": [{"Index": "10/07"}],
+    "rechnungshof": [{"Index": "10/08"}],
+    "amtshaftung": [{"Index": "10/13"}],
+    "eu_integration": [{"Index": "10/15"}],
+    "aeusseres": [{"Index": "11/01"}, {"Index": "11/02"}, {"Index": "11/03"}, {"Index": "11/04"}],
+    "landesverteidigung": [{"Index": "12/01"}, {"Index": "12/02"}, {"Index": "12/03"}, {"Index": "12/04"}],
+    "zivildienst": [{"Index": "12/04"}, {"Titel": "Zivildienstgesetz"}],
+    "voelkerrecht": [{"Index": "19/01"}, {"Index": "19/02"}, {"Index": "19/03"}, {"Index": "19/04"}],
+    # 2: Privatrecht
     "zivilrecht": [{"Index": "20/01"}],
     "handelsrecht": [{"Index": "21/01"}],
-    "gesellschaftsrecht": [{"Index": "21/02"}, {"Index": "21/03"}, {"Index": "21/04"}],
+    "aktienrecht": [{"Index": "21/02"}],
+    "gmbh_recht": [{"Index": "21/03"}],
     "genossenschaftsrecht": [{"Index": "21/04"}],
-    "wertpapierrecht": [{"Index": "21/05"}],
-    "immaterialgueter": [{"Index": "26/01"}, {"Index": "26/02"}, {"Index": "26/03"}],
-    # ── Verfahrensrecht ──
-    "zivilprozess": [{"Titel": "Zivilprozessordnung"}, {"Index": "21/01"}],
-    "ausserstreit": [{"Index": "22/01"}, {"Index": "22/02"}],
-    "exekutionsrecht": [{"Index": "23/01"}, {"Index": "23/02"}],
-    "justizverwaltung": [{"Index": "24/01"}, {"Index": "25/01"}],
-    # ── Strafrecht ──
-    "strafrecht": [{"Index": "90/01"}, {"Index": "90/02"}],
-    "strafprozess": [{"Index": "91/01"}, {"Index": "91/02"}],
-    "strafvollzug": [{"Index": "92/01"}, {"Index": "92/02"}],
-    # ── Finanz-/Steuerrecht ──
-    "finanzrecht": [{"Index": "30/01"}, {"Index": "30/02"}, {"Index": "30/03"}, {"Index": "30/04"}],
-    "steuerrecht": [
-        {"Index": "32/01"}, {"Index": "32/02"}, {"Index": "32/03"},
-        {"Index": "32/04"}, {"Index": "32/05"}, {"Index": "32/06"},
-    ],
+    "wertpapierrecht": [{"Index": "21/05"}, {"Index": "21/06"}],
+    "versicherungsrecht": [{"Index": "21/07"}, {"Titel": "Versicherungsvertragsgesetz"}],
+    "zivilprozess": [{"Index": "22/01"}, {"Index": "22/02"}],
+    "ausserstreit": [{"Index": "22/03"}, {"Index": "22/04"}],
+    "exekutionsrecht": [{"Index": "23/01"}],
+    "insolvenzrecht": [{"Index": "23/02"}],
+    "justizverwaltung": [{"Index": "24/01"}, {"Index": "24/02"}, {"Index": "24/03"}],
+    "notariat": [{"Index": "25/01"}, {"Index": "25/02"}],
+    "urheberrecht": [{"Index": "26/01"}],
+    "patentrecht": [{"Index": "26/02"}, {"Index": "26/03"}, {"Index": "26/04"}],
+    # 3: Finanzrecht
+    "finanzrecht_allg": [{"Index": "30/01"}, {"Index": "30/02"}, {"Index": "30/03"}, {"Index": "30/04"}],
+    "abgabenrecht": [{"Index": "32/01"}],
+    "einkommensteuer": [{"Index": "32/02"}],
+    "koerperschaftsteuer": [{"Index": "32/03"}],
+    "umsatzsteuer": [{"Index": "32/04"}],
+    "gebuehrenrecht": [{"Index": "32/05"}, {"Index": "32/06"}, {"Index": "32/07"}],
+    "bewertungsrecht": [{"Index": "33/01"}],
     "zollrecht": [{"Index": "34/01"}, {"Index": "34/02"}],
     "finanzausgleich": [{"Index": "35/01"}, {"Index": "35/02"}],
-    # ── Arbeits-/Sozialrecht ──
-    "arbeitsrecht": [
-        {"Index": "60/01"}, {"Index": "60/02"}, {"Index": "60/03"},
-        {"Index": "60/04"}, {"Index": "60/05"},
-    ],
-    "sozialversicherung": [
-        {"Index": "66/01"}, {"Index": "66/02"}, {"Index": "66/03"},
-        {"Index": "66/04"}, {"Index": "66/05"},
-    ],
-    # ── Gewerbe/Verkehr ──
+    "finanzstrafrecht": [{"Index": "32/01"}, {"Titel": "Finanzstrafgesetz"}],
+    # 4: Innere Verwaltung
+    "verwaltungsverfahren": [{"Index": "40/01"}, {"Index": "40/02"}, {"Index": "40/03"}],
+    "staatsbuergerschaft": [{"Index": "41/01"}, {"Index": "41/02"}],
+    "personenstandsrecht": [{"Index": "41/03"}, {"Titel": "Personenstandsgesetz"}],
+    "sicherheitspolizei": [{"Index": "43/01"}, {"Index": "43/02"}],
+    "fremdenrecht": [{"Index": "41/02"}, {"Titel": "Fremdenpolizeigesetz"}, {"Titel": "AsylG"}],
+    "waffenrecht": [{"Index": "43/03"}, {"Titel": "Waffengesetz"}],
+    "vereinsrecht": [{"Index": "10/11"}, {"Titel": "Vereinsgesetz"}],
+    "datenschutz": [{"Index": "10/10"}, {"Titel": "Datenschutzgesetz"}],
+    # 5: Gewerbe, Industrie, Handel, Verkehr
     "gewerberecht": [{"Index": "50/01"}, {"Index": "50/02"}, {"Index": "50/03"}],
+    "bergrecht": [{"Index": "50/04"}, {"Titel": "Mineralrohstoffgesetz"}],
     "energierecht": [{"Index": "58/01"}, {"Index": "58/02"}],
-    "verkehrsrecht": [
-        {"Index": "55/01"}, {"Index": "55/02"}, {"Index": "55/03"},
-        {"Index": "55/04"}, {"Index": "55/05"},
-    ],
-    # ── Bildung ──
-    "schulrecht": [{"Index": "70/01"}, {"Index": "70/02"}, {"Index": "70/03"}],
-    "hochschulrecht": [
-        {"Index": "72/01"}, {"Index": "72/02"}, {"Index": "72/03"},
-        {"Index": "72/04"}, {"Index": "72/05"}, {"Index": "72/06"}, {"Index": "72/07"},
-    ],
-    # ── Gesundheit/Umwelt ──
-    "gesundheitsrecht": [{"Index": "82/01"}, {"Index": "82/02"}, {"Index": "82/03"}],
-    "umweltrecht": [{"Index": "83/01"}, {"Index": "83/02"}, {"Index": "83/03"}],
+    "preisrecht": [{"Index": "50/05"}, {"Titel": "UWG"}, {"Titel": "Kartellgesetz"}],
+    "bankrecht": [{"Index": "21/06"}, {"Titel": "Bankwesengesetz"}, {"Titel": "WAG"}],
+    "verkehrsrecht": [{"Index": "55/01"}, {"Index": "55/02"}, {"Index": "55/03"}],
+    "schifffahrt": [{"Index": "55/04"}, {"Titel": "Schifffahrtsgesetz"}],
+    "luftfahrt": [{"Index": "55/05"}, {"Titel": "Luftfahrtgesetz"}],
+    "eisenbahn": [{"Index": "55/06"}, {"Titel": "Eisenbahngesetz"}],
+    "telekommunikation": [{"Index": "56/01"}, {"Index": "56/02"}, {"Titel": "TKG"}],
+    "postrecht": [{"Index": "56/03"}, {"Titel": "Postmarktgesetz"}],
+    # 6: Arbeitsrecht, Dienstrecht, Sozialrecht
+    "arbeitsrecht": [{"Index": "60/01"}, {"Index": "60/02"}, {"Index": "60/03"}, {"Index": "60/04"}, {"Index": "60/05"}],
+    "arbeitsschutz": [{"Index": "60/02"}, {"Titel": "ArbeitnehmerInnenschutzgesetz"}],
+    "arbeitsmarkt": [{"Index": "60/03"}, {"Titel": "Arbeitslosenversicherungsgesetz"}],
+    "beamtendienstrecht": [{"Index": "62/01"}, {"Index": "62/02"}, {"Index": "62/03"}],
+    "personalvertretung": [{"Index": "62/04"}, {"Titel": "Personalvertretungsgesetz"}],
+    "sozialversicherung": [{"Index": "66/01"}, {"Index": "66/02"}, {"Index": "66/03"}, {"Index": "66/04"}, {"Index": "66/05"}],
+    "pensionsrecht": [{"Index": "66/02"}, {"Titel": "Pensionsgesetz"}],
+    "pflegegeld": [{"Index": "66/03"}, {"Titel": "Bundespflegegeldgesetz"}],
+    "sozialhilfe": [{"Index": "66/04"}, {"Titel": "Sozialhilfe"}],
+    # 7: Unterricht, Wissenschaft, Kultur
+    "schulrecht": [{"Index": "70/01"}, {"Index": "70/02"}, {"Index": "70/03"}, {"Index": "70/04"}],
+    "hochschulrecht": [{"Index": "72/01"}, {"Index": "72/02"}, {"Index": "72/03"}, {"Index": "72/04"}, {"Index": "72/05"}, {"Index": "72/06"}, {"Index": "72/07"}],
+    "forschung": [{"Index": "72/01"}, {"Titel": "Forschungsorganisationsgesetz"}],
+    "kulturrecht": [{"Index": "75/01"}, {"Index": "75/02"}, {"Titel": "Denkmalschutzgesetz"}],
+    "medienfoerderung": [{"Index": "75/03"}, {"Titel": "Presseförderungsgesetz"}],
+    "sportrecht": [{"Index": "75/04"}, {"Titel": "Bundes-Sportförderungsgesetz"}],
+    # 8: Land-/Forstwirtschaft, Gesundheit, Umwelt
     "landwirtschaft": [{"Index": "80/01"}, {"Index": "80/02"}, {"Index": "80/03"}],
-    # ── Äußeres/Verteidigung ──
-    "aeusseres": [{"Index": "11/01"}, {"Index": "11/02"}, {"Index": "11/03"}],
-    "landesverteidigung": [{"Index": "12/01"}, {"Index": "12/02"}, {"Index": "12/03"}],
+    "tierschutz": [{"Index": "80/04"}, {"Titel": "Tierschutzgesetz"}],
+    "wasserrecht": [{"Index": "81/01"}, {"Titel": "Wasserrechtsgesetz"}],
+    "gesundheitsrecht": [{"Index": "82/01"}, {"Index": "82/02"}, {"Index": "82/03"}],
+    "arzneimittelrecht": [{"Index": "82/03"}, {"Titel": "Arzneimittelgesetz"}],
+    "lebensmittelrecht": [{"Index": "82/04"}, {"Titel": "LMSVG"}],
+    "umweltrecht": [{"Index": "83/01"}, {"Index": "83/02"}, {"Index": "83/03"}, {"Titel": "UVP-G"}],
+    "abfallrecht": [{"Index": "83/03"}, {"Titel": "Abfallwirtschaftsgesetz"}],
+    "chemikalienrecht": [{"Index": "83/04"}, {"Titel": "Chemikaliengesetz"}],
+    # 9: Strafrecht
+    "strafrecht": [{"Index": "90/01"}, {"Index": "90/02"}],
+    "nebenstrafrecht": [{"Index": "90/02"}, {"Titel": "Suchtmittelgesetz"}],
+    "strafprozess": [{"Index": "91/01"}, {"Index": "91/02"}],
+    "strafvollzug": [{"Index": "92/01"}, {"Index": "92/02"}, {"Titel": "Jugendgerichtsgesetz"}],
+    "opferschutz": [{"Index": "92/03"}, {"Titel": "Verbrechensopfergesetz"}, {"Titel": "Bewährungshilfegesetz"}],
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -181,49 +245,39 @@ COURT_SOURCES = [
 # Map Rechtsgebiet → relevant court Applikation(en) for Judikatur.
 # Unmapped categories → query all courts with Suchworte.
 CATEGORY_TO_COURTS: dict[str, list[str]] = {
-    # Verfassungsrecht → VfGH
-    "verfassungsrecht": ["Vfgh"],
-    "grundrechte": ["Vfgh"],
-    # Verwaltungsrecht → VwGH, BVwG, LVwG
-    "verwaltungsrecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "sicherheitspolizei": ["Vwgh", "Bvwg"],
-    "staatsbuergerschaft": ["Vwgh", "Bvwg"],
-    "fremdenrecht": ["Vwgh", "Bvwg"],
-    "beamtenrecht": ["Vwgh", "Bvwg"],
-    # Privatrecht → Ordentliche Gerichte
-    "zivilrecht": ["Justiz"],
-    "handelsrecht": ["Justiz"],
-    "gesellschaftsrecht": ["Justiz"],
-    "genossenschaftsrecht": ["Justiz"],
-    "wertpapierrecht": ["Justiz"],
-    "immaterialgueter": ["Justiz"],
-    # Verfahrensrecht
-    "zivilprozess": ["Justiz"],
-    "ausserstreit": ["Justiz"],
-    "exekutionsrecht": ["Justiz"],
-    "justizverwaltung": ["Justiz"],
-    # Strafrecht
-    "strafrecht": ["Justiz"],
-    "strafprozess": ["Justiz"],
-    "strafvollzug": ["Justiz"],
-    "finanzrecht": ["Vwgh", "Bvwg"],
-    "steuerrecht": ["Vwgh", "Bvwg"],
-    "zollrecht": ["Vwgh", "Bvwg"],
-    "finanzausgleich": ["Vwgh", "Bvwg"],
-    # Arbeitsrecht
-    "arbeitsrecht": ["Justiz"],
-    "sozialversicherung": ["Vwgh", "Bvwg"],
-    # Gewerbe/Verkehr
-    "gewerberecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "energierecht": ["Vwgh", "Bvwg"],
-    "verkehrsrecht": ["Vwgh", "Bvwg", "Lvwg"],
-    # Gesundheit/Umwelt
-    "gesundheitsrecht": ["Vwgh", "Bvwg"],
-    "umweltrecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "landwirtschaft": ["Vwgh", "Bvwg"],
-    # Äußeres
-    "aeusseres": ["Vfgh", "Vwgh"],
-    "landesverteidigung": ["Vwgh", "Bvwg"],
+    # VfGH
+    "verfassungsrecht": ["Vfgh"], "grundrechte": ["Vfgh"], "wahlen": ["Vfgh"],
+    "verfassungsgerichtsbarkeit": ["Vfgh"], "eu_integration": ["Vfgh"],
+    # VwGH + BVwG + LVwG
+    "verwaltungsverfahren": ["Vwgh", "Bvwg", "Lvwg"],
+    "sicherheitspolizei": ["Vwgh", "Bvwg"], "fremdenrecht": ["Vwgh", "Bvwg"],
+    "staatsbuergerschaft": ["Vwgh", "Bvwg"], "waffenrecht": ["Vwgh", "Bvwg"],
+    "datenschutz": ["Vwgh", "Bvwg"], "vereinsrecht": ["Vwgh", "Bvwg"],
+    "beamtendienstrecht": ["Vwgh", "Bvwg"], "personalvertretung": ["Vwgh", "Bvwg"],
+    "finanzrecht_allg": ["Vwgh", "Bvwg"], "abgabenrecht": ["Vwgh", "Bvwg"],
+    "einkommensteuer": ["Vwgh", "Bvwg"], "koerperschaftsteuer": ["Vwgh", "Bvwg"],
+    "umsatzsteuer": ["Vwgh", "Bvwg"], "gebuehrenrecht": ["Vwgh", "Bvwg"],
+    "bewertungsrecht": ["Vwgh", "Bvwg"], "zollrecht": ["Vwgh", "Bvwg"],
+    "finanzausgleich": ["Vwgh", "Bvwg"], "finanzstrafrecht": ["Vwgh", "Bvwg"],
+    "gewerberecht": ["Vwgh", "Bvwg", "Lvwg"], "bergrecht": ["Vwgh", "Bvwg"],
+    "energierecht": ["Vwgh", "Bvwg"], "verkehrsrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "telekommunikation": ["Vwgh", "Bvwg"],
+    "gesundheitsrecht": ["Vwgh", "Bvwg"], "umweltrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "wasserrecht": ["Vwgh", "Bvwg", "Lvwg"], "landwirtschaft": ["Vwgh", "Bvwg"],
+    "sozialversicherung": ["Vwgh", "Bvwg"], "pflegegeld": ["Vwgh", "Bvwg"],
+    # Ordentliche Gerichte
+    "zivilrecht": ["Justiz"], "handelsrecht": ["Justiz"],
+    "aktienrecht": ["Justiz"], "gmbh_recht": ["Justiz"],
+    "genossenschaftsrecht": ["Justiz"], "wertpapierrecht": ["Justiz"],
+    "versicherungsrecht": ["Justiz"], "bankrecht": ["Justiz"],
+    "zivilprozess": ["Justiz"], "ausserstreit": ["Justiz"],
+    "exekutionsrecht": ["Justiz"], "insolvenzrecht": ["Justiz"],
+    "urheberrecht": ["Justiz"], "patentrecht": ["Justiz"], "preisrecht": ["Justiz"],
+    "strafrecht": ["Justiz"], "nebenstrafrecht": ["Justiz"],
+    "strafprozess": ["Justiz"], "strafvollzug": ["Justiz"], "opferschutz": ["Justiz"],
+    "arbeitsrecht": ["Justiz"], "arbeitsschutz": ["Justiz"],
+    # VfGH + VwGH
+    "aeusseres": ["Vfgh", "Vwgh"], "landesverteidigung": ["Vwgh", "Bvwg"],
 }
 
 # DokumenteProSeite enum
@@ -354,39 +408,35 @@ async def search_gerichtsentscheidungen(
     # Filter by NORM (law name) — the Judikatur API supports a "Norm" parameter
     # that filters by the law applied in the decision.
     _CATEGORY_NORMEN: dict[str, str] = {
-        "verfassungsrecht": "B-VG",
-        "grundrechte": "EMRK",
-        "wahlrecht": "NRWO",
-        "verwaltungsrecht": "AVG",
-        "sicherheitspolizei": "SPG",
-        "staatsbuergerschaft": "StbG",
-        "fremdenrecht": "FPG",
-        "beamtenrecht": "BDG",
-        "zivilrecht": "ABGB",
-        "handelsrecht": "UGB",
-        "gesellschaftsrecht": "GmbHG",
-        "genossenschaftsrecht": "GenG",
-        "wertpapierrecht": "BörseG",
-        "immaterialgueter": "UrhG",
-        "zivilprozess": "ZPO",
-        "ausserstreit": "AußStrG",
-        "exekutionsrecht": "IO",
-        "strafrecht": "StGB",
-        "strafprozess": "StPO",
-        "strafvollzug": "StVG",
-        "finanzrecht": "FinStrG",
-        "steuerrecht": "EStG",
-        "zollrecht": "ZollG",
-        "arbeitsrecht": "ArbVG",
-        "sozialversicherung": "ASVG",
-        "gewerberecht": "GewO",
-        "energierecht": "ElWOG",
-        "verkehrsrecht": "StVO",
-        "schulrecht": "SchUG",
-        "hochschulrecht": "UG",
-        "gesundheitsrecht": "ÄrzteG",
-        "umweltrecht": "UVP-G",
-        "landwirtschaft": "ForstG",
+        "verfassungsrecht": "B-VG", "grundrechte": "EMRK", "wahlen": "NRWO",
+        "amtshaftung": "AHG", "eu_integration": "EU",
+        "verwaltungsverfahren": "AVG", "sicherheitspolizei": "SPG",
+        "staatsbuergerschaft": "StbG", "fremdenrecht": "FPG",
+        "waffenrecht": "WaffG", "datenschutz": "DSG",
+        "beamtendienstrecht": "BDG",
+        "zivilrecht": "ABGB", "handelsrecht": "UGB",
+        "aktienrecht": "AktG", "gmbh_recht": "GmbHG",
+        "genossenschaftsrecht": "GenG", "wertpapierrecht": "BörseG",
+        "versicherungsrecht": "VersVG", "bankrecht": "BWG",
+        "urheberrecht": "UrhG", "patentrecht": "PatG",
+        "zivilprozess": "ZPO", "ausserstreit": "AußStrG",
+        "exekutionsrecht": "EO", "insolvenzrecht": "IO",
+        "strafrecht": "StGB", "nebenstrafrecht": "SMG",
+        "strafprozess": "StPO", "strafvollzug": "StVG",
+        "finanzrecht_allg": "FinStrG", "abgabenrecht": "BAO",
+        "einkommensteuer": "EStG", "koerperschaftsteuer": "KStG",
+        "umsatzsteuer": "UStG", "zollrecht": "ZollG",
+        "finanzstrafrecht": "FinStrG",
+        "arbeitsrecht": "ArbVG", "arbeitsschutz": "ASchG",
+        "sozialversicherung": "ASVG", "pensionsrecht": "PG",
+        "gewerberecht": "GewO", "energierecht": "ElWOG",
+        "preisrecht": "UWG", "verkehrsrecht": "StVO",
+        "telekommunikation": "TKG",
+        "schulrecht": "SchUG", "hochschulrecht": "UG",
+        "gesundheitsrecht": "ÄrzteG", "arzneimittelrecht": "AMG",
+        "lebensmittelrecht": "LMSVG",
+        "umweltrecht": "UVP-G", "wasserrecht": "WRG",
+        "landwirtschaft": "ForstG", "tierschutz": "TSchG",
     }
     norm = _CATEGORY_NORMEN.get(category, "")
 
