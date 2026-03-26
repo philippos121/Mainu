@@ -270,20 +270,44 @@ async def _search_by_params(
     Each search dict can have {"Index": "XX/YY"} or {"Titel": "LawName"}.
     """
 
+    # Compute date range for Fassung filter
+    days = _timeframe_to_days(im_ris_seit)
+    today = date.today()
+    von = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+    bis = today.strftime("%Y-%m-%d")
+
     async def _query_one(search_params: dict) -> dict:
+        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+
+        # Try 1: Index + Fassung.VonInkrafttretensdatum (most precise)
         params = {
+            "Applikation": "BrKons",
+            "Fassung.VonInkrafttretensdatum": von,
+            "Fassung.BisInkrafttretensdatum": bis,
+            "DokumenteProSeite": "OneHundred",
+            "Seitennummer": page,
+        }
+        params.update(search_params)
+        result = await _fetch(url, params)
+        hits = _extract_hits(result)
+        label = "&".join(f"{k}={v}" for k, v in search_params.items())
+        logger.info(f"Search {label} +Fassung: {hits} hits")
+
+        if hits > 0:
+            return result
+
+        # Try 2: Index + ImRisSeit (fallback if Fassung combo fails)
+        params2 = {
             "Applikation": "BrKons",
             "ImRisSeit": im_ris_seit,
             "DokumenteProSeite": "OneHundred",
             "Seitennummer": page,
         }
-        params.update(search_params)
-        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
-        result = await _fetch(url, params)
-        hits = _extract_hits(result)
-        label = "&".join(f"{k}={v}" for k, v in search_params.items())
-        logger.info(f"Search {label}: {hits} hits")
-        return result
+        params2.update(search_params)
+        result2 = await _fetch(url, params2)
+        hits2 = _extract_hits(result2)
+        logger.info(f"Search {label} +ImRisSeit fallback: {hits2} hits")
+        return result2
 
     raw_results = await asyncio.gather(*[_query_one(s) for s in searches])
 
@@ -554,11 +578,16 @@ def _extract_id(m: dict, ref: dict, data_entry: dict) -> str:
     return doc_id
 
 
-def parse_bundesrecht_response(data: dict) -> dict:
-    """Parse Bundesrecht API response into a list of result dicts."""
+def parse_bundesrecht_response(data: dict, timeframe_days: int = 366) -> dict:
+    """Parse Bundesrecht API response into a list of result dicts.
+
+    Filters to only include provisions with Inkrafttretensdatum within
+    the search timeframe. This eliminates metadata-only updates.
+    """
     refs = _extract_refs(data)
     total_hits = _extract_hits(data)
     results = []
+    inkraft_cutoff = (date.today() - timedelta(days=timeframe_days)).strftime("%Y-%m-%d")
 
     for ref in refs:
         data_entry = ref.get("Data", {})
@@ -587,8 +616,13 @@ def parse_bundesrecht_response(data: dict) -> dict:
         ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
 
         # Skip provisions superseded before taking effect (Ausserkraft < Inkraft)
-        # These were overtaken by a later amendment before they ever became valid.
         if ausserkraft and change_date and _date_before(ausserkraft, change_date):
+            continue
+
+        # Skip provisions where Inkrafttretensdatum is BEFORE the search timeframe.
+        # This filters out metadata-only updates (ImRisSeit catches them but
+        # their Inkrafttreten is years old).
+        if change_date and change_date < inkraft_cutoff:
             continue
 
         results.append({
