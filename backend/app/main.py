@@ -239,99 +239,361 @@ async def api_report(req: ReportRequest):
             api_key=req.api_key,
         )
 
-        # Build an HTML report for download
+        # Build interactive HTML report
         today = date.today().strftime("%d.%m.%Y")
-        html = _markdown_to_html(report_md, today, req.category_label, req.timeframe_label)
+        html = _build_interactive_report(
+            report_md, req.results, today,
+            req.category_label, req.timeframe_label, req.total_hits, req.doc_type
+        )
         return {"report_markdown": report_md, "report_html": html}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-def _markdown_to_html(md: str, date_str: str, category: str, timeframe: str) -> str:
-    """Convert markdown report to a styled HTML document for download."""
-    # Simple markdown → HTML conversion (bold, headers, lists)
-    import re
-    html_body = md
-    # Headers
-    html_body = re.sub(r'^#{3}\s+(.+)$', r'<h3>\1</h3>', html_body, flags=re.MULTILINE)
-    html_body = re.sub(r'^#{2}\s+(.+)$', r'<h2>\1</h2>', html_body, flags=re.MULTILINE)
-    html_body = re.sub(r'^#{1}\s+(.+)$', r'<h1>\1</h1>', html_body, flags=re.MULTILINE)
-    # Bold
-    html_body = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html_body)
-    # Italic
-    html_body = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html_body)
-    # List items
-    html_body = re.sub(r'^[-•]\s+(.+)$', r'<li>\1</li>', html_body, flags=re.MULTILINE)
-    # Numbered list
-    html_body = re.sub(r'^\d+\.\s+(.+)$', r'<li>\1</li>', html_body, flags=re.MULTILINE)
-    # Paragraphs
-    html_body = re.sub(r'\n\n', '</p><p>', html_body)
-    html_body = f'<p>{html_body}</p>'
-    # Wrap <li> in <ul>
-    html_body = re.sub(r'((?:<li>.*?</li>\s*)+)', r'<ul>\1</ul>', html_body, flags=re.DOTALL)
+def _build_interactive_report(
+    summary_md: str, results: list[dict], date_str: str,
+    category: str, timeframe: str, total_hits: int, doc_type: str,
+) -> str:
+    """Build an interactive animated HTML report with collapsible change details."""
+    import re as _re
+    import html as _html
+
+    # Convert markdown summary to HTML
+    s = summary_md
+    s = _re.sub(r'^#{3}\s+(.+)$', r'<h4>\1</h4>', s, flags=_re.MULTILINE)
+    s = _re.sub(r'^#{2}\s+(.+)$', r'<h3>\1</h3>', s, flags=_re.MULTILINE)
+    s = _re.sub(r'^#{1}\s+(.+)$', r'<h2>\1</h2>', s, flags=_re.MULTILINE)
+    s = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
+    s = _re.sub(r'\*(.+?)\*', r'<em>\1</em>', s)
+    s = _re.sub(r'^[-•]\s+(.+)$', r'<li>\1</li>', s, flags=_re.MULTILINE)
+    s = _re.sub(r'\n\n', '</p><p>', s)
+    s = f'<p>{s}</p>'
+    s = _re.sub(r'((?:<li>.*?</li>\s*)+)', r'<ul>\1</ul>', s, flags=_re.DOTALL)
+    summary_html = s
+
+    # Build change cards
+    type_label = "Gesetze" if doc_type == "gesetze" else "Entscheidungen"
+    cards_html = ""
+    for i, r in enumerate(results[:50]):
+        title = _html.escape(r.get("title", "Unbekannt"))
+        artikel = _html.escape(r.get("artikel", ""))
+        typ = _html.escape(r.get("typ", ""))
+        bgbl = _html.escape(r.get("bgbl", ""))
+        inkraft = _html.escape(r.get("date", ""))
+        url = _html.escape(r.get("url", ""))
+        nor = _html.escape(r.get("id", ""))
+
+        cards_html += f"""
+    <div class="card" style="animation-delay: {i * 0.05}s">
+      <div class="card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="card-title">
+          <span class="card-typ">{typ}</span>
+          <strong>{title}</strong>
+          {f'<span class="card-artikel">{artikel}</span>' if artikel else ''}
+        </div>
+        <div class="card-meta">
+          <span class="chip">In Kraft: {inkraft}</span>
+          {f'<span class="chip chip-bgbl">{bgbl}</span>' if bgbl else ''}
+        </div>
+        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="card-detail">
+        <div class="detail-row">
+          <span class="detail-label">Dokumentnummer</span>
+          <span>{nor}</span>
+        </div>
+        {f'<div class="detail-row"><span class="detail-label">BGBl</span><span>{bgbl}</span></div>' if bgbl else ''}
+        {f'<a href="{url}" target="_blank" class="detail-link">Im RIS anzeigen &rarr;</a>' if url else ''}
+      </div>
+    </div>"""
 
     return f"""<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>RIS Tracker — Wissenschaftlicher Bericht</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIS Tracker — {category} — {timeframe}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&display=swap');
-  body {{
-    font-family: 'IBM Plex Serif', Georgia, serif;
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 0 24px;
-    color: #1a1a1a;
-    line-height: 1.7;
-    font-size: 15px;
-  }}
-  .header {{
-    border-bottom: 2px solid #007993;
-    padding-bottom: 16px;
-    margin-bottom: 32px;
-  }}
-  .header h1 {{
-    font-family: 'IBM Plex Sans', sans-serif;
-    color: #007993;
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin: 0 0 4px;
-  }}
-  .header .meta {{
-    font-size: 13px;
-    color: #6b7280;
-  }}
-  h1 {{ font-size: 22px; color: #0f3d49; margin-top: 28px; }}
-  h2 {{ font-size: 18px; color: #007993; margin-top: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }}
-  h3 {{ font-size: 15px; color: #374151; margin-top: 20px; }}
-  strong {{ color: #0f3d49; }}
-  ul {{ padding-left: 20px; }}
-  li {{ margin-bottom: 6px; }}
-  .footer {{
-    margin-top: 40px;
-    padding-top: 16px;
-    border-top: 1px solid #e5e7eb;
-    font-size: 12px;
-    color: #9ca3af;
-    font-family: 'IBM Plex Sans', sans-serif;
-  }}
-  @media print {{
-    body {{ margin: 20px; font-size: 12px; }}
-  }}
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+body {{
+  font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a1a;
+  line-height: 1.6;
+}}
+
+.hero {{
+  background: linear-gradient(135deg, #0f3d49 0%, #007993 100%);
+  color: white;
+  padding: 48px 24px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}}
+.hero::after {{
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+  animation: shimmer 8s ease-in-out infinite;
+}}
+@keyframes shimmer {{
+  0%, 100% {{ transform: translate(0, 0); }}
+  50% {{ transform: translate(5%, 5%); }}
+}}
+.hero h1 {{
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}}
+.hero .subtitle {{
+  font-size: 15px;
+  opacity: 0.8;
+  position: relative;
+  z-index: 1;
+}}
+.hero .stats {{
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}}
+.hero .stat {{
+  text-align: center;
+}}
+.hero .stat-num {{
+  font-size: 32px;
+  font-weight: 700;
+  display: block;
+  animation: countUp 1s ease-out;
+}}
+.hero .stat-label {{
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}}
+@keyframes countUp {{
+  from {{ opacity: 0; transform: translateY(10px); }}
+  to {{ opacity: 1; transform: translateY(0); }}
+}}
+
+.container {{
+  max-width: 800px;
+  margin: -24px auto 40px;
+  padding: 0 16px;
+  position: relative;
+  z-index: 2;
+}}
+
+.summary-box {{
+  background: white;
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  margin-bottom: 24px;
+  animation: fadeUp 0.6s ease-out;
+}}
+.summary-box h2 {{
+  font-size: 16px;
+  color: #007993;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}}
+.summary-box p {{ margin-bottom: 12px; font-size: 14px; color: #374151; }}
+.summary-box h3 {{ font-size: 15px; color: #0f3d49; margin: 16px 0 8px; }}
+.summary-box h4 {{ font-size: 14px; color: #374151; margin: 12px 0 6px; }}
+.summary-box strong {{ color: #0f3d49; }}
+.summary-box ul {{ padding-left: 20px; margin: 8px 0; }}
+.summary-box li {{ font-size: 14px; margin-bottom: 4px; color: #374151; }}
+
+@keyframes fadeUp {{
+  from {{ opacity: 0; transform: translateY(20px); }}
+  to {{ opacity: 1; transform: translateY(0); }}
+}}
+
+.section-title {{
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #9ca3af;
+  margin: 24px 0 12px;
+  padding-left: 4px;
+}}
+
+.card {{
+  background: white;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  overflow: hidden;
+  animation: fadeUp 0.4s ease-out both;
+  border: 1px solid #e5e7eb;
+  transition: border-color 0.2s;
+}}
+.card:hover {{ border-color: #007993; }}
+
+.card-header {{
+  padding: 14px 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+}}
+.card-title {{
+  flex: 1;
+  min-width: 0;
+}}
+.card-title strong {{
+  font-size: 14px;
+  color: #111827;
+  display: block;
+}}
+.card-typ {{
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(0,121,147,0.08);
+  color: #007993;
+  margin-right: 6px;
+}}
+.card-artikel {{
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(239,96,7,0.08);
+  color: #ef6007;
+  margin-left: 6px;
+}}
+.card-meta {{
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}}
+.chip {{
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #6b7280;
+  white-space: nowrap;
+}}
+.chip-bgbl {{ background: rgba(0,121,147,0.06); color: #007993; }}
+
+.chevron {{
+  flex-shrink: 0;
+  margin-top: 4px;
+  color: #9ca3af;
+  transition: transform 0.3s ease;
+}}
+.card.open .chevron {{ transform: rotate(180deg); }}
+
+.card-detail {{
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  padding: 0 18px;
+  background: #fafafa;
+  border-top: 1px solid transparent;
+}}
+.card.open .card-detail {{
+  max-height: 500px;
+  padding: 14px 18px;
+  border-top: 1px solid #e5e7eb;
+}}
+.detail-row {{
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+  color: #374151;
+}}
+.detail-label {{
+  font-weight: 500;
+  color: #6b7280;
+}}
+.detail-link {{
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #007993;
+  text-decoration: none;
+  font-weight: 500;
+}}
+.detail-link:hover {{ text-decoration: underline; }}
+
+.footer {{
+  text-align: center;
+  padding: 24px;
+  font-size: 12px;
+  color: #9ca3af;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 40px;
+}}
+.footer a {{ color: #007993; text-decoration: none; }}
+
+@media print {{
+  .hero {{ background: #0f3d49 !important; -webkit-print-color-adjust: exact; }}
+  .card-detail {{ max-height: none !important; padding: 14px 18px !important; }}
+  .chevron {{ display: none; }}
+  body {{ background: white; }}
+}}
 </style>
 </head>
 <body>
-<div class="header">
-  <h1>RIS Tracker — Wissenschaftlicher Bericht</h1>
-  <div class="meta">Rechtsgebiet: {category} · Zeitraum: {timeframe} · Erstellt am {date_str}</div>
+
+<div class="hero">
+  <h1>Rechtsänderungen — {_html.escape(category)}</h1>
+  <div class="subtitle">{_html.escape(timeframe)} · Erstellt am {date_str}</div>
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-num">{total_hits}</span>
+      <span class="stat-label">{type_label}</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">{min(len(results), 50)}</span>
+      <span class="stat-label">Analysiert</span>
+    </div>
+  </div>
 </div>
-{html_body}
+
+<div class="container">
+  <div class="summary-box">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007993" stroke-width="2">
+        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 12 18.469"/>
+      </svg>
+      KI-Zusammenfassung
+    </h2>
+    {summary_html}
+  </div>
+
+  <div class="section-title">{total_hits} {type_label} im Detail</div>
+  {cards_html}
+</div>
+
 <div class="footer">
-  Datenquelle: Rechtsinformationssystem des Bundes (RIS) — data.bka.gv.at<br>
-  Erstellt mit RIS Tracker · Zusammenfassung generiert durch GPT · {date_str}
+  Datenquelle: <a href="https://data.bka.gv.at">Rechtsinformationssystem des Bundes (RIS)</a><br>
+  Zusammenfassung generiert durch GPT · {date_str}
 </div>
+
 </body>
 </html>"""

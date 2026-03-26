@@ -282,7 +282,7 @@
             >
               <span v-if="generatingReport" class="spinner spinner-sm"></span>
               <v-icon v-else size="16" class="mr-1">mdi-file-download-outline</v-icon>
-              {{ generatingReport ? 'Bericht wird erstellt...' : 'Wissenschaftlichen Bericht herunterladen' }}
+              {{ generatingReport ? 'Report wird erstellt...' : 'Interaktiven Report herunterladen' }}
             </button>
           </div>
 
@@ -561,7 +561,7 @@ async function doReport() {
     const a = document.createElement('a')
     a.href = url
     const dateStr = new Date().toISOString().split('T')[0]
-    a.download = `RIS_Bericht_${dateStr}.html`
+    a.download = `RIS_Report_${dateStr}.html`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
