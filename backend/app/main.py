@@ -225,22 +225,29 @@ async def api_summarise(req: SummaryRequest):
 
 @app.post("/api/report")
 async def api_report(req: ReportRequest):
-    """Generate a scientific summary report. Returns markdown text."""
-    if not req.api_key or len(req.api_key) < 10:
-        raise HTTPException(status_code=400, detail="Bitte geben Sie einen gültigen OpenAI API-Key ein.")
+    """Generate an interactive summary report with optional GPT summary."""
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
-    try:
-        report_md = await generate_report_markdown(
-            results=req.results,
-            doc_type=req.doc_type,
-            category_label=req.category_label,
-            timeframe_label=req.timeframe_label,
-            total_hits=req.total_hits,
-            api_key=req.api_key,
-        )
 
-        # Build interactive HTML report
+    # GPT summary is optional — generate report even if it fails
+    report_md = ""
+    if req.api_key and len(req.api_key) >= 10:
+        try:
+            report_md = await generate_report_markdown(
+                results=req.results,
+                doc_type=req.doc_type,
+                category_label=req.category_label,
+                timeframe_label=req.timeframe_label,
+                total_hits=req.total_hits,
+                api_key=req.api_key,
+            )
+        except Exception as e:
+            logging.error(f"GPT report error: {e}")
+            report_md = f"*KI-Zusammenfassung konnte nicht erstellt werden: {str(e)[:100]}*"
+    else:
+        report_md = "*Kein OpenAI API-Key angegeben — Report ohne KI-Zusammenfassung.*"
+
+    try:
         today = date.today().strftime("%d.%m.%Y")
         html = _build_interactive_report(
             report_md, req.results, today,
@@ -248,8 +255,9 @@ async def api_report(req: ReportRequest):
             req.diffs,
         )
         return {"report_markdown": report_md, "report_html": html}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Report build error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Report-Generierung fehlgeschlagen: {str(e)[:200]}")
 
 
 def _build_interactive_report(
