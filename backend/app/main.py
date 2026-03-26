@@ -117,6 +117,62 @@ async def api_debug_doc(
     return await debug_document(gesetzesnummer=gesetzesnummer, artikel=artikel)
 
 
+@app.get("/api/debug/index")
+async def api_debug_index():
+    """DEBUG: Test which Index parameter formats work with BrKons."""
+    results = {}
+    base = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+    from app.core.config import settings as s
+
+    test_cases = [
+        ("Index=90", {"Index": "90"}),
+        ("Index=90/01", {"Index": "90/01"}),
+        ("Index='90 Strafrecht'", {"Index": "90 Strafrecht"}),
+        ("Index='90/01 Strafgesetzbuch'", {"Index": "90/01 Strafgesetzbuch"}),
+        ("Index=21/03", {"Index": "21/03"}),
+        ("Index='21/03 GesmbH'", {"Index": "21/03 GesmbH"}),
+        ("Index=20/01", {"Index": "20/01"}),
+        ("Index=32", {"Index": "32"}),
+        ("Titel=StGB", {"Titel": "StGB"}),
+        ("Titel=Strafgesetzbuch", {"Titel": "Strafgesetzbuch"}),
+        ("Titel=GmbH-Gesetz", {"Titel": "GmbH-Gesetz"}),
+    ]
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for label, extra in test_cases:
+            params = {"Applikation": "BrKons", "ImRisSeit": "EinemJahr",
+                      "DokumenteProSeite": "Ten", "Seitennummer": "1"}
+            params.update(extra)
+            try:
+                resp = await client.get(base, params=params)
+                data = resp.json()
+                hr = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("Hits", {})
+                hits = int(hr.get("#text", "0")) if isinstance(hr, dict) else 0
+                refs = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("OgdDocumentReference", [])
+                if isinstance(refs, dict):
+                    refs = [refs]
+                first = ""
+                if refs:
+                    d = refs[0].get("Data", {}).get("Metadaten", {})
+                    for sk in ("Bundesrecht", "Allgemein"):
+                        sec = d.get(sk)
+                        if isinstance(sec, list) and sec:
+                            sec = sec[0]
+                        if isinstance(sec, dict):
+                            first = first or sec.get("Kurztitel", "")
+                            for sub in ("BrKons",):
+                                ss = sec.get(sub)
+                                if isinstance(ss, list) and ss:
+                                    ss = ss[0]
+                                if isinstance(ss, dict):
+                                    first = first or ss.get("Kurztitel", "")
+                results[label] = {"hits": hits, "first_title": str(first)[:80]}
+            except Exception as e:
+                results[label] = {"error": str(e)[:200]}
+
+    return results
+
+
 # ── GPT Summary & Report endpoints ──
 
 
