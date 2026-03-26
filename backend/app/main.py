@@ -126,22 +126,32 @@ async def api_debug_index():
     base = f"{cfg.RIS_API_BASE_URL}/Bundesrecht"
 
     test_cases = [
-        ("Index=90", {"Index": "90"}),
-        ("Index=90/01", {"Index": "90/01"}),
-        ("Index='90 Strafrecht'", {"Index": "90 Strafrecht"}),
-        ("Index='90/01 Strafgesetzbuch'", {"Index": "90/01 Strafgesetzbuch"}),
-        ("Index=21/03", {"Index": "21/03"}),
-        ("Index='21/03 GesmbH'", {"Index": "21/03 GesmbH"}),
-        ("Index=20/01", {"Index": "20/01"}),
-        ("Index=32", {"Index": "32"}),
-        ("Titel=StGB", {"Titel": "StGB"}),
-        ("Titel=Strafgesetzbuch", {"Titel": "Strafgesetzbuch"}),
-        ("Titel=GmbH-Gesetz", {"Titel": "GmbH-Gesetz"}),
+        # Index + ImRisSeit (current approach)
+        ("Index=90/01+ImRisSeit", {"Index": "90/01", "ImRisSeit": "EinemJahr"}),
+        # Index + Fassung date range (desired approach)
+        ("Index=90/01+Fassung", {"Index": "90/01",
+         "Fassung.VonInkrafttretensdatum": "2025-03-25",
+         "Fassung.BisInkrafttretensdatum": "2026-03-25"}),
+        # Index + Fassung for GmbH
+        ("Index=21/03+Fassung", {"Index": "21/03",
+         "Fassung.VonInkrafttretensdatum": "2025-03-25",
+         "Fassung.BisInkrafttretensdatum": "2026-03-25"}),
+        # Index + Fassung for ABGB
+        ("Index=20/01+Fassung", {"Index": "20/01",
+         "Fassung.VonInkrafttretensdatum": "2025-03-25",
+         "Fassung.BisInkrafttretensdatum": "2026-03-25"}),
+        # Titel + Fassung
+        ("Titel=StGB+Fassung", {"Titel": "StGB",
+         "Fassung.VonInkrafttretensdatum": "2025-03-25",
+         "Fassung.BisInkrafttretensdatum": "2026-03-25"}),
+        # Just ImRisSeit for comparison
+        ("Index=90/01+ImRisSeit", {"Index": "90/01", "ImRisSeit": "EinemJahr"}),
+        ("Index=21/03+ImRisSeit", {"Index": "21/03", "ImRisSeit": "EinemJahr"}),
     ]
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         for label, extra in test_cases:
-            params = {"Applikation": "BrKons", "ImRisSeit": "EinemJahr",
+            params = {"Applikation": "BrKons",
                       "DokumenteProSeite": "Ten", "Seitennummer": "1"}
             params.update(extra)
             try:
