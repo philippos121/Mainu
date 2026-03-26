@@ -351,10 +351,7 @@ async def search_gerichtsentscheidungen(
     has_court_mapping = category in CATEGORY_TO_COURTS
     courts = CATEGORY_TO_COURTS.get(category, [c["applikation"] for c in COURT_SOURCES])
 
-    # Use Index numbers as Suchworte for Judikatur filtering
-    # (Judikatur doesn't support Index parameter directly, but Suchworte works)
-    indices = _CATEGORY_INDEX.get(category, []) if category else []
-    # Build search terms from the category label
+    # Build Suchworte from the category label for Judikatur filtering
     suchworte = ""
     if category:
         for cat in LEGAL_CATEGORIES:
@@ -688,12 +685,34 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
     if not doc_id:
         return None
 
-    case_number = _s(m.get("Geschaeftszahl")) or _s(data_entry.get("Geschaeftszahl")) or ""
+    # Case number: take only the FIRST one (API sometimes returns comma-separated lists)
+    raw_gz = _s(m.get("Geschaeftszahl")) or _s(data_entry.get("Geschaeftszahl")) or ""
+    case_number = raw_gz.split(",")[0].strip() if raw_gz else ""
+
     court_name = _s(m.get("Gericht")) or _s(data_entry.get("Gericht")) or court_app
-    title = _s(m.get("Kurztitel")) or _s(m.get("Betreff")) or f"{court_name} {case_number}"
-    doc_url = _extract_doc_url(m, ref, data_entry)
     decision_date = _s(m.get("Entscheidungsdatum")) or _s(data_entry.get("Entscheidungsdatum")) or ""
+
+    # Title: prefer Betreff (subject), then Kurztitel, fallback to court + case number
+    betreff = _s(m.get("Betreff")) or ""
+    kurztitel = _s(m.get("Kurztitel")) or ""
+    # Truncate very long titles
+    title = betreff or kurztitel or f"{court_name} {case_number}"
+    if len(title) > 200:
+        title = title[:197] + "..."
+
+    doc_url = _extract_doc_url(m, ref, data_entry)
     normen = _s(m.get("Norm")) or ""
+    # Truncate very long normen lists
+    if len(normen) > 300:
+        normen = normen[:297] + "..."
+
+    # Rechtssatz (legal principle) — short summary if available
+    rechtssatz = _s(m.get("Rechtssatz")) or _s(m.get("RechtssatzKurz")) or ""
+    if len(rechtssatz) > 500:
+        rechtssatz = rechtssatz[:497] + "..."
+
+    # Document type (Entscheidungstext vs Rechtssatz)
+    doc_typ = _s(m.get("Dokumenttyp")) or _s(m.get("DokumentTyp")) or ""
 
     return {
         "id": doc_id,
@@ -703,4 +722,6 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
         "case_number": case_number,
         "court": court_name,
         "normen": normen,
+        "rechtssatz": rechtssatz,
+        "doc_typ": doc_typ,
     }

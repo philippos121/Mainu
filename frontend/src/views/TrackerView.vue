@@ -206,11 +206,21 @@
             </div>
             <div class="result-body">
               <div class="result-title">{{ item.title }}</div>
-              <div v-if="item.normen" class="result-subtitle">Normen: {{ item.normen }}</div>
+              <div v-if="item.rechtssatz" class="result-subtitle result-rechtssatz">
+                {{ item.rechtssatz }}
+              </div>
+              <div v-else-if="item.normen" class="result-subtitle">
+                Normen: {{ item.normen }}
+              </div>
               <div class="result-meta">
                 <span class="chip chip-teal">{{ item.court }}</span>
                 <span v-if="item.case_number" class="chip chip-orange">{{ item.case_number }}</span>
-                <span v-if="item.date" class="meta-text">{{ formatDate(item.date) }}</span>
+                <span v-if="item.doc_typ" class="chip" style="background: rgba(99,102,241,0.08); color: #6366f1">
+                  {{ item.doc_typ }}
+                </span>
+                <span v-if="item.date" class="meta-text">
+                  <v-icon size="12" class="mr-1">mdi-calendar</v-icon>{{ formatDate(item.date) }}
+                </span>
               </div>
             </div>
             <v-icon size="14" color="#d1d5db" class="result-ext">mdi-open-in-new</v-icon>
@@ -854,6 +864,15 @@ async function doReport() {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.result-rechtssatz {
+  -webkit-line-clamp: 3;
+  font-style: italic;
+  color: #4b5563;
+  border-left: 2px solid #ef6007;
+  padding-left: 8px;
+  margin-top: 6px;
 }
 
 .result-meta {
