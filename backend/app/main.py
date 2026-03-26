@@ -196,7 +196,7 @@ class SummaryRequest(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    api_key: str
+    api_key: str = ""
     results: list[dict]
     doc_type: str = "gesetze"
     category_label: str = "Alle Rechtsgebiete"

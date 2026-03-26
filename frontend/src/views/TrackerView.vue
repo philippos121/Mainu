@@ -569,7 +569,7 @@ async function doReport() {
     }
 
     const resp = await api.post('/report', {
-      api_key: apiKey.value,
+      api_key: apiKey.value || '',
       results: results.value,
       doc_type: docType.value,
       category_label: categoryLabel.value,
