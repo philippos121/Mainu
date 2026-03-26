@@ -287,12 +287,38 @@
             </button>
             <button
               class="ai-btn ai-btn-report"
-              :disabled="!apiKey || generatingReport"
+              :disabled="generatingReport"
               @click="doReport"
             >
               <span v-if="generatingReport" class="spinner spinner-sm"></span>
               <v-icon v-else size="16" class="mr-1">mdi-file-download-outline</v-icon>
               {{ generatingReport ? 'Report wird erstellt...' : 'Interaktiven Report herunterladen' }}
+            </button>
+          </div>
+
+          <!-- Email delivery -->
+          <div class="email-row">
+            <v-text-field
+              v-model="reportEmail"
+              type="email"
+              label="E-Mail für Report-Versand"
+              variant="outlined"
+              density="compact"
+              hide-details
+              placeholder="name@kanzlei.at"
+              prepend-inner-icon="mdi-email-outline"
+              color="#007993"
+              base-color="#9ca3af"
+              class="email-input"
+            />
+            <button
+              class="ai-btn ai-btn-email"
+              :disabled="!reportEmail || sendingEmail"
+              @click="doEmailReport"
+            >
+              <span v-if="sendingEmail" class="spinner spinner-sm"></span>
+              <v-icon v-else size="16" class="mr-1">mdi-send</v-icon>
+              {{ sendingEmail ? 'Wird gesendet...' : 'Per E-Mail senden' }}
             </button>
           </div>
 
@@ -352,6 +378,8 @@ const summarising = ref(false)
 const summaryText = ref('')
 const summaryError = ref('')
 const generatingReport = ref(false)
+const reportEmail = ref(localStorage.getItem('ris_report_email') || '')
+const sendingEmail = ref(false)
 
 // Persist API key
 watch(apiKey, (v) => {
@@ -598,6 +626,43 @@ async function doReport() {
       : `Fehler: ${e.response?.status || ''} ${e.message || 'Unbekannt'}`
   } finally {
     generatingReport.value = false
+  }
+}
+
+async function doEmailReport() {
+  if (!reportEmail.value || !results.value.length) return
+  sendingEmail.value = true
+  summaryError.value = ''
+  localStorage.setItem('ris_report_email', reportEmail.value)
+
+  try {
+    // Collect diffs
+    const diffsPayload = {}
+    for (const [id, data] of Object.entries(diffData.value)) {
+      if (data && data.has_changes) {
+        diffsPayload[id] = { diff_html: data.diff_html, current: data.current, previous: data.previous }
+      }
+    }
+
+    await api.post('/report/email', {
+      email: reportEmail.value,
+      api_key: apiKey.value || '',
+      results: results.value,
+      doc_type: docType.value,
+      category_label: categoryLabel.value,
+      timeframe_label: timeframeLabel.value,
+      total_hits: totalHits.value,
+      diffs: diffsPayload,
+    })
+    summaryError.value = ''
+    alert(`Report wird an ${reportEmail.value} gesendet.`)
+  } catch (e) {
+    console.error('Email error:', e.response?.data || e)
+    const detail = e.response?.data?.detail
+    summaryError.value = typeof detail === 'string' ? detail
+      : `E-Mail-Versand fehlgeschlagen: ${e.message || 'Unbekannt'}`
+  } finally {
+    sendingEmail.value = false
   }
 }
 </script>
@@ -1207,6 +1272,28 @@ async function doReport() {
 }
 .ai-btn-report:hover:not(:disabled) {
   background: #0a2e37;
+}
+
+.ai-btn-email {
+  background: #6366f1;
+  color: white;
+}
+.ai-btn-email:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+/* ── Email Row ── */
+.email-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.email-input {
+  max-width: 320px;
 }
 
 /* ── Summary Box ── */

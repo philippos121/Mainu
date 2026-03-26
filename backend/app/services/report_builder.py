@@ -49,11 +49,16 @@ def build_report(
             if has_diff:
                 changes_count += 1
 
-            artikel = _html.escape(r.get("artikel", ""))
-            typ = _html.escape(r.get("typ", ""))
-            bgbl = _html.escape(r.get("bgbl", ""))
-            inkraft = _html.escape(r.get("date", ""))
-            url = _html.escape(r.get("url", ""))
+            artikel = _html.escape(str(r.get("artikel", "")))
+            typ = _html.escape(str(r.get("typ", "")))
+            bgbl = _html.escape(str(r.get("bgbl", "")))
+            inkraft = _html.escape(str(r.get("date", "")))
+            url = _html.escape(str(r.get("url", "")))
+            # Judikatur-specific fields
+            court = _html.escape(str(r.get("court", "")))
+            case_number = _html.escape(str(r.get("case_number", "")))
+            normen = _html.escape(str(r.get("normen", "")))[:200]
+            rechtssatz = _html.escape(str(r.get("rechtssatz", "")))[:400]
 
             prev_bar = ""
             if diff_data.get("previous"):
@@ -70,12 +75,16 @@ def build_report(
     <div class="card-info">
       <div class="card-top">
         {f'<span class="tag tag-typ">{typ}</span>' if typ else ''}
+        {f'<span class="tag tag-court">{court}</span>' if court else ''}
         {f'<span class="tag tag-art">{artikel}</span>' if artikel else ''}
+        {f'<span class="tag tag-art">{case_number}</span>' if case_number else ''}
         {'<span class="tag tag-chg">Geändert</span>' if has_diff else ''}
       </div>
+      {f'<div class="card-rs">{rechtssatz}</div>' if rechtssatz else ''}
       <div class="card-dates">
-        <span>In Kraft: {inkraft}</span>
+        <span>{inkraft}</span>
         {f'<span class="card-bgbl">{bgbl}</span>' if bgbl else ''}
+        {f'<span class="card-bgbl">Normen: {normen}</span>' if normen else ''}
       </div>
     </div>
     <svg class="chv" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -154,6 +163,8 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
 .tag-typ{{background:rgba(0,121,147,0.08);color:#007993}}
 .tag-art{{background:rgba(239,96,7,0.08);color:#ef6007}}
 .tag-chg{{background:rgba(16,185,129,0.08);color:#059669}}
+.tag-court{{background:rgba(99,102,241,0.08);color:#6366f1}}
+.card-rs{{font-size:12px;color:#4b5563;font-style:italic;border-left:2px solid #ef6007;padding-left:8px;margin:4px 0;line-height:1.5}}
 .card-dates{{font-size:12px;color:#6b7280}}
 .card-bgbl{{margin-left:8px;color:#9ca3af}}
 .chv{{flex-shrink:0;margin-top:2px;color:#9ca3af;transition:transform 0.25s}}

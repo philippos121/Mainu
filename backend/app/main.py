@@ -187,6 +187,93 @@ async def api_debug_index():
     return results
 
 
+# ── Email Report endpoint ──
+
+
+class EmailReportRequest(BaseModel):
+    email: str
+    api_key: str = ""
+    results: list = []
+    doc_type: str = "gesetze"
+    category_label: str = "Alle Rechtsgebiete"
+    timeframe_label: str = ""
+    total_hits: int = 0
+    diffs: dict = {}
+
+    class Config:
+        extra = "allow"
+
+
+@app.post("/api/report/email")
+async def api_report_email(req: EmailReportRequest):
+    """Generate report and send via email."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from app.core.config import settings as cfg
+
+    if not req.email or "@" not in req.email:
+        raise HTTPException(status_code=400, detail="Ungültige E-Mail-Adresse.")
+    if not req.results:
+        raise HTTPException(status_code=400, detail="Keine Ergebnisse.")
+
+    # Generate report
+    report_md = ""
+    if req.api_key and len(req.api_key) >= 10:
+        try:
+            report_md = await generate_report_markdown(
+                results=req.results, doc_type=req.doc_type,
+                category_label=req.category_label, timeframe_label=req.timeframe_label,
+                total_hits=req.total_hits, api_key=req.api_key,
+            )
+        except Exception as e:
+            report_md = f"*KI-Zusammenfassung nicht verfügbar: {str(e)[:100]}*"
+    else:
+        report_md = "*Kein API-Key — Report ohne KI-Zusammenfassung.*"
+
+    today = date.today().strftime("%d.%m.%Y")
+    html_report = build_report(
+        report_md, req.results, today,
+        req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
+        req.diffs,
+    )
+
+    # Send email
+    if not cfg.SMTP_HOST:
+        raise HTTPException(
+            status_code=501,
+            detail="E-Mail-Versand nicht konfiguriert. Bitte SMTP_HOST, SMTP_USER, SMTP_PASS als Umgebungsvariablen setzen."
+        )
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"RIS Tracker — {req.category_label} — {req.timeframe_label}"
+        msg["From"] = cfg.SMTP_FROM
+        msg["To"] = req.email
+
+        # Plain text fallback
+        text_part = MIMEText(
+            f"RIS Tracker Report\n{req.category_label} · {req.timeframe_label}\n"
+            f"{req.total_hits} Ergebnisse\n\nSiehe HTML-Version.",
+            "plain", "utf-8"
+        )
+        html_part = MIMEText(html_report, "html", "utf-8")
+        msg.attach(text_part)
+        msg.attach(html_part)
+
+        with smtplib.SMTP(cfg.SMTP_HOST, cfg.SMTP_PORT) as server:
+            server.starttls()
+            if cfg.SMTP_USER and cfg.SMTP_PASS:
+                server.login(cfg.SMTP_USER, cfg.SMTP_PASS)
+            server.sendmail(cfg.SMTP_FROM, [req.email], msg.as_string())
+
+        logging.info(f"Report emailed to {req.email}")
+        return {"status": "sent", "email": req.email}
+    except Exception as e:
+        logging.error(f"Email error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"E-Mail-Versand fehlgeschlagen: {str(e)[:200]}")
+
+
 # ── GPT Summary & Report endpoints ──
 
 
