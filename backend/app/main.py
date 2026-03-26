@@ -202,6 +202,7 @@ class ReportRequest(BaseModel):
     category_label: str = "Alle Rechtsgebiete"
     timeframe_label: str = ""
     total_hits: int = 0
+    diffs: dict = {}  # {doc_id: {diff_html, current, previous}}
 
 
 @app.post("/api/summarise")
@@ -243,7 +244,8 @@ async def api_report(req: ReportRequest):
         today = date.today().strftime("%d.%m.%Y")
         html = _build_interactive_report(
             report_md, req.results, today,
-            req.category_label, req.timeframe_label, req.total_hits, req.doc_type
+            req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
+            req.diffs,
         )
         return {"report_markdown": report_md, "report_html": html}
     except ValueError as e:
@@ -253,6 +255,7 @@ async def api_report(req: ReportRequest):
 def _build_interactive_report(
     summary_md: str, results: list[dict], date_str: str,
     category: str, timeframe: str, total_hits: int, doc_type: str,
+    diffs: dict = None,
 ) -> str:
     """Build an interactive animated HTML report with collapsible change details."""
     import re as _re
@@ -273,7 +276,9 @@ def _build_interactive_report(
 
     # Build change cards
     type_label = "Gesetze" if doc_type == "gesetze" else "Entscheidungen"
+    diffs = diffs or {}
     cards_html = ""
+    changes_count = 0
     for i, r in enumerate(results[:50]):
         title = _html.escape(r.get("title", "Unbekannt"))
         artikel = _html.escape(r.get("artikel", ""))
@@ -281,30 +286,50 @@ def _build_interactive_report(
         bgbl = _html.escape(r.get("bgbl", ""))
         inkraft = _html.escape(r.get("date", ""))
         url = _html.escape(r.get("url", ""))
-        nor = _html.escape(r.get("id", ""))
+        nor = r.get("id", "")
+
+        # Check if we have a diff for this result
+        diff_data = diffs.get(nor, {})
+        diff_html = diff_data.get("diff_html", "")
+        has_diff = bool(diff_html)
+        if has_diff:
+            changes_count += 1
+
+        # Version info
+        prev_info = ""
+        if diff_data.get("previous"):
+            prev_date = diff_data["previous"].get("date", "")
+            prev_info = f'<div class="version-info"><span class="v-old">Vorversion: {_html.escape(prev_date)}</span> → <span class="v-new">Neue Fassung: {_html.escape(inkraft)}</span></div>'
 
         cards_html += f"""
-    <div class="card" style="animation-delay: {i * 0.05}s">
+    <div class="card {'card-has-diff' if has_diff else ''}" style="animation-delay: {i * 0.06}s">
       <div class="card-header" onclick="this.parentElement.classList.toggle('open')">
-        <div class="card-title">
-          <span class="card-typ">{typ}</span>
-          <strong>{title}</strong>
-          {f'<span class="card-artikel">{artikel}</span>' if artikel else ''}
+        <div class="card-left">
+          <div class="card-title-row">
+            <span class="card-typ">{typ}</span>
+            <strong>{_html.escape(title)}</strong>
+            {f'<span class="card-artikel">{artikel}</span>' if artikel else ''}
+          </div>
+          <div class="card-meta">
+            <span class="chip chip-date">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              {inkraft}
+            </span>
+            {f'<span class="chip chip-bgbl">{bgbl}</span>' if bgbl else ''}
+            {'<span class="chip chip-diff">Änderung</span>' if has_diff else ''}
+          </div>
         </div>
-        <div class="card-meta">
-          <span class="chip">In Kraft: {inkraft}</span>
-          {f'<span class="chip chip-bgbl">{bgbl}</span>' if bgbl else ''}
-        </div>
-        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+        <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </div>
       <div class="card-detail">
-        <div class="detail-row">
-          <span class="detail-label">Dokumentnummer</span>
-          <span>{nor}</span>
+        {prev_info}
+        {f'<div class="diff-box">{diff_html}</div>' if has_diff else ''}
+        <div class="detail-meta">
+          <span>NOR: {_html.escape(nor)}</span>
+          {f' · <span>{bgbl}</span>' if bgbl else ''}
+          {f' · <a href="{_html.escape(url)}" target="_blank">Im RIS &rarr;</a>' if url else ''}
         </div>
-        {f'<div class="detail-row"><span class="detail-label">BGBl</span><span>{bgbl}</span></div>' if bgbl else ''}
-        {f'<a href="{url}" target="_blank" class="detail-link">Im RIS anzeigen &rarr;</a>' if url else ''}
       </div>
     </div>"""
 
@@ -550,11 +575,76 @@ body {{
 }}
 .footer a {{ color: #007993; text-decoration: none; }}
 
+.card-has-diff {{ border-left: 3px solid #007993; }}
+
+.card-left {{ flex: 1; min-width: 0; }}
+.card-title-row {{ display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }}
+
+.chip-date {{
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(0,121,147,0.06); color: #007993;
+}}
+.chip-diff {{
+  background: rgba(16,185,129,0.1); color: #059669;
+  font-weight: 600;
+}}
+
+.version-info {{
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; margin-bottom: 12px;
+  padding: 8px 12px; border-radius: 6px;
+  background: linear-gradient(90deg, #fef2f2 0%, #f0fdf4 100%);
+}}
+.v-old {{ color: #991b1b; font-weight: 500; }}
+.v-new {{ color: #166534; font-weight: 500; }}
+
+.diff-box {{
+  font-size: 13px;
+  line-height: 1.8;
+  padding: 12px 16px;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}}
+.diff-box .diff-del {{
+  background: #fecaca; color: #991b1b;
+  text-decoration: line-through;
+  padding: 1px 3px; border-radius: 3px;
+}}
+.diff-box .diff-ins {{
+  background: #bbf7d0; color: #166534;
+  padding: 1px 3px; border-radius: 3px;
+}}
+.diff-box .diff-info {{
+  color: #6b7280; font-style: italic; margin-bottom: 8px;
+}}
+.diff-box .diff-sidebyside {{
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}}
+.diff-box .diff-side {{ padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; }}
+.diff-box .diff-side-old {{ background: #fef2f2; border: 1px solid #fecaca; }}
+.diff-box .diff-side-new {{ background: #f0fdf4; border: 1px solid #bbf7d0; }}
+.diff-box .diff-side-label {{ font-weight: 600; font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }}
+.diff-box .diff-side-old .diff-side-label {{ color: #991b1b; }}
+.diff-box .diff-side-new .diff-side-label {{ color: #166534; }}
+.diff-box .diff-side-text {{ white-space: pre-wrap; }}
+
+.detail-meta {{
+  font-size: 12px; color: #9ca3af; padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}}
+.detail-meta a {{ color: #007993; text-decoration: none; }}
+.detail-meta a:hover {{ text-decoration: underline; }}
+
 @media print {{
   .hero {{ background: #0f3d49 !important; -webkit-print-color-adjust: exact; }}
   .card-detail {{ max-height: none !important; padding: 14px 18px !important; }}
   .chevron {{ display: none; }}
   body {{ background: white; }}
+  .diff-box {{ max-height: none; }}
 }}
 </style>
 </head>
@@ -571,6 +661,10 @@ body {{
     <div class="stat">
       <span class="stat-num">{min(len(results), 50)}</span>
       <span class="stat-label">Analysiert</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">{changes_count}</span>
+      <span class="stat-label">Mit Diff</span>
     </div>
   </div>
 </div>

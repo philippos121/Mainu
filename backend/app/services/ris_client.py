@@ -338,26 +338,57 @@ async def search_gerichtsentscheidungen(
 ) -> dict:
     """Search Judikatur (Gerichtsentscheidungen).
 
-    Uses: /Judikatur?Applikation=...&EntscheidungsdatumVon=...&Suchworte=...
+    Uses: /Judikatur?Applikation=...&EntscheidungsdatumVon=...
     Strategy:
-      - If the Rechtsgebiet maps to specific courts → query only those courts
-      - Always use Suchworte with category keywords for topic filtering
-      - If no Rechtsgebiet selected → query all courts unfiltered
+      - Map Rechtsgebiet to specific courts (Justiz, Vfgh, Vwgh, etc.)
+      - Filter by EntscheidungsdatumVon (date range)
+      - For specific categories, add Suchworte to narrow results
+      - If no category → query all courts unfiltered
     All court queries run in parallel.
     """
     days = _timeframe_to_days(im_ris_seit)
     date_from = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    has_court_mapping = category in CATEGORY_TO_COURTS
     courts = CATEGORY_TO_COURTS.get(category, [c["applikation"] for c in COURT_SOURCES])
 
-    # Build Suchworte from the category label for Judikatur filtering
-    suchworte = ""
-    if category:
-        for cat in LEGAL_CATEGORIES:
-            if cat["id"] == category:
-                suchworte = cat["label"].split("(")[0].split("/")[0].strip()
-                break
+    # Filter by NORM (law name) — the Judikatur API supports a "Norm" parameter
+    # that filters by the law applied in the decision.
+    _CATEGORY_NORMEN: dict[str, str] = {
+        "verfassungsrecht": "B-VG",
+        "grundrechte": "EMRK",
+        "wahlrecht": "NRWO",
+        "verwaltungsrecht": "AVG",
+        "sicherheitspolizei": "SPG",
+        "staatsbuergerschaft": "StbG",
+        "fremdenrecht": "FPG",
+        "beamtenrecht": "BDG",
+        "zivilrecht": "ABGB",
+        "handelsrecht": "UGB",
+        "gesellschaftsrecht": "GmbHG",
+        "genossenschaftsrecht": "GenG",
+        "wertpapierrecht": "BörseG",
+        "immaterialgueter": "UrhG",
+        "zivilprozess": "ZPO",
+        "ausserstreit": "AußStrG",
+        "exekutionsrecht": "IO",
+        "strafrecht": "StGB",
+        "strafprozess": "StPO",
+        "strafvollzug": "StVG",
+        "finanzrecht": "FinStrG",
+        "steuerrecht": "EStG",
+        "zollrecht": "ZollG",
+        "arbeitsrecht": "ArbVG",
+        "sozialversicherung": "ASVG",
+        "gewerberecht": "GewO",
+        "energierecht": "ElWOG",
+        "verkehrsrecht": "StVO",
+        "schulrecht": "SchUG",
+        "hochschulrecht": "UG",
+        "gesundheitsrecht": "ÄrzteG",
+        "umweltrecht": "UVP-G",
+        "landwirtschaft": "ForstG",
+    }
+    norm = _CATEGORY_NORMEN.get(category, "")
 
     async def _query_court(court: str) -> tuple[list[dict], int]:
         params: dict = {
@@ -366,8 +397,8 @@ async def search_gerichtsentscheidungen(
             "Seitennummer": page,
             "EntscheidungsdatumVon": date_from,
         }
-        if suchworte:
-            params["Suchworte"] = suchworte
+        if norm:
+            params["Norm"] = norm
 
         url = f"{settings.RIS_API_BASE_URL}/Judikatur"
         data = await _fetch(url, params)

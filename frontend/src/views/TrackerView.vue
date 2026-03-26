@@ -556,6 +556,18 @@ async function doReport() {
   summaryError.value = ''
 
   try {
+    // Collect any loaded diffs
+    const diffs = {}
+    for (const [id, data] of Object.entries(diffData.value)) {
+      if (data && data.has_changes) {
+        diffs[id] = {
+          diff_html: data.diff_html,
+          current: data.current,
+          previous: data.previous,
+        }
+      }
+    }
+
     const resp = await api.post('/report', {
       api_key: apiKey.value,
       results: results.value,
@@ -563,6 +575,7 @@ async function doReport() {
       category_label: categoryLabel.value,
       timeframe_label: timeframeLabel.value,
       total_hits: totalHits.value,
+      diffs: diffs,
     })
 
     // Download as HTML file
