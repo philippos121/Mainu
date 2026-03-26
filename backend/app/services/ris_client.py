@@ -78,55 +78,83 @@ LEGAL_CATEGORIES = [
 # Uses the official Austrian legal classification (Systematische Dezimalklassifikation).
 # Format: "XX/YY" where XX = Hauptgruppe, YY = Untergruppe.
 # Using just "XX" should match all Untergruppen of that Hauptgruppe.
-_CATEGORY_INDEX: dict[str, list[str]] = {
-    # Verfassungsrecht (Sachgebiet 0/1)
-    "verfassungsrecht": ["10"],        # 10 = Verfassungsrecht (all subgroups)
-    "grundrechte": ["10/10"],          # 10/10 = Grundrechte, Datenschutz
-    "wahlrecht": ["10/04", "10/12"],   # 10/04 Wahlen, 10/12 Politische Parteien
-    # Verwaltungsrecht
-    "verwaltungsrecht": ["40"],        # 40 = Verwaltungsverfahren (all subgroups)
-    "sicherheitspolizei": ["43"],      # 43 = Sicherheitspolizei
-    "staatsbuergerschaft": ["41"],     # 41 = Staatsbürgerschaft, Pass/Meldewesen
-    "fremdenrecht": ["41"],            # Also under 41
-    "beamtenrecht": ["62"],            # 62 = Dienstrecht
-    # Privatrecht (Sachgebiet 2)
-    "zivilrecht": ["20"],              # 20 = Bürgerliches Recht (all subgroups)
-    "handelsrecht": ["21/01"],         # 21/01 = Handelsrecht
-    "gesellschaftsrecht": ["21/02", "21/03", "21/04"],  # GmbH, AG, Genossenschaften
-    "genossenschaftsrecht": ["21/04"], # 21/04 = Genossenschaftsrecht
-    "wertpapierrecht": ["21/05"],      # 21/05 = Wertpapierrecht
-    "immaterialgueter": ["26"],        # 26 = Gewerblicher Rechtsschutz
-    # Verfahrensrecht
-    "zivilprozess": ["21/01"],         # Zivilprozess under 21
-    "ausserstreit": ["22"],            # 22 = Außerstreitverfahren
-    "exekutionsrecht": ["23"],         # 23 = Exekutions-/Insolvenzrecht
-    "justizverwaltung": ["24", "25"],  # 24 = Justizverwaltung, 25 = Notariatswesen
-    # Strafrecht (Sachgebiet 9)
-    "strafrecht": ["90"],              # 90 = Strafrechtswesen
-    "strafprozess": ["91"],            # 91 = Strafprozessrecht
-    "strafvollzug": ["92"],            # 92 = Strafvollzug
-    # Finanzrecht (Sachgebiet 3)
-    "finanzrecht": ["30"],             # 30 = Finanzrecht allgemein
-    "steuerrecht": ["32"],             # 32 = Steuerrecht
-    "zollrecht": ["34"],               # 34 = Zollrecht
-    "finanzausgleich": ["35"],         # 35 = Finanzausgleich
-    # Arbeits-/Sozialrecht (Sachgebiet 6)
-    "arbeitsrecht": ["60"],            # 60 = Arbeitsrecht
-    "sozialversicherung": ["66"],      # 66 = Sozialversicherungsrecht
-    # Gewerbe/Verkehr (Sachgebiet 5)
-    "gewerberecht": ["50"],            # 50 = Gewerberecht
-    "energierecht": ["58"],            # 58 = Energierecht
-    "verkehrsrecht": ["55"],           # 55 = Verkehrsrecht
-    # Bildung (Sachgebiet 7)
-    "schulrecht": ["70"],              # 70 = Schulwesen
-    "hochschulrecht": ["72"],          # 72 = Hochschulwesen
-    # Gesundheit/Umwelt (Sachgebiet 8)
-    "gesundheitsrecht": ["82"],        # 82 = Gesundheitsrecht
-    "umweltrecht": ["83"],             # 83 = Naturschutz/Umweltschutz
-    "landwirtschaft": ["80"],          # 80 = Land-/Forstwirtschaft
-    # Äußeres/Verteidigung (Sachgebiet 1)
-    "aeusseres": ["11"],               # 11 = Äußere Angelegenheiten
-    "landesverteidigung": ["12"],      # 12 = Landesverteidigung
+# Validated: Index=XX (Hauptgruppe only) returns 0 hits!
+# Only Index=XX/YY (with Untergruppe) works.
+# Also: Titel parameter works for specific laws.
+# Strategy: list all relevant XX/YY Untergruppen per category.
+# Each entry is either {"Index": "XX/YY"} or {"Titel": "LawName"}.
+_CATEGORY_SEARCH: dict[str, list[dict]] = {
+    # ── Verfassungsrecht ──
+    "verfassungsrecht": [
+        {"Index": "10/01"}, {"Index": "10/02"}, {"Index": "10/03"},
+        {"Index": "10/04"}, {"Index": "10/05"}, {"Index": "10/06"},
+        {"Index": "10/07"}, {"Index": "10/08"}, {"Index": "10/09"},
+        {"Index": "10/10"}, {"Index": "10/11"}, {"Index": "10/12"},
+        {"Index": "10/13"}, {"Index": "10/14"}, {"Index": "10/15"},
+    ],
+    "grundrechte": [{"Index": "10/10"}, {"Index": "10/11"}],
+    "wahlrecht": [{"Index": "10/04"}, {"Index": "10/12"}],
+    # ── Verwaltungsrecht ──
+    "verwaltungsrecht": [
+        {"Index": "40/01"}, {"Index": "40/02"}, {"Index": "40/03"},
+    ],
+    "sicherheitspolizei": [{"Index": "43/01"}, {"Index": "43/02"}],
+    "staatsbuergerschaft": [{"Index": "41/01"}, {"Index": "41/02"}],
+    "fremdenrecht": [{"Index": "41/02"}, {"Titel": "Fremdenpolizeigesetz"}, {"Titel": "AsylG"}],
+    "beamtenrecht": [{"Index": "62/01"}, {"Index": "62/02"}, {"Index": "62/03"}],
+    # ── Privatrecht ──
+    "zivilrecht": [{"Index": "20/01"}],
+    "handelsrecht": [{"Index": "21/01"}],
+    "gesellschaftsrecht": [{"Index": "21/02"}, {"Index": "21/03"}, {"Index": "21/04"}],
+    "genossenschaftsrecht": [{"Index": "21/04"}],
+    "wertpapierrecht": [{"Index": "21/05"}],
+    "immaterialgueter": [{"Index": "26/01"}, {"Index": "26/02"}, {"Index": "26/03"}],
+    # ── Verfahrensrecht ──
+    "zivilprozess": [{"Titel": "Zivilprozessordnung"}, {"Index": "21/01"}],
+    "ausserstreit": [{"Index": "22/01"}, {"Index": "22/02"}],
+    "exekutionsrecht": [{"Index": "23/01"}, {"Index": "23/02"}],
+    "justizverwaltung": [{"Index": "24/01"}, {"Index": "25/01"}],
+    # ── Strafrecht ──
+    "strafrecht": [{"Index": "90/01"}, {"Index": "90/02"}],
+    "strafprozess": [{"Index": "91/01"}, {"Index": "91/02"}],
+    "strafvollzug": [{"Index": "92/01"}, {"Index": "92/02"}],
+    # ── Finanz-/Steuerrecht ──
+    "finanzrecht": [{"Index": "30/01"}, {"Index": "30/02"}, {"Index": "30/03"}, {"Index": "30/04"}],
+    "steuerrecht": [
+        {"Index": "32/01"}, {"Index": "32/02"}, {"Index": "32/03"},
+        {"Index": "32/04"}, {"Index": "32/05"}, {"Index": "32/06"},
+    ],
+    "zollrecht": [{"Index": "34/01"}, {"Index": "34/02"}],
+    "finanzausgleich": [{"Index": "35/01"}, {"Index": "35/02"}],
+    # ── Arbeits-/Sozialrecht ──
+    "arbeitsrecht": [
+        {"Index": "60/01"}, {"Index": "60/02"}, {"Index": "60/03"},
+        {"Index": "60/04"}, {"Index": "60/05"},
+    ],
+    "sozialversicherung": [
+        {"Index": "66/01"}, {"Index": "66/02"}, {"Index": "66/03"},
+        {"Index": "66/04"}, {"Index": "66/05"},
+    ],
+    # ── Gewerbe/Verkehr ──
+    "gewerberecht": [{"Index": "50/01"}, {"Index": "50/02"}, {"Index": "50/03"}],
+    "energierecht": [{"Index": "58/01"}, {"Index": "58/02"}],
+    "verkehrsrecht": [
+        {"Index": "55/01"}, {"Index": "55/02"}, {"Index": "55/03"},
+        {"Index": "55/04"}, {"Index": "55/05"},
+    ],
+    # ── Bildung ──
+    "schulrecht": [{"Index": "70/01"}, {"Index": "70/02"}, {"Index": "70/03"}],
+    "hochschulrecht": [
+        {"Index": "72/01"}, {"Index": "72/02"}, {"Index": "72/03"},
+        {"Index": "72/04"}, {"Index": "72/05"}, {"Index": "72/06"}, {"Index": "72/07"},
+    ],
+    # ── Gesundheit/Umwelt ──
+    "gesundheitsrecht": [{"Index": "82/01"}, {"Index": "82/02"}, {"Index": "82/03"}],
+    "umweltrecht": [{"Index": "83/01"}, {"Index": "83/02"}, {"Index": "83/03"}],
+    "landwirtschaft": [{"Index": "80/01"}, {"Index": "80/02"}, {"Index": "80/03"}],
+    # ── Äußeres/Verteidigung ──
+    "aeusseres": [{"Index": "11/01"}, {"Index": "11/02"}, {"Index": "11/03"}],
+    "landesverteidigung": [{"Index": "12/01"}, {"Index": "12/02"}, {"Index": "12/03"}],
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -216,10 +244,10 @@ async def search_gesetze(
     2. If 0 hits, fallback to Suchworte (category label) + ImRisSeit
     3. No category → unfiltered ImRisSeit search
     """
-    indices = _CATEGORY_INDEX.get(category, []) if category else []
+    searches = _CATEGORY_SEARCH.get(category, []) if category else []
 
-    if indices:
-        return await _search_by_indices(indices, im_ris_seit, category, page)
+    if searches:
+        return await _search_by_params(searches, im_ris_seit, page)
     else:
         # No category selected or unknown → broad search
         params: dict = {
@@ -232,61 +260,32 @@ async def search_gesetze(
         return await _fetch(url, params)
 
 
-async def _search_by_indices(
-    indices: list[str],
+async def _search_by_params(
+    searches: list[dict],
     im_ris_seit: str,
-    category: str,
     page: int,
 ) -> dict:
-    """Query RIS by Index numbers + ImRisSeit timeframe.
+    """Query RIS with multiple search param sets in parallel, combine results.
 
-    Strategy per index:
-    1. Try Index=XX/YY + ImRisSeit (most precise)
-    2. If 0 hits, try Suchworte with category label (broader but correct)
+    Each search dict can have {"Index": "XX/YY"} or {"Titel": "LawName"}.
     """
-    # Get the category label for Suchworte fallback
-    category_label = ""
-    for cat in LEGAL_CATEGORIES:
-        if cat["id"] == category:
-            # Use the main label, strip parenthetical abbreviations
-            category_label = cat["label"].split("(")[0].split("/")[0].strip()
-            break
 
-    async def _query_one(index: str) -> dict:
-        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
-
-        # Try Index parameter first
+    async def _query_one(search_params: dict) -> dict:
         params = {
             "Applikation": "BrKons",
-            "Index": index,
             "ImRisSeit": im_ris_seit,
             "DokumenteProSeite": "OneHundred",
             "Seitennummer": page,
         }
+        params.update(search_params)
+        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
         result = await _fetch(url, params)
         hits = _extract_hits(result)
-        logger.info(f"Index={index}: {hits} hits")
-
-        if hits > 0:
-            return result
-
-        # Fallback: use category label as Suchworte (NOT the index number)
-        if category_label:
-            logger.info(f"Index={index} returned 0, falling back to Suchworte='{category_label}'")
-            params2 = {
-                "Applikation": "BrKons",
-                "Suchworte": category_label,
-                "ImRisSeit": im_ris_seit,
-                "DokumenteProSeite": "OneHundred",
-                "Seitennummer": page,
-            }
-            return await _fetch(url, params2)
-
+        label = "&".join(f"{k}={v}" for k, v in search_params.items())
+        logger.info(f"Search {label}: {hits} hits")
         return result
-        url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
-        return await _fetch(url, params)
 
-    raw_results = await asyncio.gather(*[_query_one(idx) for idx in indices])
+    raw_results = await asyncio.gather(*[_query_one(s) for s in searches])
 
     # Combine all results
     all_refs: list[dict] = []
