@@ -18,203 +18,115 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # ── Rechtsgebiete ──
-# Note: The BrKons application does NOT support the Index parameter (always
-# returns 0 hits). We use Suchworte (keyword search) for both Bundesrecht
-# and Judikatur filtering.
+# Each category maps to RIS Index numbers (official Austrian legal classification).
+# The Index parameter IS supported for BrKons (contrary to the old comment).
+# Format: "XX/YY" where XX = Hauptgruppe, YY = Untergruppe.
+# Using just "XX" matches all Untergruppen of that Hauptgruppe.
 
 LEGAL_CATEGORIES = [
-    # ── Öffentliches Recht ──
+    # ── Verfassungsrecht ──
     {"id": "verfassungsrecht", "label": "Verfassungsrecht", "group": "Öffentliches Recht"},
-    {"id": "verwaltungsrecht_allg", "label": "Allgemeines Verwaltungsrecht", "group": "Öffentliches Recht"},
-    {"id": "verwaltungsverfahren", "label": "Verwaltungsverfahrensrecht", "group": "Öffentliches Recht"},
-    {"id": "grundrechte", "label": "Grund- und Menschenrechte", "group": "Öffentliches Recht"},
+    {"id": "grundrechte", "label": "Grundrechte / Datenschutz", "group": "Öffentliches Recht"},
     {"id": "wahlrecht", "label": "Wahl- und Parteienrecht", "group": "Öffentliches Recht"},
-    {"id": "beamtenrecht", "label": "Beamten- und Dienstrecht", "group": "Öffentliches Recht"},
-    # ── Privatrecht / Zivilrecht ──
-    {"id": "zivilrecht_allg", "label": "Allgemeines Zivilrecht (ABGB)", "group": "Privatrecht"},
-    {"id": "vertragsrecht", "label": "Vertragsrecht / Schuldrecht", "group": "Privatrecht"},
-    {"id": "sachenrecht", "label": "Sachenrecht", "group": "Privatrecht"},
-    {"id": "familienrecht", "label": "Familienrecht", "group": "Privatrecht"},
-    {"id": "erbrecht", "label": "Erbrecht", "group": "Privatrecht"},
-    {"id": "personenrecht", "label": "Personenrecht / Namensrecht", "group": "Privatrecht"},
-    {"id": "konsumentenschutz", "label": "Konsumentenschutzrecht", "group": "Privatrecht"},
+    # ── Verwaltungsrecht ──
+    {"id": "verwaltungsrecht", "label": "Verwaltungsverfahren", "group": "Verwaltungsrecht"},
+    {"id": "sicherheitspolizei", "label": "Sicherheitspolizeirecht", "group": "Verwaltungsrecht"},
+    {"id": "staatsbuergerschaft", "label": "Staatsbürgerschaft / Meldewesen", "group": "Verwaltungsrecht"},
+    {"id": "fremdenrecht", "label": "Fremden- und Asylrecht", "group": "Verwaltungsrecht"},
+    {"id": "beamtenrecht", "label": "Beamten- und Dienstrecht", "group": "Verwaltungsrecht"},
+    # ── Privatrecht ──
+    {"id": "zivilrecht", "label": "Bürgerliches Recht (ABGB)", "group": "Privatrecht"},
+    {"id": "handelsrecht", "label": "Handelsrecht / UGB", "group": "Privatrecht"},
+    {"id": "gesellschaftsrecht", "label": "Gesellschaftsrecht (GmbHG, AktG)", "group": "Privatrecht"},
+    {"id": "genossenschaftsrecht", "label": "Genossenschaftsrecht", "group": "Privatrecht"},
+    {"id": "wertpapierrecht", "label": "Wertpapierrecht", "group": "Privatrecht"},
+    {"id": "immaterialgueter", "label": "Gewerblicher Rechtsschutz / Urheberrecht", "group": "Privatrecht"},
+    # ── Verfahrensrecht ──
+    {"id": "zivilprozess", "label": "Zivilprozessrecht", "group": "Verfahrensrecht"},
+    {"id": "ausserstreit", "label": "Außerstreitverfahren", "group": "Verfahrensrecht"},
+    {"id": "exekutionsrecht", "label": "Exekutions- und Insolvenzrecht", "group": "Verfahrensrecht"},
+    {"id": "justizverwaltung", "label": "Justizverwaltung / Notariatswesen", "group": "Verfahrensrecht"},
     # ── Strafrecht ──
-    {"id": "strafrecht_allg", "label": "Allgemeines Strafrecht (StGB)", "group": "Strafrecht"},
+    {"id": "strafrecht", "label": "Strafrecht (StGB)", "group": "Strafrecht"},
     {"id": "strafprozess", "label": "Strafprozessrecht (StPO)", "group": "Strafrecht"},
-    {"id": "verwaltungsstrafrecht", "label": "Verwaltungsstrafrecht", "group": "Strafrecht"},
-    {"id": "jugendstrafrecht", "label": "Jugendstrafrecht", "group": "Strafrecht"},
-    {"id": "finanzstrafrecht", "label": "Finanzstrafrecht", "group": "Strafrecht"},
-    # ── Wirtschaftsrecht ──
-    {"id": "unternehmensrecht", "label": "Unternehmensrecht (UGB)", "group": "Wirtschaftsrecht"},
-    {"id": "gesellschaftsrecht", "label": "Gesellschaftsrecht (GmbHG, AktG)", "group": "Wirtschaftsrecht"},
-    {"id": "gewerberecht", "label": "Gewerberecht (GewO)", "group": "Wirtschaftsrecht"},
-    {"id": "wettbewerbsrecht", "label": "Wettbewerbs- und Kartellrecht", "group": "Wirtschaftsrecht"},
-    {"id": "insolvenzrecht", "label": "Insolvenzrecht", "group": "Wirtschaftsrecht"},
-    {"id": "vergaberecht", "label": "Vergaberecht", "group": "Wirtschaftsrecht"},
-    {"id": "kapitalmarktrecht", "label": "Bank- und Kapitalmarktrecht", "group": "Wirtschaftsrecht"},
+    {"id": "strafvollzug", "label": "Strafvollzug", "group": "Strafrecht"},
+    # ── Finanz- und Steuerrecht ──
+    {"id": "finanzrecht", "label": "Finanzrecht allgemein / Haushaltsrecht", "group": "Steuerrecht"},
+    {"id": "steuerrecht", "label": "Steuerrecht", "group": "Steuerrecht"},
+    {"id": "zollrecht", "label": "Zollrecht", "group": "Steuerrecht"},
+    {"id": "finanzausgleich", "label": "Finanzausgleich", "group": "Steuerrecht"},
     # ── Arbeits- und Sozialrecht ──
     {"id": "arbeitsrecht", "label": "Arbeitsrecht", "group": "Arbeits- und Sozialrecht"},
     {"id": "sozialversicherung", "label": "Sozialversicherungsrecht", "group": "Arbeits- und Sozialrecht"},
-    {"id": "kollektivvertrag", "label": "Kollektivvertragsrecht", "group": "Arbeits- und Sozialrecht"},
-    {"id": "arbeitnehmerschutz", "label": "ArbeitnehmerInnenschutz", "group": "Arbeits- und Sozialrecht"},
-    # ── Finanz- und Steuerrecht ──
-    {"id": "einkommensteuer", "label": "Einkommensteuer / Lohnsteuer", "group": "Steuerrecht"},
-    {"id": "umsatzsteuer", "label": "Umsatzsteuer", "group": "Steuerrecht"},
-    {"id": "koerperschaftsteuer", "label": "Körperschaftsteuer", "group": "Steuerrecht"},
-    {"id": "abgabenordnung", "label": "Bundesabgabenordnung (BAO)", "group": "Steuerrecht"},
-    {"id": "gebührenrecht", "label": "Gebühren- und Verkehrsteuern", "group": "Steuerrecht"},
-    {"id": "finanzausgleich", "label": "Finanzausgleich / Haushaltsrecht", "group": "Steuerrecht"},
-    # ── Bau, Miet- und Wohnrecht ──
-    {"id": "mietrecht", "label": "Mietrecht (MRG)", "group": "Immobilienrecht"},
-    {"id": "wohnungseigentum", "label": "Wohnungseigentumsrecht (WEG)", "group": "Immobilienrecht"},
-    {"id": "baurecht", "label": "Baurecht / Raumordnung", "group": "Immobilienrecht"},
-    {"id": "grundbuchrecht", "label": "Grundbuchrecht", "group": "Immobilienrecht"},
-    # ── Umwelt und Verkehr ──
-    {"id": "umweltrecht", "label": "Umweltrecht / Klimaschutz", "group": "Umwelt & Verkehr"},
-    {"id": "naturschutz", "label": "Naturschutzrecht", "group": "Umwelt & Verkehr"},
-    {"id": "wasserrecht", "label": "Wasserrecht", "group": "Umwelt & Verkehr"},
-    {"id": "verkehrsrecht", "label": "Verkehrsrecht (StVO, KFG)", "group": "Umwelt & Verkehr"},
-    {"id": "luftfahrtrecht", "label": "Luftfahrt- und Eisenbahnrecht", "group": "Umwelt & Verkehr"},
-    # ── Gesundheit und Soziales ──
-    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht", "group": "Gesundheit & Soziales"},
-    {"id": "arzneimittelrecht", "label": "Arzneimittel- und Medizinprodukterecht", "group": "Gesundheit & Soziales"},
-    {"id": "lebensmittelrecht", "label": "Lebensmittelrecht", "group": "Gesundheit & Soziales"},
-    {"id": "pflegerecht", "label": "Pflege- und Betreuungsrecht", "group": "Gesundheit & Soziales"},
-    # ── Medien, IT und Datenschutz ──
-    {"id": "datenschutz", "label": "Datenschutzrecht (DSGVO, DSG)", "group": "Medien & IT"},
-    {"id": "medienrecht", "label": "Medienrecht", "group": "Medien & IT"},
-    {"id": "telekommunikation", "label": "Telekommunikationsrecht", "group": "Medien & IT"},
-    {"id": "ecommerce", "label": "E-Commerce / Digitale Dienste", "group": "Medien & IT"},
-    {"id": "urheberrecht", "label": "Urheberrecht / Geistiges Eigentum", "group": "Medien & IT"},
-    # ── Bildung, Wissenschaft, Kultur ──
-    {"id": "schulrecht", "label": "Schulrecht", "group": "Bildung & Kultur"},
-    {"id": "hochschulrecht", "label": "Hochschul- und Universitätsrecht", "group": "Bildung & Kultur"},
-    {"id": "forschungsrecht", "label": "Forschung und Wissenschaft", "group": "Bildung & Kultur"},
-    {"id": "kulturrecht", "label": "Kunst- und Kulturrecht", "group": "Bildung & Kultur"},
-    {"id": "sportrecht", "label": "Sportrecht", "group": "Bildung & Kultur"},
-    # ── Sicherheit und Verteidigung ──
-    {"id": "sicherheitspolizei", "label": "Sicherheitspolizeirecht", "group": "Sicherheit"},
-    {"id": "fremdenrecht", "label": "Fremden- und Asylrecht", "group": "Sicherheit"},
-    {"id": "waffenrecht", "label": "Waffenrecht", "group": "Sicherheit"},
-    {"id": "landesverteidigung", "label": "Landesverteidigung / Heeresrecht", "group": "Sicherheit"},
-    # ── Internationales und EU-Recht ──
-    {"id": "europarecht", "label": "EU-Recht / Unionsrecht", "group": "Internationales"},
-    {"id": "voelkerrecht", "label": "Völkerrecht / Staatsverträge", "group": "Internationales"},
-    # ── Verfahrensrecht ──
-    {"id": "zivilprozess", "label": "Zivilprozessrecht (ZPO)", "group": "Verfahrensrecht"},
-    {"id": "exekutionsrecht", "label": "Exekutionsrecht", "group": "Verfahrensrecht"},
-    {"id": "schiedsrecht", "label": "Schieds- und Mediationsrecht", "group": "Verfahrensrecht"},
-    # ── Agrar und Forst ──
-    {"id": "agrarrecht", "label": "Agrar- und Forstrecht", "group": "Land- und Forstwirtschaft"},
-    {"id": "tierschutz", "label": "Tierschutzrecht", "group": "Land- und Forstwirtschaft"},
+    # ── Gewerbe, Industrie, Verkehr ──
+    {"id": "gewerberecht", "label": "Gewerberecht", "group": "Wirtschaftsrecht"},
+    {"id": "energierecht", "label": "Energierecht", "group": "Wirtschaftsrecht"},
+    {"id": "verkehrsrecht", "label": "Verkehrsrecht", "group": "Wirtschaftsrecht"},
+    # ── Bildung, Wissenschaft ──
+    {"id": "schulrecht", "label": "Schulwesen", "group": "Bildung & Kultur"},
+    {"id": "hochschulrecht", "label": "Hochschulwesen", "group": "Bildung & Kultur"},
+    # ── Gesundheit, Umwelt ──
+    {"id": "gesundheitsrecht", "label": "Gesundheitsrecht", "group": "Gesundheit & Umwelt"},
+    {"id": "umweltrecht", "label": "Naturschutz / Umweltschutz", "group": "Gesundheit & Umwelt"},
+    {"id": "landwirtschaft", "label": "Land- und Forstwirtschaft", "group": "Gesundheit & Umwelt"},
+    # ── Äußeres, Landesverteidigung ──
+    {"id": "aeusseres", "label": "Äußere Angelegenheiten", "group": "Internationales"},
+    {"id": "landesverteidigung", "label": "Landesverteidigung", "group": "Internationales"},
 ]
 
-# ── Gesetzesnummern per Rechtsgebiet ──
-# Primary search strategy: query specific laws by their Gesetzesnummer.
-# This is far more precise than keyword search (Suchworte).
-# Gesetzesnummern sourced from RIS (data.bka.gv.at).
-_CATEGORY_GESETZE: dict[str, list[str]] = {
-    # Öffentliches Recht
-    "verfassungsrecht": ["10000138"],  # B-VG
-    "verwaltungsrecht_allg": ["10005768", "20008917"],  # AVG, VwGVG
-    "verwaltungsverfahren": ["10005768", "20008917", "10005788"],  # AVG, VwGVG, VVG
-    "grundrechte": ["10000308"],  # EMRK (BGBl 210/1958)
-    "wahlrecht": ["10001199", "20004474"],  # NRWO, PartG
-    "beamtenrecht": ["10008470", "10008894"],  # BDG, GehG
-    # Privatrecht
-    "zivilrecht_allg": ["10001622"],  # ABGB
-    "vertragsrecht": ["10001622"],  # ABGB (Schuldrecht Teil)
-    "sachenrecht": ["10001622"],  # ABGB (Sachenrecht Teil)
-    "familienrecht": ["10001622", "10001871"],  # ABGB, EheG
-    "erbrecht": ["10001622"],  # ABGB (Erbrecht Teil)
-    "personenrecht": ["10001622", "20004870"],  # ABGB, PStG 2013
-    "konsumentenschutz": ["10002462", "20001629"],  # KSchG, FAGG
-    # Strafrecht
-    "strafrecht_allg": ["10002296"],  # StGB
-    "strafprozess": ["10002326"],  # StPO
-    "verwaltungsstrafrecht": ["10005770"],  # VStG
-    "jugendstrafrecht": ["10002825"],  # JGG
-    "finanzstrafrecht": ["10003898"],  # FinStrG
-    # Wirtschaftsrecht
-    "unternehmensrecht": ["10001702"],  # UGB
-    "gesellschaftsrecht": [
-        "10001720",  # GmbHG
-        "10001966",  # AktG
-        "10001702",  # UGB (OG, KG etc.)
-        "10001680",  # GenG
-        "10003917",  # SpaltG
-        "10002855",  # UmwG
-        "10002864",  # FBG
-        "20003410",  # SE-G
-    ],
-    "gewerberecht": ["10007517"],  # GewO
-    "wettbewerbsrecht": ["10002665", "20001766"],  # UWG, KartG 2005
-    "insolvenzrecht": ["20005993"],  # IO
-    "vergaberecht": ["20005249"],  # BVergG 2018
-    "kapitalmarktrecht": ["10004827", "20005583", "10002951"],  # BWG, WAG 2018, BörseG
-    # Arbeits- und Sozialrecht
-    "arbeitsrecht": ["10008329", "10008289", "10008238"],  # ArbVG, AZG, UrlG
-    "sozialversicherung": ["10008147"],  # ASVG
-    "kollektivvertrag": ["10008329"],  # ArbVG
-    "arbeitnehmerschutz": ["10008910"],  # ASchG
-    # Steuerrecht
-    "einkommensteuer": ["10004570"],  # EStG
-    "umsatzsteuer": ["10004873"],  # UStG
-    "koerperschaftsteuer": ["10004569"],  # KStG
-    "abgabenordnung": ["10003940"],  # BAO
-    "gebührenrecht": ["10003882", "10003994"],  # GebG, GrEStG
-    "finanzausgleich": ["20010702"],  # FAG 2024
-    # Immobilienrecht
-    "mietrecht": ["10002531"],  # MRG
-    "wohnungseigentum": ["10002476"],  # WEG 2002
-    "baurecht": [],  # Landesrecht — Suchworte-Fallback
-    "grundbuchrecht": ["10001940", "10003033"],  # GBG, AllgGAG
-    # Umwelt & Verkehr
-    "umweltrecht": ["10010767"],  # UVP-G 2000
-    "naturschutz": [],  # Landesrecht
-    "wasserrecht": ["10010290"],  # WRG
-    "verkehrsrecht": ["10011336", "10011384", "10002967"],  # StVO, KFG, FSG
-    "luftfahrtrecht": ["10011214", "10011319"],  # LFG, EisbG
-    # Gesundheit
-    "gesundheitsrecht": ["10005192", "10001519"],  # KAKuG, ÄrzteG
-    "arzneimittelrecht": ["10010441"],  # AMG
-    "lebensmittelrecht": ["20004475"],  # LMSVG
-    "pflegerecht": ["10011026", "20007136"],  # GuKG, BPGG
-    # Medien & IT
-    "datenschutz": ["10001597", "20012122"],  # DSG, DSG-EKV
-    "medienrecht": ["10000719"],  # MedienG
-    "telekommunikation": ["20007849"],  # TKG 2021
-    "ecommerce": ["20001703"],  # ECG
-    "urheberrecht": ["10001848", "10001996", "10002163"],  # UrhG, MSchG, PatG
-    # Bildung & Kultur
-    "schulrecht": ["10009600", "10009265"],  # SchUG, SchOG
-    "hochschulrecht": ["20002128"],  # UG 2002
-    "forschungsrecht": ["10009514"],  # FOG
-    "kulturrecht": ["10009184"],  # DMSG
-    "sportrecht": ["20005380"],  # BSFG 2017
-    # Sicherheit
-    "sicherheitspolizei": ["10005792"],  # SPG
-    "fremdenrecht": ["20004241", "20004240", "20004242"],  # FPG, AsylG 2005, BFA-VG
-    "waffenrecht": ["10006016"],  # WaffG
-    "landesverteidigung": ["10005597"],  # WG 2001
-    # Internationales
-    "europarecht": [],  # Suchworte-Fallback
-    "voelkerrecht": [],  # Suchworte-Fallback
+# ── RIS Index mapping per Rechtsgebiet ──
+# Uses the official Austrian legal classification (Systematische Dezimalklassifikation).
+# Format: "XX/YY" where XX = Hauptgruppe, YY = Untergruppe.
+# Using just "XX" should match all Untergruppen of that Hauptgruppe.
+_CATEGORY_INDEX: dict[str, list[str]] = {
+    # Verfassungsrecht (Sachgebiet 0/1)
+    "verfassungsrecht": ["10"],        # 10 = Verfassungsrecht (all subgroups)
+    "grundrechte": ["10/10"],          # 10/10 = Grundrechte, Datenschutz
+    "wahlrecht": ["10/04", "10/12"],   # 10/04 Wahlen, 10/12 Politische Parteien
+    # Verwaltungsrecht
+    "verwaltungsrecht": ["40"],        # 40 = Verwaltungsverfahren (all subgroups)
+    "sicherheitspolizei": ["43"],      # 43 = Sicherheitspolizei
+    "staatsbuergerschaft": ["41"],     # 41 = Staatsbürgerschaft, Pass/Meldewesen
+    "fremdenrecht": ["41"],            # Also under 41
+    "beamtenrecht": ["62"],            # 62 = Dienstrecht
+    # Privatrecht (Sachgebiet 2)
+    "zivilrecht": ["20"],              # 20 = Bürgerliches Recht (all subgroups)
+    "handelsrecht": ["21/01"],         # 21/01 = Handelsrecht
+    "gesellschaftsrecht": ["21/02", "21/03", "21/04"],  # GmbH, AG, Genossenschaften
+    "genossenschaftsrecht": ["21/04"], # 21/04 = Genossenschaftsrecht
+    "wertpapierrecht": ["21/05"],      # 21/05 = Wertpapierrecht
+    "immaterialgueter": ["26"],        # 26 = Gewerblicher Rechtsschutz
     # Verfahrensrecht
-    "zivilprozess": ["10001699"],  # ZPO
-    "exekutionsrecht": ["10001713"],  # EO
-    "schiedsrecht": ["10001699"],  # ZPO (Vierter Teil)
-    # Agrar
-    "agrarrecht": ["10010371"],  # ForstG
-    "tierschutz": ["20003541"],  # TSchG
-}
-
-# Fallback: Suchworte for categories without Gesetzesnummern
-_CATEGORY_KEYWORDS: dict[str, str] = {
-    "baurecht": "Bauordnung Raumordnung",
-    "naturschutz": "Naturschutz",
-    "europarecht": "EU-Recht Unionsrecht",
-    "voelkerrecht": "Staatsvertrag Völkerrecht",
+    "zivilprozess": ["21/01"],         # Zivilprozess under 21
+    "ausserstreit": ["22"],            # 22 = Außerstreitverfahren
+    "exekutionsrecht": ["23"],         # 23 = Exekutions-/Insolvenzrecht
+    "justizverwaltung": ["24", "25"],  # 24 = Justizverwaltung, 25 = Notariatswesen
+    # Strafrecht (Sachgebiet 9)
+    "strafrecht": ["90"],              # 90 = Strafrechtswesen
+    "strafprozess": ["91"],            # 91 = Strafprozessrecht
+    "strafvollzug": ["92"],            # 92 = Strafvollzug
+    # Finanzrecht (Sachgebiet 3)
+    "finanzrecht": ["30"],             # 30 = Finanzrecht allgemein
+    "steuerrecht": ["32"],             # 32 = Steuerrecht
+    "zollrecht": ["34"],               # 34 = Zollrecht
+    "finanzausgleich": ["35"],         # 35 = Finanzausgleich
+    # Arbeits-/Sozialrecht (Sachgebiet 6)
+    "arbeitsrecht": ["60"],            # 60 = Arbeitsrecht
+    "sozialversicherung": ["66"],      # 66 = Sozialversicherungsrecht
+    # Gewerbe/Verkehr (Sachgebiet 5)
+    "gewerberecht": ["50"],            # 50 = Gewerberecht
+    "energierecht": ["58"],            # 58 = Energierecht
+    "verkehrsrecht": ["55"],           # 55 = Verkehrsrecht
+    # Bildung (Sachgebiet 7)
+    "schulrecht": ["70"],              # 70 = Schulwesen
+    "hochschulrecht": ["72"],          # 72 = Hochschulwesen
+    # Gesundheit/Umwelt (Sachgebiet 8)
+    "gesundheitsrecht": ["82"],        # 82 = Gesundheitsrecht
+    "umweltrecht": ["83"],             # 83 = Naturschutz/Umweltschutz
+    "landwirtschaft": ["80"],          # 80 = Land-/Forstwirtschaft
+    # Äußeres/Verteidigung (Sachgebiet 1)
+    "aeusseres": ["11"],               # 11 = Äußere Angelegenheiten
+    "landesverteidigung": ["12"],      # 12 = Landesverteidigung
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -241,64 +153,49 @@ COURT_SOURCES = [
 # Map Rechtsgebiet → relevant court Applikation(en) for Judikatur.
 # Unmapped categories → query all courts with Suchworte.
 CATEGORY_TO_COURTS: dict[str, list[str]] = {
-    # Öffentliches Recht
+    # Verfassungsrecht → VfGH
     "verfassungsrecht": ["Vfgh"],
     "grundrechte": ["Vfgh"],
-    "verwaltungsrecht_allg": ["Vwgh", "Bvwg", "Lvwg"],
-    "verwaltungsverfahren": ["Vwgh", "Bvwg", "Lvwg"],
-    "verwaltungsstrafrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    # Verwaltungsrecht → VwGH, BVwG, LVwG
+    "verwaltungsrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "sicherheitspolizei": ["Vwgh", "Bvwg"],
+    "staatsbuergerschaft": ["Vwgh", "Bvwg"],
+    "fremdenrecht": ["Vwgh", "Bvwg"],
     "beamtenrecht": ["Vwgh", "Bvwg"],
-    # Privatrecht
-    "zivilrecht_allg": ["Justiz"],
-    "vertragsrecht": ["Justiz"],
-    "sachenrecht": ["Justiz"],
-    "familienrecht": ["Justiz"],
-    "erbrecht": ["Justiz"],
-    "personenrecht": ["Justiz"],
-    "konsumentenschutz": ["Justiz"],
-    # Strafrecht
-    "strafrecht_allg": ["Justiz"],
-    "strafprozess": ["Justiz"],
-    "jugendstrafrecht": ["Justiz"],
-    "finanzstrafrecht": ["Justiz", "Vwgh"],
-    # Immobilien
-    "mietrecht": ["Justiz"],
-    "wohnungseigentum": ["Justiz"],
-    "grundbuchrecht": ["Justiz"],
-    # Arbeitsrecht
-    "arbeitsrecht": ["Justiz"],
-    "kollektivvertrag": ["Justiz"],
+    # Privatrecht → Ordentliche Gerichte
+    "zivilrecht": ["Justiz"],
+    "handelsrecht": ["Justiz"],
+    "gesellschaftsrecht": ["Justiz"],
+    "genossenschaftsrecht": ["Justiz"],
+    "wertpapierrecht": ["Justiz"],
+    "immaterialgueter": ["Justiz"],
     # Verfahrensrecht
     "zivilprozess": ["Justiz"],
+    "ausserstreit": ["Justiz"],
     "exekutionsrecht": ["Justiz"],
-    "schiedsrecht": ["Justiz"],
-    # Datenschutz & IT
-    "datenschutz": ["Vwgh", "Bvwg"],
-    "telekommunikation": ["Vwgh", "Bvwg"],
-    # Sicherheit
-    "fremdenrecht": ["Vwgh", "Bvwg"],
-    "sicherheitspolizei": ["Vwgh", "Bvwg"],
-    # Steuerrecht
-    "einkommensteuer": ["Vwgh", "Bvwg"],
-    "umsatzsteuer": ["Vwgh", "Bvwg"],
-    "koerperschaftsteuer": ["Vwgh", "Bvwg"],
-    "abgabenordnung": ["Vwgh", "Bvwg"],
-    "gebührenrecht": ["Vwgh", "Bvwg"],
-    # Umwelt & Bau
-    "umweltrecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "naturschutz": ["Vwgh", "Bvwg", "Lvwg"],
-    "wasserrecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "baurecht": ["Vwgh", "Bvwg", "Lvwg"],
-    # Wirtschaft
-    "vergaberecht": ["Vwgh", "Bvwg"],
-    "gewerberecht": ["Vwgh", "Bvwg", "Lvwg"],
-    "insolvenzrecht": ["Justiz"],
-    "gesellschaftsrecht": ["Justiz"],
-    "unternehmensrecht": ["Justiz"],
-    "wettbewerbsrecht": ["Justiz"],
-    "kapitalmarktrecht": ["Justiz"],
-    # Sozialversicherung
+    "justizverwaltung": ["Justiz"],
+    # Strafrecht
+    "strafrecht": ["Justiz"],
+    "strafprozess": ["Justiz"],
+    "strafvollzug": ["Justiz"],
+    "finanzrecht": ["Vwgh", "Bvwg"],
+    "steuerrecht": ["Vwgh", "Bvwg"],
+    "zollrecht": ["Vwgh", "Bvwg"],
+    "finanzausgleich": ["Vwgh", "Bvwg"],
+    # Arbeitsrecht
+    "arbeitsrecht": ["Justiz"],
     "sozialversicherung": ["Vwgh", "Bvwg"],
+    # Gewerbe/Verkehr
+    "gewerberecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "energierecht": ["Vwgh", "Bvwg"],
+    "verkehrsrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    # Gesundheit/Umwelt
+    "gesundheitsrecht": ["Vwgh", "Bvwg"],
+    "umweltrecht": ["Vwgh", "Bvwg", "Lvwg"],
+    "landwirtschaft": ["Vwgh", "Bvwg"],
+    # Äußeres
+    "aeusseres": ["Vfgh", "Vwgh"],
+    "landesverteidigung": ["Vwgh", "Bvwg"],
 }
 
 # DokumenteProSeite enum
@@ -314,49 +211,44 @@ async def search_gesetze(
 ) -> dict:
     """Search Bundesrecht for provisions that ACTUALLY CHANGED in the timeframe.
 
-    Uses Fassung.VonInkrafttretensdatum/BisInkrafttretensdatum to find
-    provisions with real legislative changes (new Inkrafttreten dates),
-    NOT ImRisSeit which also catches metadata-only updates.
+    Uses RIS Index (official legal classification) + Fassung.VonInkrafttretensdatum
+    to find provisions with real legislative changes.
 
     Strategy:
-      - Category with Gesetzesnummern → query each law with date range
-      - No category / fallback → use ImRisSeit (broader but less precise)
+      - Category with Index mapping → query each Index with Inkrafttreten date range
+      - No category → query all with ImRisSeit fallback
     """
-    gesetze_nummern = _CATEGORY_GESETZE.get(category, []) if category else []
+    indices = _CATEGORY_INDEX.get(category, []) if category else []
     days = _timeframe_to_days(im_ris_seit)
 
-    if gesetze_nummern:
-        return await _search_by_gesetzesnummern(gesetze_nummern, days, page)
+    if indices:
+        return await _search_by_indices(indices, days, page)
     else:
-        # Fallback: keyword/ImRisSeit search
+        # No category selected or unknown → broad search
         params: dict = {
             "Applikation": "BrKons",
             "DokumenteProSeite": DOCS_PER_PAGE,
             "Seitennummer": page,
             "ImRisSeit": im_ris_seit,
         }
-        if category:
-            keywords = _CATEGORY_KEYWORDS.get(category, "")
-            if keywords:
-                params["Suchworte"] = keywords
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
         return await _fetch(url, params)
 
 
-async def _search_by_gesetzesnummern(
-    gesetz_nrs: list[str],
+async def _search_by_indices(
+    indices: list[str],
     days: int,
     page: int,
 ) -> dict:
-    """Query multiple Gesetzesnummern using Inkrafttreten date range."""
+    """Query RIS Index numbers using Inkrafttreten date range."""
     today = date.today()
     von = (today - timedelta(days=days)).strftime("%Y-%m-%d")
     bis = today.strftime("%Y-%m-%d")
 
-    async def _query_one(gesetz_nr: str) -> dict:
+    async def _query_one(index: str) -> dict:
         params = {
             "Applikation": "BrKons",
-            "Gesetzesnummer": gesetz_nr,
+            "Index": index,
             "Fassung.VonInkrafttretensdatum": von,
             "Fassung.BisInkrafttretensdatum": bis,
             "DokumenteProSeite": "OneHundred",
@@ -365,7 +257,7 @@ async def _search_by_gesetzesnummern(
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
         return await _fetch(url, params)
 
-    raw_results = await asyncio.gather(*[_query_one(nr) for nr in gesetz_nrs])
+    raw_results = await asyncio.gather(*[_query_one(idx) for idx in indices])
 
     # Combine all results
     all_refs: list[dict] = []
@@ -407,8 +299,16 @@ async def search_gerichtsentscheidungen(
     has_court_mapping = category in CATEGORY_TO_COURTS
     courts = CATEGORY_TO_COURTS.get(category, [c["applikation"] for c in COURT_SOURCES])
 
-    # Always use keywords for topic filtering
-    suchworte = _CATEGORY_KEYWORDS.get(category, "") if category else ""
+    # Use Index numbers as Suchworte for Judikatur filtering
+    # (Judikatur doesn't support Index parameter directly, but Suchworte works)
+    indices = _CATEGORY_INDEX.get(category, []) if category else []
+    # Build search terms from the category label
+    suchworte = ""
+    if category:
+        for cat in LEGAL_CATEGORIES:
+            if cat["id"] == category:
+                suchworte = cat["label"].split("(")[0].split("/")[0].strip()
+                break
 
     async def _query_court(court: str) -> tuple[list[dict], int]:
         params: dict = {

@@ -15,7 +15,6 @@ from app.services.ris_client import (
     search_gesetze,
     search_gerichtsentscheidungen,
     parse_bundesrecht_response,
-    _timeframe_to_days,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
 from app.services.diff_service import fetch_provision_diff, debug_document  # noqa: E402
