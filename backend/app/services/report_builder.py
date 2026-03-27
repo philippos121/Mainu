@@ -118,17 +118,17 @@ def build_report(
 body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;display:flex;min-height:100vh}}
 
 /* ── Sidebar ── */
-.sidebar{{width:280px;background:#0f3d49;color:white;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;display:flex;flex-direction:column;z-index:10}}
+.sidebar{{width:280px;background:#0a2e36;color:white;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;display:flex;flex-direction:column;z-index:10}}
 .sidebar-head{{padding:28px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.1)}}
 .sidebar-head h1{{font-size:16px;font-weight:700;margin-bottom:4px}}
 .sidebar-head .sub{{font-size:12px;opacity:0.6}}
 .sidebar-stats{{display:flex;gap:16px;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1)}}
 .sidebar-stat{{text-align:center;flex:1}}
-.sidebar-stat .num{{font-size:24px;font-weight:700;color:#16a6c5;display:block}}
+.sidebar-stat .num{{font-size:24px;font-weight:700;color:#ef6007;display:block}}
 .sidebar-stat .lbl{{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:0.5}}
 .nav-label{{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,0.3);padding:16px 20px 8px;font-weight:600}}
 .nav-item{{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;font-size:13px;color:rgba(255,255,255,0.7);text-decoration:none;border-left:3px solid transparent;transition:all 0.15s}}
-.nav-item:hover,.nav-item.active{{background:rgba(255,255,255,0.05);color:white;border-left-color:#16a6c5}}
+.nav-item:hover,.nav-item.active{{background:rgba(255,255,255,0.05);color:white;border-left-color:#ef6007}}
 .nav-badge{{background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}}
 .sidebar-foot{{margin-top:auto;padding:16px 20px;font-size:11px;opacity:0.3;border-top:1px solid rgba(255,255,255,0.1)}}
 
@@ -220,6 +220,11 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
 
 <div class="sidebar">
   <div class="sidebar-head">
+    <svg width="160" height="36" viewBox="0 0 440 96" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:12px">
+      <text x="0" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="800" font-size="72" font-style="italic" fill="#16a6c5">AI</text>
+      <text x="88" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="300" font-size="72" fill="#ef6007">:</text>
+      <text x="104" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="300" font-size="60" letter-spacing="5" fill="white">ssociate</text>
+    </svg>
     <h1>{_html.escape(category)}</h1>
     <div class="sub">{_html.escape(timeframe)} · {date_str}</div>
   </div>

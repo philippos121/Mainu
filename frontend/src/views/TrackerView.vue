@@ -4,12 +4,13 @@
       <!-- Header -->
       <div class="header">
         <div class="header-logo">
-          <img v-if="hasLogo" src="/logo.svg" alt="Logo" style="height: 52px" />
-          <template v-else>
-            <span class="logo-ai">AI</span><span class="logo-colon">:</span><span class="logo-text">SSOCIATE</span>
-          </template>
+          <svg width="220" height="48" viewBox="0 0 440 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <text x="0" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="800" font-size="72" font-style="italic" fill="#007993">AI</text>
+            <text x="88" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="300" font-size="72" fill="#ef6007">:</text>
+            <text x="104" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="300" font-size="60" letter-spacing="5" fill="#0a2e36">ssociate</text>
+          </svg>
         </div>
-        <p class="header-sub">Österreichische Rechtsänderungen durchsuchen</p>
+        <p class="header-sub">Rechtsänderungen in Österreich</p>
       </div>
 
       <!-- Document Type Toggle -->
@@ -689,27 +690,17 @@ async function doEmailReport() {
 
 .header-logo {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
   margin-bottom: 8px;
 }
 
-.logo-ai {
-  font-size: 42px;
-  font-weight: 800;
-  font-style: italic;
-  color: #007993;
-  letter-spacing: -2px;
+.header-logo svg {
+  height: 48px;
+  width: auto;
 }
 
-.logo-colon {
-  font-size: 42px;
-  font-weight: 300;
-  color: #ef6007;
-  margin: 0 1px;
-}
-
-.logo-text {
+.unused-placeholder {
   font-size: 36px;
   font-weight: 300;
   color: #0f3d49;

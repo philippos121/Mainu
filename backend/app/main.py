@@ -339,12 +339,30 @@ async def api_report(req: ReportRequest):
     else:
         report_md = "*Kein OpenAI API-Key angegeben — Report ohne KI-Zusammenfassung.*"
 
+    # Auto-fetch diffs for Gesetze results that don't have diffs yet
+    all_diffs = dict(req.diffs)  # Start with frontend-provided diffs
+    if req.doc_type == "gesetze":
+        import asyncio
+        missing = [r for r in req.results[:20]
+                   if r.get("id") and r["id"] not in all_diffs
+                   and r.get("gesetzesnummer") and r.get("artikel")]
+        if missing:
+            logging.info(f"Auto-fetching {len(missing)} diffs for report...")
+            tasks = [fetch_provision_diff(
+                doc_id=r["id"], gesetzesnummer=r.get("gesetzesnummer", ""),
+                artikel=r.get("artikel", ""), inkrafttreten=r.get("date", ""),
+            ) for r in missing]
+            results_diffs = await asyncio.gather(*tasks, return_exceptions=True)
+            for r, diff_result in zip(missing, results_diffs):
+                if isinstance(diff_result, dict) and diff_result.get("has_changes"):
+                    all_diffs[r["id"]] = diff_result
+
     try:
         today = date.today().strftime("%d.%m.%Y")
         html = build_report(
             report_md, req.results, today,
             req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
-            req.diffs,
+            all_diffs,
         )
         return {"report_markdown": report_md, "report_html": html}
     except Exception as e:
