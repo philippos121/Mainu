@@ -4,11 +4,7 @@
       <!-- Header -->
       <div class="header">
         <div class="header-logo">
-          <svg width="220" height="48" viewBox="0 0 440 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <text x="0" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="800" font-size="72" font-style="italic" fill="#007993">AI</text>
-            <text x="88" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="300" font-size="72" fill="#ef6007">:</text>
-            <text x="104" y="72" font-family="'IBM Plex Sans',sans-serif" font-weight="300" font-size="60" letter-spacing="5" fill="#0a2e36">ssociate</text>
-          </svg>
+          <img src="/logo.svg" alt="AI:SSOCIATE" class="header-logo-img" />
         </div>
         <p class="header-sub">Rechtsänderungen in Österreich</p>
       </div>
@@ -695,8 +691,8 @@ async function doEmailReport() {
   margin-bottom: 8px;
 }
 
-.header-logo svg {
-  height: 48px;
+.header-logo-img {
+  height: 44px;
   width: auto;
 }
 

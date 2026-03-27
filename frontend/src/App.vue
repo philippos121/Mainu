@@ -4,9 +4,13 @@
     <div class="sidebar">
       <div class="sidebar-inner">
         <router-link to="/" class="sidebar-logo">
-          <svg width="32" height="32" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="120" height="120" rx="24" fill="#007993"/>
-            <text x="16" y="82" font-family="'IBM Plex Sans',sans-serif" font-weight="800" font-size="64" font-style="italic" fill="white">AI</text>
+          <svg width="28" height="28" viewBox="0 0 172 126" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M171.168 53.9816H164.377V80.093H171.168V53.9816Z" fill="rgba(255,255,255,0.5)"/>
+            <path d="M171.168 98.8412H164.377V124.953H171.168V98.8412Z" fill="rgba(255,255,255,0.5)"/>
+            <path d="M120.076 0H136.233V124.953H120.076V0Z" fill="rgba(255,255,255,0.5)"/>
+            <path d="M50.7057 0H69.8031L120.075 124.953H101.366L50.7057 0Z" fill="rgba(255,255,255,0.5)"/>
+            <path d="M18.7097 124.953H0L43.2988 17.4076L52.802 40.8597L18.7097 124.953Z" fill="white"/>
+            <path d="M89.4919 90.9724H47.0362L53.6905 74.5096H89.4919V90.9724Z" fill="rgba(255,255,255,0.5)"/>
           </svg>
         </router-link>
         <router-link to="/" class="sidebar-link sidebar-link-active">
