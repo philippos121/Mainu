@@ -3,8 +3,8 @@ services:
     build: ./backend
     expose:
       - "8000"
-    environment:
-      - RIS_API_BASE_URL=https://data.bka.gv.at/ris/api/v2.6
+    env_file:
+      - ./backend/.env
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/health')"]
       interval: 30s

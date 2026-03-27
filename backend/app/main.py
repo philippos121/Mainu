@@ -206,16 +206,15 @@ class EmailReportRequest(BaseModel):
 
 @app.post("/api/report/email")
 async def api_report_email(req: EmailReportRequest):
-    """Generate report and send via email."""
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
+    """Generate report and send via Resend API."""
     from app.core.config import settings as cfg
 
     if not req.email or "@" not in req.email:
         raise HTTPException(status_code=400, detail="Ungültige E-Mail-Adresse.")
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse.")
+    if not cfg.RESEND_API_KEY:
+        raise HTTPException(status_code=501, detail="E-Mail nicht konfiguriert (RESEND_API_KEY fehlt).")
 
     # Generate report
     report_md = ""
@@ -238,40 +237,33 @@ async def api_report_email(req: EmailReportRequest):
         req.diffs,
     )
 
-    # Send email
-    if not cfg.SMTP_HOST:
-        raise HTTPException(
-            status_code=501,
-            detail="E-Mail-Versand nicht konfiguriert. Bitte SMTP_HOST, SMTP_USER, SMTP_PASS als Umgebungsvariablen setzen."
-        )
-
+    # Send via Resend HTTP API
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"RIS Tracker — {req.category_label} — {req.timeframe_label}"
-        msg["From"] = cfg.SMTP_FROM
-        msg["To"] = req.email
-
-        # Plain text fallback
-        text_part = MIMEText(
-            f"RIS Tracker Report\n{req.category_label} · {req.timeframe_label}\n"
-            f"{req.total_hits} Ergebnisse\n\nSiehe HTML-Version.",
-            "plain", "utf-8"
-        )
-        html_part = MIMEText(html_report, "html", "utf-8")
-        msg.attach(text_part)
-        msg.attach(html_part)
-
-        with smtplib.SMTP(cfg.SMTP_HOST, cfg.SMTP_PORT) as server:
-            server.starttls()
-            if cfg.SMTP_USER and cfg.SMTP_PASS:
-                server.login(cfg.SMTP_USER, cfg.SMTP_PASS)
-            server.sendmail(cfg.SMTP_FROM, [req.email], msg.as_string())
-
-        logging.info(f"Report emailed to {req.email}")
-        return {"status": "sent", "email": req.email}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {cfg.RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": "AI:ssociate <onboarding@resend.dev>",
+                    "to": [req.email],
+                    "subject": f"AI:ssociate — {req.category_label} — {req.timeframe_label}",
+                    "html": html_report,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            logging.info(f"Email sent via Resend: {data.get('id')} to {req.email}")
+            return {"status": "sent", "email": req.email, "resend_id": data.get("id")}
+    except httpx.HTTPStatusError as e:
+        err = e.response.text[:300]
+        logging.error(f"Resend error: {err}")
+        raise HTTPException(status_code=500, detail=f"E-Mail-Versand fehlgeschlagen: {err}")
     except Exception as e:
-        logging.error(f"Email error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"E-Mail-Versand fehlgeschlagen: {str(e)[:200]}")
+        logging.error(f"Email error: {e}")
+        raise HTTPException(status_code=500, detail=f"E-Mail-Fehler: {str(e)[:200]}")
 
 
 # ── GPT Summary & Report endpoints ──
