@@ -1,16 +1,18 @@
 <template>
   <v-app>
-    <!-- Thin sidebar with logo -->
-    <div class="sidebar">
-      <router-link to="/" class="sidebar-logo">
-        <img src="/logo-white.svg" alt="AI:ssociate" />
+    <!-- Top bar -->
+    <header class="topbar">
+      <router-link to="/" class="topbar-logo">
+        <img src="/logo.svg" alt="AI:ssociate" />
       </router-link>
-      <div class="sidebar-glow"></div>
-    </div>
+      <nav class="topbar-nav">
+        <span class="topbar-tagline">Legal Change Tracker</span>
+      </nav>
+    </header>
 
-    <div class="app-main">
+    <main class="main">
       <router-view />
-    </div>
+    </main>
   </v-app>
 </template>
 
@@ -23,111 +25,64 @@
 :root {
   --teal: #007993;
   --teal-dark: #005f73;
-  --teal-light: #e0f4f8;
+  --teal-50: #e8f6f9;
   --orange: #ef6007;
-  --orange-light: #fff3ec;
+  --orange-50: #fff4ed;
   --navy: #052e31;
-  --navy-mid: #0a3d42;
-  --bg: #f6f8fa;
+  --bg: #f4f6f8;
   --card: #ffffff;
-  --text: #1a2332;
-  --text-secondary: #5f6d7e;
-  --border: #e3e8ef;
-  --radius: 14px;
-  --shadow-sm: 0 1px 3px rgba(0,40,50,0.04);
-  --shadow-md: 0 4px 16px rgba(0,40,50,0.06);
-  --shadow-lg: 0 8px 32px rgba(0,40,50,0.08);
+  --text: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --radius: 12px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
   color: var(--text);
 }
+.v-application { font-family: 'Inter', -apple-system, sans-serif !important; background: var(--bg) !important; }
 
-.v-application {
-  font-family: 'Inter', -apple-system, sans-serif !important;
-}
-
-/* ── Sidebar ── */
-.sidebar {
-  position: fixed;
-  left: 0; top: 0; bottom: 0;
-  width: 60px;
-  background: linear-gradient(180deg, var(--navy) 0%, var(--navy-mid) 100%);
-  z-index: 100;
+/* ── Top bar ── */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  height: 64px;
+  background: var(--navy);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 20px 0;
-  overflow: hidden;
+  padding: 0 32px;
+  gap: 24px;
+  box-shadow: 0 1px 0 rgba(0,121,147,0.2);
 }
-
-.sidebar::after {
-  content: '';
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 1px;
-  background: linear-gradient(180deg, rgba(0,121,147,0.3) 0%, rgba(0,121,147,0.05) 100%);
+.topbar-logo {
+  display: flex; align-items: center;
+  text-decoration: none;
+  transition: opacity 0.2s;
 }
-
-.sidebar-glow {
-  position: absolute;
-  top: 20px; left: 50%;
-  transform: translateX(-50%);
-  width: 80px; height: 80px;
-  background: radial-gradient(circle, rgba(0,121,147,0.15) 0%, transparent 70%);
-  pointer-events: none;
-  animation: pulse 4s ease-in-out infinite;
+.topbar-logo:hover { opacity: 0.85; }
+.topbar-logo img { height: 28px; width: auto; filter: brightness(0) invert(1); }
+.topbar-tagline {
+  font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.5px;
 }
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
-  50% { opacity: 1; transform: translateX(-50%) scale(1.2); }
-}
-
-.sidebar-logo {
-  position: relative;
-  z-index: 1;
-  display: block;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.sidebar-logo:hover { transform: scale(1.1); }
-.sidebar-logo img { width: 40px; height: auto; }
 
 /* ── Main ── */
-.app-main {
-  margin-left: 60px;
-  min-height: 100vh;
-  background: var(--bg);
+.main {
+  min-height: calc(100vh - 64px);
 }
-
 .v-main { padding: 0 !important; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(0,121,147,0.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,121,147,0.3); }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
 
-/* ── Global animations ── */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
+/* ── Keyframes ── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 </style>
