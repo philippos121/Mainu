@@ -23,6 +23,7 @@ from app.services.ris_client import (
 from app.services.openai_service import summarise_results, generate_report_markdown
 from app.services.diff_service import fetch_provision_diff, debug_document
 from app.services.report_builder import build_report
+from app.services.materialien_service import fetch_materialien_for_results
 
 logging.basicConfig(level=logging.INFO)
 
@@ -335,33 +336,66 @@ async def api_report(req: ReportRequest):
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
 
-    # Fetch related Begutachtungsentwürfe and Regierungsvorlagen
+    # Fetch Gesetzesmaterialien (Erläuterungen) per unique BGBl number
+    materialien = {}
     parliamentary = []
     try:
         import asyncio as _aio
+
+        # Materialien (Erläuterungen from parlament.gv.at)
+        mat_task = fetch_materialien_for_results(req.results)
+        # Begutachtung + Regierungsvorlagen (from RIS)
         begut_task = search_begutachtung(suchworte=req.category_label, im_ris_seit="EinemJahr")
         regv_task = search_regierungsvorlagen(suchworte=req.category_label, im_ris_seit="EinemJahr")
-        begut_results, regv_results = await _aio.gather(begut_task, regv_task, return_exceptions=True)
+
+        mat_results, begut_results, regv_results = await _aio.gather(
+            mat_task, begut_task, regv_task, return_exceptions=True
+        )
+        if isinstance(mat_results, dict):
+            materialien = mat_results
         if isinstance(begut_results, list):
             parliamentary.extend(begut_results[:5])
         if isinstance(regv_results, list):
             parliamentary.extend(regv_results[:5])
-        logging.info(f"Parliamentary materials: {len(parliamentary)} (Begut+RegV)")
+        logging.info(f"Materialien: {len(materialien)} BGBl, Parliamentary: {len(parliamentary)}")
     except Exception as e:
-        logging.error(f"Parliamentary search error: {e}")
+        logging.error(f"Materialien/Parliamentary error: {e}")
 
-    # GPT summary with parliamentary context
+    # GPT summary with Materialien + parliamentary context
     report_md = ""
     if req.api_key and len(req.api_key) >= 10:
         try:
-            # Add parliamentary info to the results for GPT context
-            parl_context = ""
+            # Build Materialien context for GPT
+            extra_context = ""
+
+            # Gesetzesmaterialien (Erläuterungen per BGBl)
+            if materialien:
+                mat_lines = []
+                for key, mat in materialien.items():
+                    line = f"- {mat.get('bgbl', key)}"
+                    if mat.get('titel'):
+                        line += f": {mat['titel']}"
+                    if mat.get('rv_nr'):
+                        line += f" (RV {mat['rv_nr']} d.B. {mat.get('gp', '')} GP)"
+                    if mat.get('parlament_url'):
+                        line += f" → {mat['parlament_url']}"
+                    mat_lines.append(line)
+                extra_context += (
+                    "\n\n--- GESETZESMATERIALIEN ---\n"
+                    "Folgende Erläuterungen (Materialien) zu den Novellen sind verfügbar:\n"
+                    + "\n".join(mat_lines)
+                    + "\nFasse die Intention des Gesetzgebers zusammen. "
+                    "Was war die zugrundeliegende Rechtsfrage die die Novelle adressiert? "
+                    "Verwende die Materialien als Kontext für die Analyse.\n"
+                )
+
+            # Parliamentary materials (Begut + RegV)
             if parliamentary:
                 parl_lines = []
                 for p in parliamentary:
                     parl_lines.append(f"- [{p['typ']}] {p['title']}" +
                                       (f" ({p['stelle']})" if p.get('stelle') else ""))
-                parl_context = (
+                extra_context += (
                     "\n\n--- PARLAMENTARISCHE MATERIALIEN ---\n"
                     "Folgende Regierungsvorlagen und Begutachtungsentwürfe sind im Zusammenhang relevant:\n"
                     + "\n".join(parl_lines)
@@ -375,7 +409,7 @@ async def api_report(req: ReportRequest):
                 timeframe_label=req.timeframe_label,
                 total_hits=req.total_hits,
                 api_key=req.api_key,
-                extra_context=parl_context,
+                extra_context=extra_context,
             )
         except Exception as e:
             logging.error(f"GPT report error: {e}")
@@ -406,10 +440,10 @@ async def api_report(req: ReportRequest):
         html = build_report(
             report_md, req.results, today,
             req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
-            all_diffs, parliamentary,
+            all_diffs, parliamentary, materialien,
         )
         return {"report_markdown": report_md, "report_html": html,
-                "parliamentary": parliamentary}
+                "parliamentary": parliamentary, "materialien": materialien}
     except Exception as e:
         logging.error(f"Report build error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Report-Generierung fehlgeschlagen: {str(e)[:200]}")

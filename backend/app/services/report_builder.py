@@ -22,6 +22,7 @@ def build_report(
     doc_type: str,
     diffs: dict = None,
     parliamentary: list[dict] = None,
+    materialien: dict = None,
 ) -> str:
     diffs = diffs or {}
     parliamentary = parliamentary or []
@@ -34,6 +35,8 @@ def build_report(
         key = r.get("title", "Sonstige")
         groups.setdefault(key, []).append(r)
 
+    materialien = materialien or {}
+
     # Build nav items + section cards
     nav_html = ""
     sections_html = ""
@@ -43,7 +46,38 @@ def build_report(
         safe_id = f"g{gi}"
         nav_html += f'<a class="nav-item" href="#" onclick="showSection(\'{safe_id}\');return false">{_html.escape(group_name)} <span class="nav-badge">{len(group_results)}</span></a>\n'
 
+        # Find matching Materialien for this group's BGBl numbers
+        group_materialien = {}
+        for r in group_results:
+            bgbl = str(r.get("bgbl", ""))
+            for key, mat in materialien.items():
+                if key in bgbl:
+                    group_materialien[key] = mat
+
         cards = ""
+
+        # Show Materialien box at top of group if available
+        for key, mat in group_materialien.items():
+            mat_title = _html.escape(str(mat.get("titel", "")))
+            mat_url = _html.escape(str(mat.get("parlament_url", "")))
+            mat_rv = _html.escape(str(mat.get("rv_nr", "")))
+            mat_gp = _html.escape(str(mat.get("gp", "")))
+            mat_erl = _html.escape(str(mat.get("erlaeuterungen_url", "")))
+            cards += f'''
+<div class="card mat-card" style="animation-delay:0s">
+  <div class="c-row" style="padding:12px 16px">
+    <div class="c-info" style="flex:1">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#7c3aed;margin-bottom:4px">Gesetzesmaterialien</div>
+      <div style="font-size:13px;font-weight:500;color:var(--text)">{_html.escape(key)}{f" — {mat_title}" if mat_title else ""}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">
+        {f"RV {mat_rv} d.B. {mat_gp} GP" if mat_rv else ""}
+        {f' · <a href="{mat_url}" target="_blank" style="color:#7c3aed;text-decoration:none">Parlament →</a>' if mat_url else ""}
+        {f' · <a href="{mat_erl}" target="_blank" style="color:#7c3aed;text-decoration:none">Erläuterungen (PDF) →</a>' if mat_erl else ""}
+      </div>
+    </div>
+  </div>
+</div>'''
+
         for i, r in enumerate(group_results):
             nor = r.get("id", "")
             diff_data = diffs.get(nor, {})
@@ -202,6 +236,7 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
 .tag-art{{background:rgba(239,96,7,0.08);color:#ef6007}}
 .tag-chg{{background:rgba(16,185,129,0.08);color:#059669}}
 .tag-court{{background:rgba(99,102,241,0.08);color:#6366f1}}
+.mat-card{{border-left:3px solid #7c3aed;background:#faf5ff}}
 .card-rs{{font-size:12px;color:#4b5563;font-style:italic;border-left:2px solid #ef6007;padding-left:8px;margin:4px 0;line-height:1.5}}
 .card-dates{{font-size:12px;color:#6b7280}}
 .card-bgbl{{margin-left:8px;color:#9ca3af}}
