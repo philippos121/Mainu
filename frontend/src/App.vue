@@ -7,19 +7,38 @@
         <span class="topbar-badge">Law Monitoring</span>
       </router-link>
 
-      <!-- Logo marquee — replace SVGs with real PNGs in /public/logos/ -->
+      <!-- Logo marquee -->
       <div class="marquee">
         <div class="marquee-track">
-          <img src="/logos/bpp.svg" alt="bpp.law" />
-          <img src="/logos/logo2.svg" alt="Partner" />
-          <img src="/logos/fink.svg" alt="Fink+Partner" />
-          <img src="/logos/flgoe.svg" alt="FLGÖ" />
-          <img src="/logos/logo5.svg" alt="Partner" />
-          <img src="/logos/bpp.svg" alt="bpp.law" />
-          <img src="/logos/logo2.svg" alt="Partner" />
-          <img src="/logos/fink.svg" alt="Fink+Partner" />
-          <img src="/logos/flgoe.svg" alt="FLGÖ" />
-          <img src="/logos/logo5.svg" alt="Partner" />
+          <img src="/logo_act_legal.svg" alt="act.legal" />
+          <img src="/logo_buwog_color.svg" alt="BUWOG" />
+          <img src="/logo_facc.svg" alt="FACC" />
+          <img src="/logo_flgoe.png" alt="FLGÖ" />
+          <img src="/logo_gpk.svg" alt="GPK" />
+          <img src="/logo_grawe_color.svg" alt="GRAWE" />
+          <img src="/logo_gsv.svg" alt="GSV" />
+          <img src="/logo_hba_color.svg" alt="HBA" />
+          <img src="/logo_heissenberger.png" alt="Heissenberger" />
+          <img src="/logo_holding_graz.svg" alt="Holding Graz" />
+          <img src="/logo_oerak_color.svg" alt="ÖRAK" />
+          <img src="/logo_treubilanz.svg" alt="Treubilanz" />
+          <img src="/logo_vav.svg" alt="VAV" />
+          <img src="/logo_wsw.svg" alt="WSW" />
+          <!-- Duplicate for seamless loop -->
+          <img src="/logo_act_legal.svg" alt="act.legal" />
+          <img src="/logo_buwog_color.svg" alt="BUWOG" />
+          <img src="/logo_facc.svg" alt="FACC" />
+          <img src="/logo_flgoe.png" alt="FLGÖ" />
+          <img src="/logo_gpk.svg" alt="GPK" />
+          <img src="/logo_grawe_color.svg" alt="GRAWE" />
+          <img src="/logo_gsv.svg" alt="GSV" />
+          <img src="/logo_hba_color.svg" alt="HBA" />
+          <img src="/logo_heissenberger.png" alt="Heissenberger" />
+          <img src="/logo_holding_graz.svg" alt="Holding Graz" />
+          <img src="/logo_oerak_color.svg" alt="ÖRAK" />
+          <img src="/logo_treubilanz.svg" alt="Treubilanz" />
+          <img src="/logo_vav.svg" alt="VAV" />
+          <img src="/logo_wsw.svg" alt="WSW" />
         </div>
       </div>
     </header>
@@ -101,22 +120,28 @@ body {
 .marquee-track {
   display: flex;
   align-items: center;
-  gap: 48px;
-  animation: scroll 25s linear infinite;
+  gap: 64px;
+  animation: scroll 40s linear infinite;
   width: max-content;
 }
 
 .marquee-track img {
-  height: 28px;
+  height: 24px;
   width: auto;
-  opacity: 0.55;
+  max-width: 120px;
+  object-fit: contain;
+  opacity: 0.6;
   filter: brightness(0) invert(1);
   transition: opacity 0.3s;
   flex-shrink: 0;
 }
 
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
 .marquee-track img:hover {
-  opacity: 0.9;
+  opacity: 1;
 }
 
 @keyframes scroll {
