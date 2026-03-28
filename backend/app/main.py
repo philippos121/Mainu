@@ -45,6 +45,26 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/debug/ris-test")
+async def ris_test():
+    """Test if RIS website is reachable from this container."""
+    import httpx as hx
+    results = {}
+    urls = {
+        "ris_api": "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht?Applikation=BrKons&DokumenteProSeite=Ten&ImRisSeit=EinemMonat",
+        "ris_website": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer=NOR40275544",
+    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    async with hx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        for name, url in urls.items():
+            try:
+                resp = await client.get(url)
+                results[name] = {"status": resp.status_code, "length": len(resp.text), "url": str(resp.url)[:200]}
+            except Exception as e:
+                results[name] = {"error": str(e)[:200]}
+    return results
+
+
 @app.get("/api/categories")
 async def get_categories():
     """Return all Rechtsgebiete (legal categories) available for filtering."""
