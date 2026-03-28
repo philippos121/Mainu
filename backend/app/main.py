@@ -55,7 +55,7 @@ async def ris_test():
         "ris_website": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer=NOR40275544",
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    async with hx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+    async with hx.AsyncClient(timeout=60.0, follow_redirects=True, headers=headers) as client:
         for name, url in urls.items():
             try:
                 resp = await client.get(url)

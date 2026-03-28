@@ -125,7 +125,7 @@ async def _fetch_page(nor: str) -> dict | None:
     """Fetch RIS Dokument.wxe page, extract text + version NORs."""
     url = f"{_DOC_URL}{nor}"
     logger.info(f"Fetch: {url}")
-    async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True, headers=_HEADERS) as client:
         try:
             resp = await client.get(url)
             resp.raise_for_status()
