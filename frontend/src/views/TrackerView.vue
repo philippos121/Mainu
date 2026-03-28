@@ -36,30 +36,19 @@
               :items="groupedCategories"
               item-title="label"
               item-value="id"
-              label="Rechtsgebiet"
+              label="Rechtsgebiete"
               variant="outlined"
               density="comfortable"
+              multiple
+              chips
+              closable-chips
               clearable
               hide-details
-              prepend-inner-icon="mdi-book-open-variant"
-              placeholder="Alle Rechtsgebiete"
+              prepend-inner-icon="mdi-scale-balance"
+              placeholder="Rechtsgebiete wählen"
               color="#007993"
               base-color="#9ca3af"
-            >
-              <template #item="{ item, props }">
-                <v-list-subheader
-                  v-if="item.raw.isGroupHeader"
-                  class="category-group-header"
-                >
-                  {{ item.raw.label }}
-                </v-list-subheader>
-                <v-list-item
-                  v-else
-                  v-bind="props"
-                  class="category-item"
-                />
-              </template>
-            </v-select>
+            />
           </div>
           <div class="filter-field">
             <v-select
@@ -353,7 +342,7 @@ const hasLogo = ref(false)
 const docType = ref('gesetze')
 const categories = ref([])
 const timeframes = ref([])
-const selectedCategory = ref(null)
+const selectedCategory = ref([])  // Array for multi-select
 const selectedTimeframe = ref('EinemMonat')
 const loading = ref(false)
 const searched = ref(false)
@@ -414,9 +403,12 @@ const groupedCategories = computed(() => {
 })
 
 const categoryLabel = computed(() => {
-  if (!selectedCategory.value) return 'Alle Rechtsgebiete'
-  const cat = categories.value.find(c => c.id === selectedCategory.value)
-  return cat ? cat.label : ''
+  if (!selectedCategory.value || selectedCategory.value.length === 0) return 'Alle Rechtsgebiete'
+  if (selectedCategory.value.length === 1) {
+    const cat = categories.value.find(c => c.id === selectedCategory.value[0])
+    return cat ? cat.label : ''
+  }
+  return `${selectedCategory.value.length} Rechtsgebiete`
 })
 
 const timeframeLabel = computed(() => {
@@ -534,16 +526,35 @@ async function search() {
     ? '/search/gesetze'
     : '/search/gerichtsentscheidungen'
 
-  const params = {
-    im_ris_seit: selectedTimeframe.value,
-    page: page.value,
-  }
-  if (selectedCategory.value) {
-    params.category = selectedCategory.value
-  }
+  const cats = selectedCategory.value || []
 
   try {
-    const resp = await api.get(endpoint, { params })
+    let resp
+    if (cats.length <= 1) {
+      // Single or no category
+      const params = { im_ris_seit: selectedTimeframe.value, page: page.value }
+      if (cats.length === 1) params.category = cats[0]
+      resp = await api.get(endpoint, { params })
+    } else {
+      // Multi-category: query each in parallel, merge
+      const promises = cats.map(cat =>
+        api.get(endpoint, { params: { im_ris_seit: selectedTimeframe.value, page: 1, category: cat } })
+      )
+      const responses = await Promise.all(promises)
+      const allResults = []
+      let allHits = 0
+      const seenIds = new Set()
+      for (const r of responses) {
+        allHits += r.data.total_hits || 0
+        for (const item of (r.data.results || [])) {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id)
+            allResults.push(item)
+          }
+        }
+      }
+      resp = { data: { results: allResults, total_hits: allHits } }
+    }
     results.value = resp.data.results || []
     totalHits.value = resp.data.total_hits || 0
   } catch (e) {

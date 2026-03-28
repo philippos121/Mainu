@@ -22,6 +22,16 @@ logger = logging.getLogger(__name__)
 # Validated: Index=XX/YY works with BrKons API. Index=XX (Hauptgruppe only) returns 0.
 
 LEGAL_CATEGORIES = [
+    # ── Kernrechtsgebiete (priority, shown first) ──
+    {"id": "einkommensteuer", "label": "Steuerrecht (EStG / KStG / UStG)", "group": "Kernrechtsgebiete"},
+    {"id": "zivilrecht", "label": "Bürgerliches Recht (ABGB)", "group": "Kernrechtsgebiete"},
+    {"id": "handelsrecht", "label": "Unternehmensrecht (UGB)", "group": "Kernrechtsgebiete"},
+    {"id": "gmbh_recht", "label": "Gesellschaftsrecht (GmbHG / AktG)", "group": "Kernrechtsgebiete"},
+    {"id": "bankrecht", "label": "Bank- und Kapitalmarktrecht (BWG / WAG)", "group": "Kernrechtsgebiete"},
+    {"id": "wertpapierrecht", "label": "Wertpapier- und Börserecht", "group": "Kernrechtsgebiete"},
+    {"id": "zivilprozess", "label": "Zivilgerichtliches Verfahren (ZPO)", "group": "Kernrechtsgebiete"},
+    {"id": "vergaberecht", "label": "Vergaberecht", "group": "Kernrechtsgebiete"},
+    {"id": "verwaltungsverfahren", "label": "Verwaltungsverfahrensrecht (AVG / VwGVG)", "group": "Kernrechtsgebiete"},
     # ── 0/1: Verfassungsrecht, Äußeres, Verteidigung ──
     {"id": "verfassungsrecht", "label": "Verfassungsrecht", "group": "Verfassungsrecht"},
     {"id": "grundrechte", "label": "Grundrechte / Datenschutz / Auskunftspflicht", "group": "Verfassungsrecht"},
@@ -36,14 +46,9 @@ LEGAL_CATEGORIES = [
     {"id": "zivildienst", "label": "Zivildienst", "group": "Äußeres & Verteidigung"},
     {"id": "voelkerrecht", "label": "Völkerrechtliche Verträge (Verfassung)", "group": "Äußeres & Verteidigung"},
     # ── 2: Privatrecht ──
-    {"id": "zivilrecht", "label": "Bürgerliches Recht (ABGB)", "group": "Privatrecht"},
-    {"id": "handelsrecht", "label": "Handelsrecht / Unternehmensrecht (UGB)", "group": "Privatrecht"},
     {"id": "aktienrecht", "label": "Aktienrecht", "group": "Privatrecht"},
-    {"id": "gmbh_recht", "label": "GmbH-Recht", "group": "Privatrecht"},
     {"id": "genossenschaftsrecht", "label": "Genossenschaftsrecht", "group": "Privatrecht"},
-    {"id": "wertpapierrecht", "label": "Wertpapierrecht / Börserecht", "group": "Privatrecht"},
     {"id": "versicherungsrecht", "label": "Versicherungsrecht", "group": "Privatrecht"},
-    {"id": "zivilprozess", "label": "Zivilprozessrecht (ZPO)", "group": "Verfahrensrecht"},
     {"id": "ausserstreit", "label": "Außerstreitverfahren", "group": "Verfahrensrecht"},
     {"id": "exekutionsrecht", "label": "Exekutionsrecht", "group": "Verfahrensrecht"},
     {"id": "insolvenzrecht", "label": "Insolvenzrecht", "group": "Verfahrensrecht"},
@@ -54,7 +59,6 @@ LEGAL_CATEGORIES = [
     # ── 3: Finanzrecht ──
     {"id": "finanzrecht_allg", "label": "Finanzrecht allgemein / Haushaltsrecht", "group": "Finanzrecht"},
     {"id": "abgabenrecht", "label": "Abgabenverfahrensrecht (BAO)", "group": "Finanzrecht"},
-    {"id": "einkommensteuer", "label": "Einkommensteuer / Lohnsteuer (EStG)", "group": "Steuerrecht"},
     {"id": "koerperschaftsteuer", "label": "Körperschaftsteuer (KStG)", "group": "Steuerrecht"},
     {"id": "umsatzsteuer", "label": "Umsatzsteuer (UStG)", "group": "Steuerrecht"},
     {"id": "gebuehrenrecht", "label": "Gebührenrecht / Verkehrsteuern", "group": "Steuerrecht"},
@@ -63,7 +67,6 @@ LEGAL_CATEGORIES = [
     {"id": "finanzausgleich", "label": "Finanzausgleich", "group": "Steuerrecht"},
     {"id": "finanzstrafrecht", "label": "Finanzstrafrecht (FinStrG)", "group": "Steuerrecht"},
     # ── 4: Innere Verwaltung ──
-    {"id": "verwaltungsverfahren", "label": "Verwaltungsverfahren (AVG / VwGVG)", "group": "Verwaltungsrecht"},
     {"id": "staatsbuergerschaft", "label": "Staatsbürgerschaft / Pass- / Meldewesen", "group": "Verwaltungsrecht"},
     {"id": "personenstandsrecht", "label": "Personenstandsrecht", "group": "Verwaltungsrecht"},
     {"id": "sicherheitspolizei", "label": "Sicherheitspolizei (SPG)", "group": "Verwaltungsrecht"},
@@ -76,7 +79,6 @@ LEGAL_CATEGORIES = [
     {"id": "bergrecht", "label": "Bergrecht", "group": "Wirtschaftsrecht"},
     {"id": "energierecht", "label": "Energierecht", "group": "Wirtschaftsrecht"},
     {"id": "preisrecht", "label": "Preisrecht / Wettbewerbsrecht (UWG / KartG)", "group": "Wirtschaftsrecht"},
-    {"id": "bankrecht", "label": "Bank- und Kapitalmarktrecht (BWG / WAG)", "group": "Wirtschaftsrecht"},
     {"id": "verkehrsrecht", "label": "Verkehrsrecht (StVO / KFG / FSG)", "group": "Wirtschaftsrecht"},
     {"id": "schifffahrt", "label": "Schifffahrtsrecht", "group": "Wirtschaftsrecht"},
     {"id": "luftfahrt", "label": "Luftfahrtrecht", "group": "Wirtschaftsrecht"},
@@ -179,6 +181,7 @@ _CATEGORY_SEARCH: dict[str, list[dict]] = {
     "bergrecht": [{"Index": "58/01"}, {"Titel": "Mineralrohstoffgesetz"}],
     "energierecht": [{"Index": "58/01"}, {"Index": "58/02"}],
     "preisrecht": [{"Index": "26/01"}, {"Titel": "UWG"}, {"Titel": "Kartellgesetz"}],
+    "vergaberecht": [{"Titel": "Bundesvergabegesetz"}],
     "bankrecht": [{"Index": "37/02"}, {"Titel": "Bankwesengesetz"}, {"Titel": "WAG"}],
     # 9: Verkehr/Technik (90-99) — Strassenverkehr is 90, NOT Strafrecht!
     "verkehrsrecht": [{"Index": "90/01"}, {"Index": "90/02"}],
