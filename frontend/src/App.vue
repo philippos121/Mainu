@@ -6,6 +6,22 @@
         <img src="/logo-white.svg" alt="AI:ssociate" class="topbar-logo" />
         <span class="topbar-badge">Law Monitoring</span>
       </router-link>
+
+      <!-- Logo marquee — replace SVGs with real PNGs in /public/logos/ -->
+      <div class="marquee">
+        <div class="marquee-track">
+          <img src="/logos/bpp.svg" alt="bpp.law" />
+          <img src="/logos/logo2.svg" alt="Partner" />
+          <img src="/logos/fink.svg" alt="Fink+Partner" />
+          <img src="/logos/flgoe.svg" alt="FLGÖ" />
+          <img src="/logos/logo5.svg" alt="Partner" />
+          <img src="/logos/bpp.svg" alt="bpp.law" />
+          <img src="/logos/logo2.svg" alt="Partner" />
+          <img src="/logos/fink.svg" alt="Fink+Partner" />
+          <img src="/logos/flgoe.svg" alt="FLGÖ" />
+          <img src="/logos/logo5.svg" alt="Partner" />
+        </div>
+      </div>
     </header>
 
     <main class="main">
@@ -71,6 +87,41 @@ body {
   margin-top: -8px;
   align-self: flex-start;
   padding-top: 4px;
+}
+
+/* ── Logo Marquee ── */
+.marquee {
+  flex: 1;
+  overflow: hidden;
+  margin: 0 32px;
+  mask-image: linear-gradient(90deg, transparent, white 10%, white 90%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, white 10%, white 90%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  animation: scroll 25s linear infinite;
+  width: max-content;
+}
+
+.marquee-track img {
+  height: 28px;
+  width: auto;
+  opacity: 0.55;
+  filter: brightness(0) invert(1);
+  transition: opacity 0.3s;
+  flex-shrink: 0;
+}
+
+.marquee-track img:hover {
+  opacity: 0.9;
+}
+
+@keyframes scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 .topbar-tagline {
   font-size: 13px; font-weight: 500;
