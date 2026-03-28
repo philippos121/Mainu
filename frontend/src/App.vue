@@ -3,11 +3,8 @@
     <!-- Top bar -->
     <header class="topbar">
       <router-link to="/" class="topbar-logo">
-        <img src="/logo.svg" alt="AI:ssociate" />
+        <img src="/logo-white.svg" alt="AI:ssociate" />
       </router-link>
-      <nav class="topbar-nav">
-        <span class="topbar-tagline">Legal Change Tracker</span>
-      </nav>
     </header>
 
     <main class="main">
@@ -28,7 +25,7 @@
   --teal-50: #e8f6f9;
   --orange: #ef6007;
   --orange-50: #fff4ed;
-  --navy: #052e31;
+  --navy: #0f3d49;
   --bg: #f4f6f8;
   --card: #ffffff;
   --text: #111827;
