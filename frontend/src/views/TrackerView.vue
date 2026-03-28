@@ -296,10 +296,10 @@ async function doEmailReport() {
   background: var(--orange); color: white;
   font-size: 14px; font-weight: 600; font-family: inherit;
   cursor: pointer; transition: all 0.15s;
-  box-shadow: 0 2px 8px rgba(239,96,7,0.2);
+  box-shadow: 0 4px 12px rgba(255,151,51,0.35);
   margin-bottom: 16px;
 }
-.btn-go:hover { background: #d45506; transform: translateY(-1px); }
+.btn-go:hover { background: #ef8a1a; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255,151,51,0.5); }
 .btn-go:disabled { opacity: 0.6; cursor: wait; }
 
 .sb-ai { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 8px; }

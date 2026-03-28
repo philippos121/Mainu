@@ -2,8 +2,9 @@
   <v-app>
     <!-- Top bar -->
     <header class="topbar">
-      <router-link to="/" class="topbar-logo">
-        <img src="/logo-white.svg" alt="AI:ssociate" />
+      <router-link to="/" class="topbar-brand">
+        <img src="/logo-white.svg" alt="AI:ssociate" class="topbar-logo" />
+        <span class="topbar-badge">Law Monitoring</span>
       </router-link>
     </header>
 
@@ -23,8 +24,8 @@
   --teal: #007993;
   --teal-dark: #005f73;
   --teal-50: #e8f6f9;
-  --orange: #ef6007;
-  --orange-50: #fff4ed;
+  --orange: #ff9733;
+  --orange-50: #fff8ed;
   --navy: #0a5062;
   --bg: #f4f6f8;
   --card: #ffffff;
@@ -55,13 +56,22 @@ body {
   gap: 24px;
   box-shadow: 0 1px 0 rgba(0,121,147,0.2);
 }
-.topbar-logo {
-  display: flex; align-items: center;
+.topbar-brand {
+  display: flex; align-items: center; gap: 12px;
   text-decoration: none;
   transition: opacity 0.2s;
 }
-.topbar-logo:hover { opacity: 0.85; }
-.topbar-logo img { height: 28px; width: auto; filter: brightness(0) invert(1); }
+.topbar-brand:hover { opacity: 0.85; }
+.topbar-logo { height: 28px; width: auto; }
+.topbar-badge {
+  font-size: 11px; font-weight: 600;
+  color: var(--orange);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-top: -8px;
+  align-self: flex-start;
+  padding-top: 4px;
+}
 .topbar-tagline {
   font-size: 13px; font-weight: 500;
   color: rgba(255,255,255,0.45);
