@@ -7,11 +7,12 @@
         <span class="topbar-badge">Law Monitoring</span>
       </router-link>
 
-      <!-- Logo marquee -->
-      <div class="marquee">
-        <div class="marquee-track" ref="marqueeTrack">
+      <!-- Logo marquee — only shows if logo files exist in /public/ -->
+      <div v-if="partnerLogos.length" class="marquee">
+        <div class="marquee-track">
           <template v-for="(_, copy) in 2" :key="copy">
-            <img v-for="logo in partnerLogos" :key="copy+'-'+logo.alt" :src="logo.src" :alt="logo.alt" />
+            <img v-for="logo in partnerLogos" :key="copy+'-'+logo.alt"
+              :src="logo.src" :alt="logo.alt" @error="$event.target.style.display='none'" />
           </template>
         </div>
       </div>
