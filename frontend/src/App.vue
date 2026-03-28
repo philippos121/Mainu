@@ -62,7 +62,7 @@ body {
   transition: opacity 0.2s;
 }
 .topbar-brand:hover { opacity: 0.85; }
-.topbar-logo { height: 28px; width: auto; }
+.topbar-logo { height: 26px; width: auto; display: block; }
 .topbar-badge {
   font-size: 11px; font-weight: 600;
   color: var(--orange);
