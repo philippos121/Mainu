@@ -1,36 +1,28 @@
 <template>
-  <div class="tracker-page">
-    <div class="tracker-content">
-      <!-- Header -->
-      <div class="header">
-        <div class="header-logo">
-          <img src="/logo.svg" alt="AI:SSOCIATE" class="header-logo-img" />
-        </div>
-        <p class="header-sub">Rechtsänderungen in Österreich</p>
-      </div>
+  <div class="page">
+    <div class="content">
+      <!-- Hero -->
+      <header class="hero">
+        <img src="/logo.svg" alt="AI:ssociate" class="hero-logo" />
+        <p class="hero-sub">Rechtsänderungen in Österreich</p>
+      </header>
 
-      <!-- Document Type Toggle -->
+      <!-- Toggle -->
       <div class="toggle-row">
-        <div class="toggle-wrap">
-          <button
-            :class="['toggle-btn', docType === 'gesetze' && 'toggle-active']"
-            @click="docType = 'gesetze'"
-          >
-            Gesetze
+        <div class="toggle">
+          <button :class="['toggle-btn', docType === 'gesetze' && 'active']" @click="docType = 'gesetze'">
+            <v-icon size="15" class="mr-1">mdi-scale-balance</v-icon>Gesetze
           </button>
-          <button
-            :class="['toggle-btn', docType === 'gerichtsentscheidungen' && 'toggle-active']"
-            @click="docType = 'gerichtsentscheidungen'"
-          >
-            Entscheidungen
+          <button :class="['toggle-btn', docType === 'gerichtsentscheidungen' && 'active']" @click="docType = 'gerichtsentscheidungen'">
+            <v-icon size="15" class="mr-1">mdi-gavel</v-icon>Entscheidungen
           </button>
         </div>
       </div>
 
-      <!-- Filter bar -->
-      <div class="filter-bar">
-        <div class="filter-fields">
-          <div class="filter-field">
+      <!-- Search bar -->
+      <div class="search-bar">
+        <div class="search-fields">
+          <div class="search-field search-field-wide">
             <v-select
               v-model="selectedCategory"
               :items="groupedCategories"
@@ -44,13 +36,12 @@
               closable-chips
               clearable
               hide-details
-              prepend-inner-icon="mdi-scale-balance"
               placeholder="Rechtsgebiete wählen"
               color="#007993"
-              base-color="#9ca3af"
+              base-color="#5f6d7e"
             />
           </div>
-          <div class="filter-field">
+          <div class="search-field">
             <v-select
               v-model="selectedTimeframe"
               :items="timeframes"
@@ -60,276 +51,166 @@
               variant="outlined"
               density="comfortable"
               hide-details
-              prepend-inner-icon="mdi-calendar-range"
               color="#007993"
-              base-color="#9ca3af"
+              base-color="#5f6d7e"
             />
           </div>
-          <button class="search-btn" :disabled="loading" @click="searchFresh">
+          <button class="btn-search" :disabled="loading" @click="searchFresh">
             <span v-if="loading" class="spinner"></span>
-            <v-icon v-else size="18" class="mr-2">mdi-magnify</v-icon>
-            Suchen
+            <v-icon v-else size="18">mdi-magnify</v-icon>
+            <span class="btn-label">Suchen</span>
           </button>
         </div>
       </div>
 
       <!-- Error -->
-      <div v-if="error" class="error-banner">{{ error }}</div>
+      <div v-if="error" class="alert alert-error">{{ error }}</div>
 
       <!-- Results -->
-      <div v-if="searched && !loading" class="results-section">
-        <div class="results-header">
-          <span class="results-count">
-            {{ totalHits.toLocaleString('de-AT') }} Ergebnis{{ totalHits !== 1 ? 'se' : '' }}
-          </span>
-          <span class="results-filter">
-            {{ categoryLabel }} · {{ timeframeLabel }}
-          </span>
+      <div v-if="searched && !loading" class="results">
+        <!-- Results header -->
+        <div class="results-head">
+          <div class="results-count">
+            <span class="count-num">{{ totalHits.toLocaleString('de-AT') }}</span>
+            <span class="count-label">Ergebnis{{ totalHits !== 1 ? 'se' : '' }}</span>
+          </div>
+          <span class="results-meta">{{ categoryLabel }} · {{ timeframeLabel }}</span>
         </div>
 
-        <!-- Empty state -->
-        <div v-if="results.length === 0" class="empty-state">
-          <v-icon size="48" color="#d1d5db">mdi-file-search-outline</v-icon>
-          <p>Keine Ergebnisse für die gewählten Filter.</p>
+        <!-- Empty -->
+        <div v-if="results.length === 0" class="empty">
+          <v-icon size="48" color="#c4c8cc">mdi-file-search-outline</v-icon>
+          <p>Keine Ergebnisse gefunden.</p>
         </div>
 
-        <!-- Info banner -->
-        <div v-if="results.length > 0" class="info-banner">
-          <v-icon size="16" color="#007993" class="mr-2">mdi-information-outline</v-icon>
-          <span>
-            Gefiltert nach Bestimmungen mit Inkrafttreten im gewählten Zeitraum.
-            Klicken Sie „Änderungen anzeigen" für einen Vergleich mit der Vorversion.
-          </span>
-        </div>
-
-        <!-- Gesetze Results -->
+        <!-- Gesetze cards -->
         <template v-if="docType === 'gesetze'">
-          <div v-for="item in results" :key="item.id" class="result-wrapper">
-            <div class="result-card">
-              <div class="result-icon result-icon-teal">
-                <v-icon color="#007993" size="18">mdi-scale-balance</v-icon>
-              </div>
-              <div class="result-body">
-                <a :href="item.url" target="_blank" rel="noopener" class="result-title-link">
-                  {{ item.title }}
-                </a>
-                <div class="result-meta">
-                  <span v-if="isExpired(item)" class="chip chip-expired">
-                    <v-icon size="10" class="mr-1">mdi-close-circle</v-icon>Außer Kraft seit {{ formatDate(item.ausserkraft) }}
-                  </span>
+          <div v-for="(item, idx) in results" :key="item.id" class="card" :style="`animation-delay:${idx * 0.03}s`">
+            <div class="card-main">
+              <div class="card-icon card-icon-teal"><v-icon color="#007993" size="18">mdi-scale-balance</v-icon></div>
+              <div class="card-body">
+                <a :href="item.url" target="_blank" rel="noopener" class="card-title">{{ item.title }}</a>
+                <div class="card-chips">
+                  <span v-if="isExpired(item)" class="chip chip-red">Außer Kraft {{ formatDate(item.ausserkraft) }}</span>
                   <span v-if="item.typ" class="chip chip-teal">{{ item.typ }}</span>
                   <span v-if="item.artikel" class="chip chip-orange">{{ item.artikel }}</span>
-                  <span v-if="item.date" class="meta-text">
-                    <v-icon size="12" class="mr-1">mdi-gavel</v-icon>In Kraft: {{ formatDate(item.date) }}
-                  </span>
-                  <span v-if="item.bgbl" class="meta-text">· {{ item.bgbl }}</span>
-                  <span v-if="item.ris_updated" class="meta-text meta-text-dim">
-                    · <v-icon size="12" class="mr-1">mdi-database-refresh-outline</v-icon>RIS: {{ formatDate(item.ris_updated) }}
-                  </span>
+                  <span v-if="item.date" class="chip chip-ghost">{{ formatDate(item.date) }}</span>
+                  <span v-if="item.bgbl" class="chip chip-ghost">{{ item.bgbl }}</span>
                 </div>
-                <!-- Diff toggle button (when we have Gesetzesnummer + Artikel) -->
-                <button
-                  v-if="item.gesetzesnummer && item.artikel"
-                  class="diff-toggle-btn"
-                  :class="{ 'diff-toggle-active': diffOpen[item.id] }"
-                  @click.stop="toggleDiff(item)"
-                >
-                  <span v-if="diffLoading[item.id]" class="spinner spinner-sm"></span>
-                  <v-icon v-else size="14" class="mr-1">
-                    {{ diffOpen[item.id] ? 'mdi-chevron-up' : 'mdi-compare' }}
-                  </v-icon>
-                  {{ diffLoading[item.id] ? 'Lade Versionen...' :
-                     diffOpen[item.id] ? 'Vergleich schließen' : 'Änderungen anzeigen' }}
+                <!-- Diff button -->
+                <button v-if="item.gesetzesnummer && item.artikel" class="btn-diff" @click.stop="toggleDiff(item)">
+                  <span v-if="diffLoading[item.id]" class="spinner-sm"></span>
+                  <v-icon v-else size="14">{{ diffOpen[item.id] ? 'mdi-chevron-up' : 'mdi-compare' }}</v-icon>
+                  {{ diffLoading[item.id] ? 'Lädt...' : diffOpen[item.id] ? 'Schließen' : 'Änderungen' }}
                 </button>
               </div>
-              <a :href="item.url" target="_blank" rel="noopener" class="result-ext-link">
-                <v-icon size="14" color="#d1d5db">mdi-open-in-new</v-icon>
-              </a>
+              <a :href="item.url" target="_blank" rel="noopener" class="card-ext"><v-icon size="14" color="#c4c8cc">mdi-open-in-new</v-icon></a>
             </div>
-            <!-- Inline diff display -->
-            <div v-if="diffOpen[item.id] && diffData[item.id]" class="diff-panel">
-              <div v-if="diffData[item.id].has_changes" class="diff-versions">
-                <div class="diff-version-info">
-                  <span class="diff-label diff-label-old">Vorversion</span>
-                  <span v-if="diffData[item.id].previous" class="diff-date">
-                    In Kraft: {{ formatDate(diffData[item.id].previous.date) }}
-                    <span v-if="diffData[item.id].previous.info"> · {{ diffData[item.id].previous.info }}</span>
-                  </span>
+            <!-- Diff panel -->
+            <transition name="slide">
+              <div v-if="diffOpen[item.id] && (diffData[item.id] || diffErrors[item.id])" class="diff-panel">
+                <div v-if="diffData[item.id] && diffData[item.id].has_changes" class="diff-versions">
+                  <span class="diff-v diff-v-old">{{ diffData[item.id].previous?.date }}</span>
+                  <v-icon size="14" color="#9ca3af">mdi-arrow-right</v-icon>
+                  <span class="diff-v diff-v-new">{{ diffData[item.id].current?.date }}</span>
                 </div>
-                <div class="diff-version-info">
-                  <span class="diff-label diff-label-new">Aktuelle Fassung</span>
-                  <span v-if="diffData[item.id].current" class="diff-date">
-                    In Kraft: {{ formatDate(diffData[item.id].current.date) }}
-                    <span v-if="diffData[item.id].current.info"> · {{ diffData[item.id].current.info }}</span>
-                  </span>
-                </div>
+                <div v-if="diffData[item.id]" class="diff-body" v-html="diffData[item.id].diff_html"></div>
+                <div v-if="diffErrors[item.id]" class="diff-error">{{ diffErrors[item.id] }}</div>
               </div>
-              <div class="diff-legend" v-if="diffData[item.id].has_changes">
-                <span class="diff-legend-item"><span class="diff-del-sample">&nbsp;</span> Entfernt</span>
-                <span class="diff-legend-item"><span class="diff-ins-sample">&nbsp;</span> Hinzugefügt</span>
-              </div>
-              <div class="diff-content" v-html="diffData[item.id].diff_html"></div>
-            </div>
-            <!-- Diff error -->
-            <div v-if="diffOpen[item.id] && diffErrors[item.id]" class="diff-error">
-              {{ diffErrors[item.id] }}
-            </div>
+            </transition>
           </div>
         </template>
 
-        <!-- Gerichtsentscheidungen Results -->
+        <!-- Entscheidungen cards -->
         <template v-if="docType === 'gerichtsentscheidungen'">
-          <a
-            v-for="item in results"
-            :key="item.id"
-            :href="item.url"
-            target="_blank"
-            rel="noopener"
-            class="result-card"
-          >
-            <div class="result-icon result-icon-orange">
-              <v-icon color="#ef6007" size="18">mdi-gavel</v-icon>
+          <a v-for="(item, idx) in results" :key="item.id" :href="item.url" target="_blank" rel="noopener"
+             class="card card-link" :style="`animation-delay:${idx * 0.03}s`">
+            <div class="card-main">
+              <div class="card-icon card-icon-orange"><v-icon color="#ef6007" size="18">mdi-gavel</v-icon></div>
+              <div class="card-body">
+                <div class="card-title">{{ item.title }}</div>
+                <div v-if="item.rechtssatz" class="card-rs">{{ item.rechtssatz }}</div>
+                <div class="card-chips">
+                  <span class="chip chip-teal">{{ item.court }}</span>
+                  <span v-if="item.case_number" class="chip chip-orange">{{ item.case_number }}</span>
+                  <span v-if="item.date" class="chip chip-ghost">{{ formatDate(item.date) }}</span>
+                </div>
+              </div>
+              <v-icon size="14" color="#c4c8cc" class="card-ext">mdi-open-in-new</v-icon>
             </div>
-            <div class="result-body">
-              <div class="result-title">{{ item.title }}</div>
-              <div v-if="item.rechtssatz" class="result-subtitle result-rechtssatz">
-                {{ item.rechtssatz }}
-              </div>
-              <div v-else-if="item.normen" class="result-subtitle">
-                Normen: {{ item.normen }}
-              </div>
-              <div class="result-meta">
-                <span class="chip chip-teal">{{ item.court }}</span>
-                <span v-if="item.case_number" class="chip chip-orange">{{ item.case_number }}</span>
-                <span v-if="item.doc_typ" class="chip" style="background: rgba(99,102,241,0.08); color: #6366f1">
-                  {{ item.doc_typ }}
-                </span>
-                <span v-if="item.date" class="meta-text">
-                  <v-icon size="12" class="mr-1">mdi-calendar</v-icon>{{ formatDate(item.date) }}
-                </span>
-              </div>
-            </div>
-            <v-icon size="14" color="#d1d5db" class="result-ext">mdi-open-in-new</v-icon>
           </a>
         </template>
 
         <!-- Pagination -->
-        <div v-if="totalHits > 20" class="pagination-row">
-          <v-pagination
-            v-model="page"
-            :length="Math.ceil(totalHits / 20)"
-            :total-visible="7"
-            rounded="lg"
-            active-color="#007993"
-            @update:model-value="search"
-          />
+        <div v-if="totalHits > 20" class="pagination">
+          <v-pagination v-model="page" :length="Math.ceil(totalHits / 20)" :total-visible="7"
+            rounded="lg" active-color="#007993" @update:model-value="search" />
         </div>
 
-        <!-- ── AI Actions bar ── -->
-        <div v-if="results.length > 0" class="ai-actions-bar">
-          <div class="ai-actions-header">
-            <v-icon color="#007993" size="20" class="mr-2">mdi-brain</v-icon>
-            <span class="ai-actions-title">AI-Analyse</span>
+        <!-- AI Section -->
+        <div v-if="results.length > 0" class="ai-section">
+          <div class="ai-header">
+            <div class="ai-badge">AI</div>
+            <span class="ai-title">Analyse & Report</span>
           </div>
 
-          <!-- API Key Input -->
-          <div class="api-key-row">
-            <v-text-field
-              v-model="apiKey"
-              :type="showApiKey ? 'text' : 'password'"
-              label="OpenAI API-Key"
-              variant="outlined"
-              density="compact"
-              hide-details
-              placeholder="sk-..."
-              prepend-inner-icon="mdi-key-variant"
-              color="#007993"
-              base-color="#9ca3af"
-              class="api-key-input"
-            >
-              <template #append-inner>
-                <v-btn
-                  icon
-                  variant="text"
-                  size="x-small"
-                  @click="showApiKey = !showApiKey"
-                >
-                  <v-icon size="18">{{ showApiKey ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
-                </v-btn>
-              </template>
-            </v-text-field>
+          <div class="ai-grid">
+            <!-- API Key -->
+            <div class="ai-field">
+              <v-text-field v-model="apiKey" :type="showApiKey ? 'text' : 'password'"
+                label="OpenAI API-Key" variant="outlined" density="compact" hide-details
+                placeholder="sk-..." prepend-inner-icon="mdi-key-variant" color="#007993">
+                <template #append-inner>
+                  <v-btn icon variant="text" size="x-small" @click="showApiKey = !showApiKey">
+                    <v-icon size="16">{{ showApiKey ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+                  </v-btn>
+                </template>
+              </v-text-field>
+            </div>
+
+            <!-- Buttons -->
+            <div class="ai-actions">
+              <button class="btn btn-teal" :disabled="!apiKey || summarising" @click="doSummarise">
+                <span v-if="summarising" class="spinner-sm"></span>
+                <v-icon v-else size="15">mdi-text-box-outline</v-icon>
+                {{ summarising ? 'Erstellt...' : 'Zusammenfassung' }}
+              </button>
+              <button class="btn btn-navy" :disabled="generatingReport" @click="doReport">
+                <span v-if="generatingReport" class="spinner-sm"></span>
+                <v-icon v-else size="15">mdi-file-download-outline</v-icon>
+                {{ generatingReport ? 'Erstellt...' : 'Report' }}
+              </button>
+            </div>
+
+            <!-- Email -->
+            <div class="ai-email">
+              <v-text-field v-model="reportEmail" type="email" label="E-Mail" variant="outlined"
+                density="compact" hide-details placeholder="name@kanzlei.at"
+                prepend-inner-icon="mdi-email-outline" color="#007993" />
+              <button class="btn btn-purple" :disabled="!reportEmail || sendingEmail" @click="doEmailReport">
+                <span v-if="sendingEmail" class="spinner-sm"></span>
+                <v-icon v-else size="15">mdi-send</v-icon>
+                {{ sendingEmail ? 'Sendet...' : 'Senden' }}
+              </button>
+            </div>
           </div>
 
-          <!-- Action Buttons -->
-          <div class="ai-buttons">
-            <button
-              class="ai-btn ai-btn-summary"
-              :disabled="!apiKey || summarising"
-              @click="doSummarise"
-            >
-              <span v-if="summarising" class="spinner spinner-sm"></span>
-              <v-icon v-else size="16" class="mr-1">mdi-text-box-outline</v-icon>
-              {{ summarising ? 'Zusammenfassung wird erstellt...' : 'Zusammenfassung erstellen' }}
-            </button>
-            <button
-              class="ai-btn ai-btn-report"
-              :disabled="generatingReport"
-              @click="doReport"
-            >
-              <span v-if="generatingReport" class="spinner spinner-sm"></span>
-              <v-icon v-else size="16" class="mr-1">mdi-file-download-outline</v-icon>
-              {{ generatingReport ? 'Report wird erstellt...' : 'Interaktiven Report herunterladen' }}
-            </button>
-          </div>
-
-          <!-- Email delivery -->
-          <div class="email-row">
-            <v-text-field
-              v-model="reportEmail"
-              type="email"
-              label="E-Mail für Report-Versand"
-              variant="outlined"
-              density="compact"
-              hide-details
-              placeholder="name@kanzlei.at"
-              prepend-inner-icon="mdi-email-outline"
-              color="#007993"
-              base-color="#9ca3af"
-              class="email-input"
-            />
-            <button
-              class="ai-btn ai-btn-email"
-              :disabled="!reportEmail || sendingEmail"
-              @click="doEmailReport"
-            >
-              <span v-if="sendingEmail" class="spinner spinner-sm"></span>
-              <v-icon v-else size="16" class="mr-1">mdi-send</v-icon>
-              {{ sendingEmail ? 'Wird gesendet...' : 'Per E-Mail senden' }}
-            </button>
-          </div>
-
-          <!-- Summary display -->
-          <div v-if="summaryText" class="summary-box">
-            <div class="summary-box-header">
-              <v-icon color="#007993" size="18" class="mr-2">mdi-text-box-check-outline</v-icon>
-              <span class="summary-box-title">GPT-Zusammenfassung</span>
-              <v-spacer />
+          <!-- Summary -->
+          <div v-if="summaryText" class="summary-card">
+            <div class="summary-head">
+              <v-icon color="#007993" size="18">mdi-text-box-check-outline</v-icon>
+              <span>Rechtliche Analyse</span>
               <button class="summary-close" @click="summaryText = ''">&times;</button>
             </div>
-            <div class="summary-box-content" v-html="renderMarkdown(summaryText)"></div>
+            <div class="summary-body" v-html="renderMarkdown(summaryText)"></div>
           </div>
 
-          <!-- Summary error -->
-          <div v-if="summaryError" class="error-banner mt-3">
-            {{ summaryError }}
-          </div>
+          <div v-if="summaryError" class="alert alert-error" style="margin-top:12px">{{ summaryError }}</div>
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="footer">
-        Daten aus dem Rechtsinformationssystem des Bundes (RIS)
-      </div>
+      <footer class="footer">Datenquelle: Rechtsinformationssystem des Bundes (RIS)</footer>
     </div>
   </div>
 </template>
@@ -342,7 +223,7 @@ const hasLogo = ref(false)
 const docType = ref('gesetze')
 const categories = ref([])
 const timeframes = ref([])
-const selectedCategory = ref([])  // Array for multi-select
+const selectedCategory = ref([])
 const selectedTimeframe = ref('EinemMonat')
 const loading = ref(false)
 const searched = ref(false)
@@ -351,13 +232,11 @@ const results = ref([])
 const totalHits = ref(0)
 const page = ref(1)
 
-// Diff / version comparison
-const diffOpen = ref({})     // { [docId]: true/false }
-const diffData = ref({})     // { [docId]: { current, previous, diff_html, has_changes } }
-const diffLoading = ref({})  // { [docId]: true/false }
-const diffErrors = ref({})   // { [docId]: "error message" }
+const diffOpen = ref({})
+const diffData = ref({})
+const diffLoading = ref({})
+const diffErrors = ref({})
 
-// AI features
 const apiKey = ref(localStorage.getItem('ris_openai_key') || '')
 const showApiKey = ref(false)
 const summarising = ref(false)
@@ -367,48 +246,29 @@ const generatingReport = ref(false)
 const reportEmail = ref(localStorage.getItem('ris_report_email') || '')
 const sendingEmail = ref(false)
 
-// Persist API key
 watch(apiKey, (v) => {
   if (v) localStorage.setItem('ris_openai_key', v)
   else localStorage.removeItem('ris_openai_key')
 })
 
-onMounted(() => {
-  loadFilters()
-  const img = new Image()
-  img.onload = () => { hasLogo.value = true }
-  img.onerror = () => { hasLogo.value = false }
-  img.src = '/logo.svg'
-})
+onMounted(() => { loadFilters() })
 
 watch(docType, () => {
-  if (searched.value) {
-    page.value = 1
-    search()
-  }
+  if (searched.value) { page.value = 1; search() }
 })
 
-// Build grouped categories for the dropdown
 const groupedCategories = computed(() => {
-  const items = []
-  let lastGroup = null
-  for (const cat of categories.value) {
-    if (cat.group && cat.group !== lastGroup) {
-      items.push({ label: cat.group, isGroupHeader: true, id: `__group_${cat.group}` })
-      lastGroup = cat.group
-    }
-    items.push({ ...cat, isGroupHeader: false })
-  }
-  return items.filter(i => !i.isGroupHeader)
+  return categories.value.map(c => ({ ...c }))
 })
 
 const categoryLabel = computed(() => {
-  if (!selectedCategory.value || selectedCategory.value.length === 0) return 'Alle Rechtsgebiete'
-  if (selectedCategory.value.length === 1) {
-    const cat = categories.value.find(c => c.id === selectedCategory.value[0])
+  const cats = selectedCategory.value || []
+  if (cats.length === 0) return 'Alle Rechtsgebiete'
+  if (cats.length === 1) {
+    const cat = categories.value.find(c => c.id === cats[0])
     return cat ? cat.label : ''
   }
-  return `${selectedCategory.value.length} Rechtsgebiete`
+  return `${cats.length} Rechtsgebiete`
 })
 
 const timeframeLabel = computed(() => {
@@ -420,12 +280,9 @@ function isExpired(item) {
   if (!item.ausserkraft) return false
   try {
     let d = item.ausserkraft
-    if (d.includes('.')) {
-      const [day, month, year] = d.split('.')
-      d = `${year}-${month}-${day}`
-    }
+    if (d.includes('.')) { const [day, month, year] = d.split('.'); d = `${year}-${month}-${day}` }
     if (d.includes('T')) d = d.split('T')[0]
-    if (d === '9999-12-31') return false // Standard "no expiry"
+    if (d === '9999-12-31') return false
     return new Date(d) < new Date()
   } catch { return false }
 }
@@ -434,974 +291,380 @@ function formatDate(dateStr) {
   if (!dateStr) return ''
   try {
     if (dateStr.includes('T')) dateStr = dateStr.split('T')[0]
-    if (dateStr.includes('-')) {
-      const [y, m, d] = dateStr.split('-')
-      return `${d}.${m}.${y}`
-    }
+    if (dateStr.includes('-')) { const [y, m, d] = dateStr.split('-'); return `${d}.${m}.${y}` }
     return dateStr
   } catch { return dateStr }
 }
 
 function renderMarkdown(md) {
   if (!md) return ''
-  let html = md
-  html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>')
-  html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>')
-  html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  html = html.replace(/^[-•] (.+)$/gm, '<li>$1</li>')
-  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-  html = html.replace(/\n\n/g, '</p><p>')
-  html = `<p>${html}</p>`
-  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/gs, '<ul>$1</ul>')
-  return html
+  let h = md
+  h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>')
+  h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>')
+  h = h.replace(/^# (.+)$/gm, '<h2>$1</h2>')
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  h = h.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  h = h.replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+  h = h.replace(/\n\n/g, '</p><p>')
+  h = `<p>${h}</p>`
+  h = h.replace(/((?:<li>.*?<\/li>\s*)+)/gs, '<ul>$1</ul>')
+  return h
 }
 
 async function loadFilters() {
   try {
-    const [catRes, tfRes] = await Promise.all([
-      api.get('/categories'),
-      api.get('/timeframes'),
-    ])
+    const [catRes, tfRes] = await Promise.all([api.get('/categories'), api.get('/timeframes')])
     categories.value = catRes.data
     timeframes.value = tfRes.data
-  } catch (e) {
-    error.value = 'Filter konnten nicht geladen werden.'
-  }
+  } catch (e) { error.value = 'Filter konnten nicht geladen werden.' }
 }
 
 async function toggleDiff(item) {
   const id = item.id
-  if (diffOpen.value[id]) {
-    diffOpen.value[id] = false
-    return
-  }
-  // Already loaded?
-  if (diffData.value[id]) {
-    diffOpen.value[id] = true
-    return
-  }
-  // Fetch diff
-  diffOpen.value[id] = true
-  diffLoading.value[id] = true
-  diffErrors.value[id] = ''
+  if (diffOpen.value[id]) { diffOpen.value[id] = false; return }
+  if (diffData.value[id]) { diffOpen.value[id] = true; return }
+  diffOpen.value[id] = true; diffLoading.value[id] = true; diffErrors.value[id] = ''
   try {
     const resp = await api.get('/diff', { params: {
-      doc_id: item.id || '',
-      gesetzesnummer: item.gesetzesnummer || '',
-      artikel: item.artikel || '',
-      inkrafttreten: item.date || '',
+      doc_id: item.id || '', gesetzesnummer: item.gesetzesnummer || '',
+      artikel: item.artikel || '', inkrafttreten: item.date || '',
     } })
     diffData.value[id] = resp.data
   } catch (e) {
-    const detail = e.response?.data?.detail
-    diffErrors.value[id] = typeof detail === 'string'
-      ? detail
-      : Array.isArray(detail) ? detail.map(d => d.msg).join(', ')
-      : 'Fehler beim Laden der Versionen.'
-    diffOpen.value[id] = true // keep open to show error
-  } finally {
-    diffLoading.value[id] = false
-  }
+    const d = e.response?.data?.detail
+    diffErrors.value[id] = typeof d === 'string' ? d : 'Fehler beim Laden.'
+    diffOpen.value[id] = true
+  } finally { diffLoading.value[id] = false }
 }
 
 async function searchFresh() {
-  page.value = 1
-  summaryText.value = ''
-  summaryError.value = ''
-  // Reset diff state
-  diffOpen.value = {}
-  diffData.value = {}
-  diffErrors.value = {}
+  page.value = 1; summaryText.value = ''; summaryError.value = ''
+  diffOpen.value = {}; diffData.value = {}; diffErrors.value = {}
   await search()
 }
 
 async function search() {
-  loading.value = true
-  error.value = ''
-  searched.value = true
-
-  const endpoint = docType.value === 'gesetze'
-    ? '/search/gesetze'
-    : '/search/gerichtsentscheidungen'
-
+  loading.value = true; error.value = ''; searched.value = true
+  const endpoint = docType.value === 'gesetze' ? '/search/gesetze' : '/search/gerichtsentscheidungen'
   const cats = selectedCategory.value || []
-
   try {
     let resp
     if (cats.length <= 1) {
-      // Single or no category
       const params = { im_ris_seit: selectedTimeframe.value, page: page.value }
       if (cats.length === 1) params.category = cats[0]
       resp = await api.get(endpoint, { params })
     } else {
-      // Multi-category: query each in parallel, merge
-      const promises = cats.map(cat =>
-        api.get(endpoint, { params: { im_ris_seit: selectedTimeframe.value, page: 1, category: cat } })
-      )
+      const promises = cats.map(cat => api.get(endpoint, { params: { im_ris_seit: selectedTimeframe.value, page: 1, category: cat } }))
       const responses = await Promise.all(promises)
-      const allResults = []
-      let allHits = 0
-      const seenIds = new Set()
+      const all = []; let hits = 0; const seen = new Set()
       for (const r of responses) {
-        allHits += r.data.total_hits || 0
-        for (const item of (r.data.results || [])) {
-          if (!seenIds.has(item.id)) {
-            seenIds.add(item.id)
-            allResults.push(item)
-          }
-        }
+        hits += r.data.total_hits || 0
+        for (const item of (r.data.results || [])) { if (!seen.has(item.id)) { seen.add(item.id); all.push(item) } }
       }
-      resp = { data: { results: allResults, total_hits: allHits } }
+      resp = { data: { results: all, total_hits: hits } }
     }
-    results.value = resp.data.results || []
-    totalHits.value = resp.data.total_hits || 0
-  } catch (e) {
-    error.value = 'Fehler bei der Suche. Bitte versuchen Sie es erneut.'
-    results.value = []
-    totalHits.value = 0
-  } finally {
-    loading.value = false
-  }
+    results.value = resp.data.results || []; totalHits.value = resp.data.total_hits || 0
+  } catch (e) { error.value = 'Fehler bei der Suche.'; results.value = []; totalHits.value = 0 }
+  finally { loading.value = false }
 }
 
 async function doSummarise() {
   if (!apiKey.value || !results.value.length) return
-  summarising.value = true
-  summaryText.value = ''
-  summaryError.value = ''
-
+  summarising.value = true; summaryText.value = ''; summaryError.value = ''
   try {
-    const resp = await api.post('/summarise', {
-      api_key: apiKey.value,
-      results: results.value,
-      doc_type: docType.value,
-    })
+    const resp = await api.post('/summarise', { api_key: apiKey.value, results: results.value, doc_type: docType.value })
     summaryText.value = resp.data.summary
-  } catch (e) {
-    summaryError.value = e.response?.data?.detail || 'Fehler bei der Zusammenfassung.'
-  } finally {
-    summarising.value = false
-  }
+  } catch (e) { summaryError.value = e.response?.data?.detail || 'Fehler.' }
+  finally { summarising.value = false }
 }
 
 async function doReport() {
-  if (!apiKey.value || !results.value.length) return
-  generatingReport.value = true
-  summaryError.value = ''
-
+  if (!results.value.length) return
+  generatingReport.value = true; summaryError.value = ''
   try {
-    // Collect any loaded diffs
     const diffs = {}
     for (const [id, data] of Object.entries(diffData.value)) {
-      if (data && data.has_changes) {
-        diffs[id] = {
-          diff_html: data.diff_html,
-          current: data.current,
-          previous: data.previous,
-        }
-      }
+      if (data?.has_changes) diffs[id] = { diff_html: data.diff_html, current: data.current, previous: data.previous }
     }
-
     const resp = await api.post('/report', {
-      api_key: apiKey.value || '',
-      results: results.value,
-      doc_type: docType.value,
-      category_label: categoryLabel.value,
-      timeframe_label: timeframeLabel.value,
-      total_hits: totalHits.value,
-      diffs: diffs,
+      api_key: apiKey.value || '', results: results.value, doc_type: docType.value,
+      category_label: categoryLabel.value, timeframe_label: timeframeLabel.value,
+      total_hits: totalHits.value, diffs,
     })
-
-    // Download as HTML file
     const blob = new Blob([resp.data.report_html], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const dateStr = new Date().toISOString().split('T')[0]
-    a.download = `RIS_Report_${dateStr}.html`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const url = URL.createObjectURL(blob); const a = document.createElement('a')
+    a.href = url; a.download = `RIS_Report_${new Date().toISOString().split('T')[0]}.html`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
   } catch (e) {
-    console.error('Report error:', e.response?.data || e.message || e)
-    const detail = e.response?.data?.detail
-    summaryError.value = typeof detail === 'string'
-      ? detail
-      : Array.isArray(detail) ? detail.map(d => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
-      : `Fehler: ${e.response?.status || ''} ${e.message || 'Unbekannt'}`
-  } finally {
-    generatingReport.value = false
-  }
+    const d = e.response?.data?.detail
+    summaryError.value = typeof d === 'string' ? d : `Fehler: ${e.message || 'Unbekannt'}`
+  } finally { generatingReport.value = false }
 }
 
 async function doEmailReport() {
   if (!reportEmail.value || !results.value.length) return
-  sendingEmail.value = true
-  summaryError.value = ''
+  sendingEmail.value = true; summaryError.value = ''
   localStorage.setItem('ris_report_email', reportEmail.value)
-
   try {
-    // Collect diffs
-    const diffsPayload = {}
+    const diffs = {}
     for (const [id, data] of Object.entries(diffData.value)) {
-      if (data && data.has_changes) {
-        diffsPayload[id] = { diff_html: data.diff_html, current: data.current, previous: data.previous }
-      }
+      if (data?.has_changes) diffs[id] = { diff_html: data.diff_html, current: data.current, previous: data.previous }
     }
-
     await api.post('/report/email', {
-      email: reportEmail.value,
-      api_key: apiKey.value || '',
-      results: results.value,
-      doc_type: docType.value,
-      category_label: categoryLabel.value,
-      timeframe_label: timeframeLabel.value,
-      total_hits: totalHits.value,
-      diffs: diffsPayload,
+      email: reportEmail.value, api_key: apiKey.value || '', results: results.value, doc_type: docType.value,
+      category_label: categoryLabel.value, timeframe_label: timeframeLabel.value,
+      total_hits: totalHits.value, diffs,
     })
-    summaryError.value = ''
     alert(`Report wird an ${reportEmail.value} gesendet.`)
   } catch (e) {
-    console.error('Email error:', e.response?.data || e)
-    const detail = e.response?.data?.detail
-    summaryError.value = typeof detail === 'string' ? detail
-      : `E-Mail-Versand fehlgeschlagen: ${e.message || 'Unbekannt'}`
-  } finally {
-    sendingEmail.value = false
-  }
+    summaryError.value = e.response?.data?.detail || `E-Mail fehlgeschlagen: ${e.message}`
+  } finally { sendingEmail.value = false }
 }
 </script>
 
 <style scoped>
-.tracker-page {
-  min-height: 100vh;
-  background: #f9fafb;
-  display: flex;
-  justify-content: center;
-}
+/* ── Page ── */
+.page { min-height: 100vh; display: flex; justify-content: center; }
+.content { width: 100%; max-width: 920px; padding: 40px 28px 60px; }
 
-.tracker-content {
-  width: 100%;
-  max-width: 960px;
-  padding: 40px 24px;
-}
-
-/* ── Header ── */
-.header {
+/* ── Hero ── */
+.hero {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
+  animation: fadeIn 0.6s ease-out;
 }
-
-.header-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-
-.header-logo-img {
-  height: 44px;
-  width: auto;
-}
-
-.unused-placeholder {
-  font-size: 36px;
-  font-weight: 300;
-  color: #0f3d49;
-  letter-spacing: 4px;
-}
-
-.header-sub {
-  font-size: 14px;
-  color: #9ca3af;
-  margin: 0;
-}
+.hero-logo { height: 48px; width: auto; }
+.hero-sub { font-size: 14px; color: var(--text-secondary); margin-top: 8px; letter-spacing: 0.3px; }
 
 /* ── Toggle ── */
-.toggle-row {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 28px;
+.toggle-row { display: flex; justify-content: center; margin-bottom: 28px; animation: fadeIn 0.6s 0.1s ease-out both; }
+.toggle {
+  display: inline-flex; border-radius: 100px;
+  background: var(--card); border: 1px solid var(--border);
+  padding: 4px; gap: 2px;
+  box-shadow: var(--shadow-sm);
 }
-
-.toggle-wrap {
-  display: inline-flex;
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: white;
-  padding: 3px;
-  gap: 2px;
-}
-
 .toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 9px 22px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #6b7280;
-  background: transparent;
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 10px 24px; font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); background: transparent;
+  border: none; border-radius: 100px; cursor: pointer;
+  font-family: inherit; transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-.toggle-active {
-  background: #ef6007;
-  color: white;
-  box-shadow: 0 1px 3px rgba(239, 96, 7, 0.3);
+.toggle-btn.active {
+  background: var(--orange); color: white;
+  box-shadow: 0 2px 8px rgba(239,96,7,0.25);
+  transform: scale(1.02);
 }
+.toggle-btn:not(.active):hover { color: var(--text); background: var(--teal-light); }
 
-.toggle-btn:not(.toggle-active):hover {
-  color: #374151;
-  background: #f3f4f6;
+/* ── Search bar ── */
+.search-bar {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); padding: 14px;
+  margin-bottom: 28px; box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.6s 0.15s ease-out both;
+  transition: box-shadow 0.3s;
 }
+.search-bar:focus-within { box-shadow: 0 0 0 3px rgba(0,121,147,0.1), var(--shadow-md); }
+.search-fields { display: flex; gap: 12px; align-items: center; }
+.search-field { flex: 1; min-width: 0; }
+.search-field-wide { flex: 2; }
 
-/* ── Filter bar ── */
-.filter-bar {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  padding: 12px;
-  margin-bottom: 28px;
+.btn-search {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 28px; background: var(--orange); color: white;
+  border: none; border-radius: 12px; font-size: 14px; font-weight: 600;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: all 0.2s; box-shadow: 0 2px 8px rgba(239,96,7,0.2);
 }
+.btn-search:hover { background: #d45506; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,96,7,0.3); }
+.btn-search:active { transform: translateY(0); }
+.btn-search:disabled { opacity: 0.6; cursor: wait; }
+.btn-label { display: inline; }
 
-.filter-fields {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.filter-field {
-  flex: 1;
-  min-width: 0;
-}
-
-.search-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 28px;
-  background: #ef6007;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s;
-  white-space: nowrap;
-  min-height: 48px;
-}
-
-.search-btn:hover { background: #c64708; }
-.search-btn:disabled { opacity: 0.7; cursor: wait; }
-
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  margin-right: 8px;
-}
-
-.spinner-sm {
-  width: 14px;
-  height: 14px;
-  border-width: 2px;
-  margin-right: 6px;
-}
-
-.diff-toggle-btn .spinner-sm {
-  border-color: rgba(0, 121, 147, 0.2);
-  border-top-color: #007993;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Category group headers ── */
-.category-group-header {
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  color: #007993 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 12px 16px 4px !important;
-  min-height: auto !important;
-}
-
-.category-item {
-  font-size: 13px;
-}
-
-/* ── Info banner ── */
-.info-banner {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-  background: rgba(0, 121, 147, 0.04);
-  border: 1px solid rgba(0, 121, 147, 0.12);
-  border-radius: 10px;
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 12px;
-}
-
-/* ── Error ── */
-.error-banner {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 14px;
-  margin-bottom: 20px;
-}
+/* ── Alerts ── */
+.alert { padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-bottom: 16px; animation: scaleIn 0.3s ease-out; }
+.alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
 /* ── Results ── */
-.results-section {
-  margin-top: 4px;
-}
+.results { animation: fadeIn 0.4s ease-out; }
+.results-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+.results-count { display: flex; align-items: baseline; gap: 6px; }
+.count-num { font-size: 24px; font-weight: 700; color: var(--teal); }
+.count-label { font-size: 14px; color: var(--text-secondary); }
+.results-meta { font-size: 13px; color: #9ca3af; }
 
-.results-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.results-count {
-  font-size: 13px;
-  font-weight: 500;
-  color: #374151;
-}
-
-.results-filter {
-  font-size: 13px;
-  color: #9ca3af;
-}
-
-/* ── Result cards ── */
-.result-card {
-  display: flex;
-  align-items: flex-start;
-  padding: 16px 20px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  margin-bottom: 8px;
-  text-decoration: none;
-  color: inherit;
-  transition: all 0.15s;
-  cursor: pointer;
-}
-
-.result-card:hover {
-  border-color: #007993;
-  box-shadow: 0 2px 8px rgba(0, 121, 147, 0.08);
-}
-
-.result-icon {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 14px;
-  margin-top: 1px;
-}
-
-.result-icon-teal { background: rgba(0, 121, 147, 0.07); }
-.result-icon-orange { background: rgba(239, 96, 7, 0.07); }
-
-.result-body { flex: 1; min-width: 0; }
-
-.result-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-  line-height: 1.5;
-}
-
-.result-subtitle {
-  font-size: 13px;
-  color: #6b7280;
-  margin-top: 2px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+/* ── Cards ── */
+.card {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); margin-bottom: 8px;
+  animation: fadeIn 0.35s ease-out both;
+  transition: all 0.2s;
   overflow: hidden;
 }
+.card:hover { border-color: var(--teal); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.card-link { text-decoration: none; color: inherit; display: block; }
+.card-main { display: flex; align-items: flex-start; padding: 16px 20px; gap: 14px; }
 
-.result-rechtssatz {
-  -webkit-line-clamp: 3;
-  font-style: italic;
-  color: #4b5563;
-  border-left: 2px solid #ef6007;
-  padding-left: 8px;
-  margin-top: 6px;
+.card-icon {
+  width: 38px; height: 38px; min-width: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; margin-top: 2px;
+}
+.card-icon-teal { background: var(--teal-light); }
+.card-icon-orange { background: var(--orange-light); }
+
+.card-body { flex: 1; min-width: 0; }
+.card-title { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.5; text-decoration: none; display: block; }
+a.card-title:hover { color: var(--teal); }
+
+.card-rs {
+  font-size: 12px; color: #4b5563; font-style: italic;
+  border-left: 2px solid var(--orange); padding-left: 8px;
+  margin: 6px 0; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-.result-meta {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
+.card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border-radius: 6px; font-size: 11px; font-weight: 500; white-space: nowrap;
 }
+.chip-teal { background: var(--teal-light); color: var(--teal); }
+.chip-orange { background: var(--orange-light); color: var(--orange); }
+.chip-ghost { background: #f3f4f6; color: #6b7280; }
+.chip-red { background: #fef2f2; color: #dc2626; }
 
-.chip-teal { background: rgba(0, 121, 147, 0.07); color: #007993; }
-.chip-orange { background: rgba(239, 96, 7, 0.07); color: #ef6007; }
-.chip-expired { background: #fef2f2; color: #991b1b; display: inline-flex; align-items: center; }
+.card-ext { flex-shrink: 0; margin-top: 4px; text-decoration: none; }
 
-.meta-text { font-size: 12px; color: #9ca3af; display: inline-flex; align-items: center; }
-.meta-text-dim { color: #d1d5db; font-size: 11px; }
-
-.result-ext {
-  margin-left: 12px;
-  margin-top: 2px;
-  flex-shrink: 0;
+/* ── Diff button ── */
+.btn-diff {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 8px; padding: 4px 12px; font-size: 12px; font-weight: 500;
+  color: var(--teal); background: var(--teal-light);
+  border: 1px solid rgba(0,121,147,0.15); border-radius: 8px;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.2s;
 }
-
-.result-ext-link {
-  margin-left: 12px;
-  margin-top: 2px;
-  flex-shrink: 0;
-  text-decoration: none;
-}
-
-.result-title-link {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-  line-height: 1.5;
-  text-decoration: none;
-}
-.result-title-link:hover {
-  color: #007993;
-}
-
-.result-wrapper {
-  margin-bottom: 8px;
-}
-
-/* ── Diff toggle button ── */
-.diff-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 8px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #007993;
-  background: rgba(0, 121, 147, 0.06);
-  border: 1px solid rgba(0, 121, 147, 0.15);
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-}
-.diff-toggle-btn:hover {
-  background: rgba(0, 121, 147, 0.12);
-  border-color: rgba(0, 121, 147, 0.25);
-}
-.diff-toggle-active {
-  background: rgba(0, 121, 147, 0.1);
-  border-color: rgba(0, 121, 147, 0.3);
-}
+.btn-diff:hover { background: rgba(0,121,147,0.12); border-color: rgba(0,121,147,0.3); }
 
 /* ── Diff panel ── */
+.slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
+.slide-enter-from, .slide-leave-to { opacity: 0; max-height: 0; }
+.slide-enter-to, .slide-leave-from { opacity: 1; max-height: 600px; }
+
 .diff-panel {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-top: none;
-  border-radius: 0 0 12px 12px;
-  padding: 16px 20px;
-  margin-top: -1px;
+  padding: 16px 20px; background: #fafbfc;
+  border-top: 1px solid var(--border); overflow: hidden;
 }
+.diff-versions { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 12px; }
+.diff-v { padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+.diff-v-old { background: #fef2f2; color: #991b1b; }
+.diff-v-new { background: #f0fdf4; color: #166534; }
 
-.diff-versions {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
+.diff-body {
+  font-size: 13px; line-height: 1.8; padding: 12px 16px;
+  background: white; border: 1px solid var(--border); border-radius: 10px;
+  max-height: 400px; overflow-y: auto;
 }
-
-.diff-version-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.diff-label {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 11px;
-}
-
-.diff-label-old {
-  background: #fef2f2;
-  color: #991b1b;
-}
-
-.diff-label-new {
-  background: #f0fdf4;
-  color: #166534;
-}
-
-.diff-date {
-  color: #9ca3af;
-  font-size: 12px;
-}
-
-.diff-legend {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.diff-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.diff-del-sample {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: #fecaca;
-}
-
-.diff-ins-sample {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: #bbf7d0;
-}
-
-.diff-content {
-  font-size: 13px;
-  line-height: 1.8;
-  color: #374151;
-  padding: 12px 16px;
-  background: #fafafa;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.diff-content :deep(.diff-del) {
-  background: #fecaca;
-  color: #991b1b;
-  text-decoration: line-through;
-  padding: 1px 3px;
-  border-radius: 3px;
-}
-
-.diff-content :deep(.diff-ins) {
-  background: #bbf7d0;
-  color: #166534;
-  padding: 1px 3px;
-  border-radius: 3px;
-}
-
-.diff-content :deep(.diff-info) {
-  color: #6b7280;
-  font-style: italic;
-  margin-bottom: 12px;
-}
-
-.diff-content :deep(.diff-current) {
-  color: #374151;
-}
-
-.diff-content :deep(.diff-sidebyside) {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 12px;
-}
-
-.diff-content :deep(.diff-side) {
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.diff-content :deep(.diff-side-old) {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-}
-
-.diff-content :deep(.diff-side-new) {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-}
-
-.diff-content :deep(.diff-side-label) {
-  font-weight: 600;
-  font-size: 12px;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.diff-content :deep(.diff-side-old .diff-side-label) { color: #991b1b; }
-.diff-content :deep(.diff-side-new .diff-side-label) { color: #166534; }
-
-.diff-content :deep(.diff-side-text) {
-  white-space: pre-wrap;
-}
-
-@media (max-width: 768px) {
-  .diff-content :deep(.diff-sidebyside) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.diff-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-top: none;
-  border-radius: 0 0 12px 12px;
-  color: #991b1b;
-  padding: 12px 20px;
-  font-size: 13px;
-  margin-top: -1px;
-}
-
-/* ── AI Actions Bar ── */
-.ai-actions-bar {
-  margin-top: 32px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.ai-actions-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.ai-actions-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #0f3d49;
-}
-
-.api-key-row {
-  margin-bottom: 16px;
-}
-
-.api-key-input {
-  max-width: 480px;
-}
-
-.ai-buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.ai-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.ai-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ai-btn-summary {
-  background: #007993;
-  color: white;
-}
-.ai-btn-summary:hover:not(:disabled) {
-  background: #006577;
-}
-
-.ai-btn-report {
-  background: #0f3d49;
-  color: white;
-}
-.ai-btn-report:hover:not(:disabled) {
-  background: #0a2e37;
-}
-
-.ai-btn-email {
-  background: #6366f1;
-  color: white;
-}
-.ai-btn-email:hover:not(:disabled) {
-  background: #4f46e5;
-}
-
-/* ── Email Row ── */
-.email-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.email-input {
-  max-width: 320px;
-}
-
-/* ── Summary Box ── */
-.summary-box {
-  margin-top: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.summary-box-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(0, 121, 147, 0.04);
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.summary-box-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #007993;
-}
-
-.summary-close {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: #9ca3af;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0 4px;
-}
-.summary-close:hover { color: #374151; }
-
-.summary-box-content {
-  padding: 16px 20px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: #374151;
-}
-
-.summary-box-content :deep(h2) {
-  font-size: 16px;
-  color: #007993;
-  margin: 16px 0 8px;
-}
-
-.summary-box-content :deep(h3) {
-  font-size: 15px;
-  color: #0f3d49;
-  margin: 14px 0 6px;
-}
-
-.summary-box-content :deep(h4) {
-  font-size: 14px;
-  color: #374151;
-  margin: 12px 0 4px;
-}
-
-.summary-box-content :deep(strong) {
-  color: #0f3d49;
-}
-
-.summary-box-content :deep(ul) {
-  padding-left: 20px;
-  margin: 8px 0;
-}
-
-.summary-box-content :deep(li) {
-  margin-bottom: 4px;
-}
-
-/* ── Empty ── */
-.empty-state {
-  text-align: center;
-  padding: 56px 16px;
-  background: white;
-  border: 1px dashed #e5e7eb;
-  border-radius: 12px;
-}
-
-.empty-state p {
-  color: #9ca3af;
-  font-size: 14px;
-  margin-top: 16px;
-}
+.diff-body :deep(.diff-del) { background: #fecaca; color: #991b1b; text-decoration: line-through; padding: 1px 3px; border-radius: 3px; }
+.diff-body :deep(.diff-ins) { background: #bbf7d0; color: #166534; padding: 1px 3px; border-radius: 3px; }
+.diff-body :deep(.diff-info) { color: #6b7280; font-style: italic; margin-bottom: 8px; }
+.diff-body :deep(.diff-sidebyside) { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.diff-body :deep(.diff-side) { padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.6; }
+.diff-body :deep(.diff-side-old) { background: #fef2f2; border: 1px solid #fecaca; }
+.diff-body :deep(.diff-side-new) { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.diff-body :deep(.diff-side-label) { font-weight: 600; font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.diff-body :deep(.diff-side-old .diff-side-label) { color: #991b1b; }
+.diff-body :deep(.diff-side-new .diff-side-label) { color: #166534; }
+.diff-body :deep(.diff-side-text) { white-space: pre-wrap; }
+.diff-error { color: #991b1b; font-size: 13px; padding: 8px; background: #fef2f2; border-radius: 8px; }
 
 /* ── Pagination ── */
-.pagination-row {
-  display: flex;
-  justify-content: center;
-  margin-top: 28px;
+.pagination { display: flex; justify-content: center; margin-top: 28px; }
+
+/* ── AI Section ── */
+.ai-section {
+  margin-top: 36px; padding: 24px;
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.5s 0.2s ease-out both;
 }
+.ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.ai-badge {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  color: white; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.ai-title { font-size: 15px; font-weight: 600; color: var(--text); }
+
+.ai-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.ai-field { flex: 1; min-width: 200px; }
+.ai-actions { display: flex; gap: 8px; }
+.ai-email { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 200px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 18px; border: none; border-radius: 10px;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+  transition: all 0.2s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-teal { background: var(--teal); color: white; }
+.btn-teal:hover:not(:disabled) { background: var(--teal-dark); }
+.btn-navy { background: var(--navy); color: white; }
+.btn-navy:hover:not(:disabled) { background: #031e20; }
+.btn-purple { background: #7c3aed; color: white; }
+.btn-purple:hover:not(:disabled) { background: #6d28d9; }
+
+/* ── Summary card ── */
+.summary-card {
+  margin-top: 20px; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; animation: scaleIn 0.3s ease-out;
+}
+.summary-head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  background: var(--teal-light); border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 600; color: var(--teal);
+}
+.summary-close { margin-left: auto; background: none; border: none; font-size: 20px; color: #9ca3af; cursor: pointer; }
+.summary-body { padding: 16px 20px; font-size: 14px; line-height: 1.7; color: #374151; }
+.summary-body :deep(h2) { font-size: 16px; color: var(--teal); margin: 16px 0 8px; }
+.summary-body :deep(h3) { font-size: 15px; color: var(--navy); margin: 14px 0 6px; }
+.summary-body :deep(strong) { color: var(--navy); }
+.summary-body :deep(ul) { padding-left: 20px; margin: 8px 0; }
+.summary-body :deep(li) { margin-bottom: 4px; }
+
+/* ── Empty ── */
+.empty { text-align: center; padding: 56px 16px; background: var(--card); border: 1px dashed var(--border); border-radius: var(--radius); }
+.empty p { color: #9ca3af; font-size: 14px; margin-top: 12px; }
 
 /* ── Footer ── */
-.footer {
-  text-align: center;
-  margin-top: 40px;
-  padding-bottom: 20px;
-  font-size: 12px;
-  color: #d1d5db;
+.footer { text-align: center; margin-top: 48px; font-size: 12px; color: #c4c8cc; }
+
+/* ── Spinners ── */
+.spinner {
+  width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: white; border-radius: 50%;
+  animation: spin 0.6s linear infinite;
 }
+.spinner-sm {
+  width: 14px; height: 14px; border: 2px solid rgba(0,121,147,0.2);
+  border-top-color: var(--teal); border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+.btn .spinner-sm { border-color: rgba(255,255,255,0.3); border-top-color: white; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .filter-fields { flex-direction: column; }
-  .search-btn { width: 100%; }
-  .ai-buttons { flex-direction: column; }
-  .ai-btn { width: 100%; justify-content: center; }
-  .api-key-input { max-width: 100%; }
+  .search-fields { flex-direction: column; }
+  .btn-search { width: 100%; justify-content: center; }
+  .btn-label { display: inline; }
+  .ai-grid { flex-direction: column; }
+  .ai-email { flex-direction: column; }
+  .diff-body :deep(.diff-sidebyside) { grid-template-columns: 1fr; }
 }
 </style>
