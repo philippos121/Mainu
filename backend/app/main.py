@@ -61,7 +61,7 @@ async def ris_test():
                 resp = await client.get(url)
                 results[name] = {"status": resp.status_code, "length": len(resp.text), "url": str(resp.url)[:200]}
             except Exception as e:
-                results[name] = {"error": str(e)[:200]}
+                results[name] = {"error": f"{type(e).__name__}: {str(e)[:300]}"}
     return results
 
 
