@@ -25,7 +25,7 @@
   --teal-50: #e8f6f9;
   --orange: #ef6007;
   --orange-50: #fff4ed;
-  --navy: #0f3d49;
+  --navy: #0a5062;
   --bg: #f4f6f8;
   --card: #ffffff;
   --text: #111827;
