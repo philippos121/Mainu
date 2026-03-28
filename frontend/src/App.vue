@@ -4,7 +4,6 @@
     <header class="topbar">
       <router-link to="/" class="topbar-brand">
         <img src="/logo-white.svg" alt="AI:ssociate" class="topbar-logo" />
-        <span class="topbar-badge">Law Monitoring</span>
       </router-link>
 
       <!-- Logo marquee — only shows if logo files exist in /public/ -->
