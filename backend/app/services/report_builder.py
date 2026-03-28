@@ -21,8 +21,10 @@ def build_report(
     total_hits: int,
     doc_type: str,
     diffs: dict = None,
+    parliamentary: list[dict] = None,
 ) -> str:
     diffs = diffs or {}
+    parliamentary = parliamentary or []
     type_label = "Gesetze" if doc_type == "gesetze" else "Entscheidungen"
     summary_html = _md_to_html(summary_md)
 
@@ -104,6 +106,42 @@ def build_report(
   <h2 class="section-title">{_html.escape(group_name)}</h2>
   <p class="section-count">{len(group_results)} Bestimmungen</p>
   {cards}
+</div>'''
+
+    # Add parliamentary materials section
+    parl_html = ""
+    if parliamentary:
+        parl_cards = ""
+        for i, p in enumerate(parliamentary):
+            ptitle = _html.escape(str(p.get("title", "")))
+            purl = _html.escape(str(p.get("url", "")))
+            ptyp = _html.escape(str(p.get("typ", "")))
+            pstelle = _html.escape(str(p.get("stelle", "")))
+            parl_cards += f'''
+<div class="card" style="animation-delay:{i*0.04}s">
+  <div class="card-head" onclick="this.parentElement.classList.toggle('open')">
+    <div class="card-info">
+      <div class="card-top">
+        <span class="tag" style="background:rgba(139,92,246,0.1);color:#7c3aed">{ptyp}</span>
+        {f'<span class="tag tag-typ">{pstelle}</span>' if pstelle else ''}
+      </div>
+      <div style="font-size:13px;font-weight:500;color:#1a1a1a;margin-top:4px">{ptitle}</div>
+    </div>
+    <svg class="chv" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+  <div class="card-body">
+    {f'<a href="{purl}" target="_blank" style="color:#007993;font-size:13px;text-decoration:none">Im RIS anzeigen →</a>' if purl else ''}
+  </div>
+</div>'''
+
+        nav_html += f'<div class="nav-label">Parlamentarische Materialien</div>\n'
+        nav_html += f'<a class="nav-item" href="#" onclick="showSection(\'parl\');return false">Regierungsvorlagen / Begutachtung <span class="nav-badge">{len(parliamentary)}</span></a>\n'
+
+        parl_html = f'''
+<div class="section" id="parl">
+  <h2 class="section-title">Parlamentarische Materialien</h2>
+  <p class="section-count">Regierungsvorlagen und Begutachtungsentwürfe</p>
+  {parl_cards}
 </div>'''
 
     return f'''<!DOCTYPE html>
@@ -269,6 +307,7 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
     </div>
   </div>
   {sections_html}
+  {parl_html}
 </div>
 
 <script>

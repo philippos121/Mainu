@@ -389,6 +389,76 @@ async def _search_by_params(
     }
 
 
+async def search_begutachtung(
+    suchworte: str = "",
+    im_ris_seit: str = "EinemJahr",
+    page: int = 1,
+) -> list[dict]:
+    """Search Begutachtungsentwürfe (draft legislation for review)."""
+    params: dict = {
+        "Applikation": "Begut",
+        "DokumenteProSeite": "Twenty",
+        "Seitennummer": page,
+    }
+    if suchworte:
+        params["Suchworte"] = suchworte
+    if im_ris_seit:
+        params["ImRisSeit"] = im_ris_seit
+
+    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+    data = await _fetch(url, params)
+    return _parse_parliamentary(data, "Begutachtungsentwurf")
+
+
+async def search_regierungsvorlagen(
+    suchworte: str = "",
+    im_ris_seit: str = "EinemJahr",
+    page: int = 1,
+) -> list[dict]:
+    """Search Regierungsvorlagen (government bills)."""
+    params: dict = {
+        "Applikation": "RegV",
+        "DokumenteProSeite": "Twenty",
+        "Seitennummer": page,
+    }
+    if suchworte:
+        params["Suchworte"] = suchworte
+    if im_ris_seit:
+        params["ImRisSeit"] = im_ris_seit
+
+    url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
+    data = await _fetch(url, params)
+    return _parse_parliamentary(data, "Regierungsvorlage")
+
+
+def _parse_parliamentary(data: dict, doc_type_label: str) -> list[dict]:
+    """Parse Begut/RegV API response."""
+    refs = _extract_refs(data)
+    results = []
+    for ref in refs:
+        d = ref.get("Data", {})
+        m = _collect_metadata(d.get("Metadaten", {}), ["Technisch", "Allgemein", "Bundesrecht", "BrKons", "Begut", "RegV"])
+
+        doc_id = _s(m.get("ID")) or _s(m.get("Dokumentnummer")) or ""
+        title = _s(m.get("Kurztitel")) or _s(m.get("Langtitel")) or doc_id
+        url = _s(m.get("DokumentUrl")) or ""
+        bgbl = _s(m.get("Kundmachungsorgan")) or ""
+        stelle = _s(m.get("EinbringendeStelle")) or ""
+
+        if not doc_id:
+            continue
+
+        results.append({
+            "id": doc_id,
+            "title": title,
+            "url": url,
+            "bgbl": bgbl,
+            "stelle": stelle,
+            "typ": doc_type_label,
+        })
+    return results
+
+
 async def search_gerichtsentscheidungen(
     category: str,
     im_ris_seit: str,

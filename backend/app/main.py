@@ -15,6 +15,8 @@ from app.services.ris_client import (
     COURT_SOURCES,
     search_gesetze,
     search_gerichtsentscheidungen,
+    search_begutachtung,
+    search_regierungsvorlagen,
     parse_bundesrecht_response,
     _timeframe_to_days,
 )
@@ -70,6 +72,26 @@ async def api_search_gesetze(
     raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
     days = _timeframe_to_days(im_ris_seit)
     return parse_bundesrecht_response(raw, timeframe_days=days)
+
+
+@app.get("/api/search/begutachtung")
+async def api_search_begutachtung(
+    suchworte: str = Query("", description="Suchworte"),
+    im_ris_seit: str = Query("EinemJahr", description="Timeframe"),
+    page: int = Query(1, ge=1),
+):
+    """Search Begutachtungsentwürfe."""
+    return await search_begutachtung(suchworte=suchworte, im_ris_seit=im_ris_seit, page=page)
+
+
+@app.get("/api/search/regierungsvorlagen")
+async def api_search_regierungsvorlagen(
+    suchworte: str = Query("", description="Suchworte"),
+    im_ris_seit: str = Query("EinemJahr", description="Timeframe"),
+    page: int = Query(1, ge=1),
+):
+    """Search Regierungsvorlagen."""
+    return await search_regierungsvorlagen(suchworte=suchworte, im_ris_seit=im_ris_seit, page=page)
 
 
 @app.get("/api/search/gerichtsentscheidungen")
@@ -313,10 +335,39 @@ async def api_report(req: ReportRequest):
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
 
-    # GPT summary is optional — generate report even if it fails
+    # Fetch related Begutachtungsentwürfe and Regierungsvorlagen
+    parliamentary = []
+    try:
+        import asyncio as _aio
+        begut_task = search_begutachtung(suchworte=req.category_label, im_ris_seit="EinemJahr")
+        regv_task = search_regierungsvorlagen(suchworte=req.category_label, im_ris_seit="EinemJahr")
+        begut_results, regv_results = await _aio.gather(begut_task, regv_task, return_exceptions=True)
+        if isinstance(begut_results, list):
+            parliamentary.extend(begut_results[:5])
+        if isinstance(regv_results, list):
+            parliamentary.extend(regv_results[:5])
+        logging.info(f"Parliamentary materials: {len(parliamentary)} (Begut+RegV)")
+    except Exception as e:
+        logging.error(f"Parliamentary search error: {e}")
+
+    # GPT summary with parliamentary context
     report_md = ""
     if req.api_key and len(req.api_key) >= 10:
         try:
+            # Add parliamentary info to the results for GPT context
+            parl_context = ""
+            if parliamentary:
+                parl_lines = []
+                for p in parliamentary:
+                    parl_lines.append(f"- [{p['typ']}] {p['title']}" +
+                                      (f" ({p['stelle']})" if p.get('stelle') else ""))
+                parl_context = (
+                    "\n\n--- PARLAMENTARISCHE MATERIALIEN ---\n"
+                    "Folgende Regierungsvorlagen und Begutachtungsentwürfe sind im Zusammenhang relevant:\n"
+                    + "\n".join(parl_lines)
+                    + "\nBerücksichtige diese in deiner Analyse (welche Gesetze stehen vor einer Änderung?)."
+                )
+
             report_md = await generate_report_markdown(
                 results=req.results,
                 doc_type=req.doc_type,
@@ -324,6 +375,7 @@ async def api_report(req: ReportRequest):
                 timeframe_label=req.timeframe_label,
                 total_hits=req.total_hits,
                 api_key=req.api_key,
+                extra_context=parl_context,
             )
         except Exception as e:
             logging.error(f"GPT report error: {e}")
@@ -354,9 +406,10 @@ async def api_report(req: ReportRequest):
         html = build_report(
             report_md, req.results, today,
             req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
-            all_diffs,
+            all_diffs, parliamentary,
         )
-        return {"report_markdown": report_md, "report_html": html}
+        return {"report_markdown": report_md, "report_html": html,
+                "parliamentary": parliamentary}
     except Exception as e:
         logging.error(f"Report build error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Report-Generierung fehlgeschlagen: {str(e)[:200]}")

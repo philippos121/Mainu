@@ -83,6 +83,7 @@ async def generate_report_markdown(
     timeframe_label: str,
     total_hits: int,
     api_key: str,
+    extra_context: str = "",
 ) -> str:
     """Generate a legal analysis report in markdown."""
     if not results:
@@ -105,7 +106,10 @@ async def generate_report_markdown(
         "   - Praktische Auswirkungen (wer ist betroffen, was ist zu tun)\n"
         "   - Handlungsbedarf für die Praxis\n"
         "3. **Weitere Änderungen**: Kürzere Darstellung der übrigen Änderungen\n"
-        "4. **Ausblick und Empfehlung**: Trends, offene Fragen, Handlungsempfehlung\n\n"
+        "4. **Parlamentarische Materialien**: Falls Regierungsvorlagen oder "
+        "   Begutachtungsentwürfe vorliegen, analysiere welche Gesetze vor "
+        "   einer Änderung stehen und was zu erwarten ist\n"
+        "5. **Ausblick und Empfehlung**: Trends, offene Fragen, Handlungsempfehlung\n\n"
         "REGELN:\n"
         "- Nur die konkret gelisteten Bestimmungen analysieren\n"
         "- Nicht das gesamte Gesetz zusammenfassen\n"
@@ -120,6 +124,7 @@ async def generate_report_markdown(
         f"(Zeitraum: {timeframe_label}).\n\n"
         f"Fokus auf die zugrundeliegenden Rechtsfragen und die praktische "
         f"Relevanz für die Rechtsanwendung:\n\n{result_text}"
+        f"{extra_context}"
     )
 
     return await _chat(api_key, system_prompt, user_prompt, max_tokens=3000)
