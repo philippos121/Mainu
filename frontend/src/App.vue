@@ -9,36 +9,10 @@
 
       <!-- Logo marquee -->
       <div class="marquee">
-        <div class="marquee-track">
-          <img src="/logo_act_legal.svg" alt="act.legal" />
-          <img src="/logo_buwog_color.svg" alt="BUWOG" />
-          <img src="/logo_facc.svg" alt="FACC" />
-          <img src="/logo_flgoe.png" alt="FLGÖ" />
-          <img src="/logo_gpk.svg" alt="GPK" />
-          <img src="/logo_grawe_color.svg" alt="GRAWE" />
-          <img src="/logo_gsv.svg" alt="GSV" />
-          <img src="/logo_hba_color.svg" alt="HBA" />
-          <img src="/logo_heissenberger.png" alt="Heissenberger" />
-          <img src="/logo_holding_graz.svg" alt="Holding Graz" />
-          <img src="/logo_oerak_color.svg" alt="ÖRAK" />
-          <img src="/logo_treubilanz.svg" alt="Treubilanz" />
-          <img src="/logo_vav.svg" alt="VAV" />
-          <img src="/logo_wsw.svg" alt="WSW" />
-          <!-- Duplicate for seamless loop -->
-          <img src="/logo_act_legal.svg" alt="act.legal" />
-          <img src="/logo_buwog_color.svg" alt="BUWOG" />
-          <img src="/logo_facc.svg" alt="FACC" />
-          <img src="/logo_flgoe.png" alt="FLGÖ" />
-          <img src="/logo_gpk.svg" alt="GPK" />
-          <img src="/logo_grawe_color.svg" alt="GRAWE" />
-          <img src="/logo_gsv.svg" alt="GSV" />
-          <img src="/logo_hba_color.svg" alt="HBA" />
-          <img src="/logo_heissenberger.png" alt="Heissenberger" />
-          <img src="/logo_holding_graz.svg" alt="Holding Graz" />
-          <img src="/logo_oerak_color.svg" alt="ÖRAK" />
-          <img src="/logo_treubilanz.svg" alt="Treubilanz" />
-          <img src="/logo_vav.svg" alt="VAV" />
-          <img src="/logo_wsw.svg" alt="WSW" />
+        <div class="marquee-track" ref="marqueeTrack">
+          <template v-for="(_, copy) in 2" :key="copy">
+            <img v-for="logo in partnerLogos" :key="copy+'-'+logo.alt" :src="logo.src" :alt="logo.alt" />
+          </template>
         </div>
       </div>
     </header>
@@ -50,6 +24,22 @@
 </template>
 
 <script setup>
+const partnerLogos = [
+  { src: '/logo_act_legal.svg', alt: 'act.legal' },
+  { src: '/logo_buwog_color.svg', alt: 'BUWOG' },
+  { src: '/logo_facc.svg', alt: 'FACC' },
+  { src: '/logo_flgoe.png', alt: 'FLGÖ' },
+  { src: '/logo_gpk.svg', alt: 'GPK' },
+  { src: '/logo_grawe_color.svg', alt: 'GRAWE' },
+  { src: '/logo_gsv.svg', alt: 'GSV' },
+  { src: '/logo_hba_color.svg', alt: 'HBA' },
+  { src: '/logo_heissenberger.png', alt: 'Heissenberger' },
+  { src: '/logo_holding_graz.svg', alt: 'Holding Graz' },
+  { src: '/logo_oerak_color.svg', alt: 'ÖRAK' },
+  { src: '/logo_treubilanz.svg', alt: 'Treubilanz' },
+  { src: '/logo_vav.svg', alt: 'VAV' },
+  { src: '/logo_wsw.svg', alt: 'WSW' },
+]
 </script>
 
 <style>
