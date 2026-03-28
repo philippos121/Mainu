@@ -86,9 +86,10 @@ body {
   display: flex; align-items: center; gap: 12px;
   text-decoration: none;
   transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 .topbar-brand:hover { opacity: 0.85; }
-.topbar-logo { height: 26px; width: auto; display: block; }
+.topbar-logo { height: 26px; width: auto; min-width: 150px; display: block; }
 .topbar-badge {
   font-size: 11px; font-weight: 600;
   color: var(--orange);
