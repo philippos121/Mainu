@@ -1,32 +1,25 @@
 <template>
 <div class="page">
-  <!-- Ambient page background particles -->
-  <div class="page-bg">
-    <div class="pb pb-1"></div>
-    <div class="pb pb-2"></div>
-    <div class="pb pb-3"></div>
-    <div class="pb pb-4"></div>
+  <!-- Full-page animated background (covers everything, no boxes) -->
+  <div class="bg-layer">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+    <div class="orb orb-6"></div>
+    <div class="aurora"></div>
+    <div class="scan-line"></div>
+    <div class="particles">
+      <div class="pt pt-1"></div><div class="pt pt-2"></div><div class="pt pt-3"></div>
+      <div class="pt pt-4"></div><div class="pt pt-5"></div><div class="pt pt-6"></div>
+      <div class="pt pt-7"></div><div class="pt pt-8"></div><div class="pt pt-9"></div>
+      <div class="pt pt-10"></div><div class="pt pt-11"></div><div class="pt pt-12"></div>
+    </div>
   </div>
 
-  <!-- Hero section -->
+  <!-- Hero section (no background of its own, transparent) -->
   <section class="hero">
-    <!-- Animated background layers -->
-    <div class="hero-bg">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
-      <div class="orb orb-4"></div>
-      <div class="orb orb-5"></div>
-      <div class="aurora"></div>
-      <div class="scan-line"></div>
-      <div class="particles">
-        <div class="pt pt-1"></div><div class="pt pt-2"></div><div class="pt pt-3"></div>
-        <div class="pt pt-4"></div><div class="pt pt-5"></div><div class="pt pt-6"></div>
-        <div class="pt pt-7"></div><div class="pt pt-8"></div><div class="pt pt-9"></div>
-        <div class="pt pt-10"></div><div class="pt pt-11"></div><div class="pt pt-12"></div>
-      </div>
-      <div class="grid-overlay"></div>
-    </div>
     <div class="hero-inner">
       <div class="hero-brand">
         <img src="/logo.svg" alt="AI:ssociate" class="hero-logo" />
@@ -203,140 +196,125 @@ async function downloadReport() {
 
 <style scoped>
 .page {
-  min-height: 100vh; position: relative; overflow: hidden;
-  background: linear-gradient(170deg, #f4fafb 0%, #f8f9fb 40%, #fdf8f3 100%);
+  min-height: 100vh; position: relative; overflow-x: hidden;
 }
 
-/* ── Page ambient background ── */
-.page-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-.pb {
-  position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.15;
-  will-change: transform;
+/* ── Full-page animated background (one continuous surface) ── */
+.bg-layer {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(170deg, #f0f8f9 0%, #f6f7fa 35%, #faf8f4 65%, #f2f9fa 100%);
+  background-size: 400% 400%;
+  animation: bgBreath 20s ease-in-out infinite;
 }
-.pb-1 { width: 600px; height: 600px; top: -200px; right: -100px; background: rgba(0,121,147,0.4); animation: ambFloat1 40s ease-in-out infinite; }
-.pb-2 { width: 500px; height: 500px; bottom: -150px; left: -100px; background: rgba(255,151,51,0.3); animation: ambFloat2 35s ease-in-out infinite; }
-.pb-3 { width: 400px; height: 400px; top: 40%; left: 60%; background: rgba(10,80,98,0.2); animation: ambFloat3 45s ease-in-out infinite; }
-.pb-4 { width: 300px; height: 300px; top: 20%; left: 10%; background: rgba(0,121,147,0.15); animation: ambFloat4 50s ease-in-out infinite; }
-@keyframes ambFloat1 { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-80px,60px)} 50%{transform:translate(40px,120px)} 75%{transform:translate(60px,-40px)} }
-@keyframes ambFloat2 { 0%,100%{transform:translate(0,0)} 30%{transform:translate(100px,-80px)} 60%{transform:translate(-40px,-40px)} 80%{transform:translate(60px,60px)} }
-@keyframes ambFloat3 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-60px,-80px) scale(1.2)} 66%{transform:translate(80px,40px) scale(0.8)} }
-@keyframes ambFloat4 { 0%,100%{transform:translate(0,0) rotate(0deg)} 50%{transform:translate(100px,80px) rotate(10deg)} }
+@keyframes bgBreath {
+  0%,100% { background-position: 0% 30%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 60% 100%; }
+  75% { background-position: 0% 60%; }
+}
+
+/* Orbs — scattered across the full page, always drifting */
+.orb { position: absolute; border-radius: 50%; will-change: transform; }
+.orb-1 {
+  width: 600px; height: 600px; top: -10%; left: -10%;
+  background: radial-gradient(circle, rgba(0,121,147,0.13) 0%, transparent 70%);
+  filter: blur(80px); animation: drift1 18s ease-in-out infinite;
+}
+.orb-2 {
+  width: 500px; height: 500px; top: 50%; right: -8%;
+  background: radial-gradient(circle, rgba(255,151,51,0.10) 0%, transparent 70%);
+  filter: blur(80px); animation: drift2 22s ease-in-out infinite;
+}
+.orb-3 {
+  width: 400px; height: 400px; top: 25%; left: 50%;
+  background: radial-gradient(circle, rgba(10,80,98,0.08) 0%, transparent 70%);
+  filter: blur(60px); animation: drift3 15s ease-in-out infinite;
+}
+.orb-4 {
+  width: 350px; height: 350px; bottom: 10%; left: 5%;
+  background: radial-gradient(circle, rgba(0,121,147,0.07) 0%, transparent 70%);
+  filter: blur(70px); animation: drift4 25s ease-in-out infinite;
+}
+.orb-5 {
+  width: 250px; height: 250px; top: 5%; right: 25%;
+  background: radial-gradient(circle, rgba(255,151,51,0.06) 0%, transparent 70%);
+  filter: blur(50px); animation: drift5 20s ease-in-out infinite;
+}
+.orb-6 {
+  width: 300px; height: 300px; bottom: -5%; right: 30%;
+  background: radial-gradient(circle, rgba(10,80,98,0.06) 0%, transparent 70%);
+  filter: blur(60px); animation: drift6 28s ease-in-out infinite;
+}
+@keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(100px,60px) scale(1.1)} 50%{transform:translate(50px,-40px) scale(0.9)} 75%{transform:translate(-40px,80px) scale(1.05)} }
+@keyframes drift2 { 0%,100%{transform:translate(0,0)} 30%{transform:translate(-90px,-60px) scale(1.12)} 60%{transform:translate(40px,40px) scale(0.88)} 80%{transform:translate(-50px,-20px)} }
+@keyframes drift3 { 0%,100%{transform:translate(0,0) rotate(0deg)} 33%{transform:translate(60px,-60px) rotate(6deg)} 66%{transform:translate(-50px,50px) rotate(-4deg)} }
+@keyframes drift4 { 0%,100%{transform:translate(0,0)} 40%{transform:translate(80px,-40px)} 70%{transform:translate(-30px,60px)} }
+@keyframes drift5 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-50px,40px) scale(1.3)} }
+@keyframes drift6 { 0%,100%{transform:translate(0,0)} 35%{transform:translate(50px,-70px)} 65%{transform:translate(-60px,30px)} }
+
+/* Aurora — color band sweeping across the full page */
+.aurora {
+  position: absolute; inset: 0;
+  background: linear-gradient(110deg,
+    transparent 15%,
+    rgba(0,121,147,0.05) 28%,
+    rgba(255,151,51,0.04) 42%,
+    rgba(10,80,98,0.05) 58%,
+    transparent 75%
+  );
+  background-size: 200% 200%;
+  animation: auroraShift 10s ease-in-out infinite;
+}
+@keyframes auroraShift {
+  0%,100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+
+/* Scan line — travels the FULL page height */
+.scan-line {
+  position: absolute; left: 0; width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,121,147,0.12) 30%, rgba(0,121,147,0.2) 50%, rgba(0,121,147,0.12) 70%, transparent);
+  animation: scanFull 8s linear infinite;
+}
+@keyframes scanFull {
+  0% { top: -1px; opacity: 0; }
+  3% { opacity: 0.5; }
+  97% { opacity: 0.5; }
+  100% { top: 100vh; opacity: 0; }
+}
+
+/* Particles — float across the entire viewport */
+.particles { position: absolute; inset: 0; width: 100%; height: 100vh; }
+.pt {
+  position: absolute; border-radius: 50%;
+  background: rgba(0,121,147,0.25); will-change: transform;
+}
+.pt-1  { width:3px; height:3px; top:10%; left:8%;  animation: float 14s ease-in-out infinite 0s; }
+.pt-2  { width:2px; height:2px; top:20%; left:22%; animation: float 18s ease-in-out infinite 2s; }
+.pt-3  { width:4px; height:4px; top:35%; left:42%; animation: float 12s ease-in-out infinite 1s; background:rgba(255,151,51,0.2); }
+.pt-4  { width:2px; height:2px; top:48%; left:62%; animation: float 16s ease-in-out infinite 3s; }
+.pt-5  { width:3px; height:3px; top:58%; left:78%; animation: float 13s ease-in-out infinite 5s; background:rgba(255,151,51,0.18); }
+.pt-6  { width:2px; height:2px; top:68%; left:32%; animation: float 19s ease-in-out infinite 4s; }
+.pt-7  { width:3px; height:3px; top:18%; left:52%; animation: float 15s ease-in-out infinite 6s; }
+.pt-8  { width:2px; height:2px; top:42%; left:88%; animation: float 20s ease-in-out infinite 1s; background:rgba(10,80,98,0.25); }
+.pt-9  { width:4px; height:4px; top:78%; left:12%; animation: float 11s ease-in-out infinite 3s; background:rgba(0,121,147,0.18); }
+.pt-10 { width:2px; height:2px; top:8%;  left:72%; animation: float 17s ease-in-out infinite 7s; }
+.pt-11 { width:3px; height:3px; top:52%; left:4%;  animation: float 14s ease-in-out infinite 2s; background:rgba(255,151,51,0.12); }
+.pt-12 { width:2px; height:2px; top:38%; left:48%; animation: float 21s ease-in-out infinite 8s; }
+@keyframes float {
+  0%,100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+  25% { transform: translate(15px, -25px) scale(1.2); opacity: 0.8; }
+  50% { transform: translate(-10px, -50px) scale(0.8); opacity: 0.5; }
+  75% { transform: translate(20px, -15px) scale(1.1); opacity: 0.9; }
+}
 
 /* ── Hero ── */
 .hero {
   padding: 64px 24px 56px; text-align: center;
-  position: relative; overflow: hidden;
+  position: relative; z-index: 1;
 }
 .hero-inner { max-width: 600px; margin: 0 auto; position: relative; z-index: 2; }
-
-/* Hero animated layers */
-.hero-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-
-.orb {
-  position: absolute; border-radius: 50%; will-change: transform;
-}
-.orb-1 {
-  width: 500px; height: 500px; top: -180px; left: -120px;
-  background: radial-gradient(circle, rgba(0,121,147,0.15) 0%, transparent 70%);
-  filter: blur(60px); animation: drift1 16s ease-in-out infinite;
-}
-.orb-2 {
-  width: 400px; height: 400px; bottom: -120px; right: -80px;
-  background: radial-gradient(circle, rgba(255,151,51,0.12) 0%, transparent 70%);
-  filter: blur(60px); animation: drift2 20s ease-in-out infinite;
-}
-.orb-3 {
-  width: 300px; height: 300px; top: 30%; left: 60%;
-  background: radial-gradient(circle, rgba(10,80,98,0.1) 0%, transparent 70%);
-  filter: blur(50px); animation: drift3 14s ease-in-out infinite;
-}
-.orb-4 {
-  width: 200px; height: 200px; top: 60%; left: 15%;
-  background: radial-gradient(circle, rgba(0,121,147,0.08) 0%, transparent 70%);
-  filter: blur(40px); animation: drift4 22s ease-in-out infinite;
-}
-.orb-5 {
-  width: 150px; height: 150px; top: 10%; right: 20%;
-  background: radial-gradient(circle, rgba(255,151,51,0.06) 0%, transparent 70%);
-  filter: blur(35px); animation: drift5 18s ease-in-out infinite;
-}
-@keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(80px,40px) scale(1.1)} 50%{transform:translate(40px,-30px) scale(0.9)} 75%{transform:translate(-30px,60px) scale(1.05)} }
-@keyframes drift2 { 0%,100%{transform:translate(0,0)} 30%{transform:translate(-70px,-40px) scale(1.15)} 60%{transform:translate(30px,30px) scale(0.85)} 80%{transform:translate(-40px,-15px)} }
-@keyframes drift3 { 0%,100%{transform:translate(0,0) rotate(0deg)} 33%{transform:translate(50px,-50px) rotate(8deg)} 66%{transform:translate(-40px,40px) rotate(-5deg)} }
-@keyframes drift4 { 0%,100%{transform:translate(0,0)} 40%{transform:translate(60px,-30px)} 70%{transform:translate(-20px,50px)} }
-@keyframes drift5 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-40px,30px) scale(1.3)} }
-
-/* Aurora — animated color band */
-.aurora {
-  position: absolute; inset: 0;
-  background: linear-gradient(110deg,
-    transparent 20%,
-    rgba(0,121,147,0.04) 30%,
-    rgba(255,151,51,0.03) 45%,
-    rgba(10,80,98,0.04) 55%,
-    transparent 70%
-  );
-  background-size: 200% 100%;
-  animation: auroraShift 8s ease-in-out infinite;
-}
-@keyframes auroraShift {
-  0%,100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* Horizontal scan line */
-.scan-line {
-  position: absolute; left: 0; width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(0,121,147,0.15) 20%, rgba(0,121,147,0.25) 50%, rgba(0,121,147,0.15) 80%, transparent 100%);
-  animation: scanDown 6s linear infinite;
-  opacity: 0.5;
-}
-@keyframes scanDown {
-  0% { top: -2px; opacity: 0; }
-  5% { opacity: 0.6; }
-  95% { opacity: 0.6; }
-  100% { top: 100%; opacity: 0; }
-}
-
-/* Floating particles */
-.particles { position: absolute; inset: 0; }
-.pt {
-  position: absolute; border-radius: 50%;
-  background: rgba(0,121,147,0.3); will-change: transform;
-}
-.pt-1  { width:3px; height:3px; top:15%; left:10%; animation: rise 12s linear infinite 0s; }
-.pt-2  { width:2px; height:2px; top:25%; left:25%; animation: rise 15s linear infinite 2s; }
-.pt-3  { width:4px; height:4px; top:35%; left:45%; animation: rise 10s linear infinite 1s; background:rgba(255,151,51,0.25); }
-.pt-4  { width:2px; height:2px; top:50%; left:65%; animation: rise 14s linear infinite 3s; }
-.pt-5  { width:3px; height:3px; top:60%; left:80%; animation: rise 11s linear infinite 5s; background:rgba(255,151,51,0.2); }
-.pt-6  { width:2px; height:2px; top:70%; left:35%; animation: rise 16s linear infinite 4s; }
-.pt-7  { width:3px; height:3px; top:20%; left:55%; animation: rise 13s linear infinite 6s; }
-.pt-8  { width:2px; height:2px; top:45%; left:90%; animation: rise 17s linear infinite 1s; background:rgba(10,80,98,0.3); }
-.pt-9  { width:4px; height:4px; top:80%; left:15%; animation: rise 9s linear infinite 3s; background:rgba(0,121,147,0.2); }
-.pt-10 { width:2px; height:2px; top:10%; left:75%; animation: rise 14s linear infinite 7s; }
-.pt-11 { width:3px; height:3px; top:55%; left:5%;  animation: rise 12s linear infinite 2s; background:rgba(255,151,51,0.15); }
-.pt-12 { width:2px; height:2px; top:40%; left:50%; animation: rise 18s linear infinite 8s; }
-@keyframes rise {
-  0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(-120px) translateX(20px) scale(0.5); opacity: 0; }
-}
-
-/* Grid overlay — faint animated perspective grid */
-.grid-overlay {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(0,121,147,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,121,147,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  animation: gridPulse 4s ease-in-out infinite;
-}
-@keyframes gridPulse {
-  0%,100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
-}
 
 /* Hero text */
 .hero-h1 {
@@ -384,7 +362,7 @@ async function downloadReport() {
 }
 
 /* ── Form ── */
-.form-section { padding: 0 24px; margin-top: -24px; position: relative; z-index: 3; }
+.form-section { padding: 0 24px; margin-top: -24px; position: relative; z-index: 2; padding-bottom: 60px; }
 .form-card {
   max-width: 560px; margin: 0 auto; position: relative;
   background: rgba(255,255,255,0.75); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
