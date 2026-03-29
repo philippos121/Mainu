@@ -52,7 +52,8 @@ async def ris_test():
     results = {}
     urls = {
         "ris_api": "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht?Applikation=BrKons&DokumenteProSeite=Ten&ImRisSeit=EinemMonat",
-        "ris_website": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer=NOR40275544",
+        "ris_www": "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer=NOR40275544",
+        "ris_no_www": "https://ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer=NOR40275544",
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     async with hx.AsyncClient(timeout=60.0, follow_redirects=True, headers=headers) as client:

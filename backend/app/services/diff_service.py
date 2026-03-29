@@ -30,6 +30,7 @@ _HEADERS = {
 }
 
 _DOC_URL = "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer="
+_DOC_URL_ALT = "https://ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer="
 
 
 async def fetch_provision_diff(
@@ -122,26 +123,27 @@ async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
 # ── Page fetch + parse ──
 
 async def _fetch_page(nor: str) -> dict | None:
-    """Fetch RIS Dokument.wxe page, extract text + version NORs. Retries on timeout."""
-    url = f"{_DOC_URL}{nor}"
-    for attempt in range(3):
-        logger.info(f"Fetch {nor} (attempt {attempt+1}/3)")
-        async with httpx.AsyncClient(timeout=90.0, follow_redirects=True, headers=_HEADERS) as client:
+    """Fetch RIS page, extract text + version NORs. Tries both www and non-www URLs."""
+    urls = [f"{_DOC_URL}{nor}", f"{_DOC_URL_ALT}{nor}"]
+    for url in urls:
+        for attempt in range(2):
+            logger.info(f"Fetch {nor} from {url.split('//')[1][:20]}... (attempt {attempt+1})")
             try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                return _parse(resp.text, nor)
+                async with httpx.AsyncClient(timeout=90.0, follow_redirects=True, headers=_HEADERS) as client:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    result = _parse(resp.text, nor)
+                    if result and result.get("text"):
+                        return result
+                    logger.warning(f"Empty text from {url}")
             except httpx.TimeoutException:
                 logger.warning(f"Timeout {nor} attempt {attempt+1}")
-                if attempt < 2:
-                    import asyncio
-                    await asyncio.sleep(2)
-                    continue
-                logger.error(f"Fetch {nor}: timeout after 3 attempts")
-                return None
             except Exception as e:
                 logger.error(f"Fetch {nor}: {type(e).__name__}: {e}")
-                return None
+                break  # Don't retry on non-timeout errors, try next URL
+            import asyncio
+            await asyncio.sleep(1)
+    logger.error(f"All fetch attempts failed for {nor}")
     return None
 
 
