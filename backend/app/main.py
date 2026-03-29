@@ -296,8 +296,13 @@ async def api_report_email(req: EmailReportRequest):
                         "from": {"email": "monitoring@test-3m5jgro09qzgdpyo.mlsender.net", "name": "AI:ssociate Monitoring"},
                         "to": [{"email": req.email}],
                         "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
-                        "text": "Siehe HTML-Version.",
-                        "html": html_report,
+                        "text": f"AI:ssociate Monitoring Report\n{req.category_label} · {req.timeframe_label}\n\nSiehe angehängte HTML-Datei.",
+                        "html": f"<p>Ihr AI:ssociate Monitoring Report für <strong>{req.category_label}</strong> ({req.timeframe_label}) ist angehängt.</p><p>Öffnen Sie die HTML-Datei im Browser für die interaktive Ansicht.</p>",
+                        "attachments": [{
+                            "filename": f"Report_{date.today().strftime('%Y-%m-%d')}.html",
+                            "content": __import__('base64').b64encode(html_report.encode('utf-8')).decode('ascii'),
+                            "disposition": "attachment",
+                        }],
                     },
                 )
             elif cfg.RESEND_API_KEY:
