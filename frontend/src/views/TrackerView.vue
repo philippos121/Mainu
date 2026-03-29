@@ -1,83 +1,97 @@
 <template>
 <div class="page">
-  <!-- 3D Library background -->
+  <!-- Library background -->
   <div class="library">
-    <!-- Shelves rendered as rows of books visible from front -->
-    <div class="lib-inner" :style="{ transform: `translateY(${scrollY * -0.25}px)` }">
-      <div class="shelf-row" v-for="row in 8" :key="row" :style="{ opacity: Math.max(0, 1 - Math.abs(scrollY - row * 120) * 0.002) }">
+    <div class="lib-inner" :style="{ transform: `translateY(${scrollY * -0.2}px)` }">
+      <div class="shelf-row" v-for="row in 8" :key="row"
+        :style="{ opacity: Math.max(0.08, 0.5 - Math.abs(scrollY * 0.6 - row * 130) * 0.003) }">
         <div class="shelf-books">
-          <div class="bk" v-for="b in 30" :key="b"
-            :style="{
-              width: (10 + ((b * row * 7) % 14)) + 'px',
-              height: (40 + ((b * row * 13) % 35)) + 'px',
-              background: bookGrad(b, row),
-              opacity: 0.15 + ((b + row) % 5) * 0.06,
-              transform: `translateZ(${((b + row) % 3) * 4}px)`
-            }"></div>
+          <div class="bk" v-for="b in 30" :key="b" :style="{
+            width: (10 + ((b * row * 7) % 14)) + 'px',
+            height: (40 + ((b * row * 13) % 35)) + 'px',
+            background: bookGrad(b, row),
+            opacity: 0.2 + ((b + row) % 5) * 0.07 }"></div>
         </div>
         <div class="shelf-board"></div>
       </div>
     </div>
-    <!-- Ambient glow -->
-    <div class="lib-glow" :style="{ opacity: Math.max(0.15, 0.6 - scrollY * 0.0004) }"></div>
+    <div class="lib-glow" :style="{ opacity: Math.max(0.1, 0.5 - scrollY * 0.0003) }"></div>
   </div>
 
-  <!-- Scroll content — each section = 1 viewport height, text centered -->
+  <!-- Scroll content -->
   <div class="scroll-content">
 
     <!-- S1: Logo -->
     <section class="panel" :class="{ vis: true }">
       <div class="panel-c">
         <img src="/logo.svg" alt="AI:ssociate" class="logo" />
-        <span class="badge">Monitoring</span>
-        <p class="scroll-hint">↓ Scrollen</p>
+        <p class="scroll-hint">↓</p>
       </div>
     </section>
 
-    <!-- S2: Headline -->
-    <section class="panel" :class="{ vis: scrollY > 200 }">
+    <!-- S2: "Monitoring" text reveal -->
+    <section class="panel panel-short" :class="{ vis: scrollY > 150 }">
+      <div class="panel-c">
+        <span class="monitoring-text">Monitoring</span>
+      </div>
+    </section>
+
+    <!-- S3: Headline -->
+    <section class="panel" :class="{ vis: scrollY > 400 }">
       <div class="panel-c">
         <h1 class="h-main">Rechtsänderungen.</h1>
         <h1 class="h-main h-accent">Automatisch. Analysiert.</h1>
       </div>
     </section>
 
-    <!-- S3: Features -->
-    <section class="panel panel-features" :class="{ vis: scrollY > 600 }">
-      <div class="panel-c">
+    <!-- S4: Features -->
+    <section class="panel" :class="{ vis: scrollY > 900 }">
+      <div class="panel-c panel-left">
         <div class="feat" v-for="(f, i) in features" :key="i"
-          :style="{ transitionDelay: i * 0.12 + 's', opacity: scrollY > 650 + i * 60 ? 1 : 0, transform: scrollY > 650 + i * 60 ? 'translateX(0)' : 'translateX(-30px)' }">
+          :style="{ transitionDelay: i*0.1+'s', opacity: scrollY > 950+i*70 ? 1 : 0, transform: scrollY > 950+i*70 ? 'none' : 'translateX(-20px)' }">
           <div class="feat-ico" v-html="f.icon"></div>
           <div><strong>{{ f.title }}</strong><br/><span class="feat-sub">{{ f.desc }}</span></div>
         </div>
       </div>
     </section>
 
-    <!-- S4: Sources -->
-    <section class="panel" :class="{ vis: scrollY > 1000 }">
+    <!-- S5: Sources -->
+    <section class="panel panel-short" :class="{ vis: scrollY > 1400 }">
       <div class="panel-c">
         <p class="src-label">Datenquellen</p>
         <div class="src-row">
-          <span class="src" v-for="(s, i) in ['RIS', 'Findok', 'EUR-Lex', 'parlament.gv.at']" :key="i"
-            :style="{ transitionDelay: i * 0.1 + 's', opacity: scrollY > 1050 + i * 40 ? 1 : 0, transform: scrollY > 1050 + i * 40 ? 'scale(1)' : 'scale(0.8)' }">{{ s }}</span>
+          <span class="src" v-for="(s, i) in ['RIS','Findok','EUR-Lex','parlament.gv.at']" :key="i"
+            :style="{ transitionDelay: i*0.08+'s', opacity: scrollY > 1450+i*30 ? 1 : 0, transform: scrollY > 1450+i*30 ? 'scale(1)' : 'scale(0.85)' }">{{ s }}</span>
         </div>
       </div>
     </section>
 
-    <!-- S5: Form — sticky at bottom -->
-    <section class="panel panel-form">
-      <div class="form-sticky" :class="{ vis: scrollY > 1300 }">
-        <div class="form-card">
-          <h2>Report erstellen</h2>
-          <p class="form-sub">Rechtsgebiete wählen, Report per E-Mail erhalten.</p>
-
-          <div class="field">
-            <label>Rechtsgebiete</label>
-            <v-select v-model="selectedCategory" :items="categories" item-title="label" item-value="id"
-              variant="outlined" density="compact" multiple chips closable-chips clearable hide-details
-              placeholder="Rechtsgebiete wählen…" color="#22c9e8" />
+    <!-- S6: Category selection — tag cloud -->
+    <section class="panel panel-cats" :class="{ vis: scrollY > 1700 }">
+      <div class="panel-c">
+        <h2 class="cat-title">Rechtsgebiete wählen</h2>
+        <div class="cat-groups" v-if="catGroups.length">
+          <div class="cat-group" v-for="(g, gi) in catGroups" :key="gi"
+            :style="{ transitionDelay: gi*0.06+'s', opacity: scrollY > 1750+gi*30 ? 1 : 0, transform: scrollY > 1750+gi*30 ? 'none' : 'translateY(12px)' }">
+            <p class="cg-label">{{ g.group }}</p>
+            <div class="cg-tags">
+              <button v-for="c in g.items" :key="c.id"
+                class="tag" :class="{ active: selectedCategory.includes(c.id) }"
+                @click="toggleCat(c.id)">{{ c.label }}</button>
+            </div>
           </div>
+        </div>
+        <div v-if="selectedCategory.length" class="cat-selected">
+          {{ selectedCategory.length }} ausgewählt
+          <button class="cat-clear" @click="selectedCategory = []">Alle abwählen</button>
+        </div>
+      </div>
+    </section>
 
+    <!-- S7: Form — sticky -->
+    <section class="panel panel-form">
+      <div class="form-sticky" :class="{ vis: scrollY > 2200 || selectedCategory.length > 0 }">
+        <div class="form-card">
           <div class="field-row">
             <div class="field fh">
               <label>Zeitraum</label>
@@ -89,12 +103,10 @@
               <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
             </div>
           </div>
-
           <div v-if="selectedTimeframe === 'custom'" class="field-row">
             <div class="field fh"><label>Von</label><input v-model="datumVon" type="date" class="inp" /></div>
             <div class="field fh"><label>Bis</label><input v-model="datumBis" type="date" class="inp" /></div>
           </div>
-
           <div class="actions">
             <button class="btn-p" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
               <span v-if="sending" class="spin"></span>
@@ -105,7 +117,6 @@
               <template v-else>↓ Download</template>
             </button>
           </div>
-
           <div v-if="statusMsg" :class="['sts', statusOk ? 'sts-ok' : 'sts-err']">{{ statusMsg }}</div>
         </div>
       </div>
@@ -116,7 +127,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 
 const scrollY = ref(0)
@@ -132,15 +143,9 @@ const features = [
 ]
 
 function bookGrad(b, row) {
-  const c = [
-    ['rgba(0,121,147,', 'rgba(0,90,110,'],
-    ['rgba(255,151,51,', 'rgba(200,110,30,'],
-    ['rgba(10,80,98,', 'rgba(8,60,75,'],
-    ['rgba(34,160,200,', 'rgba(20,120,150,'],
-    ['rgba(100,70,50,', 'rgba(70,45,30,'],
-  ]
+  const c = [['0,121,147','0,90,110'],['255,151,51','200,110,30'],['10,80,98','8,60,75'],['34,160,200','20,120,150'],['100,70,50','70,45,30']]
   const p = c[(b + row) % c.length]
-  return `linear-gradient(180deg, ${p[0]}0.35), ${p[1]}0.5))`
+  return `linear-gradient(180deg, rgba(${p[0]},0.35), rgba(${p[1]},0.5))`
 }
 
 const categories = ref([])
@@ -155,6 +160,22 @@ const sending = ref(false)
 const generating = ref(false)
 const statusMsg = ref('')
 const statusOk = ref(false)
+
+const catGroups = computed(() => {
+  const groups = {}
+  for (const c of categories.value) {
+    const g = c.group || 'Sonstige'
+    if (!groups[g]) groups[g] = []
+    groups[g].push(c)
+  }
+  return Object.entries(groups).map(([group, items]) => ({ group, items }))
+})
+
+function toggleCat(id) {
+  const idx = selectedCategory.value.indexOf(id)
+  if (idx >= 0) selectedCategory.value.splice(idx, 1)
+  else selectedCategory.value.push(id)
+}
 
 watch(reportEmail, v => { if(v) localStorage.setItem('ris_report_email',v) })
 
@@ -206,141 +227,114 @@ async function downloadReport() {
 <style scoped>
 .page { min-height: 100vh; background: #070e12; color: #e8f4f6; overflow-x: hidden; }
 
-/* ── Library background ── */
-.library {
-  position: fixed; inset: 0; z-index: 0; overflow: hidden;
-  background: linear-gradient(180deg, #060c10 0%, #091920 40%, #0c2230 70%, #060c10 100%);
-}
-.lib-inner {
-  position: absolute; left: 5%; right: 5%; top: 5%; bottom: 0;
-  will-change: transform;
-}
-.shelf-row {
-  position: relative; height: 100px; margin-bottom: 20px;
-  transition: opacity 0.3s;
-}
-.shelf-books {
-  display: flex; align-items: flex-end; gap: 3px;
-  height: 80px; padding: 0 8px;
-}
-.bk {
-  flex-shrink: 0; border-radius: 2px 2px 0 0;
-  border-top: 1px solid rgba(255,255,255,0.04);
-  box-shadow: 1px 0 2px rgba(0,0,0,0.3), -1px 0 2px rgba(0,0,0,0.2);
-}
-.shelf-board {
-  height: 6px; border-radius: 1px;
-  background: linear-gradient(180deg, rgba(120,80,45,0.4) 0%, rgba(80,50,25,0.5) 100%);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.03);
-}
-.lib-glow {
-  position: absolute; top: 0; left: 20%; width: 60%; height: 50%;
-  background: radial-gradient(ellipse at 50% 0%, rgba(255,200,100,0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
+/* ── Library ── */
+.library { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: linear-gradient(180deg, #060c10, #091920 40%, #0c2230 70%, #060c10); }
+.lib-inner { position: absolute; left: 5%; right: 5%; top: 5%; will-change: transform; }
+.shelf-row { position: relative; height: 100px; margin-bottom: 20px; }
+.shelf-books { display: flex; align-items: flex-end; gap: 3px; height: 80px; padding: 0 8px; }
+.bk { flex-shrink: 0; border-radius: 2px 2px 0 0; border-top: 1px solid rgba(255,255,255,0.04); box-shadow: 1px 0 2px rgba(0,0,0,0.3), -1px 0 2px rgba(0,0,0,0.2); }
+.shelf-board { height: 6px; border-radius: 1px; background: linear-gradient(180deg, rgba(120,80,45,0.4), rgba(80,50,25,0.5)); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+.lib-glow { position: absolute; top: 0; left: 20%; width: 60%; height: 50%; background: radial-gradient(ellipse at 50% 0%, rgba(255,200,100,0.07) 0%, transparent 70%); pointer-events: none; }
 
 /* ── Scroll content ── */
 .scroll-content { position: relative; z-index: 2; }
 
-/* Each panel = full viewport height, centered content */
-.panel {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-}
-.panel-c { text-align: center; max-width: 600px; width: 100%; }
-
-/* Reveal */
-.panel .panel-c, .panel .form-sticky {
-  opacity: 0; transform: translateY(50px);
-  transition: opacity 1s cubic-bezier(0.16,1,0.3,1), transform 1s cubic-bezier(0.16,1,0.3,1);
-}
-.panel.vis .panel-c, .panel .form-sticky.vis {
-  opacity: 1; transform: translateY(0);
-}
+.panel { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.panel-short { min-height: 60vh; }
+.panel-c { text-align: center; max-width: 640px; width: 100%; opacity: 0; transform: translateY(40px); transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1); }
+.panel.vis .panel-c { opacity: 1; transform: translateY(0); }
+.panel-left { text-align: left; }
 
 /* S1: Logo */
-.logo { height: 52px; filter: brightness(10); }
-.badge {
-  display: inline-block; margin-left: 14px; vertical-align: top; margin-top: 6px;
-  font-size: 10px; font-weight: 700; color: #ff9733;
-  text-transform: uppercase; letter-spacing: 2px;
-}
-.scroll-hint {
-  margin-top: 48px; font-size: 13px; color: rgba(255,255,255,0.2);
-  letter-spacing: 3px; text-transform: uppercase;
-  animation: hintPulse 2s ease-in-out infinite;
-}
-@keyframes hintPulse { 0%,100%{opacity:0.2;transform:translateY(0)} 50%{opacity:0.5;transform:translateY(6px)} }
+.logo { height: 56px; filter: brightness(10); }
+.scroll-hint { margin-top: 40px; font-size: 20px; color: rgba(255,255,255,0.15); animation: hintBob 2s ease-in-out infinite; }
+@keyframes hintBob { 0%,100%{transform:translateY(0);opacity:0.15} 50%{transform:translateY(8px);opacity:0.35} }
 
-/* S2: Headline */
-.h-main {
-  font-size: 52px; font-weight: 800; line-height: 1.08; margin: 0;
-  letter-spacing: -1.5px;
-  text-shadow: 0 4px 40px rgba(0,0,0,0.5);
+/* S2: Monitoring text */
+.monitoring-text {
+  font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 6px;
+  color: #ff9733;
 }
+
+/* S3: Headline */
+.h-main { font-size: 52px; font-weight: 800; line-height: 1.08; margin: 0; letter-spacing: -1.5px; text-shadow: 0 4px 40px rgba(0,0,0,0.5); }
 .h-accent { color: #22c9e8; }
 
-/* S3: Features */
-.panel-features .panel-c { text-align: left; }
+/* S4: Features */
 .feat {
   display: flex; align-items: center; gap: 16px;
   padding: 18px 22px; margin-bottom: 10px;
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 14px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px;
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
 .feat-ico { flex-shrink: 0; }
-.feat strong { font-size: 15px; color: #e8f4f6; }
+.feat strong { font-size: 15px; }
 .feat-sub { font-size: 12px; color: rgba(255,255,255,0.4); }
 
-/* S4: Sources */
+/* S5: Sources */
 .src-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 20px; }
 .src-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.src {
-  font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.65);
-  padding: 8px 20px; border-radius: 10px;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+.src { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.65); padding: 8px 20px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); transition: all 0.5s ease; }
+
+/* S6: Category tag cloud */
+.panel-cats { min-height: auto; padding-top: 60px; padding-bottom: 60px; }
+.panel-cats .panel-c { max-width: 800px; text-align: left; }
+.cat-title { font-size: 22px; font-weight: 700; margin: 0 0 28px; text-align: center; }
+
+.cat-group { margin-bottom: 20px; transition: opacity 0.5s ease, transform 0.5s ease; }
+.cg-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin: 0 0 10px; }
+.cg-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.tag {
+  padding: 7px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.6);
+  font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: all 0.2s;
+}
+.tag:hover { border-color: rgba(34,201,232,0.3); color: rgba(255,255,255,0.85); background: rgba(34,201,232,0.06); }
+.tag.active {
+  background: rgba(34,201,232,0.15); border-color: rgba(34,201,232,0.4);
+  color: #22c9e8; font-weight: 600;
 }
 
-/* S5: Form — sticky so it stays on screen */
-.panel-form {
-  min-height: auto; align-items: flex-start;
-  position: sticky; bottom: 0;
-  padding: 40px 24px 40px;
+.cat-selected {
+  text-align: center; margin-top: 20px; font-size: 13px; color: rgba(255,255,255,0.5);
 }
+.cat-clear {
+  background: none; border: none; color: #22c9e8; font-size: 13px; font-family: inherit;
+  cursor: pointer; text-decoration: underline; margin-left: 8px;
+}
+
+/* S7: Form sticky */
+.panel-form { min-height: auto; position: sticky; bottom: 0; padding: 0 24px 0; align-items: flex-end; }
 .form-sticky {
-  max-width: 560px; margin: 0 auto; width: 100%;
-  opacity: 0; transform: translateY(30px);
-  transition: opacity 0.8s ease, transform 0.8s ease;
+  max-width: 600px; margin: 0 auto; width: 100%;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
 }
 .form-sticky.vis { opacity: 1; transform: translateY(0); }
 
 .form-card {
-  background: rgba(10,25,33,0.85); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
-  border-radius: 20px; border: 1px solid rgba(255,255,255,0.08);
-  padding: 32px;
-  box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+  background: rgba(10,25,33,0.9); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border-radius: 20px 20px 0 0; border: 1px solid rgba(255,255,255,0.08); border-bottom: none;
+  padding: 28px 32px 32px;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
 }
-.form-card h2 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
-.form-sub { font-size: 13px; color: rgba(255,255,255,0.4); margin: 0 0 24px; }
 
-.field { margin-bottom: 16px; }
-.field label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); margin-bottom: 5px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.5); margin-bottom: 5px; }
 .field-row { display: flex; gap: 12px; }
 .fh { flex: 1; min-width: 0; }
 
 .inp {
-  width: 100%; padding: 11px 14px;
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  width: 100%; padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
   font-size: 14px; font-family: inherit; outline: none;
-  background: rgba(255,255,255,0.04); color: #e8f4f6;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  background: rgba(255,255,255,0.04); color: #e8f4f6; transition: border-color 0.2s, box-shadow 0.2s;
 }
 .inp:focus { border-color: rgba(34,201,232,0.4); box-shadow: 0 0 0 3px rgba(34,201,232,0.08); }
 .inp::placeholder { color: rgba(255,255,255,0.18); }
 
-.actions { display: flex; gap: 10px; margin-top: 24px; }
+.actions { display: flex; gap: 10px; margin-top: 20px; }
 .btn-p {
   flex: 1; padding: 14px; border: none; border-radius: 12px;
   background: linear-gradient(135deg, #ff9733, #e8870a); color: white;
@@ -371,7 +365,6 @@ async function downloadReport() {
 :deep(.v-field__input) { color: #e8f4f6 !important; }
 :deep(.v-field--focused) { border-color: rgba(34,201,232,0.4) !important; }
 :deep(.v-chip) { background: rgba(34,201,232,0.12) !important; color: #22c9e8 !important; }
-:deep(.v-field__input::placeholder) { color: rgba(255,255,255,0.18) !important; }
 :deep(.v-select__selection-text) { color: #e8f4f6 !important; }
 :deep(.v-field__append-inner .v-icon) { color: rgba(255,255,255,0.3) !important; }
 :deep(.v-list) { background: #0c1c25 !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 10px !important; }
@@ -383,12 +376,13 @@ async function downloadReport() {
   .h-main { font-size: 34px; }
   .field-row { flex-direction: column; gap: 0; }
   .actions { flex-direction: column; }
-  .form-card { padding: 22px; }
+  .form-card { padding: 20px; }
   .panel { padding: 20px 16px; }
+  .panel-cats .panel-c { max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .panel .panel-c, .form-sticky { opacity: 1; transform: none; transition: none; }
-  .feat, .src { opacity: 1 !important; transform: none !important; }
+  .panel-c { opacity: 1; transform: none; transition: none; }
+  .feat, .src, .cat-group { opacity: 1 !important; transform: none !important; }
   .library { display: none; }
   .page { background: #0c2230; }
 }
