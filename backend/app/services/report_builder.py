@@ -90,6 +90,7 @@ def build_report(
             bgbl = _html.escape(str(r.get("bgbl", "")))
             inkraft = _html.escape(str(r.get("date", "")))
             url = _html.escape(str(r.get("url", "")))
+            source = r.get("source", "")
             # Judikatur-specific fields
             court = _html.escape(str(r.get("court", "")))
             case_number = _html.escape(str(r.get("case_number", "")))
@@ -115,6 +116,8 @@ def build_report(
         {f'<span class="tag tag-art">{artikel}</span>' if artikel else ''}
         {f'<span class="tag tag-art">{case_number}</span>' if case_number else ''}
         {'<span class="tag tag-chg">Geändert</span>' if has_diff else ''}
+        {'<span class="tag tag-findok">Findok</span>' if source == 'findok' else ''}
+        {'<span class="tag tag-eurlex">EUR-Lex</span>' if source == 'eurlex' else ''}
       </div>
       {f'<div class="card-rs">{rechtssatz}</div>' if rechtssatz else ''}
       <div class="card-dates">
@@ -236,6 +239,8 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
 .tag-art{{background:rgba(239,96,7,0.08);color:#ef6007}}
 .tag-chg{{background:rgba(16,185,129,0.08);color:#059669}}
 .tag-court{{background:rgba(99,102,241,0.08);color:#6366f1}}
+.tag-findok{{background:rgba(234,88,12,0.08);color:#ea580c}}
+.tag-eurlex{{background:rgba(37,99,235,0.08);color:#2563eb}}
 .mat-card{{border-left:3px solid #7c3aed;background:#faf5ff}}
 .card-rs{{font-size:12px;color:#4b5563;font-style:italic;border-left:2px solid #ef6007;padding-left:8px;margin:4px 0;line-height:1.5}}
 .card-dates{{font-size:12px;color:#6b7280}}

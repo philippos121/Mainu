@@ -118,6 +118,8 @@ LEGAL_CATEGORIES = [
     {"id": "strafprozess", "label": "Strafprozessrecht", "group": "Strafrecht"},
     {"id": "strafvollzug", "label": "Strafvollzug", "group": "Strafrecht"},
     {"id": "opferschutz", "label": "Opferschutz / Bewährungshilfe", "group": "Strafrecht"},
+    # ── Sonderquellen ──
+    {"id": "unionsrecht", "label": "Unionsrecht (EU)", "group": "EU / International"},
 ]
 
 # ── RIS Index mapping per Rechtsgebiet ──
@@ -223,6 +225,8 @@ _CATEGORY_SEARCH: dict[str, list[dict]] = {
     "strafprozess": [{"Index": "25/01"}],
     "strafvollzug": [{"Index": "25/02"}, {"Index": "24/02"}],
     "opferschutz": [{"Index": "25/02"}, {"Titel": "Verbrechensopfergesetz"}, {"Titel": "Bewährungshilfegesetz"}],
+    # Sonderquellen (nicht über RIS Index, sondern über eigene APIs)
+    "unionsrecht": [],  # handled by eurlex_client.py
 }
 
 # ── Timeframe options (ImRisSeit enum) ──

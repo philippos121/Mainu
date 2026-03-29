@@ -24,6 +24,8 @@ from app.services.openai_service import summarise_results, generate_report_markd
 from app.services.diff_service import fetch_provision_diff, debug_document
 from app.services.report_builder import build_report
 from app.services.materialien_service import fetch_materialien_for_results
+from app.services.findok_client import search_findok
+from app.services.eurlex_client import search_eurlex
 
 logging.basicConfig(level=logging.INFO)
 
@@ -90,10 +92,27 @@ async def api_search_gesetze(
     im_ris_seit: str = Query("EinemMonat", description="Timeframe filter"),
     page: int = Query(1, ge=1),
 ):
-    """Search Gesetze und Verordnungen (Bundesrecht consolidated)."""
+    """Search Gesetze und Verordnungen (Bundesrecht consolidated).
+    Special categories 'unionsrecht' are routed to EUR-Lex."""
+    if category == "unionsrecht":
+        results = await search_eurlex(im_ris_seit=im_ris_seit)
+        return {"results": results, "total_hits": len(results)}
     raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
     days = _timeframe_to_days(im_ris_seit)
-    return parse_bundesrecht_response(raw, timeframe_days=days)
+    parsed = parse_bundesrecht_response(raw, timeframe_days=days)
+    # For Steuerrecht categories, also fetch Findok
+    steuer_cats = {"einkommensteuer", "koerperschaftsteuer", "umsatzsteuer", "abgabenrecht",
+                   "gebuehrenrecht", "bewertungsrecht", "finanzstrafrecht", "finanzrecht_allg"}
+    if category in steuer_cats:
+        try:
+            findok_results = await search_findok(im_ris_seit=im_ris_seit)
+            if findok_results:
+                parsed["results"].extend(findok_results)
+                parsed["total_hits"] = parsed.get("total_hits", 0) + len(findok_results)
+                logging.info(f"Added {len(findok_results)} Findok results for {category}")
+        except Exception as e:
+            logging.error(f"Findok error: {e}")
+    return parsed
 
 
 @app.get("/api/search/begutachtung")
@@ -176,6 +195,20 @@ async def api_debug_materialien(
     gp, rv = parse_materialien_string(materialien)
     result = await fetch_materialien_for_bgbl(bgbl, gesetzesnummer=gesetzesnummer, materialien_str=materialien)
     return {"parsed_gp": gp, "parsed_rv": rv, "result": result}
+
+
+@app.get("/api/debug/findok")
+async def api_debug_findok():
+    """DEBUG: Test Findok scraping."""
+    return await search_findok(im_ris_seit="EinemMonat")
+
+
+@app.get("/api/debug/eurlex")
+async def api_debug_eurlex(
+    im_ris_seit: str = Query("EinemMonat", description="Timeframe"),
+):
+    """DEBUG: Test EUR-Lex SPARQL search."""
+    return await search_eurlex(im_ris_seit=im_ris_seit)
 
 
 @app.get("/api/debug/index")
@@ -373,15 +406,17 @@ class ReportRequest(BaseModel):
 @app.post("/api/summarise")
 async def api_summarise(req: SummaryRequest):
     """Generate a GPT summary of search results. API key provided by frontend."""
-    if not req.api_key or len(req.api_key) < 10:
-        raise HTTPException(status_code=400, detail="Bitte geben Sie einen gültigen OpenAI API-Key ein.")
+    from app.core.config import settings as _cfg2
+    sum_key = _cfg2.OPENAI_API_KEY or req.api_key
+    if not sum_key or len(sum_key) < 10:
+        raise HTTPException(status_code=400, detail="OpenAI API-Key nicht konfiguriert (OPENAI_API_KEY in .env).")
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse zum Zusammenfassen.")
     try:
         summary = await summarise_results(
             results=req.results,
             doc_type=req.doc_type,
-            api_key=req.api_key,
+            api_key=sum_key,
         )
         return {"summary": summary}
     except ValueError as e:
@@ -456,8 +491,10 @@ async def _generate_full_report(req) -> dict:
         )
 
     # GPT summary with Materialien + diffs + parliamentary context
+    from app.core.config import settings as _cfg
+    api_key = _cfg.OPENAI_API_KEY or getattr(req, 'api_key', '')
     report_md = ""
-    if req.api_key and len(req.api_key) >= 10:
+    if api_key and len(api_key) >= 10:
         try:
             # Build Materialien context for GPT
             extra_context = ""
@@ -507,7 +544,7 @@ async def _generate_full_report(req) -> dict:
                 category_label=req.category_label,
                 timeframe_label=req.timeframe_label,
                 total_hits=req.total_hits,
-                api_key=req.api_key,
+                api_key=api_key,
                 extra_context=extra_context + diff_context,
             )
         except Exception as e:

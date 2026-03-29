@@ -56,11 +56,6 @@
         </div>
       </div>
 
-      <div class="field">
-        <label>OpenAI API-Key <span class="opt">(optional — für KI-Analyse)</span></label>
-        <input v-model="apiKey" type="password" placeholder="sk-..." class="inp" />
-      </div>
-
       <div class="actions">
         <button class="btn-primary" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
           <span v-if="sending" class="spin"></span>
@@ -90,14 +85,12 @@ const categories = ref([])
 const timeframes = ref([])
 const selectedCategory = ref([])
 const selectedTimeframe = ref('EinemMonat')
-const apiKey = ref(localStorage.getItem('ris_openai_key') || '')
 const reportEmail = ref(localStorage.getItem('ris_report_email') || '')
 const sending = ref(false)
 const generating = ref(false)
 const statusMsg = ref('')
 const statusOk = ref(false)
 
-watch(apiKey, v => { if(v) localStorage.setItem('ris_openai_key',v); else localStorage.removeItem('ris_openai_key') })
 watch(reportEmail, v => { if(v) localStorage.setItem('ris_report_email',v) })
 
 onMounted(async () => {
@@ -141,7 +134,7 @@ async function sendReport() {
     const data = await doSearch()
     if (!data.results?.length) { statusMsg.value = 'Keine Ergebnisse.'; statusOk.value = false; return }
     statusMsg.value = `${data.results.length} Ergebnisse. Report wird versendet…`
-    await api.post('/report/email', { email: reportEmail.value, api_key: apiKey.value||'', results: data.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: data.total_hits, diffs: {} })
+    await api.post('/report/email', { email: reportEmail.value, results: data.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: data.total_hits, diffs: {} })
     statusMsg.value = `✓ Report an ${reportEmail.value} gesendet.`; statusOk.value = true
   } catch(e) { statusMsg.value = e.response?.data?.detail || `Fehler: ${e.message}`; statusOk.value = false }
   finally { sending.value = false }
@@ -154,7 +147,7 @@ async function downloadReport() {
     const data = await doSearch()
     if (!data.results?.length) { statusMsg.value = 'Keine Ergebnisse.'; statusOk.value = false; return }
     statusMsg.value = `${data.results.length} Ergebnisse. Report wird erstellt…`
-    const r = await api.post('/report', { api_key: apiKey.value||'', results: data.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: data.total_hits, diffs: {} })
+    const r = await api.post('/report', { results: data.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: data.total_hits, diffs: {} })
     const b = new Blob([r.data.report_html],{type:'text/html;charset=utf-8'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`Report_${new Date().toISOString().split('T')[0]}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u)
     statusMsg.value = '✓ Report heruntergeladen.'; statusOk.value = true
   } catch(e) { statusMsg.value = e.response?.data?.detail || `Fehler: ${e.message}`; statusOk.value = false }
