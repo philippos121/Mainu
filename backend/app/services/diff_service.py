@@ -122,17 +122,27 @@ async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
 # ── Page fetch + parse ──
 
 async def _fetch_page(nor: str) -> dict | None:
-    """Fetch RIS Dokument.wxe page, extract text + version NORs."""
+    """Fetch RIS Dokument.wxe page, extract text + version NORs. Retries on timeout."""
     url = f"{_DOC_URL}{nor}"
-    logger.info(f"Fetch: {url}")
-    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True, headers=_HEADERS) as client:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return _parse(resp.text, nor)
-        except Exception as e:
-            logger.error(f"Fetch {nor}: {e}")
-            return None
+    for attempt in range(3):
+        logger.info(f"Fetch {nor} (attempt {attempt+1}/3)")
+        async with httpx.AsyncClient(timeout=90.0, follow_redirects=True, headers=_HEADERS) as client:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                return _parse(resp.text, nor)
+            except httpx.TimeoutException:
+                logger.warning(f"Timeout {nor} attempt {attempt+1}")
+                if attempt < 2:
+                    import asyncio
+                    await asyncio.sleep(2)
+                    continue
+                logger.error(f"Fetch {nor}: timeout after 3 attempts")
+                return None
+            except Exception as e:
+                logger.error(f"Fetch {nor}: {type(e).__name__}: {e}")
+                return None
+    return None
 
 
 def _parse(html: str, current_nor: str = "") -> dict:
