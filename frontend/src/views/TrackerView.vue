@@ -3,7 +3,10 @@
   <!-- Hero section -->
   <section class="hero">
     <div class="hero-inner">
-      <img src="/logo.svg" alt="AI:ssociate" class="hero-logo" />
+      <div class="hero-brand">
+        <img src="/logo.svg" alt="AI:ssociate" class="hero-logo" />
+        <span class="hero-badge">Monitoring</span>
+      </div>
       <div class="hero-props">
         <div class="hp">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
@@ -23,7 +26,6 @@
         </div>
       </div>
       <h1 class="hero-h1">Rechtsänderungen.<br/><span class="hero-accent">Automatisch. Analysiert.</span></h1>
-      <p class="hero-p">Alle Gesetzesänderungen und Gerichtsentscheidungen Ihres Rechtsgebiets — mit Versionsvergleich, Gesetzesmaterialien und KI-gestützter Analyse als Report per E-Mail.</p>
     </div>
   </section>
 
@@ -168,7 +170,13 @@ async function downloadReport() {
 .hero-accent { color: var(--teal); }
 .hero-p { font-size: 16px; color: var(--muted); line-height: 1.7; }
 
-.hero-logo { height: 40px; width: auto; margin-bottom: 24px; }
+.hero-brand { position: relative; display: inline-block; margin-bottom: 24px; }
+.hero-logo { height: 40px; width: auto; }
+.hero-badge {
+  position: absolute; top: -6px; right: -70px;
+  font-size: 10px; font-weight: 700; color: var(--orange);
+  text-transform: uppercase; letter-spacing: 1.5px;
+}
 .hero-props { display: flex; justify-content: center; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
 .hp {
   display: flex; align-items: center; gap: 6px;
