@@ -14,10 +14,11 @@
       </div>
     </section>
 
-    <!-- S2: "Monitoring" text reveal -->
+    <!-- S2: "Monitoring" reveal -->
     <section class="panel panel-short" :class="{ vis: scrollY > 150 }">
       <div class="panel-c">
-        <span class="monitoring-text">Monitoring</span>
+        <h2 class="monitoring-text">Monitoring</h2>
+        <p class="monitoring-sub">Ihr Rechtsradar für Österreich und die EU</p>
       </div>
     </section>
 
@@ -25,15 +26,17 @@
     <section class="panel" :class="{ vis: scrollY > 400 }">
       <div class="panel-c">
         <h1 class="h-main">Rechtsänderungen.</h1>
-        <h1 class="h-main h-accent">Automatisch. Analysiert.</h1>
+        <h1 class="h-main h-accent">Automatisch.<br/>Analysiert.</h1>
+        <p class="h-sub">Gesetze, Verordnungen, Entscheidungen und BMF-Richtlinien —<br/>alle Novellen im Blick, KI-gestützt zusammengefasst.</p>
       </div>
     </section>
 
     <!-- S4: Features -->
     <section class="panel" :class="{ vis: scrollY > 900 }">
       <div class="panel-c panel-left">
+        <p class="sec-label">Was wir liefern</p>
         <div class="feat" v-for="(f, i) in features" :key="i"
-          :style="{ transitionDelay: i*0.1+'s', opacity: scrollY > 950+i*70 ? 1 : 0, transform: scrollY > 950+i*70 ? 'none' : 'translateX(-20px)' }">
+          :style="{ transitionDelay: i*0.1+'s', opacity: scrollY > 950+i*70 ? 1 : 0, transform: scrollY > 950+i*70 ? 'none' : 'translateX(-30px)' }">
           <div class="feat-ico" v-html="f.icon"></div>
           <div><strong>{{ f.title }}</strong><br/><span class="feat-sub">{{ f.desc }}</span></div>
         </div>
@@ -43,18 +46,22 @@
     <!-- S5: Sources -->
     <section class="panel panel-short" :class="{ vis: scrollY > 1400 }">
       <div class="panel-c">
-        <p class="src-label">Datenquellen</p>
+        <p class="sec-label">Datenquellen — live angebunden</p>
         <div class="src-row">
-          <span class="src" v-for="(s, i) in ['RIS','Findok','EUR-Lex','parlament.gv.at']" :key="i"
-            :style="{ transitionDelay: i*0.08+'s', opacity: scrollY > 1450+i*30 ? 1 : 0, transform: scrollY > 1450+i*30 ? 'scale(1)' : 'scale(0.85)' }">{{ s }}</span>
+          <span class="src" v-for="(s, i) in sources" :key="i"
+            :style="{ transitionDelay: i*0.08+'s', opacity: scrollY > 1450+i*30 ? 1 : 0, transform: scrollY > 1450+i*30 ? 'scale(1)' : 'scale(0.85)' }">
+            <strong>{{ s.name }}</strong>
+            <span>{{ s.desc }}</span>
+          </span>
         </div>
       </div>
     </section>
 
-    <!-- S6: Category selection — tag cloud -->
+    <!-- S6: Category selection -->
     <section class="panel panel-cats" :class="{ vis: scrollY > 1700 }">
       <div class="panel-c">
-        <h2 class="cat-title">Rechtsgebiete wählen</h2>
+        <h2 class="cat-title">Wählen Sie Ihre Rechtsgebiete</h2>
+        <p class="cat-sub">Klicken Sie auf die relevanten Bereiche — der Report deckt alles ab.</p>
         <div class="cat-groups" v-if="catGroups.length">
           <div class="cat-group" v-for="(g, gi) in catGroups" :key="gi"
             :style="{ transitionDelay: gi*0.06+'s', opacity: scrollY > 1750+gi*30 ? 1 : 0, transform: scrollY > 1750+gi*30 ? 'none' : 'translateY(12px)' }">
@@ -250,7 +257,14 @@ const features = [
   { title: '86 Rechtsgebiete', desc: 'Vollständige RIS-Dezimalklassifikation', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
   { title: 'Versionsvergleich', desc: 'Inkrafttreten vs. Vorfassung', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>' },
   { title: 'Gesetzesmaterialien', desc: 'Erläuterungen von parlament.gv.at', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>' },
-  { title: 'KI-Analyse', desc: 'GPT-Report mit Quellenangaben', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff9733" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
+  { title: 'KI-Analyse', desc: 'GPT-Report mit Quellenangaben — sachlich, juristisch, klickbar', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff9733" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
+]
+
+const sources = [
+  { name: 'RIS', desc: 'Bundesrecht & Judikatur' },
+  { name: 'Findok', desc: 'BMF-Richtlinien & BFG' },
+  { name: 'EUR-Lex', desc: 'EU-Verordnungen & Richtlinien' },
+  { name: 'parlament.gv.at', desc: 'Materialien & Erläuterungen' },
 ]
 
 const categories = ref([])
@@ -346,39 +360,75 @@ async function downloadReport() {
 
 /* S1: Logo */
 .logo { height: 56px; filter: brightness(10); }
-.scroll-hint { margin-top: 40px; font-size: 20px; color: rgba(255,255,255,0.15); animation: hintBob 2s ease-in-out infinite; }
-@keyframes hintBob { 0%,100%{transform:translateY(0);opacity:0.15} 50%{transform:translateY(8px);opacity:0.35} }
+.scroll-hint { margin-top: 48px; font-size: 18px; color: rgba(255,255,255,0.12); animation: hintBob 2.5s ease-in-out infinite; }
+@keyframes hintBob { 0%,100%{transform:translateY(0);opacity:0.12} 50%{transform:translateY(10px);opacity:0.3} }
 
-/* S2: Monitoring text */
+/* S2: Monitoring */
 .monitoring-text {
-  font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 6px;
-  color: #ff9733;
+  font-size: 42px; font-weight: 800; letter-spacing: 8px; text-transform: uppercase;
+  margin: 0;
+  background: linear-gradient(135deg, #ff9733, #ffb347, #ff9733);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 20px rgba(255,151,51,0.3));
+}
+.monitoring-sub {
+  font-size: 15px; color: rgba(255,255,255,0.35); margin-top: 12px;
+  letter-spacing: 1px; font-weight: 400;
 }
 
 /* S3: Headline */
-.h-main { font-size: 52px; font-weight: 800; line-height: 1.08; margin: 0; letter-spacing: -1.5px; text-shadow: 0 4px 40px rgba(0,0,0,0.5); }
+.h-main {
+  font-size: 56px; font-weight: 800; line-height: 1.05; margin: 0;
+  letter-spacing: -2px;
+  text-shadow: 0 4px 40px rgba(0,0,0,0.5);
+}
 .h-accent { color: #22c9e8; }
+.h-sub {
+  font-size: 16px; color: rgba(255,255,255,0.4); margin-top: 24px;
+  line-height: 1.7; font-weight: 400; letter-spacing: 0.2px;
+}
+
+/* Section labels */
+.sec-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px;
+  color: rgba(34,201,232,0.5); margin-bottom: 24px;
+}
 
 /* S4: Features */
 .feat {
-  display: flex; align-items: center; gap: 16px;
-  padding: 18px 22px; margin-bottom: 10px;
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px;
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  display: flex; align-items: flex-start; gap: 18px;
+  padding: 22px 24px; margin-bottom: 12px;
+  background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 16px; transition: opacity 0.6s ease, transform 0.6s ease;
 }
-.feat-ico { flex-shrink: 0; }
-.feat strong { font-size: 15px; }
-.feat-sub { font-size: 12px; color: rgba(255,255,255,0.4); }
+.feat:hover { background: rgba(255,255,255,0.04); border-color: rgba(34,201,232,0.15); }
+.feat-ico { flex-shrink: 0; margin-top: 2px; }
+.feat strong { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+.feat-sub { font-size: 13px; color: rgba(255,255,255,0.4); line-height: 1.5; margin-top: 2px; display: inline-block; }
 
 /* S5: Sources */
-.src-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 20px; }
-.src-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.src { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.65); padding: 8px 20px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); transition: all 0.5s ease; }
+.src-row { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.src {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 14px 24px; border-radius: 14px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  transition: all 0.5s ease; min-width: 130px;
+}
+.src strong { font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.8); }
+.src span { font-size: 11px; color: rgba(255,255,255,0.35); text-align: center; }
 
-/* S6: Category tag cloud */
-.panel-cats { min-height: auto; padding-top: 60px; padding-bottom: 60px; }
+/* S6: Categories */
+.panel-cats { min-height: auto; padding-top: 80px; padding-bottom: 80px; }
 .panel-cats .panel-c { max-width: 800px; text-align: left; }
-.cat-title { font-size: 22px; font-weight: 700; margin: 0 0 28px; text-align: center; }
+.cat-title {
+  font-size: 28px; font-weight: 800; margin: 0 0 8px; text-align: center;
+  letter-spacing: -0.5px;
+}
+.cat-sub {
+  font-size: 14px; color: rgba(255,255,255,0.35); text-align: center;
+  margin: 0 0 36px;
+}
 
 .cat-group { margin-bottom: 20px; transition: opacity 0.5s ease, transform 0.5s ease; }
 .cg-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin: 0 0 10px; }
