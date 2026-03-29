@@ -257,8 +257,8 @@ async def api_report_email(req: EmailReportRequest):
         raise HTTPException(status_code=400, detail="Ungültige E-Mail-Adresse.")
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse.")
-    if not cfg.RESEND_API_KEY:
-        raise HTTPException(status_code=501, detail="E-Mail nicht konfiguriert (RESEND_API_KEY fehlt).")
+    if not cfg.MAILERSEND_API_KEY and not cfg.RESEND_API_KEY:
+        raise HTTPException(status_code=501, detail="E-Mail nicht konfiguriert (MAILERSEND_API_KEY oder RESEND_API_KEY fehlt).")
 
     # Generate report
     report_md = ""
@@ -281,30 +281,52 @@ async def api_report_email(req: EmailReportRequest):
         req.diffs,
     )
 
-    # Send via Resend HTTP API
+    # Send via MailerSend or Resend
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                "https://api.resend.com/emails",
-                headers={
-                    "Authorization": f"Bearer {cfg.RESEND_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "from": "AI:ssociate <onboarding@resend.dev>",
-                    "to": [req.email],
-                    "subject": f"AI:ssociate — {req.category_label} — {req.timeframe_label}",
-                    "html": html_report,
-                },
-            )
+            if cfg.MAILERSEND_API_KEY:
+                # MailerSend — no domain verification needed for trial
+                resp = await client.post(
+                    "https://api.mailersend.com/v1/email",
+                    headers={
+                        "Authorization": f"Bearer {cfg.MAILERSEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": {"email": "monitoring@trial-z86org8d5x7gew13.mlsender.net", "name": "AI:ssociate Monitoring"},
+                        "to": [{"email": req.email}],
+                        "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
+                        "html": html_report,
+                    },
+                )
+            elif cfg.RESEND_API_KEY:
+                # Resend fallback
+                resp = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {cfg.RESEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": "AI:ssociate <onboarding@resend.dev>",
+                        "to": [req.email],
+                        "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
+                        "html": html_report,
+                    },
+                )
+            else:
+                raise HTTPException(status_code=501, detail="E-Mail nicht konfiguriert (MAILERSEND_API_KEY oder RESEND_API_KEY fehlt).")
+
             resp.raise_for_status()
             data = resp.json()
-            logging.info(f"Email sent via Resend: {data.get('id')} to {req.email}")
-            return {"status": "sent", "email": req.email, "resend_id": data.get("id")}
+            logging.info(f"Email sent to {req.email}: {data}")
+            return {"status": "sent", "email": req.email}
     except httpx.HTTPStatusError as e:
-        err = e.response.text[:300]
-        logging.error(f"Resend error: {err}")
+        err = e.response.text[:500]
+        logging.error(f"Email error: {err}")
         raise HTTPException(status_code=500, detail=f"E-Mail-Versand fehlgeschlagen: {err}")
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Email error: {e}")
         raise HTTPException(status_code=500, detail=f"E-Mail-Fehler: {str(e)[:200]}")
