@@ -1,22 +1,7 @@
 <template>
 <div class="page">
-  <!-- Library background -->
-  <div class="library">
-    <div class="lib-inner" :style="{ transform: `translateY(${scrollY * -0.2}px)` }">
-      <div class="shelf-row" v-for="row in 8" :key="row"
-        :style="{ opacity: Math.max(0.08, 0.5 - Math.abs(scrollY * 0.6 - row * 130) * 0.003) }">
-        <div class="shelf-books">
-          <div class="bk" v-for="b in 30" :key="b" :style="{
-            width: (10 + ((b * row * 7) % 14)) + 'px',
-            height: (40 + ((b * row * 13) % 35)) + 'px',
-            background: bookGrad(b, row),
-            opacity: 0.2 + ((b + row) % 5) * 0.07 }"></div>
-        </div>
-        <div class="shelf-board"></div>
-      </div>
-    </div>
-    <div class="lib-glow" :style="{ opacity: Math.max(0.1, 0.5 - scrollY * 0.0003) }"></div>
-  </div>
+  <!-- 3D Neural network canvas -->
+  <canvas ref="canvas3d" class="bg-canvas"></canvas>
 
   <!-- Scroll content -->
   <div class="scroll-content">
@@ -130,10 +115,140 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 
+const canvas3d = ref(null)
 const scrollY = ref(0)
+let animId = 0
+
 function onScroll() { scrollY.value = window.scrollY }
-onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
+
+// 3D neural network renderer
+function init3D() {
+  const cvs = canvas3d.value; if (!cvs) return
+  const ctx = cvs.getContext('2d')
+  let W, H
+  const nodes = []
+  const NODE_COUNT = 80
+  const CONNECT_DIST = 180
+
+  function resize() {
+    W = cvs.width = window.innerWidth
+    H = cvs.height = window.innerHeight
+  }
+  resize()
+  window.addEventListener('resize', resize)
+
+  // Create nodes in 3D space
+  for (let i = 0; i < NODE_COUNT; i++) {
+    nodes.push({
+      x: Math.random() * 2 - 1, // -1 to 1
+      y: Math.random() * 2 - 1,
+      z: Math.random() * 2 - 1,
+      vx: (Math.random() - 0.5) * 0.002,
+      vy: (Math.random() - 0.5) * 0.002,
+      vz: (Math.random() - 0.5) * 0.001,
+      r: 1.5 + Math.random() * 2,
+      hue: Math.random() > 0.7 ? 30 : 185, // orange or teal
+    })
+  }
+
+  function project(x, y, z, sY) {
+    // Rotate based on scroll
+    const rotX = sY * 0.0003
+    const rotY = sY * 0.0002 + performance.now() * 0.00003
+    // Rotate Y
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY)
+    let rx = x * cosY - z * sinY
+    let rz = x * sinY + z * cosY
+    // Rotate X
+    const cosX = Math.cos(rotX), sinX = Math.sin(rotX)
+    let ry = y * cosX - rz * sinX
+    rz = y * sinX + rz * cosX
+    // Perspective
+    const fov = 2.5
+    const scale = fov / (fov + rz + 1.5)
+    return {
+      sx: W / 2 + rx * W * 0.4 * scale,
+      sy: H / 2 + ry * H * 0.35 * scale,
+      scale,
+      z: rz
+    }
+  }
+
+  function draw() {
+    const sY = scrollY.value
+    ctx.clearRect(0, 0, W, H)
+
+    // Update positions
+    for (const n of nodes) {
+      n.x += n.vx; n.y += n.vy; n.z += n.vz
+      if (n.x > 1.2 || n.x < -1.2) n.vx *= -1
+      if (n.y > 1.2 || n.y < -1.2) n.vy *= -1
+      if (n.z > 1.2 || n.z < -1.2) n.vz *= -1
+    }
+
+    // Project all nodes
+    const projected = nodes.map(n => ({ ...n, ...project(n.x, n.y, n.z, sY) }))
+    projected.sort((a, b) => a.z - b.z) // painter's order
+
+    // Draw connections
+    for (let i = 0; i < projected.length; i++) {
+      for (let j = i + 1; j < projected.length; j++) {
+        const a = projected[i], b = projected[j]
+        const dx = a.sx - b.sx, dy = a.sy - b.sy
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < CONNECT_DIST) {
+          const alpha = (1 - dist / CONNECT_DIST) * 0.15 * Math.min(a.scale, b.scale)
+          ctx.beginPath()
+          ctx.moveTo(a.sx, a.sy)
+          ctx.lineTo(b.sx, b.sy)
+          ctx.strokeStyle = `rgba(34,201,232,${alpha})`
+          ctx.lineWidth = 0.5
+          ctx.stroke()
+        }
+      }
+    }
+
+    // Draw nodes
+    for (const p of projected) {
+      const r = p.r * p.scale
+      const alpha = 0.3 + p.scale * 0.5
+      ctx.beginPath()
+      ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2)
+      if (p.hue === 30) {
+        ctx.fillStyle = `rgba(255,151,51,${alpha * 0.8})`
+      } else {
+        ctx.fillStyle = `rgba(34,201,232,${alpha * 0.6})`
+      }
+      ctx.fill()
+      // Glow
+      ctx.beginPath()
+      ctx.arc(p.sx, p.sy, r * 3, 0, Math.PI * 2)
+      const g = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r * 3)
+      g.addColorStop(0, p.hue === 30 ? `rgba(255,151,51,${alpha * 0.15})` : `rgba(34,201,232,${alpha * 0.1})`)
+      g.addColorStop(1, 'transparent')
+      ctx.fillStyle = g
+      ctx.fill()
+    }
+
+    animId = requestAnimationFrame(draw)
+  }
+
+  draw()
+  return () => {
+    cancelAnimationFrame(animId)
+    window.removeEventListener('resize', resize)
+  }
+}
+
+let cleanup3d = null
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  cleanup3d = init3D()
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  if (cleanup3d) cleanup3d()
+})
 
 const features = [
   { title: '86 Rechtsgebiete', desc: 'Vollständige RIS-Dezimalklassifikation', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
@@ -141,12 +256,6 @@ const features = [
   { title: 'Gesetzesmaterialien', desc: 'Erläuterungen von parlament.gv.at', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>' },
   { title: 'KI-Analyse', desc: 'GPT-Report mit Quellenangaben', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff9733" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
 ]
-
-function bookGrad(b, row) {
-  const c = [['0,121,147','0,90,110'],['255,151,51','200,110,30'],['10,80,98','8,60,75'],['34,160,200','20,120,150'],['100,70,50','70,45,30']]
-  const p = c[(b + row) % c.length]
-  return `linear-gradient(180deg, rgba(${p[0]},0.35), rgba(${p[1]},0.5))`
-}
 
 const categories = ref([])
 const timeframes = ref([])
@@ -227,14 +336,8 @@ async function downloadReport() {
 <style scoped>
 .page { min-height: 100vh; background: #070e12; color: #e8f4f6; overflow-x: hidden; }
 
-/* ── Library ── */
-.library { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: linear-gradient(180deg, #060c10, #091920 40%, #0c2230 70%, #060c10); }
-.lib-inner { position: absolute; left: 5%; right: 5%; top: 5%; will-change: transform; }
-.shelf-row { position: relative; height: 100px; margin-bottom: 20px; }
-.shelf-books { display: flex; align-items: flex-end; gap: 3px; height: 80px; padding: 0 8px; }
-.bk { flex-shrink: 0; border-radius: 2px 2px 0 0; border-top: 1px solid rgba(255,255,255,0.04); box-shadow: 1px 0 2px rgba(0,0,0,0.3), -1px 0 2px rgba(0,0,0,0.2); }
-.shelf-board { height: 6px; border-radius: 1px; background: linear-gradient(180deg, rgba(120,80,45,0.4), rgba(80,50,25,0.5)); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
-.lib-glow { position: absolute; top: 0; left: 20%; width: 60%; height: 50%; background: radial-gradient(ellipse at 50% 0%, rgba(255,200,100,0.07) 0%, transparent 70%); pointer-events: none; }
+/* ── 3D Canvas ── */
+.bg-canvas { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; }
 
 /* ── Scroll content ── */
 .scroll-content { position: relative; z-index: 2; }
@@ -383,7 +486,7 @@ async function downloadReport() {
 @media (prefers-reduced-motion: reduce) {
   .panel-c { opacity: 1; transform: none; transition: none; }
   .feat, .src, .cat-group { opacity: 1 !important; transform: none !important; }
-  .library { display: none; }
+  .bg-canvas { display: none; }
   .page { background: #0c2230; }
 }
 </style>
