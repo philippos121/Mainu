@@ -3,6 +3,7 @@
   <!-- Hero section -->
   <section class="hero">
     <div class="hero-inner">
+      <img src="/logo.svg" alt="AI:ssociate" class="hero-logo" />
       <div class="hero-props">
         <div class="hp">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
@@ -51,11 +52,6 @@
           <label>E-Mail</label>
           <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
         </div>
-      </div>
-
-      <div class="field">
-        <label>OpenAI API-Key <span class="opt">optional — für KI-Zusammenfassung</span></label>
-        <input v-model="apiKey" type="password" placeholder="sk-…" class="inp" />
       </div>
 
       <div class="actions">
@@ -172,6 +168,7 @@ async function downloadReport() {
 .hero-accent { color: var(--teal); }
 .hero-p { font-size: 16px; color: var(--muted); line-height: 1.7; }
 
+.hero-logo { height: 40px; width: auto; margin-bottom: 24px; }
 .hero-props { display: flex; justify-content: center; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
 .hp {
   display: flex; align-items: center; gap: 6px;
