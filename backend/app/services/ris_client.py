@@ -771,7 +771,15 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 366) -> dict:
         doc_url = _extract_doc_url(m, ref, data_entry)
         # Inkrafttretensdatum = when this version of the law took effect
         change_date = _s(m.get("Inkrafttretensdatum")) or _s(m.get("Aenderungsdatum")) or _s(m.get("Geaendert")) or ""
-        bgbl = _s(m.get("Kundmachungsorgan")) or _s(m.get("Aenderung")) or ""
+        bgbl = _s(m.get("Kundmachungsorgan")) or ""
+        # Aenderung contains the Novellen-BGBl (e.g. "BGBl. I Nr. 97/2025")
+        # This is the BGBl of the amendment, not the original law
+        aenderung = _s(m.get("Aenderung")) or ""
+        if aenderung and not bgbl:
+            bgbl = aenderung
+        elif aenderung and bgbl and aenderung != bgbl:
+            # Combine: show Stammgesetz BGBl + "zuletzt geändert durch" Novellen-BGBl
+            bgbl = f"{bgbl} zuletzt geändert durch {aenderung}"
         typ = _s(m.get("Typ")) or ""
         artikel = _s(m.get("ArtikelParagraphAnlage")) or ""
         # When the RIS database entry was last updated (metadata refresh)
@@ -809,6 +817,7 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 366) -> dict:
             "gesetzesnummer": gesetzesnummer,
             "ausserkraft": ausserkraft,
             "materialien": materialien_str,
+            "aenderung_bgbl": aenderung,
         })
 
     # Deduplicate: if an expired version AND a newer version of the same

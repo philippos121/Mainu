@@ -333,16 +333,21 @@ async def fetch_materialien_for_results(results: list[dict]) -> dict[str, dict]:
     import asyncio
 
     # Extract unique BGBl numbers + associated metadata
+    # Prefer aenderung_bgbl (Novellen-BGBl) over bgbl (Stammgesetz-BGBl)
+    # because Materialien (Erläuterungen) are linked to the Novelle, not the original law
     bgbl_map: dict[str, dict] = {}
     for r in results:
+        # Use the Novellen-BGBl if available
+        aenderung = r.get("aenderung_bgbl", "")
         bgbl = r.get("bgbl", "")
-        if bgbl and "BGBl" in bgbl:
-            m = re.search(r'Nr\.?\s*\d+/\d{4}', bgbl)
+        lookup_bgbl = aenderung if aenderung and "BGBl" in aenderung else bgbl
+        if lookup_bgbl and "BGBl" in lookup_bgbl:
+            m = re.search(r'Nr\.?\s*\d+/\d{4}', lookup_bgbl)
             if m:
                 key = m.group(0)
                 if key not in bgbl_map:
                     bgbl_map[key] = {
-                        "bgbl": bgbl,
+                        "bgbl": lookup_bgbl,
                         "gesetzesnummer": r.get("gesetzesnummer", ""),
                         "materialien": r.get("materialien", ""),
                     }
