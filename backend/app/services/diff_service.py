@@ -85,10 +85,10 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
     """Query RIS API for a specific provision and extract its text.
 
     Strategy:
-    1. Try API with ArtikelParagraphAnlage filter
-    2. Extract text from Dokumentinhalt (inline text in API response)
-    3. If no inline text, fetch the best ContentUrl HTML
-    4. Filter to pick the correct provision (matching artikel)
+    1. Query API to get the document with ContentReferences
+    2. Find the MainDocument ContentUrl (XML with actual law text)
+    3. Fetch XML, extract text content
+    4. Skip Attachments (they contain only titles/annotations)
     """
 
     # Step 1: Query API
@@ -102,7 +102,7 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
         params["Fassung.FassungVom"] = fassung_vom
 
     api_url = f"{BASE_URL}/Bundesrecht"
-    logger.info(f"API query: {params}")
+    logger.info(f"DIFF query: {params}")
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -113,7 +113,7 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
         logger.error(f"API error: {type(e).__name__}: {e}")
         return None
 
-    # Step 2: Parse response — find the matching provision
+    # Step 2: Find the matching provision
     refs = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("OgdDocumentReference", [])
     if isinstance(refs, dict):
         refs = [refs]
@@ -121,7 +121,6 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
         logger.info(f"No results for GN={gesetzesnummer} Art={artikel} FV={fassung_vom}")
         return None
 
-    # Pick the best matching reference (match ArtikelParagraphAnlage)
     best_ref = refs[0]
     for ref in refs:
         meta = _flatten(ref.get("Data", {}))
@@ -134,53 +133,61 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
     meta = _flatten(d)
     inkraft = meta.get("Inkrafttretensdatum", "")
     doc_nr = meta.get("Dokumentnummer", "") or meta.get("ID", "")
+    logger.info(f"Found doc: {doc_nr}, Inkraft: {inkraft}")
 
-    # Step 3: Fetch law text from ContentUrl (most reliable for actual paragraph text)
-    # DO NOT use inline Dokumentinhalt — it often contains only Kurzinformation/annotations
-    content_urls = _find_urls(d)
-    logger.info(f"Content URLs for {doc_nr}: {content_urls}")
+    # Step 3: Find MainDocument URL (contains actual law text)
+    # ContentReferences have ContentType: "MainDocument" vs "Attachment"
+    # MainDocument is XML with the full legal text
+    # Attachments are PDF/HTML with annotations/titles — SKIP these
+    main_url, attach_urls = _find_main_document_url(d)
+    logger.info(f"MainDoc URL: {main_url}, Attachments: {len(attach_urls)}")
 
     best_text = ""
     best_url = ""
 
-    if content_urls:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
-            for u in content_urls[:4]:
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
+        # Try MainDocument first (XML with full law text)
+        if main_url:
+            try:
+                resp = await client.get(main_url)
+                resp.raise_for_status()
+                text = _strip_html(resp.text)
+                if text and len(text) > 50:
+                    best_text = text
+                    best_url = main_url
+                    logger.info(f"Got MainDocument text for {doc_nr}: {len(text)} chars")
+            except Exception as e:
+                logger.warning(f"MainDocument fetch error for {doc_nr}: {e}")
+
+        # If MainDocument failed or was short, try attachment URLs but only accept long text
+        if not best_text or len(best_text) < 100:
+            for u in attach_urls[:3]:
                 try:
                     resp = await client.get(u)
                     resp.raise_for_status()
-                    raw = resp.text
-                    t = _extract_law_text(raw, u)
-                    # Only accept substantial text (>200 chars = real law content)
+                    t = _extract_law_text(resp.text, u)
                     if t and len(t) > 200 and len(t) > len(best_text):
                         best_text = t
                         best_url = u
                 except Exception as e:
-                    logger.warning(f"Content fetch error for {u}: {e}")
+                    logger.warning(f"Attachment fetch error: {e}")
 
-    if best_text:
-        logger.info(f"Got law text from {best_url}: {len(best_text)} chars")
-        return {"text": _clean_accessible(best_text), "inkrafttreten": inkraft, "url": best_url}
-
-    # Step 4: Fallback — try RIS website Dokument.wxe
-    if doc_nr:
-        fallback_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_nr}"
-        logger.info(f"Fallback to website: {fallback_url}")
-        try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
-                resp = await client.get(fallback_url)
+        # Last resort: RIS website (may timeout from Docker but worth trying)
+        if (not best_text or len(best_text) < 100) and doc_nr:
+            try:
+                doc_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_nr}"
+                resp = await client.get(doc_url, timeout=15.0)
                 resp.raise_for_status()
                 t = _extract_text_section(resp.text)
-                if t and len(t) > 100:
-                    return {"text": _clean_accessible(t), "inkrafttreten": inkraft, "url": fallback_url}
-        except Exception as e:
-            logger.error(f"Fallback fetch error: {e}")
+                if t and len(t) > 50:
+                    best_text = t
+                    best_url = doc_url
+                    logger.info(f"Got text via Dokument.wxe for {doc_nr}: {len(t)} chars")
+            except Exception as e:
+                logger.warning(f"Dokument.wxe timeout/error for {doc_nr}: {e}")
 
-    # Step 5: Last resort — try inline text only if substantial (>500 chars)
-    inline = _extract_inline_text(d)
-    if inline and len(inline) > 500:
-        logger.info(f"Using inline text for {doc_nr}: {len(inline)} chars")
-        return {"text": _clean_accessible(inline), "inkrafttreten": inkraft, "url": ""}
+    if best_text:
+        return {"text": _clean_accessible(best_text), "inkrafttreten": inkraft, "url": best_url}
 
     logger.warning(f"No text found for {doc_nr}")
     return None
@@ -280,14 +287,64 @@ def _flatten(data_entry: dict) -> dict:
     return merged
 
 
+def _find_main_document_url(data_entry: dict) -> tuple[str, list[str]]:
+    """Find the MainDocument URL (law text XML) and Attachment URLs separately.
+
+    RIS API ContentReferences have:
+    - ContentType: "MainDocument" → XML with actual law text
+    - ContentType: "Attachment" → PDF/HTML with annotations, titles
+    """
+    main_url = ""
+    attach_urls = []
+
+    def _search(obj, depth=0):
+        nonlocal main_url
+        if depth > 12:
+            return
+        if isinstance(obj, dict):
+            content_type = obj.get("ContentType", "")
+            url = ""
+            # Check for Url in ContentUrl
+            cu = obj.get("ContentUrl")
+            if isinstance(cu, str) and cu.startswith("http"):
+                url = cu
+            elif isinstance(cu, dict) and "Url" in cu:
+                url = cu["Url"]
+            elif isinstance(cu, list):
+                for item in cu:
+                    if isinstance(item, dict) and "Url" in item:
+                        url = url or item["Url"]
+                    elif isinstance(item, str) and item.startswith("http"):
+                        url = url or item
+
+            if not url and "Url" in obj and "DataType" in obj:
+                url = obj["Url"]
+
+            if url and isinstance(url, str) and url.startswith("http"):
+                if content_type == "MainDocument" or obj.get("DataType") == "Xml":
+                    if not main_url:
+                        main_url = url
+                else:
+                    attach_urls.append(url)
+
+            for val in obj.values():
+                _search(val, depth + 1)
+        elif isinstance(obj, list):
+            for item in obj:
+                _search(item, depth + 1)
+
+    _search(data_entry)
+    return main_url, attach_urls
+
+
 def _find_urls(data_entry: dict) -> list[str]:
-    """Recursively find ContentUrl values, prioritize HTML content URLs."""
-    urls = []
-    _walk(data_entry, urls, 0)
-    # Sort: HTML files first, then by URL length (longer = more specific)
-    html_urls = [u for u in urls if "html" in u.lower()]
-    other_urls = [u for u in urls if u not in html_urls]
-    return html_urls + other_urls
+    """Recursively find all ContentUrl values (fallback)."""
+    main, attachments = _find_main_document_url(data_entry)
+    result = []
+    if main:
+        result.append(main)
+    result.extend(attachments)
+    return result
 
 
 def _walk(obj, urls, depth):

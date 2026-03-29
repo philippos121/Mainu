@@ -9,7 +9,8 @@
     <div class="orb orb-5"></div>
     <div class="orb orb-6"></div>
     <div class="aurora"></div>
-    <div class="scan-line"></div>
+    <div class="wave wave-1"></div>
+    <div class="wave wave-2"></div>
     <div class="particles">
       <div class="pt pt-1"></div><div class="pt pt-2"></div><div class="pt pt-3"></div>
       <div class="pt pt-4"></div><div class="pt pt-5"></div><div class="pt pt-6"></div>
@@ -270,18 +271,25 @@ async function downloadReport() {
   50% { background-position: 100% 100%; }
 }
 
-/* Scan line — travels the FULL page height */
-.scan-line {
-  position: absolute; left: 0; width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0,121,147,0.12) 30%, rgba(0,121,147,0.2) 50%, rgba(0,121,147,0.12) 70%, transparent);
-  animation: scanFull 8s linear infinite;
+/* Soft waves — organic flowing shapes */
+.wave {
+  position: absolute; width: 200%; height: 300px;
+  left: -50%; border-radius: 45%;
+  opacity: 0.03; will-change: transform;
 }
-@keyframes scanFull {
-  0% { top: -1px; opacity: 0; }
-  3% { opacity: 0.5; }
-  97% { opacity: 0.5; }
-  100% { top: 100vh; opacity: 0; }
+.wave-1 {
+  top: 30%; background: rgba(0,121,147,0.6);
+  animation: waveFlow 20s ease-in-out infinite;
+}
+.wave-2 {
+  top: 60%; background: rgba(255,151,51,0.5);
+  animation: waveFlow 25s ease-in-out infinite reverse;
+}
+@keyframes waveFlow {
+  0%,100% { transform: rotate(0deg) translateY(0); border-radius: 45%; }
+  25% { transform: rotate(3deg) translateY(-20px); border-radius: 42% 48% 44% 46%; }
+  50% { transform: rotate(-2deg) translateY(15px); border-radius: 48% 42% 46% 44%; }
+  75% { transform: rotate(1deg) translateY(-10px); border-radius: 44% 46% 42% 48%; }
 }
 
 /* Particles — float across the entire viewport */
