@@ -124,8 +124,8 @@ function startCanvas() {
   const c = cvs.value; if (!c) return
   const gl = c.getContext('2d', { alpha: false })
   let W, H
-  const N = 40
-  const DSQ = 140 * 140
+  const N = 30
+  const DSQ = 150 * 150
   // Typed arrays
   const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N)
   const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N)
@@ -157,14 +157,11 @@ function startCanvas() {
       const a=ox[i]-ox[j],b=oy[i]-oy[j];if(a*a+b*b<DSQ){gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])}
     }
     gl.stroke()
-    // Nodes
+    // Nodes — single circle each, no glow pass
     for(let i=0;i<N;i++){
-      const r=sr[i]*os[i],a=.25+os[i]*.5
-      gl.beginPath();gl.arc(ox[i],oy[i],r*2.5,0,6.28)
-      gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.07})`:`rgba(34,201,232,${a*.05})`
-      gl.fill()
-      gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-      gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.7})`:`rgba(34,201,232,${a*.5})`
+      const r=sr[i]*os[i],a=.3+os[i]*.5
+      gl.beginPath();gl.arc(ox[i],oy[i],r*1.5,0,6.28)
+      gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.6})`:`rgba(34,201,232,${a*.45})`
       gl.fill()
     }
     raf=requestAnimationFrame(frame)
@@ -175,9 +172,16 @@ function startCanvas() {
 
 let stop=null
 onMounted(()=>{
+  // Scroll MUST work immediately — register before anything else
   window.addEventListener('scroll',onScroll,{passive:true})
-  // Defer canvas init so first paint + scroll aren't blocked
-  setTimeout(()=>{stop=startCanvas()},80)
+  // Force layout so browser knows page is scrollable
+  document.documentElement.style.scrollBehavior='auto'
+  // Canvas starts only after browser is idle (or after 200ms worst case)
+  if('requestIdleCallback' in window){
+    requestIdleCallback(()=>{stop=startCanvas()},{timeout:300})
+  } else {
+    setTimeout(()=>{stop=startCanvas()},200)
+  }
 })
 onUnmounted(()=>{window.removeEventListener('scroll',onScroll);if(stop)stop()})
 
@@ -219,7 +223,9 @@ const catGroups = computed(()=>{const g={};for(const c of categories.value){cons
 function toggleCat(id){const i=selectedCategory.value.indexOf(id);if(i>=0)selectedCategory.value.splice(i,1);else selectedCategory.value.push(id)}
 
 watch(reportEmail,v=>{if(v)localStorage.setItem('ris_report_email',v)})
-onMounted(async()=>{try{const[a,b]=await Promise.all([api.get('/categories'),api.get('/timeframes')]);categories.value=a.data;timeframes.value=b.data;timeframeOptions.value=[...b.data,{value:'custom',label:'Benutzerdefiniert…'}]}catch{statusMsg.value='Verbindung fehlgeschlagen.';statusOk.value=false}})
+// Load categories in background — never block mount/render
+function loadData(){Promise.all([api.get('/categories'),api.get('/timeframes')]).then(([a,b])=>{categories.value=a.data;timeframes.value=b.data;timeframeOptions.value=[...b.data,{value:'custom',label:'Benutzerdefiniert…'}]}).catch(()=>{statusMsg.value='Verbindung fehlgeschlagen.';statusOk.value=false})}
+onMounted(loadData)
 
 async function doSearch(){const cats=selectedCategory.value||[];const isC=selectedTimeframe.value==='custom';const tf=isC?'EinemJahr':selectedTimeframe.value;const ep=isC&&datumVon.value&&datumBis.value?{datum_von:datumVon.value,datum_bis:datumBis.value}:{};const ends=['/search/gesetze','/search/gerichtsentscheidungen'];const all=[];let hits=0;const seen=new Set();for(const e of ends){if(cats.length<=1){const p={im_ris_seit:tf,page:1,...ep};if(cats.length===1)p.category=cats[0];try{const r=(await api.get(e,{params:p})).data;hits+=r.total_hits||0;for(const i of(r.results||[]))if(!seen.has(i.id)){seen.add(i.id);all.push(i)}}catch{}}else{const ps=cats.map(c=>api.get(e,{params:{im_ris_seit:tf,page:1,category:c,...ep}}).catch(()=>({data:{results:[],total_hits:0}})));const rs=await Promise.all(ps);for(const r of rs){hits+=r.data.total_hits||0;for(const i of(r.data.results||[]))if(!seen.has(i.id)){seen.add(i.id);all.push(i)}}}}return{results:all,total_hits:hits}}
 function catLabel(){const c=selectedCategory.value||[];if(!c.length)return'Alle';if(c.length===1){const f=categories.value.find(x=>x.id===c[0]);return f?f.label:''}return`${c.length} Rechtsgebiete`}
