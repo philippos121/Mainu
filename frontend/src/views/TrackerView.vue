@@ -1,151 +1,146 @@
 <template>
-<div class="page" ref="pageRef">
-  <!-- 3D Library scene — fixed background -->
-  <div class="scene">
-    <div class="scene-depth" :style="{ transform: `perspective(1400px) rotateX(${2 + scrollY * 0.008}deg)` }">
-      <!-- Floor -->
-      <div class="floor" :style="{ transform: `translateZ(-200px) translateY(${scrollY * 0.05}px)` }"></div>
-      <!-- Bookshelves — left wall -->
-      <div class="shelf-wall shelf-left" :style="{ transform: `translateX(-48vw) rotateY(88deg) translateY(${scrollY * -0.12}px)` }">
-        <div class="shelf-unit" v-for="n in 6" :key="'l'+n" :style="{ top: (n-1)*16+'%' }">
-          <div class="shelf-plank"></div>
-          <div class="books">
-            <div class="book" v-for="b in 12" :key="b" :style="{ height: 20+Math.sin(b*n)*18+'px', background: bookColor(b,n) }"></div>
-          </div>
+<div class="page">
+  <!-- 3D Library background -->
+  <div class="library">
+    <!-- Shelves rendered as rows of books visible from front -->
+    <div class="lib-inner" :style="{ transform: `translateY(${scrollY * -0.25}px)` }">
+      <div class="shelf-row" v-for="row in 8" :key="row" :style="{ opacity: Math.max(0, 1 - Math.abs(scrollY - row * 120) * 0.002) }">
+        <div class="shelf-books">
+          <div class="bk" v-for="b in 30" :key="b"
+            :style="{
+              width: (10 + ((b * row * 7) % 14)) + 'px',
+              height: (40 + ((b * row * 13) % 35)) + 'px',
+              background: bookGrad(b, row),
+              opacity: 0.15 + ((b + row) % 5) * 0.06,
+              transform: `translateZ(${((b + row) % 3) * 4}px)`
+            }"></div>
         </div>
+        <div class="shelf-board"></div>
       </div>
-      <!-- Bookshelves — right wall -->
-      <div class="shelf-wall shelf-right" :style="{ transform: `translateX(48vw) rotateY(-88deg) translateY(${scrollY * -0.12}px)` }">
-        <div class="shelf-unit" v-for="n in 6" :key="'r'+n" :style="{ top: (n-1)*16+'%' }">
-          <div class="shelf-plank"></div>
-          <div class="books">
-            <div class="book" v-for="b in 12" :key="b" :style="{ height: 18+Math.cos(b*n)*16+'px', background: bookColor(b+3,n+1) }"></div>
-          </div>
-        </div>
-      </div>
-      <!-- Ceiling beams -->
-      <div class="beam beam-1" :style="{ transform: `translateY(${scrollY * -0.06}px)` }"></div>
-      <div class="beam beam-2" :style="{ transform: `translateY(${scrollY * -0.06}px)` }"></div>
-      <!-- Ambient light -->
-      <div class="light" :style="{ opacity: Math.max(0.3, 1 - scrollY * 0.001) }"></div>
     </div>
+    <!-- Ambient glow -->
+    <div class="lib-glow" :style="{ opacity: Math.max(0.15, 0.6 - scrollY * 0.0004) }"></div>
   </div>
 
-  <!-- Scroll sections with reveal -->
-  <div class="content" :style="{ '--sy': scrollY }">
+  <!-- Scroll content — each section = 1 viewport height, text centered -->
+  <div class="scroll-content">
 
-    <!-- Section 1: Brand reveal -->
-    <section class="sec sec-brand" :class="{ visible: scrollY < 200 }">
-      <div class="sec-inner">
-        <img src="/logo.svg" alt="AI:ssociate" class="brand-logo" />
-        <span class="brand-badge">Monitoring</span>
+    <!-- S1: Logo -->
+    <section class="panel" :class="{ vis: true }">
+      <div class="panel-c">
+        <img src="/logo.svg" alt="AI:ssociate" class="logo" />
+        <span class="badge">Monitoring</span>
+        <p class="scroll-hint">↓ Scrollen</p>
       </div>
     </section>
 
-    <!-- Section 2: Headline -->
-    <section class="sec sec-headline" :class="{ visible: scrollY > 80 }">
-      <h1 class="main-h1">Rechtsänderungen.</h1>
-      <h1 class="main-h1 accent">Automatisch. Analysiert.</h1>
+    <!-- S2: Headline -->
+    <section class="panel" :class="{ vis: scrollY > 200 }">
+      <div class="panel-c">
+        <h1 class="h-main">Rechtsänderungen.</h1>
+        <h1 class="h-main h-accent">Automatisch. Analysiert.</h1>
+      </div>
     </section>
 
-    <!-- Section 3: Features -->
-    <section class="sec sec-features" :class="{ visible: scrollY > 280 }">
-      <div class="feat" v-for="(f, i) in features" :key="i" :class="{ visible: scrollY > 300 + i * 80 }">
-        <div class="feat-icon" v-html="f.icon"></div>
-        <div class="feat-text">
-          <strong>{{ f.title }}</strong>
-          <span>{{ f.desc }}</span>
+    <!-- S3: Features -->
+    <section class="panel panel-features" :class="{ vis: scrollY > 600 }">
+      <div class="panel-c">
+        <div class="feat" v-for="(f, i) in features" :key="i"
+          :style="{ transitionDelay: i * 0.12 + 's', opacity: scrollY > 650 + i * 60 ? 1 : 0, transform: scrollY > 650 + i * 60 ? 'translateX(0)' : 'translateX(-30px)' }">
+          <div class="feat-ico" v-html="f.icon"></div>
+          <div><strong>{{ f.title }}</strong><br/><span class="feat-sub">{{ f.desc }}</span></div>
         </div>
       </div>
     </section>
 
-    <!-- Section 4: Sources -->
-    <section class="sec sec-sources" :class="{ visible: scrollY > 550 }">
-      <p class="sources-label">Datenquellen</p>
-      <div class="source-row">
-        <span class="src" v-for="(s, i) in ['RIS', 'Findok', 'EUR-Lex', 'parlament.gv.at']" :key="i" :class="{ visible: scrollY > 580 + i * 60 }">{{ s }}</span>
+    <!-- S4: Sources -->
+    <section class="panel" :class="{ vis: scrollY > 1000 }">
+      <div class="panel-c">
+        <p class="src-label">Datenquellen</p>
+        <div class="src-row">
+          <span class="src" v-for="(s, i) in ['RIS', 'Findok', 'EUR-Lex', 'parlament.gv.at']" :key="i"
+            :style="{ transitionDelay: i * 0.1 + 's', opacity: scrollY > 1050 + i * 40 ? 1 : 0, transform: scrollY > 1050 + i * 40 ? 'scale(1)' : 'scale(0.8)' }">{{ s }}</span>
+        </div>
       </div>
     </section>
 
-    <!-- Section 5: Form -->
-    <section class="sec sec-form" :class="{ visible: scrollY > 750 }">
-      <div class="form-card">
-        <div class="fc-head">
+    <!-- S5: Form — sticky at bottom -->
+    <section class="panel panel-form">
+      <div class="form-sticky" :class="{ vis: scrollY > 1300 }">
+        <div class="form-card">
           <h2>Report erstellen</h2>
-          <p>Wählen Sie Ihre Rechtsgebiete und erhalten Sie den Report per E-Mail.</p>
-        </div>
+          <p class="form-sub">Rechtsgebiete wählen, Report per E-Mail erhalten.</p>
 
-        <div class="field">
-          <label>Rechtsgebiete</label>
-          <v-select v-model="selectedCategory" :items="categories" item-title="label" item-value="id"
-            variant="outlined" density="compact" multiple chips closable-chips clearable hide-details
-            placeholder="Rechtsgebiete wählen…" color="#22c9e8" />
-        </div>
-
-        <div class="field-row">
-          <div class="field field-half">
-            <label>Zeitraum</label>
-            <v-select v-model="selectedTimeframe" :items="timeframeOptions" item-title="label" item-value="value"
-              variant="outlined" density="compact" hide-details color="#22c9e8" />
+          <div class="field">
+            <label>Rechtsgebiete</label>
+            <v-select v-model="selectedCategory" :items="categories" item-title="label" item-value="id"
+              variant="outlined" density="compact" multiple chips closable-chips clearable hide-details
+              placeholder="Rechtsgebiete wählen…" color="#22c9e8" />
           </div>
-          <div class="field field-half">
-            <label>E-Mail</label>
-            <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
+
+          <div class="field-row">
+            <div class="field fh">
+              <label>Zeitraum</label>
+              <v-select v-model="selectedTimeframe" :items="timeframeOptions" item-title="label" item-value="value"
+                variant="outlined" density="compact" hide-details color="#22c9e8" />
+            </div>
+            <div class="field fh">
+              <label>E-Mail</label>
+              <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
+            </div>
           </div>
-        </div>
 
-        <div v-if="selectedTimeframe === 'custom'" class="field-row">
-          <div class="field field-half"><label>Von</label><input v-model="datumVon" type="date" class="inp" /></div>
-          <div class="field field-half"><label>Bis</label><input v-model="datumBis" type="date" class="inp" /></div>
-        </div>
+          <div v-if="selectedTimeframe === 'custom'" class="field-row">
+            <div class="field fh"><label>Von</label><input v-model="datumVon" type="date" class="inp" /></div>
+            <div class="field fh"><label>Bis</label><input v-model="datumBis" type="date" class="inp" /></div>
+          </div>
 
-        <div class="actions">
-          <button class="btn-primary" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
-            <span v-if="sending" class="spin"></span>
-            <template v-else>Report senden →</template>
-          </button>
-          <button class="btn-ghost" :disabled="!selectedCategory.length || generating" @click="downloadReport">
-            <span v-if="generating" class="spin spin-dark"></span>
-            <template v-else>↓ Herunterladen</template>
-          </button>
-        </div>
+          <div class="actions">
+            <button class="btn-p" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
+              <span v-if="sending" class="spin"></span>
+              <template v-else>Report senden →</template>
+            </button>
+            <button class="btn-g" :disabled="!selectedCategory.length || generating" @click="downloadReport">
+              <span v-if="generating" class="spin spin-d"></span>
+              <template v-else>↓ Download</template>
+            </button>
+          </div>
 
-        <div v-if="statusMsg" :class="['status', statusOk ? 'status-ok' : 'status-err']">{{ statusMsg }}</div>
+          <div v-if="statusMsg" :class="['sts', statusOk ? 'sts-ok' : 'sts-err']">{{ statusMsg }}</div>
+        </div>
       </div>
     </section>
 
-    <!-- Spacer to enable enough scroll -->
-    <div style="height: 100px"></div>
   </div>
 </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 
-const pageRef = ref(null)
 const scrollY = ref(0)
 function onScroll() { scrollY.value = window.scrollY }
-onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }) })
-onUnmounted(() => { window.removeEventListener('scroll', onScroll) })
+onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
+onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 const features = [
-  { title: '86 Rechtsgebiete', desc: 'Vollständige RIS-Dezimalklassifikation', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
-  { title: 'Versionsvergleich', desc: 'Inkrafttreten vs. Vorfassung — Wort für Wort', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>' },
-  { title: 'Gesetzesmaterialien', desc: 'Erläuterungen direkt von parlament.gv.at', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>' },
-  { title: 'KI-Analyse', desc: 'GPT-Zusammenfassung mit Quellenangaben', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff9733" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
+  { title: '86 Rechtsgebiete', desc: 'Vollständige RIS-Dezimalklassifikation', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
+  { title: 'Versionsvergleich', desc: 'Inkrafttreten vs. Vorfassung', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>' },
+  { title: 'Gesetzesmaterialien', desc: 'Erläuterungen von parlament.gv.at', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>' },
+  { title: 'KI-Analyse', desc: 'GPT-Report mit Quellenangaben', icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff9733" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
 ]
 
-function bookColor(b, n) {
-  const colors = [
-    'linear-gradient(180deg, rgba(0,121,147,0.3), rgba(0,121,147,0.15))',
-    'linear-gradient(180deg, rgba(255,151,51,0.2), rgba(255,151,51,0.08))',
-    'linear-gradient(180deg, rgba(10,80,98,0.25), rgba(10,80,98,0.1))',
-    'linear-gradient(180deg, rgba(34,201,232,0.15), rgba(34,201,232,0.06))',
-    'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+function bookGrad(b, row) {
+  const c = [
+    ['rgba(0,121,147,', 'rgba(0,90,110,'],
+    ['rgba(255,151,51,', 'rgba(200,110,30,'],
+    ['rgba(10,80,98,', 'rgba(8,60,75,'],
+    ['rgba(34,160,200,', 'rgba(20,120,150,'],
+    ['rgba(100,70,50,', 'rgba(70,45,30,'],
   ]
-  return colors[(b + n) % colors.length]
+  const p = c[(b + row) % c.length]
+  return `linear-gradient(180deg, ${p[0]}0.35), ${p[1]}0.5))`
 }
 
 const categories = ref([])
@@ -191,262 +186,210 @@ async function doSearch() {
   }
   return { results: allResults, total_hits: allHits }
 }
-
-function catLabel() {
-  const c = selectedCategory.value || []
-  if (!c.length) return 'Alle'
-  if (c.length===1) { const f=categories.value.find(x=>x.id===c[0]); return f?f.label:'' }
-  return `${c.length} Rechtsgebiete`
-}
-function tfLabel() {
-  if (selectedTimeframe.value === 'custom' && datumVon.value && datumBis.value) return `${datumVon.value} bis ${datumBis.value}`
-  const t=timeframes.value.find(x=>x.value===selectedTimeframe.value); return t?t.label:''
-}
+function catLabel() { const c=selectedCategory.value||[]; if(!c.length) return 'Alle'; if(c.length===1){const f=categories.value.find(x=>x.id===c[0]);return f?f.label:''} return `${c.length} Rechtsgebiete` }
+function tfLabel() { if(selectedTimeframe.value==='custom'&&datumVon.value&&datumBis.value) return `${datumVon.value} bis ${datumBis.value}`; const t=timeframes.value.find(x=>x.value===selectedTimeframe.value); return t?t.label:'' }
 
 async function sendReport() {
-  if (!reportEmail.value || !selectedCategory.value.length) return
-  sending.value = true; statusMsg.value = 'Suche läuft…'; statusOk.value = true
-  try {
-    const data = await doSearch()
-    if (!data.results?.length) { statusMsg.value = 'Keine Ergebnisse.'; statusOk.value = false; return }
-    statusMsg.value = `${data.results.length} Ergebnisse. Report wird versendet…`
-    await api.post('/report/email', { email: reportEmail.value, results: data.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: data.total_hits, diffs: {} })
-    statusMsg.value = `Report an ${reportEmail.value} gesendet.`; statusOk.value = true
-  } catch(e) { statusMsg.value = e.response?.data?.detail || `Fehler: ${e.message}`; statusOk.value = false }
-  finally { sending.value = false }
+  if(!reportEmail.value||!selectedCategory.value.length) return
+  sending.value=true; statusMsg.value='Suche läuft…'; statusOk.value=true
+  try { const data=await doSearch(); if(!data.results?.length){statusMsg.value='Keine Ergebnisse.';statusOk.value=false;return}; statusMsg.value=`${data.results.length} Ergebnisse. Report wird versendet…`; await api.post('/report/email',{email:reportEmail.value,results:data.results,doc_type:'gesetze',category_label:catLabel(),timeframe_label:tfLabel(),total_hits:data.total_hits,diffs:{}}); statusMsg.value=`Report an ${reportEmail.value} gesendet.`;statusOk.value=true }
+  catch(e){statusMsg.value=e.response?.data?.detail||`Fehler: ${e.message}`;statusOk.value=false} finally{sending.value=false}
 }
-
 async function downloadReport() {
-  if (!selectedCategory.value.length) return
-  generating.value = true; statusMsg.value = 'Suche läuft…'; statusOk.value = true
-  try {
-    const data = await doSearch()
-    if (!data.results?.length) { statusMsg.value = 'Keine Ergebnisse.'; statusOk.value = false; return }
-    statusMsg.value = `${data.results.length} Ergebnisse. Report wird erstellt…`
-    const r = await api.post('/report', { results: data.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: data.total_hits, diffs: {} })
-    const b = new Blob([r.data.report_html],{type:'text/html;charset=utf-8'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`Report_${new Date().toISOString().split('T')[0]}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u)
-    statusMsg.value = 'Report heruntergeladen.'; statusOk.value = true
-  } catch(e) { statusMsg.value = e.response?.data?.detail || `Fehler: ${e.message}`; statusOk.value = false }
-  finally { generating.value = false }
+  if(!selectedCategory.value.length) return
+  generating.value=true; statusMsg.value='Suche läuft…'; statusOk.value=true
+  try { const data=await doSearch(); if(!data.results?.length){statusMsg.value='Keine Ergebnisse.';statusOk.value=false;return}; statusMsg.value=`${data.results.length} Ergebnisse. Report wird erstellt…`; const r=await api.post('/report',{results:data.results,doc_type:'gesetze',category_label:catLabel(),timeframe_label:tfLabel(),total_hits:data.total_hits,diffs:{}}); const bl=new Blob([r.data.report_html],{type:'text/html;charset=utf-8'});const u=URL.createObjectURL(bl);const a=document.createElement('a');a.href=u;a.download=`Report_${new Date().toISOString().split('T')[0]}.html`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u); statusMsg.value='Report heruntergeladen.';statusOk.value=true }
+  catch(e){statusMsg.value=e.response?.data?.detail||`Fehler: ${e.message}`;statusOk.value=false} finally{generating.value=false}
 }
 </script>
 
 <style scoped>
-.page { min-height: 300vh; position: relative; overflow-x: hidden; background: #080f13; }
+.page { min-height: 100vh; background: #070e12; color: #e8f4f6; overflow-x: hidden; }
 
-/* ── 3D Library Scene ── */
-.scene {
+/* ── Library background ── */
+.library {
   position: fixed; inset: 0; z-index: 0; overflow: hidden;
-  background: linear-gradient(180deg, #060d12 0%, #0a1a22 25%, #0d2530 50%, #0a1a22 75%, #060d12 100%);
+  background: linear-gradient(180deg, #060c10 0%, #091920 40%, #0c2230 70%, #060c10 100%);
 }
-.scene-depth {
-  position: absolute; inset: 0;
-  transform-style: preserve-3d;
-  transform-origin: 50% 60%;
+.lib-inner {
+  position: absolute; left: 5%; right: 5%; top: 5%; bottom: 0;
+  will-change: transform;
 }
-
-/* Floor — receding into distance */
-.floor {
-  position: absolute; bottom: -10%; left: -20%; width: 140%; height: 50%;
-  background: linear-gradient(180deg, transparent 0%, rgba(0,121,147,0.03) 40%, rgba(10,80,98,0.06) 100%);
-  border-top: 1px solid rgba(0,121,147,0.06);
+.shelf-row {
+  position: relative; height: 100px; margin-bottom: 20px;
+  transition: opacity 0.3s;
 }
-
-/* Bookshelf walls */
-.shelf-wall {
-  position: absolute; top: 0; width: 40vw; height: 100%;
-  transform-style: preserve-3d;
-  transform-origin: right center;
+.shelf-books {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 80px; padding: 0 8px;
 }
-.shelf-right { transform-origin: left center; }
-
-.shelf-unit {
-  position: absolute; left: 0; width: 100%; height: 14%;
+.bk {
+  flex-shrink: 0; border-radius: 2px 2px 0 0;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  box-shadow: 1px 0 2px rgba(0,0,0,0.3), -1px 0 2px rgba(0,0,0,0.2);
 }
-.shelf-plank {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-  background: linear-gradient(90deg, rgba(139,90,43,0.15), rgba(139,90,43,0.25), rgba(139,90,43,0.15));
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+.shelf-board {
+  height: 6px; border-radius: 1px;
+  background: linear-gradient(180deg, rgba(120,80,45,0.4) 0%, rgba(80,50,25,0.5) 100%);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.03);
 }
-.books {
-  position: absolute; bottom: 3px; left: 4px; right: 4px;
-  display: flex; align-items: flex-end; gap: 2px;
-}
-.book {
-  width: 8px; min-width: 6px; flex-shrink: 0;
-  border-radius: 1px 1px 0 0;
-  border: 1px solid rgba(255,255,255,0.03);
-  border-bottom: none;
-}
-
-/* Ceiling beams */
-.beam {
-  position: absolute; top: 8%; height: 4px; border-radius: 2px;
-  background: linear-gradient(90deg, transparent, rgba(139,90,43,0.12), transparent);
-}
-.beam-1 { left: 10%; right: 10%; }
-.beam-2 { left: 20%; right: 20%; top: 12%; }
-
-/* Warm overhead light */
-.light {
-  position: absolute; top: -10%; left: 30%; width: 40%; height: 60%;
-  background: radial-gradient(ellipse, rgba(255,200,100,0.06) 0%, transparent 70%);
+.lib-glow {
+  position: absolute; top: 0; left: 20%; width: 60%; height: 50%;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255,200,100,0.08) 0%, transparent 70%);
   pointer-events: none;
 }
 
-/* ── Content layer ── */
-.content {
-  position: relative; z-index: 2;
-  display: flex; flex-direction: column; align-items: center;
+/* ── Scroll content ── */
+.scroll-content { position: relative; z-index: 2; }
+
+/* Each panel = full viewport height, centered content */
+.panel {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.panel-c { text-align: center; max-width: 600px; width: 100%; }
+
+/* Reveal */
+.panel .panel-c, .panel .form-sticky {
+  opacity: 0; transform: translateY(50px);
+  transition: opacity 1s cubic-bezier(0.16,1,0.3,1), transform 1s cubic-bezier(0.16,1,0.3,1);
+}
+.panel.vis .panel-c, .panel .form-sticky.vis {
+  opacity: 1; transform: translateY(0);
 }
 
-/* Sections — scroll reveal */
-.sec {
-  width: 100%; max-width: 640px; padding: 0 24px;
-  opacity: 0; transform: translateY(40px);
-  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1);
+/* S1: Logo */
+.logo { height: 52px; filter: brightness(10); }
+.badge {
+  display: inline-block; margin-left: 14px; vertical-align: top; margin-top: 6px;
+  font-size: 10px; font-weight: 700; color: #ff9733;
+  text-transform: uppercase; letter-spacing: 2px;
 }
-.sec.visible { opacity: 1; transform: translateY(0); }
-
-/* Brand */
-.sec-brand { padding-top: 100px; padding-bottom: 20px; text-align: center; }
-.brand-logo { height: 48px; filter: brightness(10); }
-.brand-badge {
-  display: inline-block; margin-left: 12px; vertical-align: top;
-  font-size: 10px; font-weight: 700; color: var(--orange);
-  text-transform: uppercase; letter-spacing: 2px; margin-top: 4px;
+.scroll-hint {
+  margin-top: 48px; font-size: 13px; color: rgba(255,255,255,0.2);
+  letter-spacing: 3px; text-transform: uppercase;
+  animation: hintPulse 2s ease-in-out infinite;
 }
+@keyframes hintPulse { 0%,100%{opacity:0.2;transform:translateY(0)} 50%{opacity:0.5;transform:translateY(6px)} }
 
-/* Headline */
-.sec-headline { text-align: center; padding-bottom: 40px; }
-.main-h1 {
-  font-size: 48px; font-weight: 800; color: #e8f4f6; line-height: 1.1;
-  letter-spacing: -1px; margin: 0;
-  text-shadow: 0 2px 30px rgba(0,0,0,0.4);
+/* S2: Headline */
+.h-main {
+  font-size: 52px; font-weight: 800; line-height: 1.08; margin: 0;
+  letter-spacing: -1.5px;
+  text-shadow: 0 4px 40px rgba(0,0,0,0.5);
 }
-.main-h1.accent { color: #22c9e8; }
+.h-accent { color: #22c9e8; }
 
-/* Features */
-.sec-features { padding-bottom: 40px; }
+/* S3: Features */
+.panel-features .panel-c { text-align: left; }
 .feat {
   display: flex; align-items: center; gap: 16px;
-  padding: 16px 20px; margin-bottom: 8px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
+  padding: 18px 22px; margin-bottom: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
   border-radius: 14px;
-  opacity: 0; transform: translateX(-30px);
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
-.feat.visible { opacity: 1; transform: translateX(0); }
-.feat-icon { flex-shrink: 0; width: 24px; height: 24px; }
-.feat-text { display: flex; flex-direction: column; }
-.feat-text strong { font-size: 14px; font-weight: 600; color: #e8f4f6; }
-.feat-text span { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+.feat-ico { flex-shrink: 0; }
+.feat strong { font-size: 15px; color: #e8f4f6; }
+.feat-sub { font-size: 12px; color: rgba(255,255,255,0.4); }
 
-/* Sources */
-.sec-sources { text-align: center; padding-bottom: 50px; }
-.sources-label {
-  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;
-  color: rgba(255,255,255,0.3); margin-bottom: 16px;
-}
-.source-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+/* S4: Sources */
+.src-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 20px; }
+.src-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 .src {
-  font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7);
-  padding: 6px 16px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.65);
+  padding: 8px 20px; border-radius: 10px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
-  opacity: 0; transform: translateY(20px) scale(0.9);
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
-.src.visible { opacity: 1; transform: translateY(0) scale(1); }
 
-/* ── Form ── */
-.sec-form { padding-bottom: 0; max-width: 600px; }
-.form-card {
-  background: rgba(255,255,255,0.05); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
-  border-radius: 20px; border: 1px solid rgba(255,255,255,0.08);
-  padding: 36px;
-  box-shadow: 0 16px 60px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+/* S5: Form — sticky so it stays on screen */
+.panel-form {
+  min-height: auto; align-items: flex-start;
+  position: sticky; bottom: 0;
+  padding: 40px 24px 40px;
 }
+.form-sticky {
+  max-width: 560px; margin: 0 auto; width: 100%;
+  opacity: 0; transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.form-sticky.vis { opacity: 1; transform: translateY(0); }
 
-.fc-head { margin-bottom: 24px; }
-.fc-head h2 { font-size: 20px; font-weight: 700; color: #e8f4f6; margin-bottom: 4px; }
-.fc-head p { font-size: 14px; color: rgba(255,255,255,0.45); }
+.form-card {
+  background: rgba(10,25,33,0.85); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border-radius: 20px; border: 1px solid rgba(255,255,255,0.08);
+  padding: 32px;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+}
+.form-card h2 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.form-sub { font-size: 13px; color: rgba(255,255,255,0.4); margin: 0 0 24px; }
 
-.field { margin-bottom: 18px; }
-.field label { display: block; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
-.field-row { display: flex; gap: 14px; }
-.field-half { flex: 1; min-width: 0; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); margin-bottom: 5px; }
+.field-row { display: flex; gap: 12px; }
+.fh { flex: 1; min-width: 0; }
 
 .inp {
-  width: 100%; padding: 12px 16px;
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  width: 100%; padding: 11px 14px;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
   font-size: 14px; font-family: inherit; outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   background: rgba(255,255,255,0.04); color: #e8f4f6;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.inp:focus {
-  border-color: rgba(34,201,232,0.4);
-  box-shadow: 0 0 0 3px rgba(34,201,232,0.08);
-  background: rgba(255,255,255,0.07);
-}
-.inp::placeholder { color: rgba(255,255,255,0.2); }
+.inp:focus { border-color: rgba(34,201,232,0.4); box-shadow: 0 0 0 3px rgba(34,201,232,0.08); }
+.inp::placeholder { color: rgba(255,255,255,0.18); }
 
-.actions { display: flex; gap: 10px; margin-top: 28px; }
-
-.btn-primary {
-  flex: 1; padding: 15px; border: none; border-radius: 14px;
-  background: linear-gradient(135deg, #ff9733, #e8870a);
-  color: white; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
-  box-shadow: 0 4px 24px rgba(255,151,51,0.25); transition: all 0.2s;
+.actions { display: flex; gap: 10px; margin-top: 24px; }
+.btn-p {
+  flex: 1; padding: 14px; border: none; border-radius: 12px;
+  background: linear-gradient(135deg, #ff9733, #e8870a); color: white;
+  font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(255,151,51,0.25); transition: all 0.2s;
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(255,151,51,0.4); }
-.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.btn-ghost {
-  padding: 15px 22px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+.btn-p:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(255,151,51,0.4); }
+.btn-p:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-g {
+  padding: 14px 20px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
   background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600;
   font-family: inherit; cursor: pointer; transition: all 0.2s; white-space: nowrap;
 }
-.btn-ghost:hover:not(:disabled) { border-color: rgba(34,201,232,0.3); color: #22c9e8; background: rgba(34,201,232,0.05); }
-.btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-g:hover:not(:disabled) { border-color: rgba(34,201,232,0.3); color: #22c9e8; }
+.btn-g:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.status { margin-top: 16px; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-.status-ok { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.15); }
-.status-err { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.15); }
+.sts { margin-top: 14px; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
+.sts-ok { background: rgba(16,185,129,0.1); color: #34d399; border: 1px solid rgba(16,185,129,0.15); }
+.sts-err { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.15); }
 
 .spin { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: sp .6s linear infinite; display: inline-block; }
-.spin-dark { border-color: rgba(255,255,255,0.1); border-top-color: #22c9e8; }
+.spin-d { border-color: rgba(255,255,255,0.1); border-top-color: #22c9e8; }
 @keyframes sp { to { transform: rotate(360deg) } }
 
-/* Vuetify dark overrides */
-:deep(.v-field) { background: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.08) !important; color: #e8f4f6 !important; border-radius: 12px !important; }
+/* Vuetify dark */
+:deep(.v-field) { background: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.08) !important; color: #e8f4f6 !important; border-radius: 10px !important; }
 :deep(.v-field__input) { color: #e8f4f6 !important; }
 :deep(.v-field--focused) { border-color: rgba(34,201,232,0.4) !important; }
 :deep(.v-chip) { background: rgba(34,201,232,0.12) !important; color: #22c9e8 !important; }
-:deep(.v-field__input::placeholder) { color: rgba(255,255,255,0.2) !important; }
+:deep(.v-field__input::placeholder) { color: rgba(255,255,255,0.18) !important; }
 :deep(.v-select__selection-text) { color: #e8f4f6 !important; }
-:deep(.v-field__append-inner .v-icon) { color: rgba(255,255,255,0.35) !important; }
-:deep(.v-list) { background: #0d1f28 !important; }
+:deep(.v-field__append-inner .v-icon) { color: rgba(255,255,255,0.3) !important; }
+:deep(.v-list) { background: #0c1c25 !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 10px !important; }
 :deep(.v-list-item) { color: #e8f4f6 !important; }
-:deep(.v-list-item:hover) { background: rgba(34,201,232,0.08) !important; }
-:deep(.v-list-item--active) { background: rgba(34,201,232,0.12) !important; color: #22c9e8 !important; }
-:deep(.v-overlay__content) { border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px !important; }
+:deep(.v-list-item:hover) { background: rgba(34,201,232,0.06) !important; }
+:deep(.v-list-item--active) { background: rgba(34,201,232,0.1) !important; color: #22c9e8 !important; }
 
-@media (max-width: 600px) {
-  .main-h1 { font-size: 32px; }
+@media (max-width: 640px) {
+  .h-main { font-size: 34px; }
   .field-row { flex-direction: column; gap: 0; }
   .actions { flex-direction: column; }
-  .form-card { padding: 24px; border-radius: 16px; }
-  .shelf-wall { display: none; }
-  .sec-brand { padding-top: 60px; }
-  .page { min-height: 250vh; }
+  .form-card { padding: 22px; }
+  .panel { padding: 20px 16px; }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .sec { opacity: 1; transform: none; transition: none; }
-  .feat, .src { opacity: 1; transform: none; transition: none; }
-  .scene { display: none; }
-  .page { background: #0d2530; }
+  .panel .panel-c, .form-sticky { opacity: 1; transform: none; transition: none; }
+  .feat, .src { opacity: 1 !important; transform: none !important; }
+  .library { display: none; }
+  .page { background: #0c2230; }
 }
 </style>
