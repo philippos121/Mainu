@@ -300,8 +300,10 @@ async def api_report_email(req: EmailReportRequest):
                         "html": f"<p>Ihr AI:ssociate Monitoring Report für <strong>{req.category_label}</strong> ({req.timeframe_label}) ist angehängt.</p><p>Öffnen Sie die HTML-Datei im Browser für die interaktive Ansicht.</p>",
                         "attachments": [{
                             "filename": f"Report_{date.today().strftime('%Y-%m-%d')}.html",
+                            "type": "text/html",
                             "content": __import__('base64').b64encode(html_report.encode('utf-8')).decode('ascii'),
                             "disposition": "attachment",
+                            "id": "report",
                         }],
                     },
                 )
