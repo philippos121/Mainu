@@ -6,8 +6,6 @@
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 :root {
   --teal: #007993;
   --teal-dark: #005f73;
@@ -29,7 +27,7 @@ html, body {
   height: auto !important; min-height: 100vh;
   overflow-x: hidden; overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   background: #070e12;
   color: var(--text);
