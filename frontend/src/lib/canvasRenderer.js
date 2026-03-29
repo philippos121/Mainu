@@ -5,18 +5,18 @@ export function createRenderer(canvas) {
   const gl = canvas.getContext('2d', { alpha: false })
   let W = 0, H = 0
 
-  // Ambient particles
-  const N = 50
-  const DSQ = 150 * 150
+  // Ambient particles — large network
+  const N = 90
+  const DSQ = 180 * 180
   const ax = new Float32Array(N), ay = new Float32Array(N), az = new Float32Array(N)
   const dx = new Float32Array(N), dy = new Float32Array(N), dz = new Float32Array(N)
   const sr = new Float32Array(N), sh = new Uint8Array(N)
   const ox = new Float32Array(N), oy = new Float32Array(N), os = new Float32Array(N)
 
   for (let i = 0; i < N; i++) {
-    ax[i] = Math.random() * 2.4 - 1.2
-    ay[i] = Math.random() * 2.4 - 1.2
-    az[i] = Math.random() * 2.4 - 1.2
+    ax[i] = Math.random() * 3.2 - 1.6
+    ay[i] = Math.random() * 3.2 - 1.6
+    az[i] = Math.random() * 3.2 - 1.6
     dx[i] = (Math.random() - .5) * .0008
     dy[i] = (Math.random() - .5) * .0008
     dz[i] = (Math.random() - .5) * .0006

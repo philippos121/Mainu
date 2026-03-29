@@ -7,7 +7,7 @@ export const KERN = [
   { id: 'bankrecht', label: 'Kapitalmarktrecht', sub: 'BWG · WAG · BaSAG' },
   { id: 'wertpapierrecht', label: 'Wertpapierrecht', sub: 'BörseG · DepotG' },
   { id: 'zivilprozess', label: 'Zivilverfahren', sub: 'ZPO · JN · EO' },
-  { id: 'vergaberecht', label: 'Vergaberecht', sub: 'BVergG' },
+  { id: 'verfassungsrecht', label: 'Verfassungsrecht', sub: 'B-VG · StGG · EMRK' },
   { id: 'verwaltungsverfahren', label: 'Verwaltungsrecht', sub: 'AVG · VwGVG · VStG' },
 ]
 
