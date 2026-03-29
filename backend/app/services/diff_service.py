@@ -29,15 +29,23 @@ async def fetch_provision_diff(doc_id: str, gesetzesnummer: str, artikel: str, i
     if not gesetzesnummer or not artikel:
         return _err("Gesetzesnummer oder Artikel fehlt.")
 
-    # 1. Get current version text via API
-    current = await _get_version_text(gesetzesnummer, artikel, fassung_vom=None)
+    # Parse inkrafttreten to use as FassungVom for current version
+    # CRITICAL: Without FassungVom, the API returns § 0 (table of contents)
+    # instead of the specific paragraph. Always pass a date.
+    inkraft_date = _parse_date(inkrafttreten)
+    if not inkraft_date:
+        return _err("Inkrafttretensdatum konnte nicht geparst werden.")
+
+    current_fv = inkraft_date.strftime("%Y-%m-%d")
+    prev_fv = (inkraft_date - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # 1. Get current version text (using Inkrafttreten as FassungVom)
+    current = await _get_version_text(gesetzesnummer, artikel, fassung_vom=current_fv)
     if not current or not current["text"]:
         return _err("Aktueller Text konnte nicht geladen werden.")
 
-    # 2. Compute FassungVom = Inkrafttreten - 1 day
-    fv = _day_before(inkrafttreten)
-    if not fv:
-        return _err("Inkrafttretensdatum konnte nicht geparst werden.")
+    # 2. Get previous version text (Inkrafttreten - 1 day)
+    fv = prev_fv
 
     # 3. Get previous version text
     previous = await _get_version_text(gesetzesnummer, artikel, fassung_vom=fv)
@@ -403,22 +411,52 @@ def _extract_law_text(html: str, url: str) -> str:
 
 
 def _extract_text_section(html: str) -> str:
-    """Extract the 'Text' section from a RIS Dokument.wxe page."""
+    """Extract the 'Text' section from a RIS page or content URL."""
+    # Try to find the "Text" section marker (Dokument.wxe pages)
     ends = ["Schlagworte", "Zuletzt aktualisiert", "Dokumentnummer",
             "European Legislation Identifier", "Navigation im Suchergebnis",
             "Zum Seitenanfang"]
     end_pat = "|".join(re.escape(s) for s in ends)
     m = re.search(rf'>\s*Text\s*</[^>]+>(.*?)({end_pat})', html, re.DOTALL | re.IGNORECASE)
     if m:
-        return _strip_html(m.group(1))
-    # Fallback: largest block with legal text patterns
-    blocks = re.findall(r'<(?:td|div)[^>]*>(.*?)</(?:td|div)>', html, re.DOTALL)
-    best = ""
-    for b in blocks:
-        c = _strip_html(b)
-        if len(c) > len(best) and len(c) > 100 and re.search(r'\(\d+\)|§\s*\d+', c):
-            best = c
-    return best
+        return _strip_metadata(_strip_html(m.group(1)))
+    # Fallback: strip HTML and remove metadata header
+    text = _strip_html(html)
+    return _strip_metadata(text)
+
+
+def _strip_metadata(text: str) -> str:
+    """Remove RIS metadata header from extracted text.
+
+    RIS pages include: "Bundesrecht konsolidiert www.ris.bka.gv.at Seite X von Y
+    Kurztitel ... Kundmachungsorgan ... Typ ... §/Artikel/Anlage ...
+    Inkrafttretensdatum ... Außerkrafttretensdatum ... Abkürzung ... Index ...
+    Beachte ... Text <actual law text>"
+    """
+    # Method 1: Find "Text" marker followed by actual content
+    m = re.search(r'\bText\s+((?:\d+\.\s*(?:TEIL|ABSCHNITT|Abschnitt)|§\s*\d+|Artikel|Anlage)\b.+)', text, re.DOTALL)
+    if m and len(m.group(1)) > 50:
+        return m.group(1).strip()
+
+    # Method 2: Strip known metadata prefixes
+    cleaned = text
+    # Remove "Bundesrecht konsolidiert" header
+    cleaned = re.sub(r'^.*?(?:www\.ris\.bka\.gv\.at\s+Seite\s+\d+\s+von\s+\d+\s*)+', '', cleaned, flags=re.DOTALL)
+    # Remove metadata fields up to "Text" or first § marker
+    cleaned = re.sub(
+        r'^.*?(?:Kurztitel|Kundmachungsorgan|Inkrafttretensdatum|Abkürzung|Index|Beachte|Langtitel|Änderung|Präambel).*?(?=(?:\d+\.\s*(?:TEIL|ABSCHNITT)|§\s*\d+|\(\d+\)))',
+        '', cleaned, count=1, flags=re.DOTALL
+    )
+    # Remove "Inhaltsverzeichnis" sections (§ 0 content)
+    if 'Inhaltsverzeichnis' in cleaned and len(cleaned) < 3000:
+        # This is likely the table of contents, not actual law text
+        m2 = re.search(r'(§\s*\d+[a-z]?\.\s*\(\d+\).+)', cleaned, re.DOTALL)
+        if m2:
+            cleaned = m2.group(1)
+        else:
+            return ""  # Only table of contents, no real text
+
+    return cleaned.strip()
 
 
 def _strip_html(text: str) -> str:
@@ -493,13 +531,18 @@ def _err(msg: str) -> dict:
             "has_changes": False}
 
 
-def _day_before(date_str: str) -> str | None:
+def _parse_date(date_str: str) -> datetime | None:
+    """Parse a date string in various formats."""
     if not date_str:
         return None
     for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
         try:
-            dt = datetime.strptime(date_str.strip().split("+")[0].split(".000")[0], fmt)
-            return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+            return datetime.strptime(date_str.strip().split("+")[0].split(".000")[0], fmt)
         except ValueError:
             continue
     return None
+
+
+def _day_before(date_str: str) -> str | None:
+    dt = _parse_date(date_str)
+    return (dt - timedelta(days=1)).strftime("%Y-%m-%d") if dt else None
