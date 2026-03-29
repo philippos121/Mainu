@@ -81,11 +81,14 @@
         <div class="form-inner">
           <div class="form-row">
             <div class="ff">
-              <v-select v-model="selectedTimeframe" :items="timeframeOptions" item-title="label" item-value="value"
-                variant="outlined" density="compact" hide-details color="#22c9e8" label="Zeitraum" />
+              <label>Zeitraum</label>
+              <select v-model="selectedTimeframe" class="inp">
+                <option v-for="t in timeframeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+              </select>
             </div>
             <div class="ff">
-              <input v-model="reportEmail" type="email" placeholder="E-Mail für Report" class="inp" />
+              <label>E-Mail</label>
+              <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
             </div>
           </div>
           <div v-if="selectedTimeframe==='custom'" class="form-row">
@@ -356,17 +359,9 @@ async function downloadReport(){if(!selectedCategory.value.length)return;generat
 .spin-c{border-color:rgba(255,255,255,.1);border-top-color:#22c9e8}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-/* Vuetify */
-:deep(.v-field){background:rgba(255,255,255,.03)!important;border-color:rgba(255,255,255,.07)!important;color:#e4f0f2!important;border-radius:10px!important}
-:deep(.v-field__input){color:#e4f0f2!important}
-:deep(.v-field--focused){border-color:rgba(34,201,232,.35)!important}
-:deep(.v-chip){background:rgba(34,201,232,.1)!important;color:#22c9e8!important}
-:deep(.v-select__selection-text){color:#e4f0f2!important}
-:deep(.v-field__append-inner .v-icon){color:rgba(255,255,255,.25)!important}
-:deep(.v-list){background:#0b1922!important;border:1px solid rgba(255,255,255,.05)!important;border-radius:10px!important}
-:deep(.v-list-item){color:#e4f0f2!important}
-:deep(.v-list-item:hover){background:rgba(34,201,232,.05)!important}
-:deep(.v-list-item--active){background:rgba(34,201,232,.08)!important;color:#22c9e8!important}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+select.inp option{background:#0b1922;color:#e4f0f2}
+.ff label{display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.4);margin-bottom:5px}
 
 @media(max-width:640px){
   .title-monitoring{font-size:40px;letter-spacing:2px}

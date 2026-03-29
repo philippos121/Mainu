@@ -1,7 +1,5 @@
 <template>
-  <v-app>
-    <router-view />
-  </v-app>
+  <router-view />
 </template>
 
 <script setup>
@@ -36,9 +34,6 @@ html, body {
   background: #070e12;
   color: var(--text);
 }
-.v-application { font-family: 'Inter', -apple-system, sans-serif !important; background: none !important; }
-.v-application--wrap { min-height: 0 !important; }
-.v-main { padding: 0 !important; min-height: 0 !important; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
