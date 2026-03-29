@@ -268,17 +268,21 @@ async def api_report_email(req: EmailReportRequest):
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             if cfg.MAILERSEND_API_KEY:
-                import base64 as _b64
                 today_str = date.today().strftime('%Y-%m-%d')
-                report_md_preview = report_data.get("report_markdown", "")[:600]
+                report_md_full = report_data.get("report_markdown", "")
+                materialien_data = report_data.get("materialien", {})
+                parliamentary_data = report_data.get("parliamentary", [])
 
-                # Build a clean inline-styled email body (no external CSS, no JS)
-                email_html = _build_email_body(
+                # Build full email-optimized HTML (inline styles, table layout, no JS)
+                email_html = _build_email_report(
                     category=req.category_label,
                     timeframe=req.timeframe_label,
                     total_hits=req.total_hits,
-                    summary_preview=report_md_preview,
+                    report_md=report_md_full,
+                    results=req.results,
                     date_str=today_str,
+                    materialien=materialien_data,
+                    parliamentary=parliamentary_data,
                 )
 
                 resp = await client.post(
@@ -291,13 +295,8 @@ async def api_report_email(req: EmailReportRequest):
                         "from": {"email": "monitoring@test-3m5jgro09qzgdpyo.mlsender.net", "name": "AI:ssociate Monitoring"},
                         "to": [{"email": req.email}],
                         "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
-                        "text": f"AI:ssociate Monitoring Report\n{req.category_label} · {req.timeframe_label}\n\nSiehe angehängte HTML-Datei für den interaktiven Report.",
+                        "text": f"AI:ssociate Monitoring Report\n{req.category_label} · {req.timeframe_label}",
                         "html": email_html,
-                        "attachments": [{
-                            "filename": f"AI-ssociate_Report_{today_str}.html",
-                            "content": _b64.b64encode(html_report.encode('utf-8')).decode('ascii'),
-                            "disposition": "attachment",
-                        }],
                     },
                 )
             elif cfg.RESEND_API_KEY:
@@ -526,85 +525,169 @@ async def api_report(req: ReportRequest):
     return await _generate_full_report(req)
 
 
-def _build_email_body(category: str, timeframe: str, total_hits: int, summary_preview: str, date_str: str) -> str:
-    """Build a clean inline-styled HTML email body (works in all email clients)."""
+def _build_email_report(
+    category: str, timeframe: str, total_hits: int, report_md: str,
+    results: list, date_str: str, materialien: dict = None, parliamentary: list = None,
+) -> str:
+    """Build a full email-optimized HTML report with inline styles (works in all email clients)."""
     import html as _h
     import re as _re
 
-    # Convert markdown preview to simple HTML
-    preview = _h.escape(summary_preview)
-    preview = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', preview)
-    preview = _re.sub(r'\*(.+?)\*', r'<em>\1</em>', preview)
-    preview = _re.sub(r'^[-•]\s+(.+)$', r'<li>\1</li>', preview, flags=_re.MULTILINE)
-    preview = preview.replace('\n\n', '</p><p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.6">')
-    preview = _re.sub(r'^#{1,3}\s+(.+)$', r'<strong style="color:#0a5062;font-size:15px">\1</strong><br>', preview, flags=_re.MULTILINE)
+    materialien = materialien or {}
+    parliamentary = parliamentary or []
+
+    # Convert full markdown to email-safe HTML
+    def md_to_email(text):
+        if not text:
+            return '<p style="margin:0 0 10px;color:#6b7280;font-style:italic">Keine Zusammenfassung verfügbar.</p>'
+        t = _h.escape(text)
+        # Headings
+        t = _re.sub(r'^#{3}\s+(.+)$', r'<p style="margin:18px 0 6px;font-size:14px;font-weight:bold;color:#374151">\1</p>', t, flags=_re.MULTILINE)
+        t = _re.sub(r'^#{2}\s+(.+)$', r'<p style="margin:20px 0 8px;font-size:15px;font-weight:bold;color:#0a5062">\1</p>', t, flags=_re.MULTILINE)
+        t = _re.sub(r'^#{1}\s+(.+)$', r'<p style="margin:22px 0 10px;font-size:17px;font-weight:bold;color:#007993">\1</p>', t, flags=_re.MULTILINE)
+        t = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', t)
+        t = _re.sub(r'\*(.+?)\*', r'<em>\1</em>', t)
+        # List items
+        t = _re.sub(r'^[-•]\s+(.+)$', r'<tr><td style="padding:0 8px 4px 0;vertical-align:top;color:#007993;font-size:14px">•</td><td style="padding:0 0 4px;font-size:14px;line-height:1.6;color:#374151">\1</td></tr>', t, flags=_re.MULTILINE)
+        t = _re.sub(r'(<tr><td style=.*?</td></tr>\s*)+', lambda m: f'<table cellpadding="0" cellspacing="0" style="margin:6px 0 10px 8px">{m.group(0)}</table>', t)
+        # Paragraphs
+        t = _re.sub(r'\n\n', '</p><p style="margin:0 0 10px;font-size:14px;line-height:1.7;color:#374151">', t)
+        t = f'<p style="margin:0 0 10px;font-size:14px;line-height:1.7;color:#374151">{t}</p>'
+        return t
+
+    summary_html = md_to_email(report_md)
+
+    # Build result rows
+    results_rows = ""
+    for i, r in enumerate(results[:30]):
+        title = _h.escape(str(r.get("title", "")))
+        artikel = _h.escape(str(r.get("artikel", "")))
+        inkraft = _h.escape(str(r.get("date", "")))
+        bgbl = _h.escape(str(r.get("bgbl", "")))
+        url = _h.escape(str(r.get("url", "")))
+        bg = "#ffffff" if i % 2 == 0 else "#f9fafb"
+        results_rows += f'''<tr style="background:{bg}">
+<td style="padding:10px 12px;font-size:13px;color:#1a1a1a;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">
+  <strong>{title}</strong>{f" {artikel}" if artikel else ""}
+</td>
+<td style="padding:10px 12px;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3;white-space:nowrap">{inkraft}</td>
+<td style="padding:10px 12px;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">{bgbl}</td>
+<td style="padding:10px 12px;font-size:12px;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">
+  {f'<a href="{url}" style="color:#007993;text-decoration:none">RIS →</a>' if url else ""}
+</td>
+</tr>'''
+
+    # Materialien rows
+    mat_rows = ""
+    for key, mat in materialien.items():
+        titel = _h.escape(str(mat.get("titel", "")))
+        rv = _h.escape(str(mat.get("rv_nr", "")))
+        gp = _h.escape(str(mat.get("gp", "")))
+        purl = _h.escape(str(mat.get("parlament_url", "")))
+        if titel or rv:
+            mat_rows += f'''<tr>
+<td style="padding:8px 12px;font-size:13px;color:#1a1a1a;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">
+  <strong>{_h.escape(key)}</strong><br>
+  <span style="color:#6b7280;font-size:12px">{titel}</span>
+</td>
+<td style="padding:8px 12px;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3;white-space:nowrap">
+  {f"RV {rv} d.B. {gp} GP" if rv else ""}
+</td>
+<td style="padding:8px 12px;font-size:12px;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">
+  {f'<a href="{purl}" style="color:#7c3aed;text-decoration:none">Parlament →</a>' if purl else ""}
+</td>
+</tr>'''
+
+    mat_section = ""
+    if mat_rows:
+        mat_section = f'''
+  <tr><td style="background:white;padding:24px 28px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb">
+    <p style="font-size:15px;font-weight:bold;color:#7c3aed;margin:0 0 12px;font-family:Arial,sans-serif">Gesetzesmaterialien</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px">
+      <tr style="background:#f5f3ff">
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;color:#7c3aed;font-family:Arial,sans-serif">BGBl</td>
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;color:#7c3aed;font-family:Arial,sans-serif">RV</td>
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;color:#7c3aed;font-family:Arial,sans-serif">Link</td>
+      </tr>
+      {mat_rows}
+    </table>
+  </td></tr>'''
+
+    more_text = f"und {len(results) - 30} weitere..." if len(results) > 30 else ""
 
     return f'''<!DOCTYPE html>
 <html lang="de">
-<head><meta charset="UTF-8"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f5f6f8;font-family:Arial,Helvetica,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;padding:20px 0">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+<table width="700" cellpadding="0" cellspacing="0" style="max-width:700px;width:100%">
 
   <!-- Header -->
-  <tr><td style="background:#0a5062;padding:32px 28px;border-radius:12px 12px 0 0">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="color:white;font-size:22px;font-weight:bold;font-family:Arial,sans-serif">
-          AI:ssociate
-          <span style="display:inline-block;background:#ff9733;color:white;font-size:11px;font-weight:bold;padding:3px 8px;border-radius:4px;margin-left:8px;vertical-align:middle">MONITORING</span>
-        </td>
-      </tr>
-      <tr><td style="color:rgba(255,255,255,0.7);font-size:13px;padding-top:8px">
-        Law Monitoring Report · {_h.escape(date_str)}
-      </td></tr>
-    </table>
+  <tr><td style="background:#0a5062;padding:28px 28px 20px;border-radius:8px 8px 0 0">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="color:white;font-size:22px;font-weight:bold;font-family:Arial,sans-serif">
+        AI:ssociate
+        <span style="display:inline-block;background:#ff9733;color:white;font-size:11px;font-weight:bold;padding:3px 8px;border-radius:4px;margin-left:8px;vertical-align:middle">MONITORING</span>
+      </td>
+      <td style="text-align:right;color:rgba(255,255,255,0.6);font-size:12px;font-family:Arial,sans-serif">
+        {_h.escape(date_str)}
+      </td>
+    </tr></table>
   </td></tr>
 
   <!-- Stats bar -->
-  <tr><td style="background:#083d4d;padding:16px 28px">
+  <tr><td style="background:#083d4d;padding:14px 28px">
     <table width="100%" cellpadding="0" cellspacing="0"><tr>
       <td style="color:white;font-size:13px;font-family:Arial,sans-serif">
-        <strong style="color:#ff9733;font-size:20px">{total_hits}</strong>
-        <span style="color:rgba(255,255,255,0.6);margin-left:4px">Treffer</span>
+        <strong style="color:#ff9733;font-size:22px">{total_hits}</strong>
+        <span style="color:rgba(255,255,255,0.5);margin-left:4px">Treffer</span>
       </td>
-      <td style="color:white;font-size:13px;text-align:center;font-family:Arial,sans-serif">
-        <strong style="color:white">{_h.escape(category)}</strong>
+      <td style="color:white;font-size:14px;text-align:center;font-weight:bold;font-family:Arial,sans-serif">
+        {_h.escape(category)}
       </td>
-      <td style="color:rgba(255,255,255,0.6);font-size:13px;text-align:right;font-family:Arial,sans-serif">
+      <td style="color:rgba(255,255,255,0.5);font-size:13px;text-align:right;font-family:Arial,sans-serif">
         {_h.escape(timeframe)}
       </td>
     </tr></table>
   </td></tr>
 
-  <!-- Summary preview -->
+  <!-- GPT Analysis (full) -->
   <tr><td style="background:white;padding:28px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb">
     <table width="100%" cellpadding="0" cellspacing="0">
-      <tr><td style="font-size:16px;font-weight:bold;color:#007993;padding-bottom:16px;font-family:Arial,sans-serif;border-bottom:2px solid #f0f1f3;margin-bottom:16px">
-        Analyse (Vorschau)
+      <tr><td style="font-size:16px;font-weight:bold;color:#007993;padding-bottom:14px;font-family:Arial,sans-serif;border-bottom:2px solid #e5e7eb">
+        KI-Analyse
       </td></tr>
-      <tr><td style="padding-top:16px;font-size:14px;line-height:1.7;color:#374151;font-family:Arial,sans-serif">
-        <p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.6">{preview}{'…' if len(summary_preview) >= 590 else ''}</p>
+      <tr><td style="padding-top:16px;font-family:Arial,sans-serif">
+        {summary_html}
       </td></tr>
     </table>
   </td></tr>
 
-  <!-- CTA -->
-  <tr><td style="background:#fafbfc;padding:24px 28px;text-align:center;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr><td style="background:#fff8f0;border:1px solid #ffe4c4;border-radius:8px;padding:16px 20px;text-align:center">
-        <strong style="color:#0a5062;font-size:14px;font-family:Arial,sans-serif">Interaktiver Report angehängt</strong><br>
-        <span style="color:#6b7280;font-size:13px;font-family:Arial,sans-serif">Öffnen Sie die HTML-Datei im Browser für die vollständige interaktive Ansicht mit Sidebar-Navigation, Versionsvergleichen und GPT-Analyse.</span>
-      </td></tr>
+  <!-- Materialien -->
+  {mat_section}
+
+  <!-- Results table -->
+  <tr><td style="background:white;padding:24px 28px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb">
+    <p style="font-size:15px;font-weight:bold;color:#0a5062;margin:0 0 12px;font-family:Arial,sans-serif">Geänderte Bestimmungen</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px">
+      <tr style="background:#f0f7f9">
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:#007993;font-family:Arial,sans-serif">Bestimmung</td>
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:#007993;font-family:Arial,sans-serif">Inkrafttreten</td>
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:#007993;font-family:Arial,sans-serif">BGBl</td>
+        <td style="padding:8px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:#007993;font-family:Arial,sans-serif">Link</td>
+      </tr>
+      {results_rows}
     </table>
+    {f'<p style="font-size:12px;color:#9ca3af;margin:8px 0 0;font-family:Arial,sans-serif">{more_text}</p>' if more_text else ""}
   </td></tr>
 
   <!-- Footer -->
-  <tr><td style="background:#f5f6f8;padding:20px 28px;text-align:center;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none">
-    <span style="font-size:11px;color:#9ca3af;font-family:Arial,sans-serif">
-      Datenquelle: RIS · data.bka.gv.at · AI:ssociate Monitoring
-    </span>
+  <tr><td style="background:#f5f6f8;padding:20px 28px;text-align:center;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none">
+    <p style="font-size:11px;color:#9ca3af;margin:0;font-family:Arial,sans-serif">
+      Datenquelle: RIS · data.bka.gv.at<br>
+      AI:ssociate Monitoring · {_h.escape(date_str)}
+    </p>
   </td></tr>
 
 </table>
