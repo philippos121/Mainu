@@ -130,7 +130,7 @@ LEGAL_CATEGORIES = [
 # Fallback: Titel parameter for specific laws.
 _CATEGORY_SEARCH: dict[str, list[dict]] = {
     # 1: Verfassungsrecht (10-19)
-    "verfassungsrecht": [{"Index": "10/01"}, {"Index": "10/02"}, {"Index": "10/03"}, {"Index": "10/14"}, {"Index": "10/15"}],
+    "verfassungsrecht": [{"Index": "10/01"}, {"Index": "10/02"}, {"Index": "10/03"}, {"Index": "10/14"}],
     "grundrechte": [{"Index": "10/10"}, {"Index": "10/11"}],
     "wahlen": [{"Index": "10/04"}, {"Index": "10/06"}, {"Index": "10/12"}],
     "bezuege": [{"Index": "10/05"}],
@@ -161,14 +161,14 @@ _CATEGORY_SEARCH: dict[str, list[dict]] = {
     # 3: Finanzrecht (30-39)
     "finanzrecht_allg": [{"Index": "30/01"}, {"Index": "31/01"}],
     "abgabenrecht": [{"Index": "32/01"}],
-    "einkommensteuer": [{"Index": "32/02"}],
-    "koerperschaftsteuer": [{"Index": "32/02"}, {"Titel": "Körperschaftsteuergesetz"}],
+    "einkommensteuer": [{"Index": "32/02"}, {"Titel": "Einkommensteuergesetz"}],
+    "koerperschaftsteuer": [{"Titel": "Körperschaftsteuergesetz"}],
     "umsatzsteuer": [{"Index": "32/04"}],
     "gebuehrenrecht": [{"Index": "32/06"}, {"Index": "32/07"}],
     "bewertungsrecht": [{"Index": "32/03"}],
     "zollrecht": [{"Index": "35/01"}, {"Index": "35/02"}],
     "finanzausgleich": [{"Index": "30/01"}, {"Titel": "Finanzausgleichsgesetz"}],
-    "finanzstrafrecht": [{"Index": "32/01"}, {"Titel": "Finanzstrafgesetz"}],
+    "finanzstrafrecht": [{"Titel": "Finanzstrafgesetz"}],
     # 4: Innere Verwaltung (40-49)
     "verwaltungsverfahren": [{"Index": "40/01"}, {"Index": "40/02"}, {"Index": "40/03"}],
     "staatsbuergerschaft": [{"Index": "41/02"}],
@@ -177,7 +177,7 @@ _CATEGORY_SEARCH: dict[str, list[dict]] = {
     "fremdenrecht": [{"Index": "41/02"}, {"Titel": "Fremdenpolizeigesetz"}, {"Titel": "AsylG"}],
     "waffenrecht": [{"Index": "41/04"}, {"Titel": "Waffengesetz"}],
     "vereinsrecht": [{"Index": "41/01"}, {"Titel": "Vereinsgesetz"}],
-    "datenschutz": [{"Index": "10/10"}, {"Titel": "Datenschutzgesetz"}],
+    "datenschutz": [{"Titel": "Datenschutzgesetz"}, {"Titel": "DSG"}],
     # 5: Wirtschaft (50-59)
     "gewerberecht": [{"Index": "50/01"}, {"Index": "50/02"}, {"Index": "50/03"}],
     "bergrecht": [{"Index": "58/01"}, {"Titel": "Mineralrohstoffgesetz"}],
@@ -530,6 +530,21 @@ async def search_gerichtsentscheidungen(
     }
     norm = _CATEGORY_NORMEN.get(category, "")
 
+    # Additional Suchworte for categories that share court sources
+    # This prevents cross-contamination between e.g. verwaltungsverfahren and fremdenrecht
+    _CATEGORY_SUCHWORTE: dict[str, str] = {
+        "verwaltungsverfahren": "Verwaltungsverfahren AVG",
+        "sicherheitspolizei": "Sicherheitspolizei SPG",
+        "fremdenrecht": "Fremd Asyl Aufenthalt",
+        "datenschutz": "Datenschutz",
+        "beamtendienstrecht": "Beamte Dienstrecht BDG",
+        "einkommensteuer": "Einkommensteuer",
+        "koerperschaftsteuer": "Körperschaftsteuer",
+        "umsatzsteuer": "Umsatzsteuer",
+        "finanzstrafrecht": "Finanzstrafrecht",
+    }
+    suchworte = _CATEGORY_SUCHWORTE.get(category, "")
+
     async def _query_court(court: str) -> tuple[list[dict], int]:
         params: dict = {
             "Applikation": court,
@@ -539,6 +554,8 @@ async def search_gerichtsentscheidungen(
         }
         if norm:
             params["Norm"] = norm
+        if suchworte:
+            params["Suchworte"] = suchworte
 
         url = f"{settings.RIS_API_BASE_URL}/Judikatur"
         data = await _fetch(url, params)
