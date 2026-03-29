@@ -1,123 +1,152 @@
 <template>
 <div class="page" ref="pageRef">
-  <!-- 3D parallax scene — fixed behind everything -->
+  <!-- 3D Library scene — fixed background -->
   <div class="scene">
-    <div class="scene-inner" :style="{ transform: `translateY(${scrollY * 0.15}px)` }">
-      <!-- Far layer — large soft shapes -->
-      <div class="layer layer-far" :style="{ transform: `translateY(${scrollY * -0.08}px) scale(${1 + scrollY * 0.0002})` }">
-        <div class="shape sh-1"></div>
-        <div class="shape sh-2"></div>
-        <div class="shape sh-3"></div>
+    <div class="scene-depth" :style="{ transform: `perspective(1400px) rotateX(${2 + scrollY * 0.008}deg)` }">
+      <!-- Floor -->
+      <div class="floor" :style="{ transform: `translateZ(-200px) translateY(${scrollY * 0.05}px)` }"></div>
+      <!-- Bookshelves — left wall -->
+      <div class="shelf-wall shelf-left" :style="{ transform: `translateX(-48vw) rotateY(88deg) translateY(${scrollY * -0.12}px)` }">
+        <div class="shelf-unit" v-for="n in 6" :key="'l'+n" :style="{ top: (n-1)*16+'%' }">
+          <div class="shelf-plank"></div>
+          <div class="books">
+            <div class="book" v-for="b in 12" :key="b" :style="{ height: 20+Math.sin(b*n)*18+'px', background: bookColor(b,n) }"></div>
+          </div>
+        </div>
       </div>
-      <!-- Mid layer — geometric elements -->
-      <div class="layer layer-mid" :style="{ transform: `translateY(${scrollY * -0.2}px) rotateX(${scrollY * 0.01}deg)` }">
-        <div class="geo geo-1"></div>
-        <div class="geo geo-2"></div>
-        <div class="geo geo-3"></div>
-        <div class="geo geo-4"></div>
-        <div class="geo geo-5"></div>
+      <!-- Bookshelves — right wall -->
+      <div class="shelf-wall shelf-right" :style="{ transform: `translateX(48vw) rotateY(-88deg) translateY(${scrollY * -0.12}px)` }">
+        <div class="shelf-unit" v-for="n in 6" :key="'r'+n" :style="{ top: (n-1)*16+'%' }">
+          <div class="shelf-plank"></div>
+          <div class="books">
+            <div class="book" v-for="b in 12" :key="b" :style="{ height: 18+Math.cos(b*n)*16+'px', background: bookColor(b+3,n+1) }"></div>
+          </div>
+        </div>
       </div>
-      <!-- Near layer — floating book spines / columns -->
-      <div class="layer layer-near" :style="{ transform: `translateY(${scrollY * -0.35}px)` }">
-        <div class="col col-1"></div>
-        <div class="col col-2"></div>
-        <div class="col col-3"></div>
-        <div class="col col-4"></div>
-        <div class="col col-5"></div>
-        <div class="col col-6"></div>
-        <div class="col col-7"></div>
-      </div>
+      <!-- Ceiling beams -->
+      <div class="beam beam-1" :style="{ transform: `translateY(${scrollY * -0.06}px)` }"></div>
+      <div class="beam beam-2" :style="{ transform: `translateY(${scrollY * -0.06}px)` }"></div>
+      <!-- Ambient light -->
+      <div class="light" :style="{ opacity: Math.max(0.3, 1 - scrollY * 0.001) }"></div>
     </div>
   </div>
 
-  <!-- Hero content -->
-  <section class="hero">
-    <div class="hero-inner">
-      <div class="hero-brand">
-        <img src="/logo.svg" alt="AI:ssociate" class="hero-logo" />
-        <span class="hero-badge">Monitoring</span>
-      </div>
-      <div class="hero-props">
-        <div class="hp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><span>86 Rechtsgebiete</span></div>
-        <div class="hp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg><span>Versionsvergleich</span></div>
-        <div class="hp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Gesetzesmaterialien</span></div>
-        <div class="hp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>KI-Analyse</span></div>
-      </div>
-      <h1 class="hero-h1">Rechtsänderungen.<br/><span class="hero-accent">Automatisch. Analysiert.</span></h1>
-      <div class="hero-sources">
-        <span class="hs">RIS</span><span class="hs-dot"></span>
-        <span class="hs">Findok</span><span class="hs-dot"></span>
-        <span class="hs">EUR-Lex</span><span class="hs-dot"></span>
-        <span class="hs">parlament.gv.at</span>
-      </div>
-    </div>
-  </section>
+  <!-- Scroll sections with reveal -->
+  <div class="content" :style="{ '--sy': scrollY }">
 
-  <!-- Form -->
-  <section class="form-section">
-    <div class="form-card">
-      <div class="fc-head">
-        <h2>Report erstellen</h2>
-        <p>Wählen Sie Ihre Rechtsgebiete und erhalten Sie den Report direkt per E-Mail.</p>
+    <!-- Section 1: Brand reveal -->
+    <section class="sec sec-brand" :class="{ visible: scrollY < 200 }">
+      <div class="sec-inner">
+        <img src="/logo.svg" alt="AI:ssociate" class="brand-logo" />
+        <span class="brand-badge">Monitoring</span>
       </div>
+    </section>
 
-      <div class="field">
-        <label>Rechtsgebiete</label>
-        <v-select v-model="selectedCategory" :items="categories" item-title="label" item-value="id"
-          variant="outlined" density="compact" multiple chips closable-chips clearable hide-details
-          placeholder="Rechtsgebiete wählen…" color="#007993" bg-color="white" />
-      </div>
+    <!-- Section 2: Headline -->
+    <section class="sec sec-headline" :class="{ visible: scrollY > 80 }">
+      <h1 class="main-h1">Rechtsänderungen.</h1>
+      <h1 class="main-h1 accent">Automatisch. Analysiert.</h1>
+    </section>
 
-      <div class="field-row">
-        <div class="field field-half">
-          <label>Zeitraum</label>
-          <v-select v-model="selectedTimeframe" :items="timeframeOptions" item-title="label" item-value="value"
-            variant="outlined" density="compact" hide-details color="#007993" bg-color="white" />
-        </div>
-        <div class="field field-half">
-          <label>E-Mail</label>
-          <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
+    <!-- Section 3: Features -->
+    <section class="sec sec-features" :class="{ visible: scrollY > 280 }">
+      <div class="feat" v-for="(f, i) in features" :key="i" :class="{ visible: scrollY > 300 + i * 80 }">
+        <div class="feat-icon" v-html="f.icon"></div>
+        <div class="feat-text">
+          <strong>{{ f.title }}</strong>
+          <span>{{ f.desc }}</span>
         </div>
       </div>
+    </section>
 
-      <div v-if="selectedTimeframe === 'custom'" class="field-row">
-        <div class="field field-half">
-          <label>Von</label>
-          <input v-model="datumVon" type="date" class="inp" />
-        </div>
-        <div class="field field-half">
-          <label>Bis</label>
-          <input v-model="datumBis" type="date" class="inp" />
-        </div>
+    <!-- Section 4: Sources -->
+    <section class="sec sec-sources" :class="{ visible: scrollY > 550 }">
+      <p class="sources-label">Datenquellen</p>
+      <div class="source-row">
+        <span class="src" v-for="(s, i) in ['RIS', 'Findok', 'EUR-Lex', 'parlament.gv.at']" :key="i" :class="{ visible: scrollY > 580 + i * 60 }">{{ s }}</span>
       </div>
+    </section>
 
-      <div class="actions">
-        <button class="btn-primary" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
-          <span v-if="sending" class="spin"></span>
-          <template v-else>Report senden →</template>
-        </button>
-        <button class="btn-ghost" :disabled="!selectedCategory.length || generating" @click="downloadReport">
-          <span v-if="generating" class="spin spin-dark"></span>
-          <template v-else>↓ Herunterladen</template>
-        </button>
+    <!-- Section 5: Form -->
+    <section class="sec sec-form" :class="{ visible: scrollY > 750 }">
+      <div class="form-card">
+        <div class="fc-head">
+          <h2>Report erstellen</h2>
+          <p>Wählen Sie Ihre Rechtsgebiete und erhalten Sie den Report per E-Mail.</p>
+        </div>
+
+        <div class="field">
+          <label>Rechtsgebiete</label>
+          <v-select v-model="selectedCategory" :items="categories" item-title="label" item-value="id"
+            variant="outlined" density="compact" multiple chips closable-chips clearable hide-details
+            placeholder="Rechtsgebiete wählen…" color="#22c9e8" />
+        </div>
+
+        <div class="field-row">
+          <div class="field field-half">
+            <label>Zeitraum</label>
+            <v-select v-model="selectedTimeframe" :items="timeframeOptions" item-title="label" item-value="value"
+              variant="outlined" density="compact" hide-details color="#22c9e8" />
+          </div>
+          <div class="field field-half">
+            <label>E-Mail</label>
+            <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
+          </div>
+        </div>
+
+        <div v-if="selectedTimeframe === 'custom'" class="field-row">
+          <div class="field field-half"><label>Von</label><input v-model="datumVon" type="date" class="inp" /></div>
+          <div class="field field-half"><label>Bis</label><input v-model="datumBis" type="date" class="inp" /></div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
+            <span v-if="sending" class="spin"></span>
+            <template v-else>Report senden →</template>
+          </button>
+          <button class="btn-ghost" :disabled="!selectedCategory.length || generating" @click="downloadReport">
+            <span v-if="generating" class="spin spin-dark"></span>
+            <template v-else>↓ Herunterladen</template>
+          </button>
+        </div>
+
+        <div v-if="statusMsg" :class="['status', statusOk ? 'status-ok' : 'status-err']">{{ statusMsg }}</div>
       </div>
+    </section>
 
-      <div v-if="statusMsg" :class="['status', statusOk ? 'status-ok' : 'status-err']">{{ statusMsg }}</div>
-    </div>
-  </section>
+    <!-- Spacer to enable enough scroll -->
+    <div style="height: 100px"></div>
+  </div>
 </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 
 const pageRef = ref(null)
 const scrollY = ref(0)
-
 function onScroll() { scrollY.value = window.scrollY }
 onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }) })
 onUnmounted(() => { window.removeEventListener('scroll', onScroll) })
+
+const features = [
+  { title: '86 Rechtsgebiete', desc: 'Vollständige RIS-Dezimalklassifikation', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
+  { title: 'Versionsvergleich', desc: 'Inkrafttreten vs. Vorfassung — Wort für Wort', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>' },
+  { title: 'Gesetzesmaterialien', desc: 'Erläuterungen direkt von parlament.gv.at', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c9e8" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>' },
+  { title: 'KI-Analyse', desc: 'GPT-Zusammenfassung mit Quellenangaben', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff9733" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
+]
+
+function bookColor(b, n) {
+  const colors = [
+    'linear-gradient(180deg, rgba(0,121,147,0.3), rgba(0,121,147,0.15))',
+    'linear-gradient(180deg, rgba(255,151,51,0.2), rgba(255,151,51,0.08))',
+    'linear-gradient(180deg, rgba(10,80,98,0.25), rgba(10,80,98,0.1))',
+    'linear-gradient(180deg, rgba(34,201,232,0.15), rgba(34,201,232,0.06))',
+    'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+  ]
+  return colors[(b + n) % colors.length]
+}
 
 const categories = ref([])
 const timeframes = ref([])
@@ -146,8 +175,7 @@ async function doSearch() {
   const cats = selectedCategory.value || []
   const isCustom = selectedTimeframe.value === 'custom'
   const tf = isCustom ? 'EinemJahr' : selectedTimeframe.value
-  const extraParams = isCustom && datumVon.value && datumBis.value
-    ? { datum_von: datumVon.value, datum_bis: datumBis.value } : {}
+  const extraParams = isCustom && datumVon.value && datumBis.value ? { datum_von: datumVon.value, datum_bis: datumBis.value } : {}
   const endpoints = ['/search/gesetze', '/search/gerichtsentscheidungen']
   const allResults = []; let allHits = 0; const seen = new Set()
   for (const ep of endpoints) {
@@ -204,196 +232,221 @@ async function downloadReport() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; position: relative; overflow-x: hidden; background: #0b1a20; }
+.page { min-height: 300vh; position: relative; overflow-x: hidden; background: #080f13; }
 
-/* ── 3D Parallax scene ── */
+/* ── 3D Library Scene ── */
 .scene {
-  position: fixed; inset: 0; z-index: 0;
-  perspective: 1200px;
-  overflow: hidden;
-  background: linear-gradient(180deg, #0b1a20 0%, #0d2832 30%, #0f3640 55%, #112a34 80%, #0b1a20 100%);
+  position: fixed; inset: 0; z-index: 0; overflow: hidden;
+  background: linear-gradient(180deg, #060d12 0%, #0a1a22 25%, #0d2530 50%, #0a1a22 75%, #060d12 100%);
 }
-.scene-inner {
-  position: absolute; inset: -20%; width: 140%; height: 140%;
+.scene-depth {
+  position: absolute; inset: 0;
   transform-style: preserve-3d;
+  transform-origin: 50% 60%;
 }
 
-/* Far layer — large soft ambient shapes */
-.layer { position: absolute; inset: 0; will-change: transform; }
-.layer-far { opacity: 0.6; }
-.shape {
-  position: absolute; border-radius: 50%;
-  filter: blur(100px);
-}
-.sh-1 {
-  width: 700px; height: 700px; top: -15%; left: -10%;
-  background: radial-gradient(circle, rgba(0,121,147,0.25) 0%, transparent 70%);
-}
-.sh-2 {
-  width: 500px; height: 500px; bottom: 5%; right: -5%;
-  background: radial-gradient(circle, rgba(255,151,51,0.15) 0%, transparent 70%);
-}
-.sh-3 {
-  width: 400px; height: 400px; top: 40%; left: 45%;
-  background: radial-gradient(circle, rgba(10,80,98,0.2) 0%, transparent 70%);
+/* Floor — receding into distance */
+.floor {
+  position: absolute; bottom: -10%; left: -20%; width: 140%; height: 50%;
+  background: linear-gradient(180deg, transparent 0%, rgba(0,121,147,0.03) 40%, rgba(10,80,98,0.06) 100%);
+  border-top: 1px solid rgba(0,121,147,0.06);
 }
 
-/* Mid layer — geometric abstract elements (floating planes) */
-.layer-mid { transform-style: preserve-3d; }
-.geo {
-  position: absolute;
-  border: 1px solid rgba(0,121,147,0.12);
-  border-radius: 4px;
-  background: linear-gradient(135deg, rgba(0,121,147,0.04) 0%, rgba(255,255,255,0.02) 100%);
-  backdrop-filter: blur(1px);
+/* Bookshelf walls */
+.shelf-wall {
+  position: absolute; top: 0; width: 40vw; height: 100%;
+  transform-style: preserve-3d;
+  transform-origin: right center;
 }
-.geo-1 { width: 180px; height: 120px; top: 12%; left: 8%; transform: rotateY(-12deg) rotateX(5deg); }
-.geo-2 { width: 140px; height: 200px; top: 25%; right: 12%; transform: rotateY(8deg) rotateX(-3deg); }
-.geo-3 { width: 220px; height: 80px;  top: 55%; left: 20%; transform: rotateY(-5deg) rotateX(8deg); }
-.geo-4 { width: 100px; height: 160px; top: 60%; right: 25%; transform: rotateY(15deg) rotateX(-6deg); }
-.geo-5 { width: 160px; height: 100px; top: 78%; left: 50%; transform: rotateY(-10deg) rotateX(4deg); }
+.shelf-right { transform-origin: left center; }
 
-/* Near layer — vertical columns like book spines in a library */
-.layer-near { transform-style: preserve-3d; }
-.col {
-  position: absolute; bottom: 0;
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, rgba(0,121,147,0.08) 0%, rgba(10,80,98,0.15) 100%);
-  border: 1px solid rgba(0,121,147,0.06);
+.shelf-unit {
+  position: absolute; left: 0; width: 100%; height: 14%;
+}
+.shelf-plank {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, rgba(139,90,43,0.15), rgba(139,90,43,0.25), rgba(139,90,43,0.15));
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.books {
+  position: absolute; bottom: 3px; left: 4px; right: 4px;
+  display: flex; align-items: flex-end; gap: 2px;
+}
+.book {
+  width: 8px; min-width: 6px; flex-shrink: 0;
+  border-radius: 1px 1px 0 0;
+  border: 1px solid rgba(255,255,255,0.03);
   border-bottom: none;
 }
-.col-1 { width: 28px; height: 55%; left: 5%;  background: linear-gradient(180deg, rgba(0,121,147,0.06) 0%, rgba(0,121,147,0.12) 100%); }
-.col-2 { width: 22px; height: 70%; left: 12%; background: linear-gradient(180deg, rgba(255,151,51,0.04) 0%, rgba(255,151,51,0.08) 100%); }
-.col-3 { width: 32px; height: 48%; left: 22%; }
-.col-4 { width: 26px; height: 62%; left: 55%; background: linear-gradient(180deg, rgba(10,80,98,0.05) 0%, rgba(10,80,98,0.12) 100%); }
-.col-5 { width: 20px; height: 75%; left: 68%; background: linear-gradient(180deg, rgba(0,121,147,0.04) 0%, rgba(0,121,147,0.1) 100%); }
-.col-6 { width: 30px; height: 52%; left: 80%; }
-.col-7 { width: 24px; height: 65%; left: 92%; background: linear-gradient(180deg, rgba(255,151,51,0.03) 0%, rgba(255,151,51,0.07) 100%); }
 
-/* ── Content sections ── */
-.hero {
+/* Ceiling beams */
+.beam {
+  position: absolute; top: 8%; height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(139,90,43,0.12), transparent);
+}
+.beam-1 { left: 10%; right: 10%; }
+.beam-2 { left: 20%; right: 20%; top: 12%; }
+
+/* Warm overhead light */
+.light {
+  position: absolute; top: -10%; left: 30%; width: 40%; height: 60%;
+  background: radial-gradient(ellipse, rgba(255,200,100,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Content layer ── */
+.content {
   position: relative; z-index: 2;
-  padding: 72px 24px 64px; text-align: center;
+  display: flex; flex-direction: column; align-items: center;
 }
-.hero-inner { max-width: 600px; margin: 0 auto; }
 
-.hero-h1 {
-  font-size: 38px; font-weight: 800; color: #e8f4f6; line-height: 1.15;
-  margin-bottom: 16px; letter-spacing: -0.5px;
-  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+/* Sections — scroll reveal */
+.sec {
+  width: 100%; max-width: 640px; padding: 0 24px;
+  opacity: 0; transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1);
 }
-.hero-accent { color: #22c9e8; }
+.sec.visible { opacity: 1; transform: translateY(0); }
 
-.hero-brand { position: relative; display: inline-block; margin-bottom: 24px; }
-.hero-logo { height: 40px; width: auto; filter: brightness(10); }
-.hero-badge {
-  position: absolute; top: -6px; right: -70px;
+/* Brand */
+.sec-brand { padding-top: 100px; padding-bottom: 20px; text-align: center; }
+.brand-logo { height: 48px; filter: brightness(10); }
+.brand-badge {
+  display: inline-block; margin-left: 12px; vertical-align: top;
   font-size: 10px; font-weight: 700; color: var(--orange);
-  text-transform: uppercase; letter-spacing: 1.5px;
+  text-transform: uppercase; letter-spacing: 2px; margin-top: 4px;
 }
 
-.hero-props { display: flex; justify-content: center; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
-.hp {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.7);
+/* Headline */
+.sec-headline { text-align: center; padding-bottom: 40px; }
+.main-h1 {
+  font-size: 48px; font-weight: 800; color: #e8f4f6; line-height: 1.1;
+  letter-spacing: -1px; margin: 0;
+  text-shadow: 0 2px 30px rgba(0,0,0,0.4);
 }
-.hp svg { stroke: #22c9e8; }
+.main-h1.accent { color: #22c9e8; }
 
-.hero-sources {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  margin-top: 4px; flex-wrap: wrap;
+/* Features */
+.sec-features { padding-bottom: 40px; }
+.feat {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px; margin-bottom: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 14px;
+  opacity: 0; transform: translateX(-30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
 }
-.hs {
-  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8);
-  padding: 3px 10px; border-radius: 6px;
-  background: rgba(255,255,255,0.06); letter-spacing: 0.3px;
-  border: 1px solid rgba(255,255,255,0.08);
+.feat.visible { opacity: 1; transform: translateX(0); }
+.feat-icon { flex-shrink: 0; width: 24px; height: 24px; }
+.feat-text { display: flex; flex-direction: column; }
+.feat-text strong { font-size: 14px; font-weight: 600; color: #e8f4f6; }
+.feat-text span { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+/* Sources */
+.sec-sources { text-align: center; padding-bottom: 50px; }
+.sources-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;
+  color: rgba(255,255,255,0.3); margin-bottom: 16px;
 }
-.hs-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.2); flex-shrink: 0; }
+.source-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.src {
+  font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7);
+  padding: 6px 16px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  opacity: 0; transform: translateY(20px) scale(0.9);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.src.visible { opacity: 1; transform: translateY(0) scale(1); }
 
 /* ── Form ── */
-.form-section { position: relative; z-index: 2; padding: 0 24px 80px; }
+.sec-form { padding-bottom: 0; max-width: 600px; }
 .form-card {
-  max-width: 560px; margin: 0 auto;
-  background: rgba(255,255,255,0.07); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
-  border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border-radius: 20px; border: 1px solid rgba(255,255,255,0.08);
   padding: 36px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05) inset;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
 }
 
 .fc-head { margin-bottom: 24px; }
 .fc-head h2 { font-size: 20px; font-weight: 700; color: #e8f4f6; margin-bottom: 4px; }
-.fc-head p { font-size: 14px; color: rgba(255,255,255,0.5); }
+.fc-head p { font-size: 14px; color: rgba(255,255,255,0.45); }
 
 .field { margin-bottom: 18px; }
-.field label { display: block; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 6px; }
+.field label { display: block; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
 .field-row { display: flex; gap: 14px; }
 .field-half { flex: 1; min-width: 0; }
 
 .inp {
   width: 100%; padding: 12px 16px;
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
   font-size: 14px; font-family: inherit; outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  background: rgba(255,255,255,0.05); color: #e8f4f6;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  background: rgba(255,255,255,0.04); color: #e8f4f6;
 }
 .inp:focus {
-  border-color: rgba(34,201,232,0.5);
-  box-shadow: 0 0 0 3px rgba(34,201,232,0.1);
-  background: rgba(255,255,255,0.08);
+  border-color: rgba(34,201,232,0.4);
+  box-shadow: 0 0 0 3px rgba(34,201,232,0.08);
+  background: rgba(255,255,255,0.07);
 }
-.inp::placeholder { color: rgba(255,255,255,0.25); }
+.inp::placeholder { color: rgba(255,255,255,0.2); }
 
 .actions { display: flex; gap: 10px; margin-top: 28px; }
 
 .btn-primary {
   flex: 1; padding: 15px; border: none; border-radius: 14px;
-  background: linear-gradient(135deg, var(--orange), #e8870a);
-  color: white;
-  font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
-  box-shadow: 0 4px 20px rgba(255,151,51,0.3); transition: all 0.2s;
+  background: linear-gradient(135deg, #ff9733, #e8870a);
+  color: white; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+  box-shadow: 0 4px 24px rgba(255,151,51,0.25); transition: all 0.2s;
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(255,151,51,0.5); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(255,151,51,0.4); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .btn-ghost {
-  padding: 15px 22px; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
-  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 600;
+  padding: 15px 22px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+  background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600;
   font-family: inherit; cursor: pointer; transition: all 0.2s; white-space: nowrap;
 }
-.btn-ghost:hover:not(:disabled) { border-color: rgba(34,201,232,0.4); color: #22c9e8; background: rgba(34,201,232,0.06); }
-.btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost:hover:not(:disabled) { border-color: rgba(34,201,232,0.3); color: #22c9e8; background: rgba(34,201,232,0.05); }
+.btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .status { margin-top: 16px; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-.status-ok { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
-.status-err { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+.status-ok { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.15); }
+.status-err { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.15); }
 
 .spin { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: sp .6s linear infinite; display: inline-block; }
 .spin-dark { border-color: rgba(255,255,255,0.1); border-top-color: #22c9e8; }
 @keyframes sp { to { transform: rotate(360deg) } }
 
-/* Vuetify overrides for dark theme */
-:deep(.v-field) { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.1) !important; color: #e8f4f6 !important; }
+/* Vuetify dark overrides */
+:deep(.v-field) { background: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.08) !important; color: #e8f4f6 !important; border-radius: 12px !important; }
 :deep(.v-field__input) { color: #e8f4f6 !important; }
-:deep(.v-field--focused) { border-color: rgba(34,201,232,0.5) !important; }
-:deep(.v-chip) { background: rgba(34,201,232,0.15) !important; color: #22c9e8 !important; }
-:deep(.v-field__input::placeholder) { color: rgba(255,255,255,0.25) !important; }
+:deep(.v-field--focused) { border-color: rgba(34,201,232,0.4) !important; }
+:deep(.v-chip) { background: rgba(34,201,232,0.12) !important; color: #22c9e8 !important; }
+:deep(.v-field__input::placeholder) { color: rgba(255,255,255,0.2) !important; }
 :deep(.v-select__selection-text) { color: #e8f4f6 !important; }
-:deep(.v-field__append-inner .v-icon) { color: rgba(255,255,255,0.4) !important; }
+:deep(.v-field__append-inner .v-icon) { color: rgba(255,255,255,0.35) !important; }
+:deep(.v-list) { background: #0d1f28 !important; }
+:deep(.v-list-item) { color: #e8f4f6 !important; }
+:deep(.v-list-item:hover) { background: rgba(34,201,232,0.08) !important; }
+:deep(.v-list-item--active) { background: rgba(34,201,232,0.12) !important; color: #22c9e8 !important; }
+:deep(.v-overlay__content) { border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px !important; }
 
 @media (max-width: 600px) {
-  .hero-h1 { font-size: 28px; }
-  .hero-props { gap: 16px; }
+  .main-h1 { font-size: 32px; }
   .field-row { flex-direction: column; gap: 0; }
   .actions { flex-direction: column; }
-  .hero { padding: 48px 16px 40px; }
   .form-card { padding: 24px; border-radius: 16px; }
-  .geo { display: none; }
+  .shelf-wall { display: none; }
+  .sec-brand { padding-top: 60px; }
+  .page { min-height: 250vh; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sec { opacity: 1; transform: none; transition: none; }
+  .feat, .src { opacity: 1; transform: none; transition: none; }
   .scene { display: none; }
-  .page { background: #0d2832; }
+  .page { background: #0d2530; }
 }
 </style>
