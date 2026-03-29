@@ -1,14 +1,14 @@
 // Kernrechtsgebiete mapped to a 3D helix path
 export const KERN = [
-  { id: 'einkommensteuer', label: 'Steuerrecht', sub: 'EStG · KStG · UStG · BAO' },
-  { id: 'zivilrecht', label: 'Bürgerliches Recht', sub: 'ABGB · MRG · WEG' },
-  { id: 'handelsrecht', label: 'Unternehmensrecht', sub: 'UGB · GewO · UWG' },
-  { id: 'gmbh_recht', label: 'Gesellschaftsrecht', sub: 'GmbHG · AktG · GenG' },
-  { id: 'bankrecht', label: 'Kapitalmarktrecht', sub: 'BWG · WAG · BaSAG' },
-  { id: 'wertpapierrecht', label: 'Wertpapierrecht', sub: 'BörseG · DepotG' },
-  { id: 'zivilprozess', label: 'Zivilverfahren', sub: 'ZPO · JN · EO' },
-  { id: 'verfassungsrecht', label: 'Verfassungsrecht', sub: 'B-VG · StGG · EMRK' },
-  { id: 'verwaltungsverfahren', label: 'Verwaltungsrecht', sub: 'AVG · VwGVG · VStG' },
+  { id: 'einkommensteuer', label: 'Steuerrecht' },
+  { id: 'zivilrecht', label: 'Bürgerliches Recht' },
+  { id: 'handelsrecht', label: 'Unternehmensrecht' },
+  { id: 'gmbh_recht', label: 'Gesellschaftsrecht' },
+  { id: 'bankrecht', label: 'Kapitalmarktrecht' },
+  { id: 'wertpapierrecht', label: 'Wertpapierrecht' },
+  { id: 'zivilprozess', label: 'Zivilverfahren' },
+  { id: 'verfassungsrecht', label: 'Verfassungsrecht' },
+  { id: 'verwaltungsverfahren', label: 'Verwaltungsrecht' },
 ]
 
 // Position on helix: t in [0,1] → {x,y,z} in [-1,1]
