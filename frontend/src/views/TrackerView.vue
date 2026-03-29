@@ -3,6 +3,24 @@
   <!-- Hero section -->
   <section class="hero">
     <div class="hero-inner">
+      <div class="hero-props">
+        <div class="hp">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          <span>86 Rechtsgebiete</span>
+        </div>
+        <div class="hp">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+          <span>Versionsvergleich</span>
+        </div>
+        <div class="hp">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span>Gesetzesmaterialien</span>
+        </div>
+        <div class="hp">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <span>KI-Analyse</span>
+        </div>
+      </div>
       <h1 class="hero-h1">Rechtsänderungen.<br/><span class="hero-accent">Automatisch. Analysiert.</span></h1>
       <p class="hero-p">Alle Gesetzesänderungen und Gerichtsentscheidungen Ihres Rechtsgebiets — mit Versionsvergleich, Gesetzesmaterialien und KI-gestützter Analyse als Report per E-Mail.</p>
     </div>
@@ -52,32 +70,6 @@
       </div>
 
       <div v-if="statusMsg" :class="['status', statusOk ? 'status-ok' : 'status-err']">{{ statusMsg }}</div>
-    </div>
-  </section>
-
-  <!-- Value props -->
-  <section class="props">
-    <div class="props-inner">
-      <div class="prop">
-        <div class="prop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-        <h3>86 Rechtsgebiete</h3>
-        <p>Vollständig nach offizieller RIS-Dezimalklassifikation — von Steuerrecht bis Strafrecht.</p>
-      </div>
-      <div class="prop">
-        <div class="prop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M12 20V10M18 20V4M6 20v-4"/></svg></div>
-        <h3>Versionsvergleich</h3>
-        <p>Jede Bestimmung wird automatisch mit der Vorfassung verglichen. Änderungen farblich markiert.</p>
-      </div>
-      <div class="prop">
-        <div class="prop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-        <h3>Gesetzesmaterialien</h3>
-        <p>Erläuterungen zur Regierungsvorlage und parlamentarische Dokumente automatisch verknüpft.</p>
-      </div>
-      <div class="prop">
-        <div class="prop-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-        <h3>KI-Analyse</h3>
-        <p>Rechtliche Zusammenfassung wie von einem österreichischen Anwalt — fokussiert auf die Rechtsfrage.</p>
-      </div>
     </div>
   </section>
 
@@ -180,6 +172,12 @@ async function downloadReport() {
 .hero-accent { color: var(--teal); }
 .hero-p { font-size: 16px; color: var(--muted); line-height: 1.7; }
 
+.hero-props { display: flex; justify-content: center; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
+.hp {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: #0a2e36;
+}
+
 /* ── Form ── */
 .form-section { padding: 0 24px; margin-top: -24px; position: relative; z-index: 1; }
 .form-card {
@@ -225,14 +223,6 @@ async function downloadReport() {
 .status { margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
 .status-ok { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .status-err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-
-/* ── Value props ── */
-.props { padding: 64px 24px; background: var(--bg); }
-.props-inner { max-width: 800px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-.prop { }
-.prop-icon { margin-bottom: 12px; }
-.prop h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-.prop p { font-size: 14px; color: var(--muted); line-height: 1.6; }
 
 .foot { text-align: center; padding: 24px; }
 .foot p { font-size: 12px; color: #c4c8cc; }
