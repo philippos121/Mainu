@@ -1,6 +1,5 @@
 <template>
   <v-app>
-    <!-- Top bar -->
     <header class="topbar">
       <router-link to="/" class="topbar-brand">
         <svg class="topbar-logo" viewBox="0 0 770 126" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -19,9 +18,10 @@
           <path d="M661.59 51.43H635.63V42.31H697.71V51.43H671.86V123.66H661.59Z" fill="white"/>
           <path d="M716.73 42.31H768.42V51.43H727.04V78.09H761.38V87.21H727.04V114.56H769.85V123.68H716.73Z" fill="white"/>
         </svg>
+        <span class="topbar-title">Law Monitoring</span>
       </router-link>
 
-      <!-- Logo marquee — only shows if logo files exist in /public/ -->
+      <!-- Logo marquee -->
       <div v-if="partnerLogos.length" class="marquee">
         <div class="marquee-track">
           <template v-for="(_, copy) in 2" :key="copy">
@@ -88,82 +88,56 @@ body {
 /* ── Top bar ── */
 .topbar {
   position: sticky; top: 0; z-index: 50;
-  height: 64px;
+  height: 56px;
   background: var(--navy);
   display: flex;
   align-items: center;
-  padding: 0 32px;
-  gap: 24px;
-  box-shadow: 0 1px 0 rgba(0,121,147,0.2);
-}
-.topbar-brand {
-  display: flex; align-items: center; gap: 12px;
-  text-decoration: none;
-  transition: opacity 0.2s;
-  flex-shrink: 0;
-}
-.topbar-brand:hover { opacity: 0.85; }
-.topbar-logo { height: 28px; width: 160px; display: block; }
-.topbar-badge {
-  font-size: 11px; font-weight: 600;
-  color: var(--orange);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  margin-top: -8px;
-  align-self: flex-start;
-  padding-top: 4px;
+  padding: 0 24px;
+  gap: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-/* ── Logo Marquee ── */
+.topbar-brand {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+.topbar-brand:hover { opacity: 0.85; }
+.topbar-logo { height: 22px; width: 135px; display: block; }
+.topbar-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--orange);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-top: -12px;
+  align-self: flex-start;
+  padding-top: 6px;
+  white-space: nowrap;
+}
+
+/* ── Marquee ── */
 .marquee {
-  flex: 1;
-  overflow: hidden;
-  margin: 0 32px;
+  flex: 1; overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, white 10%, white 90%, transparent);
   -webkit-mask-image: linear-gradient(90deg, transparent, white 10%, white 90%, transparent);
 }
-
 .marquee-track {
-  display: flex;
-  align-items: center;
-  gap: 64px;
-  animation: scroll 40s linear infinite;
-  width: max-content;
+  display: flex; align-items: center; gap: 64px;
+  animation: scroll 40s linear infinite; width: max-content;
 }
-
 .marquee-track img {
-  height: 24px;
-  width: auto;
-  max-width: 120px;
-  object-fit: contain;
-  opacity: 0.6;
-  filter: brightness(0) invert(1);
-  transition: opacity 0.3s;
-  flex-shrink: 0;
+  height: 24px; width: auto; max-width: 120px; object-fit: contain;
+  opacity: 0.6; filter: brightness(0) invert(1);
+  transition: opacity 0.3s; flex-shrink: 0;
 }
-
-.marquee:hover .marquee-track {
-  animation-play-state: paused;
-}
-
-.marquee-track img:hover {
-  opacity: 1;
-}
-
-@keyframes scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-.topbar-tagline {
-  font-size: 13px; font-weight: 500;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.5px;
-}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+.marquee-track img:hover { opacity: 1; }
+@keyframes scroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
 
 /* ── Main ── */
-.main {
-  min-height: calc(100vh - 64px);
-}
+.main { min-height: calc(100vh - 56px); }
 .v-main { padding: 0 !important; }
 
 /* ── Scrollbar ── */
@@ -171,7 +145,6 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
 
-/* ── Keyframes ── */
-@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
 </style>

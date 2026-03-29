@@ -49,13 +49,53 @@
 
   <!-- Right: Results -->
   <section class="main-col">
-    <!-- Empty state -->
+    <!-- Welcome state -->
     <div v-if="!searched" class="welcome">
-      <div class="welcome-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <div class="welcome-hero">
+        <div class="wh-icon">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.2" stroke-linecap="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="9" y1="15" x2="15" y2="15" stroke="var(--orange)" stroke-width="2"/>
+            <line x1="9" y1="11" x2="13" y2="11" opacity=".4"/>
+            <line x1="9" y1="19" x2="12" y2="19" opacity=".4"/>
+          </svg>
+        </div>
+        <h1>Gesetzesänderungen im Blick</h1>
+        <p class="wh-sub">Wählen Sie links Ihre Rechtsgebiete und den Zeitraum. AI:ssociate findet alle Änderungen, vergleicht Fassungen und erstellt Ihnen einen Report per E-Mail.</p>
       </div>
-      <h2>Rechtsänderungen durchsuchen</h2>
-      <p>Wählen Sie Rechtsgebiete und einen Zeitraum, dann klicken Sie auf „Suchen".</p>
+
+      <div class="welcome-cards">
+        <div class="wc">
+          <div class="wc-num">1</div>
+          <div class="wc-body">
+            <strong>Rechtsgebiete wählen</strong>
+            <span>Steuerrecht, Gesellschaftsrecht, Verwaltungsrecht — alle RIS-Kategorien verfügbar</span>
+          </div>
+        </div>
+        <div class="wc">
+          <div class="wc-num">2</div>
+          <div class="wc-body">
+            <strong>Änderungen analysieren</strong>
+            <span>Vergleich mit Vorversion, Gesetzesmaterialien, parlamentarische Dokumente</span>
+          </div>
+        </div>
+        <div class="wc">
+          <div class="wc-num">3</div>
+          <div class="wc-body">
+            <strong>Report erhalten</strong>
+            <span>Interaktiver HTML-Report per E-Mail mit KI-gestützter juristischer Analyse</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="welcome-email">
+        <p class="we-label">Report direkt per E-Mail erhalten:</p>
+        <div class="we-row">
+          <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="we-input" />
+          <span class="we-hint">Wird nach der Suche für den Versand verwendet</span>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -325,13 +365,51 @@ async function doEmailReport() {
 .btn-purple { background: #7c3aed; min-width: 36px; }
 
 /* ── Welcome ── */
-.welcome {
-  text-align: center; padding: 80px 20px;
-  animation: fadeUp 0.5s ease-out;
+.welcome { padding: 40px 0; animation: fadeUp 0.5s ease-out; }
+
+.welcome-hero { text-align: center; margin-bottom: 40px; }
+.wh-icon {
+  width: 80px; height: 80px; border-radius: 20px;
+  background: var(--teal-50); display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 20px;
 }
-.welcome-icon { margin-bottom: 20px; opacity: 0.6; }
-.welcome h2 { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-.welcome p { font-size: 14px; color: var(--muted); max-width: 360px; margin: 0 auto; line-height: 1.6; }
+.welcome h1 { font-size: 24px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.wh-sub { font-size: 15px; color: var(--muted); max-width: 480px; margin: 0 auto; line-height: 1.7; }
+
+.welcome-cards {
+  display: flex; flex-direction: column; gap: 10px; margin-bottom: 36px;
+}
+.wc {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 18px; background: white; border-radius: var(--radius);
+  border: 1px solid var(--border); animation: fadeUp 0.4s ease-out both;
+}
+.wc:nth-child(1) { animation-delay: 0.1s; }
+.wc:nth-child(2) { animation-delay: 0.2s; }
+.wc:nth-child(3) { animation-delay: 0.3s; }
+.wc-num {
+  width: 28px; height: 28px; min-width: 28px; border-radius: 8px;
+  background: var(--teal); color: white; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.wc-body { display: flex; flex-direction: column; gap: 2px; }
+.wc-body strong { font-size: 14px; color: var(--text); }
+.wc-body span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+.welcome-email {
+  background: linear-gradient(135deg, var(--teal-50) 0%, var(--orange-50) 100%);
+  border-radius: var(--radius); padding: 20px; border: 1px solid var(--border);
+  animation: fadeUp 0.4s 0.4s ease-out both;
+}
+.we-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+.we-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.we-input {
+  flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px;
+  font-size: 14px; font-family: inherit; outline: none; background: white;
+  transition: border-color 0.2s;
+}
+.we-input:focus { border-color: var(--teal); }
+.we-hint { font-size: 12px; color: var(--muted); }
 
 /* ── Loading ── */
 .loading-state { padding: 40px 0; }
