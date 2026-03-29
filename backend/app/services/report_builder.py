@@ -1,7 +1,7 @@
-"""Generate a clean, scientific HTML report for legal changes.
+"""Generate a scroll-driven dark HTML report with neural network background.
 
-Light theme, parallax scroll, summary-focused.
-No interactive elements — pure reading experience for download.
+Same visual style as the frontend: dark bg, teal nodes, text swaps on scroll.
+Summary-focused — no long source lists, just concise analysis sections.
 """
 
 import html as _html
@@ -21,209 +21,146 @@ def build_report(
     materialien: dict = None,
 ) -> str:
     diffs = diffs or {}
-    parliamentary = parliamentary or []
     materialien = materialien or {}
-    summary_html = _md_to_html(summary_md)
-    type_label = "Gesetze" if doc_type == "gesetze" else "Entscheidungen"
 
-    # Count changes
-    changes_count = sum(1 for r in results[:50] if diffs.get(r.get("id", ""), {}).get("has_changes"))
+    # Split GPT summary into sections for slide-by-slide display
+    sections = _split_sections(summary_md)
 
-    # Build result sections grouped by law
-    groups: dict[str, list] = {}
-    for r in results[:50]:
-        key = r.get("title", "Sonstige")
-        groups.setdefault(key, []).append(r)
-
-    sections_html = ""
-    for gi, (group_name, group_results) in enumerate(groups.items()):
-        # Find materialien for this group
-        mat_html = ""
-        for r in group_results:
-            bgbl = str(r.get("bgbl", ""))
-            aenderung = str(r.get("aenderung_bgbl", ""))
-            combined = f"{bgbl} {aenderung}"
-            for key, mat in materialien.items():
-                if key in combined and mat.get("titel"):
-                    mat_html += f'<p class="mat">Materialien: {_html.escape(str(mat.get("titel", "")))} '
-                    if mat.get("parlament_url"):
-                        mat_html += f'<a href="{_html.escape(str(mat["parlament_url"]))}" target="_blank">Parlament →</a>'
-                    mat_html += '</p>'
-                    break
-            if mat_html:
-                break
-
-        provisions = ""
-        for r in group_results:
-            nor = r.get("id", "")
-            diff_data = diffs.get(nor, {})
-            has_diff = bool(diff_data.get("diff_html"))
-            artikel = _html.escape(str(r.get("artikel", "")))
-            inkraft = _html.escape(str(r.get("date", "")))
-            bgbl = _html.escape(str(r.get("bgbl", "")))
-            url = _html.escape(str(r.get("url", "")))
-            source = r.get("source", "")
-            source_tag = ""
-            if source == "findok":
-                source_tag = '<span class="src-tag findok">Findok</span>'
-            elif source == "eurlex":
-                source_tag = '<span class="src-tag eurlex">EUR-Lex</span>'
-
-            diff_html = ""
-            if has_diff:
-                diff_html = f'<div class="diff">{diff_data["diff_html"]}</div>'
-
-            provisions += f'''<div class="provision{' has-diff' if has_diff else ''}">
-<div class="prov-head">
-  <span class="prov-art">{artikel}</span>
-  <span class="prov-date">{inkraft}</span>
-  {f'<span class="prov-bgbl">{bgbl}</span>' if bgbl else ''}
-  {source_tag}
-  {f'<a class="prov-link" href="{url}" target="_blank">Quelle →</a>' if url else ''}
-</div>
-{diff_html}
-</div>'''
-
-        sections_html += f'''
-<section class="law-group" style="--delay:{gi * 0.05}s">
-  <h3 class="law-title">{_html.escape(group_name)}</h3>
-  <p class="law-count">{len(group_results)} Bestimmung{"en" if len(group_results) > 1 else ""}</p>
-  {mat_html}
-  {provisions}
-</section>'''
+    # Build slides JSON for the JS scroll driver
+    slides_json = '['
+    # Slide 0: title
+    slides_json += f'{{"t":"{_js(category)}","s":"{_js(timeframe)} · {_js(date_str)}","cls":"hero"}},'
+    slides_json += f'{{"t":"{total_hits} Rechtsakte analysiert","s":"{len(diffs)} Änderungen · {len(materialien)} Materialien","cls":"stat"}},'
+    # Summary sections as slides
+    for sec in sections:
+        title = _js(sec["title"])
+        body = _js(sec["body"][:600])
+        slides_json += f'{{"t":"{title}","s":"{body}","cls":"analysis"}},'
+    slides_json += '{"t":"Report vollständig.","s":"","cls":"end"}'
+    slides_json += ']'
 
     return f'''<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Legal Monitoring — {_html.escape(category)} — {date_str}</title>
+<title>Legal Monitoring — {_html.escape(category)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Inter',system-ui,sans-serif;background:#f8f9fb;color:#1a1f2e;line-height:1.6}}
-
-/* ── Hero parallax ── */
-.hero{{
-  min-height:60vh;display:flex;align-items:center;justify-content:center;text-align:center;
-  background:linear-gradient(180deg,#0a1e28 0%,#0d2a38 60%,#f8f9fb 100%);
-  color:white;padding:80px 24px 120px;position:relative;
-}}
-.hero-inner{{max-width:600px}}
-.hero h1{{font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:8px}}
-.hero .accent{{color:#22c9e8}}
-.hero .meta{{font-size:14px;opacity:.5;margin-top:12px}}
-.hero .stats{{display:flex;justify-content:center;gap:40px;margin-top:28px}}
-.hero .stat-n{{font-size:28px;font-weight:800;color:#ff9733;display:block}}
-.hero .stat-l{{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;opacity:.4}}
-
-/* ── Content ── */
-.content{{max-width:720px;margin:-40px auto 0;padding:0 24px 80px;position:relative;z-index:1}}
-
-/* ── Summary card ── */
-.summary-card{{
-  background:white;border-radius:16px;padding:36px;
-  box-shadow:0 4px 24px rgba(0,0,0,.06);margin-bottom:48px;
-}}
-.summary-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#007993;margin-bottom:20px}}
-.summary-card p{{font-size:15px;line-height:1.8;color:#374151;margin-bottom:12px}}
-.summary-card h2{{font-size:18px;font-weight:700;color:#0a1e28;margin:28px 0 10px}}
-.summary-card h3{{font-size:16px;font-weight:600;color:#1a2a3a;margin:22px 0 8px}}
-.summary-card h4{{font-size:14px;font-weight:600;color:#374151;margin:18px 0 6px}}
-.summary-card strong{{color:#0a1e28}}
-.summary-card ul{{padding-left:20px;margin:8px 0}}
-.summary-card li{{font-size:14px;margin-bottom:6px;color:#374151}}
-.summary-card a{{color:#007993;text-decoration:none}}
-.summary-card a:hover{{text-decoration:underline}}
-
-/* ── Law groups ── */
-.law-group{{margin-bottom:40px;padding-top:24px;border-top:1px solid #e8eaef}}
-.law-title{{font-size:18px;font-weight:700;color:#0a1e28;letter-spacing:-.3px}}
-.law-count{{font-size:12px;color:#9ca3af;margin-bottom:12px}}
-.mat{{font-size:13px;color:#7c3aed;margin-bottom:12px;padding:10px 14px;background:#f5f3ff;border-radius:8px}}
-.mat a{{color:#7c3aed;text-decoration:none;font-weight:600}}
-.mat a:hover{{text-decoration:underline}}
-
-.provision{{padding:12px 0;border-bottom:1px solid #f0f1f4}}
-.provision:last-child{{border:none}}
-.has-diff{{border-left:3px solid #007993;padding-left:12px;margin-left:-12px}}
-.prov-head{{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}}
-.prov-art{{font-weight:700;color:#0a1e28}}
-.prov-date{{color:#6b7280}}
-.prov-bgbl{{color:#9ca3af;font-size:12px}}
-.prov-link{{color:#007993;text-decoration:none;font-weight:500;font-size:12px}}
-.prov-link:hover{{text-decoration:underline}}
-.src-tag{{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px}}
-.src-tag.findok{{background:#fff7ed;color:#ea580c}}
-.src-tag.eurlex{{background:#eff6ff;color:#2563eb}}
-
-.diff{{
-  margin-top:10px;padding:14px;background:#fafbfc;border:1px solid #e8eaef;
-  border-radius:8px;font-size:13px;line-height:1.7;
-  max-height:300px;overflow-y:auto;
-}}
-.diff .diff-del{{background:#fecaca;color:#991b1b;text-decoration:line-through;padding:1px 3px;border-radius:2px}}
-.diff .diff-ins{{background:#bbf7d0;color:#166534;padding:1px 3px;border-radius:2px}}
-.diff .diff-info{{color:#6b7280;font-style:italic;margin-bottom:6px}}
-.diff .diff-sidebyside{{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
-.diff .diff-side{{padding:10px;border-radius:6px;font-size:12px;line-height:1.5}}
-.diff .diff-side-old{{background:#fef2f2;border:1px solid #fecaca}}
-.diff .diff-side-new{{background:#f0fdf4;border:1px solid #bbf7d0}}
-.diff .diff-side-label{{font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}}
-.diff .diff-side-old .diff-side-label{{color:#991b1b}}
-.diff .diff-side-new .diff-side-label{{color:#166534}}
-.diff .diff-side-text{{white-space:pre-wrap}}
-
-/* ── Footer ── */
-.footer{{text-align:center;padding:40px 24px;font-size:11px;color:#9ca3af}}
-.footer a{{color:#007993;text-decoration:none}}
-
-@media print{{
-  .hero{{min-height:auto;padding:40px 24px;background:#0a1e28!important;-webkit-print-color-adjust:exact}}
-  .diff{{max-height:none}}
-  body{{background:white}}
-}}
-@media(max-width:640px){{
-  .hero h1{{font-size:24px}}
-  .summary-card{{padding:24px}}
-  .diff .diff-sidebyside{{grid-template-columns:1fr}}
-}}
+body{{font-family:'Inter',system-ui,sans-serif;background:#070e12;color:#e4f0f2;overflow-x:hidden}}
+canvas{{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;contain:strict}}
+.stage{{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none}}
+.stage-text{{text-align:center;max-width:640px;padding:0 32px;transition:opacity .3s ease,transform .3s ease;will-change:opacity,transform}}
+.st-title{{font-size:36px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:-.5px;margin:0;line-height:1.2}}
+.st-title.hero{{font-size:42px;font-weight:800;background:linear-gradient(135deg,#ff9733,#ffbe6d 40%,#ff9733 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
+.st-title.stat{{font-size:28px;font-weight:300;color:rgba(255,255,255,.5)}}
+.st-title.analysis{{font-size:26px;font-weight:700;color:#22c9e8;margin-bottom:16px}}
+.st-title.end{{font-size:24px;font-weight:300;color:rgba(255,255,255,.4)}}
+.st-sub{{font-size:15px;font-weight:400;color:rgba(255,255,255,.45);margin-top:12px;line-height:1.7;max-height:50vh;overflow-y:auto}}
+.st-sub.hero{{font-size:16px;color:rgba(255,255,255,.3)}}
+.st-sub.stat{{font-size:22px;color:rgba(34,201,232,.5);letter-spacing:1px}}
+.st-sub.analysis{{font-size:14px;color:rgba(255,255,255,.5);text-align:left;line-height:1.8}}
+.scroll-driver{{position:relative;z-index:1;pointer-events:none}}
+@media(max-width:640px){{.st-title{{font-size:26px}}.st-title.hero{{font-size:30px}}.st-title.analysis{{font-size:22px}}.st-sub.analysis{{font-size:13px}}}}
+@media print{{body{{background:#fff;color:#1a1a1a}}canvas{{display:none}}.stage{{position:static;display:block}}.scroll-driver{{display:none}}.st-title,.st-sub{{color:#1a1a1a!important;-webkit-text-fill-color:#1a1a1a!important}}}}
 </style>
 </head>
 <body>
+<canvas id="c"></canvas>
+<div class="stage"><div class="stage-text" id="st">
+  <h2 class="st-title" id="st-t"></h2>
+  <p class="st-sub" id="st-s"></p>
+</div></div>
+<div class="scroll-driver" id="drv"></div>
+<script>
+(function(){{
+  const slides={slides_json};
+  const SH=500,drv=document.getElementById('drv');
+  drv.style.height=(slides.length*SH+innerHeight)+'px';
+  const st=document.getElementById('st'),tt=document.getElementById('st-t'),ss=document.getElementById('st-s');
+  let prev=-1;
 
-<div class="hero">
-  <div class="hero-inner">
-    <h1>Legal Monitoring <span class="accent">Report</span></h1>
-    <p>{_html.escape(category)} · {_html.escape(timeframe)}</p>
-    <p class="meta">Erstellt am {date_str}</p>
-    <div class="stats">
-      <div><span class="stat-n">{total_hits}</span><span class="stat-l">{type_label}</span></div>
-      <div><span class="stat-n">{changes_count}</span><span class="stat-l">Änderungen</span></div>
-      <div><span class="stat-n">{len(materialien)}</span><span class="stat-l">Materialien</span></div>
-    </div>
-  </div>
-</div>
+  // Canvas
+  const c=document.getElementById('c'),g=c.getContext('2d',{{alpha:false}});
+  let W,H;const N=50,D=170*170;
+  const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N);
+  const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N);
+  const sr=new Float32Array(N),ox=new Float32Array(N),oy=new Float32Array(N),os=new Float32Array(N);
+  for(let i=0;i<N;i++){{ax[i]=Math.random()*2.6-1.3;ay[i]=Math.random()*2.6-1.3;az[i]=Math.random()*2.6-1.3;dx[i]=(Math.random()-.5)*.001;dy[i]=(Math.random()-.5)*.001;dz[i]=(Math.random()-.5)*.0008;sr[i]=1.2+Math.random()*1.8}}
+  function resize(){{W=c.width=innerWidth;H=c.height=innerHeight}}
+  resize();addEventListener('resize',resize);
 
-<div class="content">
-  <div class="summary-card">
-    <p class="summary-label">KI-Analyse</p>
-    {summary_html}
-  </div>
+  function draw(sY,moving){{
+    const ry=sY*.00025,rx=sY*.00015;
+    const cy=Math.cos(ry),sn=Math.sin(ry),cx=Math.cos(rx),sx=Math.sin(rx),hw=W/2,hh=H/2;
+    if(moving)for(let i=0;i<N;i++){{ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i];if(ax[i]>1.3||ax[i]<-1.3)dx[i]*=-1;if(ay[i]>1.3||ay[i]<-1.3)dy[i]*=-1;if(az[i]>1.3||az[i]<-1.3)dz[i]*=-1}}
+    for(let i=0;i<N;i++){{const x=ax[i],y=ay[i],z=az[i],a=x*cy-z*sn,b=x*sn+z*cy,d=y*cx-b*sx,e=y*sx+b*cx,s=2.5/(4+e);ox[i]=hw+a*W*.36*s;oy[i]=hh+d*H*.3*s;os[i]=s}}
+    g.fillStyle='#070e12';g.fillRect(0,0,W,H);
+    g.beginPath();g.strokeStyle='rgba(34,201,232,0.06)';g.lineWidth=.5;
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){{const a=ox[i]-ox[j],b=oy[i]-oy[j];if(a*a+b*b<D){{g.moveTo(ox[i],oy[i]);g.lineTo(ox[j],oy[j])}}}}
+    g.stroke();
+    for(let i=0;i<N;i++){{const r=sr[i]*os[i],a=.2+os[i]*.4;g.beginPath();g.arc(ox[i],oy[i],r*3,0,6.28);g.fillStyle='rgba(34,201,232,'+(a*.05)+')';g.fill();g.beginPath();g.arc(ox[i],oy[i],r,0,6.28);g.fillStyle='rgba(34,201,232,'+(a*.5)+')';g.fill()}}
+  }}
+  draw(0,false);
 
-  {sections_html}
-</div>
-
-<div class="footer">
-  AI:ssociate Legal Monitoring · Datenquellen: RIS · Findok · EUR-Lex · parlament.gv.at
-</div>
-
+  let scrolling=false,timer=0,raf=0;
+  function loop(){{if(!scrolling)return;draw(scrollY,true);raf=requestAnimationFrame(loop)}}
+  addEventListener('scroll',function(){{
+    if(!scrolling){{scrolling=true;loop()}}
+    clearTimeout(timer);timer=setTimeout(function(){{scrolling=false}},150);
+    const idx=Math.min(slides.length-1,Math.floor(scrollY/SH));
+    if(idx===prev)return;prev=idx;
+    const sl=slides[idx];
+    st.style.opacity='0';st.style.transform='translateY(20px)';
+    setTimeout(function(){{
+      tt.textContent=sl.t;tt.className='st-title '+(sl.cls||'');
+      ss.textContent=sl.s;ss.className='st-sub '+(sl.cls||'');
+      ss.style.display=sl.s?'block':'none';
+      st.style.opacity='1';st.style.transform='translateY(0)';
+    }},150);
+  }},{{passive:true}});
+}})();
+</script>
 </body>
 </html>'''
 
 
+def _split_sections(md: str) -> list[dict]:
+    """Split GPT markdown into sections by ## headings."""
+    if not md:
+        return [{"title": "Analyse", "body": "Keine Zusammenfassung verfügbar."}]
+
+    parts = re.split(r'(?=^#{1,3}\s)', md, flags=re.MULTILINE)
+    sections = []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        lines = part.split('\n', 1)
+        title = re.sub(r'^#+\s*', '', lines[0]).strip()
+        body = lines[1].strip() if len(lines) > 1 else ''
+        # Clean markdown formatting for plain text display
+        body = re.sub(r'\*\*(.+?)\*\*', r'\1', body)
+        body = re.sub(r'\*(.+?)\*', r'\1', body)
+        body = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', body)  # remove links
+        body = re.sub(r'^[-•]\s+', '· ', body, flags=re.MULTILINE)
+        if title:
+            sections.append({"title": title, "body": body})
+
+    if not sections:
+        return [{"title": "Analyse", "body": md[:600]}]
+    return sections
+
+
+def _js(s: str) -> str:
+    """Escape string for JS string literal inside JSON."""
+    return _html.escape(str(s)).replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', '')
+
+
 def _md_to_html(md: str) -> str:
+    """Convert markdown to HTML (kept for email report compatibility)."""
     if not md:
         return "<p><em>Keine Zusammenfassung verfügbar.</em></p>"
     s = md
@@ -232,7 +169,6 @@ def _md_to_html(md: str) -> str:
     s = re.sub(r'^#{1}\s+(.+)$', r'<h2>\1</h2>', s, flags=re.MULTILINE)
     s = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
     s = re.sub(r'\*(.+?)\*', r'<em>\1</em>', s)
-    # Markdown links [text](url)
     s = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank">\1</a>', s)
     s = re.sub(r'^[-•]\s+(.+)$', r'<li>\1</li>', s, flags=re.MULTILINE)
     s = re.sub(r'\n\n', '</p><p>', s)
