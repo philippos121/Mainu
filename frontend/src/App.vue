@@ -18,7 +18,7 @@
           <path d="M661.59 51.43H635.63V42.31H697.71V51.43H671.86V123.66H661.59Z" fill="white"/>
           <path d="M716.73 42.31H768.42V51.43H727.04V78.09H761.38V87.21H727.04V114.56H769.85V123.68H716.73Z" fill="white"/>
         </svg>
-        <span class="topbar-title">AI:ssociate Law Monitoring</span>
+        <span class="topbar-title">Monitoring</span>
       </router-link>
 
       <!-- Logo marquee -->
