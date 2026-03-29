@@ -143,13 +143,13 @@ def _guess_gp(year: str) -> str:
 
 
 async def _fetch_parlament_page(gp: str, rv_nr: str, bgbl_str: str) -> dict | None:
-    """Fetch the parlament.gv.at JSON page for a Regierungsvorlage."""
+    """Fetch the parlament.gv.at JSON page and Erläuterungen text."""
     url = f"https://www.parlament.gv.at/gegenstand/{gp}/I/{rv_nr}"
     json_url = f"{url}?json=true"
 
     logger.info(f"Fetching parlament.gv.at: {json_url}")
 
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=_HEADERS) as client:
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=_HEADERS) as client:
         try:
             resp = await client.get(json_url)
             resp.raise_for_status()
@@ -157,39 +157,60 @@ async def _fetch_parlament_page(gp: str, rv_nr: str, bgbl_str: str) -> dict | No
         except Exception as e:
             logger.error(f"parlament.gv.at error: {e}")
             return {
-                "bgbl": bgbl_str,
-                "rv_nr": rv_nr,
-                "gp": gp,
-                "titel": "",
-                "erlaeuterungen_url": "",
+                "bgbl": bgbl_str, "rv_nr": rv_nr, "gp": gp,
+                "titel": "", "erlaeuterungen_url": "", "erlaeuterungen_text": "",
                 "parlament_url": url,
             }
 
-    # Extract title
-    titel = data.get("title", "") or data.get("content", {}).get("title", "")
+        # Extract title
+        titel = data.get("title", "") or data.get("content", {}).get("title", "")
 
-    # Find Erläuterungen document
-    erl_url = ""
-    documents = data.get("content", {}).get("documents", [])
-    if isinstance(documents, list):
-        for doc_group in documents:
-            if isinstance(doc_group, dict):
-                group_title = doc_group.get("title", "").lower()
-                if "erläuterung" in group_title or "erlaeuterung" in group_title:
-                    docs = doc_group.get("documents", [])
-                    if isinstance(docs, list) and docs:
-                        link = docs[0].get("link", "")
-                        if link:
-                            erl_url = f"https://www.parlament.gv.at{link}" if link.startswith("/") else link
-                    break
+        # Find Erläuterungen document URL
+        erl_url = ""
+        erl_html_url = ""
+        documents = data.get("content", {}).get("documents", [])
+        if isinstance(documents, list):
+            for doc_group in documents:
+                if isinstance(doc_group, dict):
+                    group_title = doc_group.get("title", "").lower()
+                    if "erläuterung" in group_title or "erlaeuterung" in group_title:
+                        docs = doc_group.get("documents", [])
+                        if isinstance(docs, list):
+                            for doc in docs:
+                                link = doc.get("link", "")
+                                if link:
+                                    full_url = f"https://www.parlament.gv.at{link}" if link.startswith("/") else link
+                                    if link.endswith(".html") or "html" in link.lower():
+                                        erl_html_url = full_url
+                                    if not erl_url:
+                                        erl_url = full_url
+                        break
+
+        # Fetch Erläuterungen text (prefer HTML version)
+        erl_text = ""
+        fetch_url = erl_html_url or erl_url
+        if fetch_url and (fetch_url.endswith(".html") or "html" in fetch_url.lower()):
+            try:
+                import html as html_mod
+                resp2 = await client.get(fetch_url)
+                resp2.raise_for_status()
+                raw = resp2.text
+                # Strip HTML to text
+                clean = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', raw, flags=re.DOTALL | re.IGNORECASE)
+                clean = re.sub(r'<[^>]+>', ' ', clean)
+                clean = html_mod.unescape(clean)
+                clean = re.sub(r'\s+', ' ', clean).strip()
+                # Take first 3000 chars as summary context
+                if len(clean) > 100:
+                    erl_text = clean[:3000]
+                    logger.info(f"Fetched Erläuterungen text: {len(erl_text)} chars")
+            except Exception as e:
+                logger.warning(f"Could not fetch Erläuterungen text: {e}")
 
     return {
-        "bgbl": bgbl_str,
-        "rv_nr": rv_nr,
-        "gp": gp,
-        "titel": titel,
-        "erlaeuterungen_url": erl_url,
-        "parlament_url": url,
+        "bgbl": bgbl_str, "rv_nr": rv_nr, "gp": gp,
+        "titel": titel, "erlaeuterungen_url": erl_url,
+        "erlaeuterungen_text": erl_text, "parlament_url": url,
     }
 
 

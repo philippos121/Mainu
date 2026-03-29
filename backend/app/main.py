@@ -260,26 +260,9 @@ async def api_report_email(req: EmailReportRequest):
     if not cfg.MAILERSEND_API_KEY and not cfg.RESEND_API_KEY:
         raise HTTPException(status_code=501, detail="E-Mail nicht konfiguriert (MAILERSEND_API_KEY oder RESEND_API_KEY fehlt).")
 
-    # Generate report
-    report_md = ""
-    if req.api_key and len(req.api_key) >= 10:
-        try:
-            report_md = await generate_report_markdown(
-                results=req.results, doc_type=req.doc_type,
-                category_label=req.category_label, timeframe_label=req.timeframe_label,
-                total_hits=req.total_hits, api_key=req.api_key,
-            )
-        except Exception as e:
-            report_md = f"*KI-Zusammenfassung nicht verfügbar: {str(e)[:100]}*"
-    else:
-        report_md = "*Kein API-Key — Report ohne KI-Zusammenfassung.*"
-
-    today = date.today().strftime("%d.%m.%Y")
-    html_report = build_report(
-        report_md, req.results, today,
-        req.category_label, req.timeframe_label, req.total_hits, req.doc_type,
-        req.diffs,
-    )
+    # Generate report using the same flow as /api/report (with materialien + diffs)
+    report_data = await _generate_full_report(req)
+    html_report = report_data["report_html"]
 
     # Send via MailerSend or Resend
     try:
@@ -383,12 +366,9 @@ async def api_summarise(req: SummaryRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/report")
-async def api_report(req: ReportRequest):
-    """Generate an interactive summary report with optional GPT summary."""
-    logging.info(f"Report request: {len(req.results)} results, {len(req.diffs)} diffs, api_key={'yes' if req.api_key else 'no'}")
-    if not req.results:
-        raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
+async def _generate_full_report(req) -> dict:
+    """Shared logic: fetch materialien + diffs, generate GPT report, build HTML."""
+    logging.info(f"Report: {len(req.results)} results, diffs={len(getattr(req, 'diffs', {}))}, api_key={'yes' if req.api_key else 'no'}")
 
     # Fetch Gesetzesmaterialien (Erläuterungen) per unique BGBl number
     materialien = {}
@@ -471,13 +451,18 @@ async def api_report(req: ReportRequest):
                         line += f" (RV {mat['rv_nr']} d.B. {mat.get('gp', '')} GP)"
                     if mat.get('parlament_url'):
                         line += f" → {mat['parlament_url']}"
+                    # Include actual Erläuterungen text if available
+                    erl_text = mat.get('erlaeuterungen_text', '')
+                    if erl_text:
+                        line += f"\n  Erläuterungen (Auszug): {erl_text}"
                     mat_lines.append(line)
                 extra_context += (
-                    "\n\n--- GESETZESMATERIALIEN ---\n"
-                    "Folgende Erläuterungen (Materialien) zu den Novellen sind verfügbar.\n"
-                    "Fasse pro BGBl-Novelle einmal zusammen: Was war das Thema und die "
-                    "Intention des Gesetzgebers? Nicht für jede einzelne Bestimmung "
-                    "wiederholen, sondern einmal pro BGBl-Änderung:\n"
+                    "\n\n--- GESETZESMATERIALIEN (Erläuterungen) ---\n"
+                    "Folgende Erläuterungen (Materialien) zu den Novellen wurden von "
+                    "parlament.gv.at abgerufen. Fasse pro BGBl-Novelle zusammen: "
+                    "Was war das Thema und die Intention des Gesetzgebers laut den "
+                    "Erläuterungen? Nicht für jede einzelne Bestimmung wiederholen, "
+                    "sondern einmal pro BGBl-Änderung:\n"
                     + "\n".join(mat_lines)
                 )
 
@@ -521,6 +506,14 @@ async def api_report(req: ReportRequest):
     except Exception as e:
         logging.error(f"Report build error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Report-Generierung fehlgeschlagen: {str(e)[:200]}")
+
+
+@app.post("/api/report")
+async def api_report(req: ReportRequest):
+    """Generate an interactive summary report with optional GPT summary."""
+    if not req.results:
+        raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
+    return await _generate_full_report(req)
 
 
 def _build_interactive_report(
