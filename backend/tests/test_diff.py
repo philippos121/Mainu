@@ -16,11 +16,11 @@ from app.services.ris_client import (
     parse_bundesrecht_response,
 )
 from app.services.diff_service import (
-    _dedup_accessible,
-    _remove_sentence_dupes,
-    _clean,
-    _word_diff,
+    _clean_accessible as _dedup_accessible,
+    _strip_html as _clean,
+    _diff as _word_diff,
 )
+_remove_sentence_dupes = lambda x: x  # removed in rewrite
 
 
 # ── Filter: superseded before taking effect ──

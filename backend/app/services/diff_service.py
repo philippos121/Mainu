@@ -1,16 +1,11 @@
-"""Service for fetching and comparing versions of RIS Bundesrecht provisions.
+"""Diff service: compare a provision with its previous version.
 
-Proven approach (validated with real data):
-1. Fetch the NOR-specific page from ris.bka.gv.at → extract text (works: 12688 chars)
-2. Parse "Alle Fassungen" links from same page → get previous NOR (works: found 6 NORs)
-3. Fetch previous NOR's page → extract text
-4. Compute word-level diff
-
-Why other approaches failed:
-- API ContentUrls → return entire law, not specific paragraph
-- API Fassung.VonInkrafttretensdatum range → returns ALL paragraphs of the law
-- API FassungVom → returns same consolidated NOR number
-- Website FassungVom on Dokument.wxe → ignored when specific NOR given
+Simple approach:
+1. Current version: fetch from RIS API by Gesetzesnummer + ArtikelParagraphAnlage (no FassungVom = today's version)
+2. Previous version: same query + Fassung.FassungVom = (Inkrafttretensdatum - 1 day)
+3. Both return metadata + ContentReference with HTML/XML URLs
+4. Fetch the HTML content URLs to get the actual legal text
+5. Diff the two texts
 """
 
 import difflib
@@ -21,369 +16,275 @@ from datetime import datetime, timedelta
 
 import httpx
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "de-AT,de;q=0.9,en;q=0.5",
-}
-
-_DOC_URL = "https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer="
+BASE_URL = settings.RIS_API_BASE_URL
 
 
-async def fetch_provision_diff(
-    doc_id: str,
-    gesetzesnummer: str,
-    artikel: str,
-    inkrafttreten: str,
-) -> dict:
-    """Fetch current + previous version and return diff.
+async def fetch_provision_diff(doc_id: str, gesetzesnummer: str, artikel: str, inkrafttreten: str) -> dict:
+    """Compare current provision text with version from day before Inkrafttreten."""
+    logger.info(f"DIFF: gesetzesnr={gesetzesnummer}, art={artikel}, inkraft={inkrafttreten}")
 
-    Strategy: Use "Alle Fassungen" links from the RIS website page.
-    The API Fassung.FassungVom approach is broken (returns wrong NOR
-    for the general law annotation instead of the specific paragraph).
-    """
-    logger.info(f"=== DIFF: NOR={doc_id}, Art={artikel}, Inkraft={inkrafttreten}")
+    if not gesetzesnummer or not artikel:
+        return _err("Gesetzesnummer oder Artikel fehlt.")
 
-    if not doc_id:
-        return _error("Dokumentnummer (NOR) fehlt.")
+    # 1. Get current version text via API
+    current = await _get_version_text(gesetzesnummer, artikel, fassung_vom=None)
+    if not current or not current["text"]:
+        return _err("Aktueller Text konnte nicht geladen werden.")
 
-    # 1. Fetch current page → text + Alle Fassungen NOR list
-    current_page = await _fetch_page(doc_id)
-    if not current_page or not current_page["text"]:
-        return _error(f"Text für {doc_id} konnte nicht geladen werden.")
-    current_text = current_page["text"]
-    all_nors = current_page.get("version_nors", [])
-    logger.info(f"Text: {len(current_text)} chars, Alle Fassungen: {all_nors}")
+    # 2. Compute FassungVom = Inkrafttreten - 1 day
+    fv = _day_before(inkrafttreten)
+    if not fv:
+        return _err("Inkrafttretensdatum konnte nicht geparst werden.")
 
-    # 2. Find previous NOR from Alle Fassungen
-    prev_nor = _next_nor(doc_id, all_nors)
-
-    if not prev_nor:
+    # 3. Get previous version text
+    previous = await _get_version_text(gesetzesnummer, artikel, fassung_vom=fv)
+    if not previous or not previous["text"]:
         return {
-            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
+            "current": {"text": current["text"], "date": inkrafttreten},
             "previous": None,
-            "diff_html": _no_prev("Keine Vorversion in 'Alle Fassungen' gefunden (Erstfassung).", current_text),
+            "diff_html": f'<p class="diff-info">Keine Vorversion vom {fv} verfügbar (Erstfassung?).</p>'
+                         f'<div class="diff-current">{html_module.escape(current["text"])}</div>',
             "has_changes": False,
         }
 
-    logger.info(f"Previous NOR from Alle Fassungen: {prev_nor}")
+    # 4. Compare
+    ct = current["text"].strip()
+    pt = previous["text"].strip()
 
-    # 3. Fetch previous version text
-    prev_page = await _fetch_page(prev_nor)
-    prev_text = prev_page["text"] if prev_page else ""
-    if not prev_text:
+    if ct == pt:
         return {
-            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
-            "previous": None,
-            "diff_html": _no_prev(f"Text für Vorversion {prev_nor} nicht ladbar.", current_text),
-            "has_changes": False,
-        }
-    prev_inkraft = prev_page.get("inkrafttreten", "")
-
-    # 4. Diff
-    if current_text.strip() == prev_text.strip():
-        return {
-            "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
-            "previous": {"text": prev_text, "date": prev_inkraft, "nor_id": prev_nor},
-            "diff_html": (
-                f'<p class="diff-info">Identischer Text ({doc_id} vs {prev_nor}).</p>'
-                f'<div class="diff-current">{html_module.escape(current_text)}</div>'
-            ),
+            "current": {"text": ct, "date": inkrafttreten},
+            "previous": {"text": pt, "date": previous.get("inkrafttreten", fv)},
+            "diff_html": f'<p class="diff-info">Kein Textunterschied zur Fassung vom {fv}.</p>'
+                         f'<div class="diff-current">{html_module.escape(ct)}</div>',
             "has_changes": False,
         }
 
     return {
-        "current": {"text": current_text, "date": inkrafttreten, "nor_id": doc_id},
-        "previous": {"text": prev_text, "date": prev_inkraft, "nor_id": prev_nor},
-        "diff_html": _word_diff(prev_text, current_text),
+        "current": {"text": ct, "date": inkrafttreten},
+        "previous": {"text": pt, "date": previous.get("inkrafttreten", fv)},
+        "diff_html": _diff(pt, ct),
         "has_changes": True,
     }
 
 
 async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
-    """DEBUG: pass NOR as artikel to inspect page parsing."""
-    nor = artikel if artikel.startswith("NOR") else ""
-    if not nor:
-        return {"usage": "Pass NOR number as artikel, e.g. artikel=NOR40275544"}
-    page = await _fetch_page(nor)
-    if not page:
-        return {"error": f"Could not fetch {nor}"}
-    return {
-        "text_length": len(page["text"]),
-        "text_preview": page["text"][:400] + "..." if len(page["text"]) > 400 else page["text"],
-        "version_nors": page["version_nors"],
-        "inkrafttreten": page.get("inkrafttreten", ""),
-        "ausserkrafttreten": page.get("ausserkrafttreten", ""),
+    """Debug: show what the API returns."""
+    result = {}
+    cur = await _get_version_text(gesetzesnummer, artikel, fassung_vom=None)
+    result["current"] = {"text_len": len(cur["text"]) if cur else 0, "meta": cur} if cur else {"error": "no result"}
+    return result
+
+
+# ── Core: get provision text via RIS API + content URL ──
+
+async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str | None) -> dict | None:
+    """Query RIS API, get content URL, fetch HTML, extract text."""
+
+    # Step 1: Query API
+    params = {
+        "Applikation": "BrKons",
+        "Gesetzesnummer": gesetzesnummer,
+        "ArtikelParagraphAnlage": artikel,
+        "DokumenteProSeite": "Ten",
     }
+    if fassung_vom:
+        params["Fassung.FassungVom"] = fassung_vom
+
+    api_url = f"{BASE_URL}/Bundesrecht"
+    logger.info(f"API query: {params}")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(api_url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        logger.error(f"API error: {type(e).__name__}: {e}")
+        return None
+
+    # Step 2: Parse response
+    refs = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("OgdDocumentReference", [])
+    if isinstance(refs, dict):
+        refs = [refs]
+    if not refs:
+        logger.info(f"No results for FassungVom={fassung_vom}")
+        return None
+
+    ref = refs[0]
+    d = ref.get("Data", {})
+    meta = _flatten(d)
+    inkraft = meta.get("Inkrafttretensdatum", "")
+
+    # Step 3: Find content URL (HTML preferred)
+    content_urls = _find_urls(d)
+    logger.info(f"Content URLs: {len(content_urls)}")
+
+    html_url = None
+    for u in content_urls:
+        if "html" in u.lower() or "Html" in u:
+            html_url = u
+            break
+    if not html_url and content_urls:
+        html_url = content_urls[0]
+
+    if not html_url:
+        # Fallback: try RIS website
+        nor = meta.get("ID", "") or meta.get("Dokumentnummer", "")
+        if nor:
+            html_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={nor}"
+            logger.info(f"Fallback to website: {html_url}")
+
+    if not html_url:
+        logger.warning("No content URL found")
+        return None
+
+    # Step 4: Fetch HTML content
+    text = await _fetch_html(html_url)
+    if not text:
+        return None
+
+    return {"text": text, "inkrafttreten": inkraft, "url": html_url}
 
 
-# ── Page fetch + parse ──
-
-async def _fetch_page(nor: str) -> dict | None:
-    """Fetch RIS Dokument.wxe page, extract text + version NORs."""
-    url = f"{_DOC_URL}{nor}"
-    logger.info(f"Fetch: {url}")
-    async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
-        try:
+async def _fetch_html(url: str) -> str:
+    """Fetch HTML from URL, extract legal text."""
+    logger.info(f"Fetch content: {url}")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=headers) as client:
             resp = await client.get(url)
             resp.raise_for_status()
-            return _parse(resp.text, nor)
-        except Exception as e:
-            logger.error(f"Fetch {nor}: {type(e).__name__}: {e}")
-            return None
+            raw = resp.text
+    except Exception as e:
+        logger.error(f"Fetch error: {type(e).__name__}: {e}")
+        return ""
+
+    # If it's a full RIS page (Dokument.wxe), extract the "Text" section
+    if "Dokument.wxe" in url or len(raw) > 5000:
+        text = _extract_text_section(raw)
+        if text:
+            return _clean_accessible(text)
+
+    # Otherwise it's raw content from a ContentUrl
+    return _clean_accessible(_strip_html(raw))
 
 
-def _parse(html: str, current_nor: str = "") -> dict:
-    """Parse RIS page: text, version NORs, metadata."""
-    r = {"text": "", "version_nors": [], "inkrafttreten": "", "ausserkrafttreten": ""}
-    if not html or len(html) < 200:
-        return r
+# ── Response parsing ──
 
-    # ── Text ──
-    # Find >Text</tag> then content until next section label
+def _flatten(data_entry: dict) -> dict:
+    """Flatten nested API metadata."""
+    metadata = data_entry.get("Metadaten", {})
+    merged = {}
+    for key in ("Technisch", "Allgemein", "Bundesrecht"):
+        section = metadata.get(key)
+        if isinstance(section, list) and section:
+            section = section[0]
+        if isinstance(section, dict):
+            merged.update(section)
+            for sub in ("BrKons",):
+                s = section.get(sub)
+                if isinstance(s, list) and s:
+                    s = s[0]
+                if isinstance(s, dict):
+                    merged.update(s)
+    return merged
+
+
+def _find_urls(data_entry: dict) -> list[str]:
+    """Recursively find ContentUrl values."""
+    urls = []
+    _walk(data_entry, urls, 0)
+    return urls
+
+
+def _walk(obj, urls, depth):
+    if depth > 12:
+        return
+    if isinstance(obj, dict):
+        if "Url" in obj and "DataType" in obj:
+            u = obj["Url"]
+            if isinstance(u, str) and u.startswith("http"):
+                urls.append(u)
+        if "ContentUrl" in obj:
+            v = obj["ContentUrl"]
+            if isinstance(v, str) and v.startswith("http"):
+                urls.append(v)
+            elif isinstance(v, list):
+                for item in v:
+                    if isinstance(item, dict) and "Url" in item:
+                        urls.append(item["Url"])
+                    elif isinstance(item, str) and item.startswith("http"):
+                        urls.append(item)
+        for val in obj.values():
+            _walk(val, urls, depth + 1)
+    elif isinstance(obj, list):
+        for item in obj:
+            _walk(item, urls, depth + 1)
+
+
+# ── Text extraction ──
+
+def _extract_text_section(html: str) -> str:
+    """Extract the 'Text' section from a RIS Dokument.wxe page."""
     ends = ["Schlagworte", "Zuletzt aktualisiert", "Dokumentnummer",
             "European Legislation Identifier", "Navigation im Suchergebnis",
             "Zum Seitenanfang"]
     end_pat = "|".join(re.escape(s) for s in ends)
     m = re.search(rf'>\s*Text\s*</[^>]+>(.*?)({end_pat})', html, re.DOTALL | re.IGNORECASE)
     if m:
-        raw = m.group(1)
-        # Remove any stray <div> tags that start with MainContent (page structure artifacts)
-        raw = re.sub(r'<div[^>]*id="MainContent[^"]*"[^>]*/?\s*>?', '', raw)
-        t = _clean(raw)
-        if len(t) > 20:
-            r["text"] = _dedup_accessible(t)
-
-    if not r["text"]:
-        blocks = re.findall(r'<(?:td|div)[^>]*>(.*?)</(?:td|div)>', html, re.DOTALL)
-        best = ""
-        for b in blocks:
-            c = _clean(b)
-            if len(c) > len(best) and len(c) > 100 and re.search(r'\(\d+\)|§\s*\d+', c):
-                best = c
-        if best:
-            r["text"] = _dedup_accessible(best)
-
-    # ── Metadata ──
-    for label, key in [("Inkrafttretensdatum", "inkrafttreten"),
-                       ("Außerkrafttretensdatum", "ausserkrafttreten")]:
-        mm = re.search(rf'>\s*{re.escape(label)}\s*</[^>]+>\s*(?:<[^>]+>\s*)*([^<]+)', html, re.IGNORECASE)
-        if mm:
-            r[key] = html_module.unescape(mm.group(1).strip())
-
-    # ── Alle Fassungen NORs ──
-    # CRITICAL: Each § on the page has its OWN version list in a
-    # <div class="...documentVersionsDialogBody..."> containing an <ol> with <li> entries.
-    # We must find the div that contains the CURRENT NOR to avoid mixing up
-    # version lists from different paragraphs (ABGB has 1000+ §§).
-    #
-    # HTML structure (from real debug):
-    # <div id="...DocumentVersionList_0_DialogBody_0" class="ui-helper-hidden documentVersionsDialogBody">
-    #   <ol>
-    #     <li class="selectedDocumentVersion">
-    #       <a href="/eli/rgbl/1906/58/P30g/NOR40275544">§ 30g gültig ab 19.02.2026</a>
-    #     </li>
-    #     <li><a href="/eli/rgbl/1906/58/P30g/NOR40181338">§ 30g gültig von ...</a></li>
-    #   </ol>
-    # </div>
-    nors = []
-
-    # Strategy 1: Find the documentVersionsDialogBody div containing current NOR
-    if current_nor:
-        # Find all version dialog divs
-        dialog_pattern = r'<div[^>]*class="[^"]*documentVersionsDialogBody[^"]*"[^>]*>(.*?)</div>'
-        dialogs = re.findall(dialog_pattern, html, re.DOTALL | re.IGNORECASE)
-        for dialog_content in dialogs:
-            if current_nor in dialog_content:
-                # This is OUR version list! Extract all NOR numbers from it.
-                found = re.findall(r'/(NOR\d+)', dialog_content)
-                nors = _unique(found)
-                logger.info(f"Found version dialog with current NOR: {nors}")
-                break
-
-    # Strategy 2: Find "Alle Fassungen" link with current NOR's anchor, then look at nearby dialog
-    if not nors and current_nor:
-        # The "Alle Fassungen" link has href="...#alleFassungen" with the current NOR
-        afl_idx = html.find(f'{current_nor}#alleFassungen')
-        if afl_idx >= 0:
-            # The dialog div is right after this link
-            chunk = html[afl_idx:afl_idx + 5000]
-            found = re.findall(r'/(NOR\d+)', chunk)
-            # Remove current NOR's duplicate from the anchor itself and keep unique
-            nors = _unique(found)
-            logger.info(f"Found via Alle Fassungen anchor: {nors}")
-
-    # Strategy 3: Broader — find all NOR-containing eli links near "selectedDocumentVersion"
-    if not nors:
-        sel_idx = html.find('selectedDocumentVersion')
-        if sel_idx >= 0:
-            # Search within 3000 chars around the selectedDocumentVersion
-            start = max(0, sel_idx - 500)
-            chunk = html[start:start + 4000]
-            found = re.findall(r'/(NOR\d+)', chunk)
-            nors = _unique(found)
-            logger.info(f"Found via selectedDocumentVersion: {nors}")
-
-    r["version_nors"] = nors
-    logger.info(f"Parsed: text={len(r['text'])}ch, nors={nors}, inkraft={r['inkrafttreten']}")
-    return r
+        return _strip_html(m.group(1))
+    # Fallback: largest block with legal text patterns
+    blocks = re.findall(r'<(?:td|div)[^>]*>(.*?)</(?:td|div)>', html, re.DOTALL)
+    best = ""
+    for b in blocks:
+        c = _strip_html(b)
+        if len(c) > len(best) and len(c) > 100 and re.search(r'\(\d+\)|§\s*\d+', c):
+            best = c
+    return best
 
 
-def _next_nor(current: str, nors: list[str]) -> str | None:
-    """Find the NOR immediately after current in the list (= previous version)."""
-    for i, n in enumerate(nors):
-        if n == current and i + 1 < len(nors):
-            return nors[i + 1]
-    # Fallback: first NOR that differs
-    for n in nors:
-        if n != current:
-            return n
-    return None
+def _strip_html(text: str) -> str:
+    """Strip HTML tags to plain text."""
+    c = re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    c = re.sub(r'<span[^>]*class="[^"]*(?:Gld[A-Z][a-z]+|ScreenReader)[^"]*"[^>]*>.*?</span>', '', c, flags=re.DOTALL | re.IGNORECASE)
+    c = re.sub(r'<div[^>]*id="MainContent[^"]*"[^>]*/?>', '', c)
+    c = re.sub(r'<(?:br|/p|/div|/tr|/li)\s*/?>', '\n', c, flags=re.IGNORECASE)
+    c = re.sub(r'<[^>]+>', ' ', c)
+    c = html_module.unescape(c)
+    c = re.sub(r'[ \t]+', ' ', c)
+    c = re.sub(r'\n[ \t]+', '\n', c)
+    c = re.sub(r'\n{3,}', '\n\n', c)
+    return c.strip()
 
 
-def _unique(lst: list[str]) -> list[str]:
-    seen = set()
-    out = []
-    for x in lst:
-        if x not in seen:
-            seen.add(x)
-            out.append(x)
-    return out
-
-
-# ── Text cleanup ──
-
-def _dedup_accessible(text: str) -> str:
-    """Remove RIS accessible text duplicates that survive HTML cleaning."""
-    # Step 1: Remove known accessible marker words
+def _clean_accessible(text: str) -> str:
+    """Remove RIS accessible text duplicates."""
     text = re.sub(r'(§\s*\d+[a-z]?\.?)\s*Paragraph\s*\d+[a-z]?,?\s*', r'\1 ', text)
-    text = re.sub(
-        r'(\(\d+[a-z]?\))\s*Absatz\s*(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+\s*[a-z]?),?\s*',
-        r'\1 ', text)
+    text = re.sub(r'(\(\d+[a-z]?\))\s*Absatz\s*(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+\s*[a-z]?),?\s*', r'\1 ', text)
     text = re.sub(r'\bParagraph\s+\d+\s*[a-z]?,\s*', '', text)
     text = re.sub(r'\bAbsatz\s+\d+\s*[a-z]?,\s*', '', text)
     text = re.sub(r'\bAbsatz\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn),\s*', '', text)
     text = re.sub(r'\bZiffer\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+)\s*', '', text)
     text = re.sub(r'\bLitera\s+[a-z]\s*', '', text)
-    text = re.sub(r'Anmerkung,?\s*aus Bundesgesetzblatt[^)]*\)\s*', '', text)
-    text = re.sub(r'\brömisch\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|[IVXivx]+)\.?\s*', '', text)
-    text = re.sub(r'\bParagraph/Artikel/Anlage\s*', '', text)
-
-    # Step 2: Remove accessible rewrites of legal references.
-    # "BGBl. Nr. X/Y" → accessible: "Bundesgesetzblatt Nr. X aus Y,"
     text = re.sub(r',?\s*Bundesgesetzblatt\s+Nr\.\s*\d+\s+aus\s+\d+,?\s*', ' ', text)
-    # Remove entire accessible duplicate phrases that follow the original.
-    # Pattern: "original phrase ending with period. accessible version of same phrase."
-    # The accessible version strips § and Abs. references, leaving "des des" artifacts.
-    text = re.sub(r'des\s+des\b', 'des', text)  # "des des" → "des" (artifact of § removal)
-
-    # Step 3: Remove DUPLICATE text blocks (the core accessible text problem).
-    text = _remove_sentence_dupes(text)
-    # Step 3b: Remove remaining duplicates that start mid-sentence (lowercase)
-    text = _remove_lowercase_dupes(text)
-
-    # Step 4: Remove trailing HTML artifacts and "Im RIS seit" metadata
+    text = re.sub(r'\brömisch\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|[IVXivx]+)\.?\s*', '', text)
     text = re.sub(r'<div[^>]*$', '', text)
     text = re.sub(r'\s*Im RIS seit\s+[\d.]+\s*$', '', text)
-    text = re.sub(r'\s*Gesetzesnummer\s+\d+\s*$', '', text)
     text = re.sub(r'  +', ' ', text)
-    text = re.sub(r'\n ', '\n', text)
     return text.strip()
 
 
-def _remove_sentence_dupes(text: str) -> str:
-    """Remove duplicate text blocks that are accessible rewrites.
+# ── Diff ──
 
-    RIS renders each legal paragraph twice: original + accessible.
-    Strategy: split on REAL sentence boundaries (not abbreviation dots),
-    then check for word overlap between consecutive chunks.
-    """
-    lines = text.split('\n')
-    result = []
-    for line in lines:
-        # Split on real sentence endings:
-        # Period + space + ( or § or uppercase letter that starts a new sentence
-        # But NOT after abbreviations like "Abs.", "Nr.", "BGBl.", "bzw."
-        # Safe split: after ". " when followed by (N), §, or a word of 4+ chars starting uppercase
-        # Split on ". " followed by ( or § or uppercase — but avoid
-        # splitting after abbreviations. Use a simple heuristic:
-        # replace ". " with a marker only when preceded by a long word
-        # Split on ". " followed by ( or § or uppercase.
-        # Avoid splitting after abbreviations (Abs., Nr., BGBl., etc.)
-        # by requiring the preceding word to be at least 3 chars.
-        # Split on sentence boundaries: ". " after a word of 3+ chars,
-        # followed by ( or § or uppercase OR lowercase (for accessible dupes)
-        SEP = "|||SPLIT|||"
-        marked = re.sub(r'(\w\w\w+\.) (?=[(§A-Za-z])', lambda m: m.group(1) + SEP, line)
-        chunks = marked.split(SEP)
-        if len(chunks) <= 1:
-            result.append(line)
-            continue
-
-        kept = [chunks[0]]
-        for i in range(1, len(chunks)):
-            is_dupe = False
-            for prev in kept:
-                prev_words = set(re.findall(r'\w{3,}', prev.lower()))
-                curr_words = set(re.findall(r'\w{3,}', chunks[i].lower()))
-                if not curr_words or len(curr_words) < 3:
-                    break
-                overlap = len(prev_words & curr_words) / max(len(curr_words), 1)
-                if overlap > 0.65:
-                    is_dupe = True
-                    break
-            if not is_dupe:
-                kept.append(chunks[i])
-        result.append(' '.join(kept))
-    return '\n'.join(result)
-
-
-def _remove_lowercase_dupes(text: str) -> str:
-    """Remove duplicate phrases that start with lowercase (missed by sentence splitter).
-
-    Detects: "...überwiegen. im Sinne des des Arbeitsverfassungsgesetzes überwiegen."
-    where the second occurrence repeats content from earlier in the same line.
-    """
-    lines = text.split('\n')
-    result = []
-    for line in lines:
-        words = line.split()
-        if len(words) < 10:
-            result.append(line)
-            continue
-
-        # Check if the second half of the line is a near-duplicate of the first half
-        mid = len(words) // 2
-        first_half_set = set(w.lower() for w in words[:mid] if len(w) >= 3)
-        second_half_set = set(w.lower() for w in words[mid:] if len(w) >= 3)
-
-        if not second_half_set:
-            result.append(line)
-            continue
-
-        overlap = len(first_half_set & second_half_set) / max(len(second_half_set), 1)
-        if overlap > 0.7:
-            # The second half is a near-duplicate → keep only first half
-            # But we need to find the right cut point (after the period)
-            line_text = ' '.join(words)
-            # Find the last ". " that's near the middle
-            best_cut = -1
-            for m in re.finditer(r'\.\s', line_text):
-                pos = m.end()
-                if abs(pos - len(line_text) // 2) < len(line_text) // 3:
-                    best_cut = m.start() + 1  # include the period
-            if best_cut > 0:
-                result.append(line_text[:best_cut].strip())
-            else:
-                result.append(line)
-        else:
-            result.append(line)
-    return '\n'.join(result)
-
-
-def _word_diff(old: str, new: str) -> str:
+def _diff(old: str, new: str) -> str:
     ow, nw = old.split(), new.split()
     if not ow and not nw:
         return '<p class="diff-info">Beide Versionen leer.</p>'
@@ -391,19 +292,14 @@ def _word_diff(old: str, new: str) -> str:
     sm = difflib.SequenceMatcher(None, ow, nw)
     ratio = sm.ratio()
 
-    # If similarity < 40%, it's a complete rewrite → show side-by-side
     if ratio < 0.4:
         return (
-            '<p class="diff-info">Umfassende Neufassung (weniger als 40% Textübereinstimmung). '
-            'Gegenüberstellung statt Inline-Diff:</p>'
+            '<p class="diff-info">Umfassende Neufassung (&lt;40% Übereinstimmung):</p>'
             '<div class="diff-sidebyside">'
-            f'<div class="diff-side diff-side-old">'
-            f'<div class="diff-side-label">Vorversion</div>'
+            f'<div class="diff-side diff-side-old"><div class="diff-side-label">Vorversion</div>'
             f'<div class="diff-side-text">{html_module.escape(old)}</div></div>'
-            f'<div class="diff-side diff-side-new">'
-            f'<div class="diff-side-label">Neue Fassung</div>'
-            f'<div class="diff-side-text">{html_module.escape(new)}</div></div>'
-            '</div>'
+            f'<div class="diff-side diff-side-new"><div class="diff-side-label">Neue Fassung</div>'
+            f'<div class="diff-side-text">{html_module.escape(new)}</div></div></div>'
         )
 
     parts = []
@@ -420,63 +316,19 @@ def _word_diff(old: str, new: str) -> str:
     return " ".join(parts)
 
 
-def _no_prev(msg: str, text: str) -> str:
-    return (f'<p class="diff-info">{html_module.escape(msg)}</p>'
-            f'<div class="diff-current">{html_module.escape(text)}</div>')
-
-
-def _error(msg: str) -> dict:
+def _err(msg: str) -> dict:
     return {"current": None, "previous": None,
             "diff_html": f'<p class="diff-info">{html_module.escape(msg)}</p>',
             "has_changes": False}
 
 
 def _day_before(date_str: str) -> str | None:
-    """Parse a date and return the day before as YYYY-MM-DD."""
     if not date_str:
         return None
-    date_str = date_str.strip()
     for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
         try:
-            dt = datetime.strptime(date_str.split("+")[0].split(".000")[0], fmt)
+            dt = datetime.strptime(date_str.strip().split("+")[0].split(".000")[0], fmt)
             return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
         except ValueError:
             continue
     return None
-
-
-def _clean(text: str) -> str:
-    """Clean HTML to plain text, removing accessible duplicates at the HTML level."""
-    # 1. Remove script/style/noscript blocks
-    c = re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
-
-    # 2. Remove RIS accessible/screenreader duplicate elements BEFORE stripping tags.
-    # The RIS website renders each legal reference twice:
-    # - Original: <span class="...">§ 123 Abs. 1</span>
-    # - Accessible: <span class="GldPar">Paragraph 123,</span> <span class="GldAbs">Absatz eins,</span>
-    # The accessible spans have classes like GldPar, GldAbs, GldZ, GldLit, GldRom, GldAnl, etc.
-    # They also use class="ScreenReaderText" or similar.
-    # Remove these duplicate spans entirely from the HTML.
-    c = re.sub(r'<span[^>]*class="[^"]*(?:Gld[A-Z][a-z]+|ScreenReader|Barrierefreiheit)[^"]*"[^>]*>.*?</span>',
-               '', c, flags=re.DOTALL | re.IGNORECASE)
-
-    # 3. Also remove <abbr> accessible expansion elements (RIS uses these for abbreviations)
-    # Pattern: <abbr title="Absatz">Abs.</abbr> followed by accessible duplicate
-    # Just keep the <abbr> content, strip the tag
-    c = re.sub(r'<abbr[^>]*>(.*?)</abbr>', r'\1', c, flags=re.DOTALL)
-
-    # 4. Remove stray MainContent div artifacts
-    c = re.sub(r'<div[^>]*id="MainContent[^"]*"[^>]*/?>', '', c)
-
-    # 5. Convert block elements to newlines
-    c = re.sub(r'<(?:br|/p|/div|/tr|/li)\s*/?>', '\n', c, flags=re.IGNORECASE)
-
-    # 6. Strip remaining tags
-    c = re.sub(r'<[^>]+>', ' ', c)
-
-    # 7. Decode entities and normalize whitespace
-    c = html_module.unescape(c)
-    c = re.sub(r'[ \t]+', ' ', c)
-    c = re.sub(r'\n[ \t]+', '\n', c)
-    c = re.sub(r'\n{3,}', '\n\n', c)
-    return c.strip()
