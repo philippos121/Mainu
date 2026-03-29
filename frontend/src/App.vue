@@ -24,9 +24,6 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
   margin: 0; padding: 0;
-  height: auto !important; min-height: 100vh;
-  overflow-x: hidden; overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   background: #070e12;
