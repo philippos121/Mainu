@@ -56,6 +56,11 @@
         </div>
       </div>
 
+      <div class="field">
+        <label>OpenAI API-Key <span class="opt">(optional — für KI-Analyse)</span></label>
+        <input v-model="apiKey" type="password" placeholder="sk-..." class="inp" />
+      </div>
+
       <div class="actions">
         <button class="btn-primary" :disabled="!reportEmail || !selectedCategory.length || sending" @click="sendReport">
           <span v-if="sending" class="spin"></span>

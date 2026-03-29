@@ -766,6 +766,8 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 366) -> dict:
         gesetzesnummer = _s(m.get("Gesetzesnummer")) or _s(data_entry.get("Gesetzesnummer")) or ""
         # Außerkrafttretensdatum - if set and in the past, provision is no longer in force
         ausserkraft = _s(m.get("Ausserkrafttretensdatum")) or ""
+        # Gesetzesmaterialien: "NR: GP XXVIII RV 301 AB 389 S. 52."
+        materialien_str = _s(m.get("Gesetzesmaterialien")) or _s(m.get("Materialien")) or ""
 
         # Skip provisions superseded before taking effect (Ausserkraft < Inkraft)
         if ausserkraft and change_date and _date_before(ausserkraft, change_date):
@@ -790,6 +792,7 @@ def parse_bundesrecht_response(data: dict, timeframe_days: int = 366) -> dict:
             "index": index_text,
             "gesetzesnummer": gesetzesnummer,
             "ausserkraft": ausserkraft,
+            "materialien": materialien_str,
         })
 
     # Deduplicate: if an expired version AND a newer version of the same

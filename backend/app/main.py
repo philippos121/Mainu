@@ -165,6 +165,19 @@ async def api_debug_doc(
     return await debug_document(gesetzesnummer=gesetzesnummer, artikel=artikel)
 
 
+@app.get("/api/debug/materialien")
+async def api_debug_materialien(
+    bgbl: str = Query("BGBl. I Nr. 6/2026", description="BGBl string"),
+    gesetzesnummer: str = Query("", description="Gesetzesnummer for BrKons lookup"),
+    materialien: str = Query("", description="Pre-extracted Materialien string"),
+):
+    """DEBUG: Test Materialien pipeline for a BGBl number."""
+    from app.services.materialien_service import fetch_materialien_for_bgbl, parse_materialien_string
+    gp, rv = parse_materialien_string(materialien)
+    result = await fetch_materialien_for_bgbl(bgbl, gesetzesnummer=gesetzesnummer, materialien_str=materialien)
+    return {"parsed_gp": gp, "parsed_rv": rv, "result": result}
+
+
 @app.get("/api/debug/index")
 async def api_debug_index():
     """DEBUG: Test which Index parameter formats work with BrKons."""
