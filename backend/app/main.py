@@ -93,16 +93,31 @@ async def api_search_gesetze(
     page: int = Query(1, ge=1),
 ):
     """Search Gesetze und Verordnungen (Bundesrecht consolidated).
-    Special categories 'unionsrecht' are routed to EUR-Lex."""
+    Special categories 'unionsrecht' are routed to EUR-Lex + RIS EU-Integration."""
     if category == "unionsrecht":
-        results = await search_eurlex(im_ris_seit=im_ris_seit)
-        return {"results": results, "total_hits": len(results)}
+        # EUR-Lex for EU acts + RIS EU-Integration index for Austrian implementation
+        import asyncio as _aio
+        eurlex_task = search_eurlex(im_ris_seit=im_ris_seit)
+        ris_task = search_gesetze(category="eu_integration", im_ris_seit=im_ris_seit, page=page)
+        eurlex_results, ris_raw = await _aio.gather(eurlex_task, ris_task, return_exceptions=True)
+        combined = []
+        total = 0
+        if isinstance(eurlex_results, list):
+            combined.extend(eurlex_results)
+            total += len(eurlex_results)
+        if isinstance(ris_raw, dict):
+            days = _timeframe_to_days(im_ris_seit)
+            ris_parsed = parse_bundesrecht_response(ris_raw, timeframe_days=days)
+            combined.extend(ris_parsed.get("results", []))
+            total += ris_parsed.get("total_hits", 0)
+        return {"results": combined, "total_hits": total}
     raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
     days = _timeframe_to_days(im_ris_seit)
     parsed = parse_bundesrecht_response(raw, timeframe_days=days)
-    # For Steuerrecht categories, also fetch Findok
+    # For Steuerrecht/Finanzrecht categories, also fetch Findok (BMF Richtlinien, Erlässe, BFG)
     steuer_cats = {"einkommensteuer", "koerperschaftsteuer", "umsatzsteuer", "abgabenrecht",
-                   "gebuehrenrecht", "bewertungsrecht", "finanzstrafrecht", "finanzrecht_allg"}
+                   "gebuehrenrecht", "bewertungsrecht", "finanzstrafrecht", "finanzrecht_allg",
+                   "zollrecht", "finanzausgleich"}
     if category in steuer_cats:
         try:
             findok_results = await search_findok(im_ris_seit=im_ris_seit)
