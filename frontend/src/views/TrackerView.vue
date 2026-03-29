@@ -121,14 +121,31 @@ let animId = 0
 
 function onScroll() { scrollY.value = window.scrollY }
 
-// 3D neural network renderer
+// 3D neural network renderer — optimized for instant scroll
 function init3D() {
   const cvs = canvas3d.value; if (!cvs) return
-  const ctx = cvs.getContext('2d')
-  let W, H
-  const nodes = []
-  const NODE_COUNT = 80
-  const CONNECT_DIST = 180
+  const ctx = cvs.getContext('2d', { alpha: false })
+  let W = 0, H = 0
+  const N = 55 // fewer nodes = faster
+  const DIST_SQ = 160 * 160 // squared distance, skip sqrt
+  const PI2 = Math.PI * 2
+
+  // Pre-allocated arrays (no GC pressure)
+  const px = new Float32Array(N), py = new Float32Array(N), pz = new Float32Array(N)
+  const vx = new Float32Array(N), vy = new Float32Array(N), vz = new Float32Array(N)
+  const nr = new Float32Array(N), nh = new Uint8Array(N) // radius, hue flag
+  const sx = new Float32Array(N), sy = new Float32Array(N), sc = new Float32Array(N)
+
+  for (let i = 0; i < N; i++) {
+    px[i] = Math.random() * 2 - 1
+    py[i] = Math.random() * 2 - 1
+    pz[i] = Math.random() * 2 - 1
+    vx[i] = (Math.random() - 0.5) * 0.0015
+    vy[i] = (Math.random() - 0.5) * 0.0015
+    vz[i] = (Math.random() - 0.5) * 0.001
+    nr[i] = 1.5 + Math.random() * 2
+    nh[i] = Math.random() > 0.7 ? 1 : 0
+  }
 
   function resize() {
     W = cvs.width = window.innerWidth
@@ -137,103 +154,82 @@ function init3D() {
   resize()
   window.addEventListener('resize', resize)
 
-  // Create nodes in 3D space
-  for (let i = 0; i < NODE_COUNT; i++) {
-    nodes.push({
-      x: Math.random() * 2 - 1, // -1 to 1
-      y: Math.random() * 2 - 1,
-      z: Math.random() * 2 - 1,
-      vx: (Math.random() - 0.5) * 0.002,
-      vy: (Math.random() - 0.5) * 0.002,
-      vz: (Math.random() - 0.5) * 0.001,
-      r: 1.5 + Math.random() * 2,
-      hue: Math.random() > 0.7 ? 30 : 185, // orange or teal
-    })
-  }
-
-  function project(x, y, z, sY) {
-    // Rotate based on scroll
-    const rotX = sY * 0.0003
-    const rotY = sY * 0.0002 + performance.now() * 0.00003
-    // Rotate Y
-    const cosY = Math.cos(rotY), sinY = Math.sin(rotY)
-    let rx = x * cosY - z * sinY
-    let rz = x * sinY + z * cosY
-    // Rotate X
-    const cosX = Math.cos(rotX), sinX = Math.sin(rotX)
-    let ry = y * cosX - rz * sinX
-    rz = y * sinX + rz * cosX
-    // Perspective
-    const fov = 2.5
-    const scale = fov / (fov + rz + 1.5)
-    return {
-      sx: W / 2 + rx * W * 0.4 * scale,
-      sy: H / 2 + ry * H * 0.35 * scale,
-      scale,
-      z: rz
-    }
-  }
-
   function draw() {
     const sY = scrollY.value
-    ctx.clearRect(0, 0, W, H)
+    const now = performance.now()
 
-    // Update positions
-    for (const n of nodes) {
-      n.x += n.vx; n.y += n.vy; n.z += n.vz
-      if (n.x > 1.2 || n.x < -1.2) n.vx *= -1
-      if (n.y > 1.2 || n.y < -1.2) n.vy *= -1
-      if (n.z > 1.2 || n.z < -1.2) n.vz *= -1
+    // Trig for rotation (compute once per frame)
+    const rotY = sY * 0.0002 + now * 0.00003
+    const rotX = sY * 0.0003
+    const cosRY = Math.cos(rotY), sinRY = Math.sin(rotY)
+    const cosRX = Math.cos(rotX), sinRX = Math.sin(rotX)
+    const hw = W * 0.5, hh = H * 0.5, sw = W * 0.4, sh = H * 0.35
+
+    // Update + project
+    for (let i = 0; i < N; i++) {
+      let x = px[i] += vx[i], y = py[i] += vy[i], z = pz[i] += vz[i]
+      if (x > 1.2 || x < -1.2) vx[i] *= -1
+      if (y > 1.2 || y < -1.2) vy[i] *= -1
+      if (z > 1.2 || z < -1.2) vz[i] *= -1
+      // Rotate Y then X
+      const rx = x * cosRY - z * sinRY
+      let rz = x * sinRY + z * cosRY
+      const ry = y * cosRX - rz * sinRX
+      rz = y * sinRX + rz * cosRX
+      const s = 2.5 / (2.5 + rz + 1.5)
+      sx[i] = hw + rx * sw * s
+      sy[i] = hh + ry * sh * s
+      sc[i] = s
     }
 
-    // Project all nodes
-    const projected = nodes.map(n => ({ ...n, ...project(n.x, n.y, n.z, sY) }))
-    projected.sort((a, b) => a.z - b.z) // painter's order
+    // Clear with bg color (faster than clearRect + fillRect)
+    ctx.fillStyle = '#070e12'
+    ctx.fillRect(0, 0, W, H)
 
-    // Draw connections
-    for (let i = 0; i < projected.length; i++) {
-      for (let j = i + 1; j < projected.length; j++) {
-        const a = projected[i], b = projected[j]
-        const dx = a.sx - b.sx, dy = a.sy - b.sy
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < CONNECT_DIST) {
-          const alpha = (1 - dist / CONNECT_DIST) * 0.15 * Math.min(a.scale, b.scale)
-          ctx.beginPath()
-          ctx.moveTo(a.sx, a.sy)
-          ctx.lineTo(b.sx, b.sy)
-          ctx.strokeStyle = `rgba(34,201,232,${alpha})`
-          ctx.lineWidth = 0.5
-          ctx.stroke()
+    // Batch all connections in one path per alpha band (3 bands)
+    ctx.lineWidth = 0.6
+    for (let band = 0; band < 3; band++) {
+      ctx.beginPath()
+      for (let i = 0; i < N; i++) {
+        for (let j = i + 1; j < N; j++) {
+          const dx = sx[i] - sx[j], dy = sy[i] - sy[j]
+          const dSq = dx * dx + dy * dy
+          if (dSq < DIST_SQ) {
+            const a = (1 - dSq / DIST_SQ) * 0.18 * Math.min(sc[i], sc[j])
+            const b3 = (a * 3) | 0 // 0,1,2
+            if (b3 === band) {
+              ctx.moveTo(sx[i], sy[i])
+              ctx.lineTo(sx[j], sy[j])
+            }
+          }
         }
       }
+      ctx.strokeStyle = `rgba(34,201,232,${0.04 + band * 0.05})`
+      ctx.stroke()
     }
 
-    // Draw nodes
-    for (const p of projected) {
-      const r = p.r * p.scale
-      const alpha = 0.3 + p.scale * 0.5
+    // Draw nodes (no glow gradients — just solid circles + larger faded circle)
+    for (let i = 0; i < N; i++) {
+      const r = nr[i] * sc[i]
+      const a = 0.3 + sc[i] * 0.5
+      // Outer glow (simple filled circle, no gradient)
       ctx.beginPath()
-      ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2)
-      if (p.hue === 30) {
-        ctx.fillStyle = `rgba(255,151,51,${alpha * 0.8})`
-      } else {
-        ctx.fillStyle = `rgba(34,201,232,${alpha * 0.6})`
-      }
+      ctx.arc(sx[i], sy[i], r * 2.5, 0, PI2)
+      ctx.fillStyle = nh[i] ? `rgba(255,151,51,${a * 0.08})` : `rgba(34,201,232,${a * 0.06})`
       ctx.fill()
-      // Glow
+      // Core
       ctx.beginPath()
-      ctx.arc(p.sx, p.sy, r * 3, 0, Math.PI * 2)
-      const g = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r * 3)
-      g.addColorStop(0, p.hue === 30 ? `rgba(255,151,51,${alpha * 0.15})` : `rgba(34,201,232,${alpha * 0.1})`)
-      g.addColorStop(1, 'transparent')
-      ctx.fillStyle = g
+      ctx.arc(sx[i], sy[i], r, 0, PI2)
+      ctx.fillStyle = nh[i] ? `rgba(255,151,51,${a * 0.8})` : `rgba(34,201,232,${a * 0.6})`
       ctx.fill()
     }
 
     animId = requestAnimationFrame(draw)
   }
 
-  draw()
+  // Delay first frame slightly to not block initial paint
+  animId = requestAnimationFrame(() => { animId = requestAnimationFrame(draw) })
+
   return () => {
     cancelAnimationFrame(animId)
     window.removeEventListener('resize', resize)
