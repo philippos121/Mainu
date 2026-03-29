@@ -296,6 +296,7 @@ async def api_report_email(req: EmailReportRequest):
                         "from": {"email": "monitoring@test-3m5jgro09qzgdpyo.mlsender.net", "name": "AI:ssociate Monitoring"},
                         "to": [{"email": req.email}],
                         "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
+                        "text": "Siehe HTML-Version.",
                         "html": html_report,
                     },
                 )
@@ -318,8 +319,11 @@ async def api_report_email(req: EmailReportRequest):
                 raise HTTPException(status_code=501, detail="E-Mail nicht konfiguriert (MAILERSEND_API_KEY oder RESEND_API_KEY fehlt).")
 
             resp.raise_for_status()
-            data = resp.json()
-            logging.info(f"Email sent to {req.email}: {data}")
+            try:
+                data = resp.json()
+            except Exception:
+                data = {"raw": resp.text[:200]}
+            logging.info(f"Email sent to {req.email}: status={resp.status_code} {data}")
             return {"status": "sent", "email": req.email}
     except httpx.HTTPStatusError as e:
         err = e.response.text[:500]
