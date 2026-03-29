@@ -268,7 +268,19 @@ async def api_report_email(req: EmailReportRequest):
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             if cfg.MAILERSEND_API_KEY:
-                # MailerSend — send full HTML report as email body
+                import base64 as _b64
+                today_str = date.today().strftime('%Y-%m-%d')
+                report_md_preview = report_data.get("report_markdown", "")[:600]
+
+                # Build a clean inline-styled email body (no external CSS, no JS)
+                email_html = _build_email_body(
+                    category=req.category_label,
+                    timeframe=req.timeframe_label,
+                    total_hits=req.total_hits,
+                    summary_preview=report_md_preview,
+                    date_str=today_str,
+                )
+
                 resp = await client.post(
                     "https://api.mailersend.com/v1/email",
                     headers={
@@ -279,8 +291,13 @@ async def api_report_email(req: EmailReportRequest):
                         "from": {"email": "monitoring@test-3m5jgro09qzgdpyo.mlsender.net", "name": "AI:ssociate Monitoring"},
                         "to": [{"email": req.email}],
                         "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
-                        "text": f"AI:ssociate Monitoring Report\n{req.category_label} · {req.timeframe_label}",
-                        "html": html_report,
+                        "text": f"AI:ssociate Monitoring Report\n{req.category_label} · {req.timeframe_label}\n\nSiehe angehängte HTML-Datei für den interaktiven Report.",
+                        "html": email_html,
+                        "attachments": [{
+                            "filename": f"AI-ssociate_Report_{today_str}.html",
+                            "content": _b64.b64encode(html_report.encode('utf-8')).decode('ascii'),
+                            "disposition": "attachment",
+                        }],
                     },
                 )
             elif cfg.RESEND_API_KEY:
@@ -507,6 +524,94 @@ async def api_report(req: ReportRequest):
     if not req.results:
         raise HTTPException(status_code=400, detail="Keine Ergebnisse für den Bericht.")
     return await _generate_full_report(req)
+
+
+def _build_email_body(category: str, timeframe: str, total_hits: int, summary_preview: str, date_str: str) -> str:
+    """Build a clean inline-styled HTML email body (works in all email clients)."""
+    import html as _h
+    import re as _re
+
+    # Convert markdown preview to simple HTML
+    preview = _h.escape(summary_preview)
+    preview = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', preview)
+    preview = _re.sub(r'\*(.+?)\*', r'<em>\1</em>', preview)
+    preview = _re.sub(r'^[-•]\s+(.+)$', r'<li>\1</li>', preview, flags=_re.MULTILINE)
+    preview = preview.replace('\n\n', '</p><p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.6">')
+    preview = _re.sub(r'^#{1,3}\s+(.+)$', r'<strong style="color:#0a5062;font-size:15px">\1</strong><br>', preview, flags=_re.MULTILINE)
+
+    return f'''<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f6f8;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;padding:20px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+  <!-- Header -->
+  <tr><td style="background:#0a5062;padding:32px 28px;border-radius:12px 12px 0 0">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="color:white;font-size:22px;font-weight:bold;font-family:Arial,sans-serif">
+          AI:ssociate
+          <span style="display:inline-block;background:#ff9733;color:white;font-size:11px;font-weight:bold;padding:3px 8px;border-radius:4px;margin-left:8px;vertical-align:middle">MONITORING</span>
+        </td>
+      </tr>
+      <tr><td style="color:rgba(255,255,255,0.7);font-size:13px;padding-top:8px">
+        Law Monitoring Report · {_h.escape(date_str)}
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Stats bar -->
+  <tr><td style="background:#083d4d;padding:16px 28px">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="color:white;font-size:13px;font-family:Arial,sans-serif">
+        <strong style="color:#ff9733;font-size:20px">{total_hits}</strong>
+        <span style="color:rgba(255,255,255,0.6);margin-left:4px">Treffer</span>
+      </td>
+      <td style="color:white;font-size:13px;text-align:center;font-family:Arial,sans-serif">
+        <strong style="color:white">{_h.escape(category)}</strong>
+      </td>
+      <td style="color:rgba(255,255,255,0.6);font-size:13px;text-align:right;font-family:Arial,sans-serif">
+        {_h.escape(timeframe)}
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Summary preview -->
+  <tr><td style="background:white;padding:28px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="font-size:16px;font-weight:bold;color:#007993;padding-bottom:16px;font-family:Arial,sans-serif;border-bottom:2px solid #f0f1f3;margin-bottom:16px">
+        Analyse (Vorschau)
+      </td></tr>
+      <tr><td style="padding-top:16px;font-size:14px;line-height:1.7;color:#374151;font-family:Arial,sans-serif">
+        <p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.6">{preview}{'…' if len(summary_preview) >= 590 else ''}</p>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- CTA -->
+  <tr><td style="background:#fafbfc;padding:24px 28px;text-align:center;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="background:#fff8f0;border:1px solid #ffe4c4;border-radius:8px;padding:16px 20px;text-align:center">
+        <strong style="color:#0a5062;font-size:14px;font-family:Arial,sans-serif">Interaktiver Report angehängt</strong><br>
+        <span style="color:#6b7280;font-size:13px;font-family:Arial,sans-serif">Öffnen Sie die HTML-Datei im Browser für die vollständige interaktive Ansicht mit Sidebar-Navigation, Versionsvergleichen und GPT-Analyse.</span>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="background:#f5f6f8;padding:20px 28px;text-align:center;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none">
+    <span style="font-size:11px;color:#9ca3af;font-family:Arial,sans-serif">
+      Datenquelle: RIS · data.bka.gv.at · AI:ssociate Monitoring
+    </span>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>'''
 
 
 def _build_interactive_report(
