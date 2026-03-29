@@ -124,8 +124,8 @@ function startCanvas() {
   const c = cvs.value; if (!c) return
   const gl = c.getContext('2d', { alpha: false })
   let W, H
-  const N = 30
-  const DSQ = 150 * 150
+  const N = 65
+  const DSQ = 160 * 160
   // Typed arrays
   const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N)
   const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N)
@@ -157,11 +157,16 @@ function startCanvas() {
       const a=ox[i]-ox[j],b=oy[i]-oy[j];if(a*a+b*b<DSQ){gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])}
     }
     gl.stroke()
-    // Nodes — single circle each, no glow pass
+    // Nodes with glow halos
     for(let i=0;i<N;i++){
-      const r=sr[i]*os[i],a=.3+os[i]*.5
-      gl.beginPath();gl.arc(ox[i],oy[i],r*1.5,0,6.28)
-      gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.6})`:`rgba(34,201,232,${a*.45})`
+      const r=sr[i]*os[i],a=.25+os[i]*.5
+      // Glow
+      gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
+      gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.06})`:`rgba(34,201,232,${a*.05})`
+      gl.fill()
+      // Core
+      gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
+      gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.8})`:`rgba(34,201,232,${a*.6})`
       gl.fill()
     }
     raf=requestAnimationFrame(frame)
@@ -172,16 +177,8 @@ function startCanvas() {
 
 let stop=null
 onMounted(()=>{
-  // Scroll MUST work immediately — register before anything else
   window.addEventListener('scroll',onScroll,{passive:true})
-  // Force layout so browser knows page is scrollable
-  document.documentElement.style.scrollBehavior='auto'
-  // Canvas starts only after browser is idle (or after 200ms worst case)
-  if('requestIdleCallback' in window){
-    requestIdleCallback(()=>{stop=startCanvas()},{timeout:300})
-  } else {
-    setTimeout(()=>{stop=startCanvas()},200)
-  }
+  stop=startCanvas()
 })
 onUnmounted(()=>{window.removeEventListener('scroll',onScroll);if(stop)stop()})
 
@@ -237,7 +234,7 @@ async function downloadReport(){if(!selectedCategory.value.length)return;generat
 
 <style scoped>
 .page{min-height:100vh;background:#070e12;color:#e4f0f2;overflow-x:hidden}
-.bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%}
+.bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none}
 .scroll-wrap{position:relative;z-index:2}
 
 /* ── Sections ── */
