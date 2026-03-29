@@ -183,7 +183,7 @@ def build_report(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rechtsänderungen — {_html.escape(category)}</title>
+<title>Law Monitoring Report — {_html.escape(category)} — {date_str}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -284,8 +284,17 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
 }}
 /* ── Mobile ── */
 @media(max-width:768px){{
-  .sidebar{{width:100%;position:relative;max-height:300px}}
+  .sidebar{{width:100%;position:relative;max-height:none;height:auto;border-bottom:1px solid rgba(255,255,255,0.1)}}
   .main{{margin-left:0;padding:16px}}
+  .sidebar-head{{padding:20px 16px 12px}}
+  .sidebar-head h1{{font-size:14px}}
+  .sidebar-stats{{padding:10px 16px}}
+  .nav-item{{padding:8px 16px;font-size:12px}}
+  .card-head{{padding:12px 14px}}
+  .diff-box{{font-size:12px;padding:10px}}
+  .diff-box .diff-sidebyside{{grid-template-columns:1fr}}
+  .summary{{padding:20px}}
+  body{{font-size:14px}}
 }}
 </style>
 </head>
@@ -312,8 +321,8 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
         <path d="M716.73 42.31H768.42V51.43H727.04V78.09H761.38V87.21H727.04V114.56H769.85V123.68H716.73V42.31Z" fill="white"/>
       </g>
     </svg>
-    <h1>{_html.escape(category)}</h1>
-    <div class="sub">{_html.escape(timeframe)} · {date_str}</div>
+    <h1>Law Monitoring Report</h1>
+    <div class="sub">{_html.escape(category)} · {_html.escape(timeframe)} · {date_str}</div>
   </div>
   <div class="sidebar-stats">
     <div class="sidebar-stat"><span class="num">{total_hits}</span><span class="lbl">{type_label}</span></div>
@@ -321,7 +330,7 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
   </div>
   <div class="nav-label">Übersicht</div>
   <a class="nav-item active" href="#" onclick="showSummary();return false">
-    Rechtliche Analyse
+    Analyse
   </a>
   <div class="nav-label">{type_label} nach Gesetz</div>
   {nav_html}
@@ -336,7 +345,7 @@ body{{font-family:'IBM Plex Sans',sans-serif;background:#f5f6f8;color:#1a1a1a;di
     <div class="summary">
       <div class="summary-head">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007993" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 12 18.469"/></svg>
-        Rechtliche Analyse
+        Analyse
       </div>
       {summary_html}
     </div>
