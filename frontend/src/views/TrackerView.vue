@@ -26,6 +26,15 @@
         </div>
       </div>
       <h1 class="hero-h1">Rechtsänderungen.<br/><span class="hero-accent">Automatisch. Analysiert.</span></h1>
+      <div class="hero-sources">
+        <span class="hs">RIS</span>
+        <span class="hs-dot"></span>
+        <span class="hs">Findok</span>
+        <span class="hs-dot"></span>
+        <span class="hs">EUR-Lex</span>
+        <span class="hs-dot"></span>
+        <span class="hs">parlament.gv.at</span>
+      </div>
     </div>
   </section>
 
@@ -205,6 +214,19 @@ async function downloadReport() {
 .hp {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; font-weight: 500; color: #0a2e36;
+}
+.hero-sources {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 4px; flex-wrap: wrap;
+}
+.hs {
+  font-size: 12px; font-weight: 600; color: var(--navy);
+  padding: 3px 10px; border-radius: 6px;
+  background: rgba(10,80,98,0.06); letter-spacing: 0.3px;
+}
+.hs-dot {
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--muted); flex-shrink: 0;
 }
 
 /* ── Form ── */
