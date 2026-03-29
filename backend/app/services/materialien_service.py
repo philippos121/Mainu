@@ -359,7 +359,7 @@ async def fetch_materialien_for_results(results: list[dict]) -> dict[str, dict]:
             gesetzesnummer=info["gesetzesnummer"],
             materialien_str=info["materialien"],
         )
-        for info in list(bgbl_map.values())[:10]
+        for info in list(bgbl_map.values())[:20]
     ]
     results_mat = await asyncio.gather(*tasks, return_exceptions=True)
 

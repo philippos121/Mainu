@@ -47,12 +47,23 @@
       <div class="field-row">
         <div class="field field-half">
           <label>Zeitraum</label>
-          <v-select v-model="selectedTimeframe" :items="timeframes" item-title="label" item-value="value"
+          <v-select v-model="selectedTimeframe" :items="timeframeOptions" item-title="label" item-value="value"
             variant="outlined" density="compact" hide-details color="#007993" bg-color="white" />
         </div>
         <div class="field field-half">
           <label>E-Mail</label>
           <input v-model="reportEmail" type="email" placeholder="name@kanzlei.at" class="inp" />
+        </div>
+      </div>
+
+      <div v-if="selectedTimeframe === 'custom'" class="field-row">
+        <div class="field field-half">
+          <label>Von</label>
+          <input v-model="datumVon" type="date" class="inp" />
+        </div>
+        <div class="field field-half">
+          <label>Bis</label>
+          <input v-model="datumBis" type="date" class="inp" />
         </div>
       </div>
 
@@ -85,7 +96,12 @@ const categories = ref([])
 const timeframes = ref([])
 const selectedCategory = ref([])
 const selectedTimeframe = ref('EinemMonat')
+const datumVon = ref('')
+const datumBis = ref('')
 const reportEmail = ref(localStorage.getItem('ris_report_email') || '')
+
+// Timeframe options: server list + custom date option
+const timeframeOptions = ref([])
 const sending = ref(false)
 const generating = ref(false)
 const statusMsg = ref('')
@@ -97,21 +113,26 @@ onMounted(async () => {
   try {
     const [a,b] = await Promise.all([api.get('/categories'), api.get('/timeframes')])
     categories.value = a.data; timeframes.value = b.data
+    timeframeOptions.value = [...b.data, { value: 'custom', label: 'Benutzerdefiniert…' }]
   } catch { statusMsg.value = 'Verbindung fehlgeschlagen.'; statusOk.value = false }
 })
 
 async function doSearch() {
   const cats = selectedCategory.value || []
+  const isCustom = selectedTimeframe.value === 'custom'
+  const tf = isCustom ? 'EinemJahr' : selectedTimeframe.value
+  const extraParams = isCustom && datumVon.value && datumBis.value
+    ? { datum_von: datumVon.value, datum_bis: datumBis.value } : {}
   // Search both Gesetze + Entscheidungen and combine
   const endpoints = ['/search/gesetze', '/search/gerichtsentscheidungen']
   const allResults = []; let allHits = 0; const seen = new Set()
   for (const ep of endpoints) {
     if (cats.length <= 1) {
-      const p = { im_ris_seit: selectedTimeframe.value, page: 1 }
+      const p = { im_ris_seit: tf, page: 1, ...extraParams }
       if (cats.length === 1) p.category = cats[0]
       try { const r = (await api.get(ep, { params: p })).data; allHits += r.total_hits || 0; for (const i of (r.results||[])) { if(!seen.has(i.id)){seen.add(i.id);allResults.push(i)} } } catch {}
     } else {
-      const ps = cats.map(c => api.get(ep, { params: { im_ris_seit: selectedTimeframe.value, page: 1, category: c } }).catch(()=>({data:{results:[],total_hits:0}})))
+      const ps = cats.map(c => api.get(ep, { params: { im_ris_seit: tf, page: 1, category: c, ...extraParams } }).catch(()=>({data:{results:[],total_hits:0}})))
       const rs = await Promise.all(ps)
       for (const r of rs) { allHits += r.data.total_hits || 0; for (const i of (r.data.results||[])) { if(!seen.has(i.id)){seen.add(i.id);allResults.push(i)} } }
     }
@@ -125,7 +146,12 @@ function catLabel() {
   if (c.length===1) { const f=categories.value.find(x=>x.id===c[0]); return f?f.label:'' }
   return `${c.length} Rechtsgebiete`
 }
-function tfLabel() { const t=timeframes.value.find(x=>x.value===selectedTimeframe.value); return t?t.label:'' }
+function tfLabel() {
+  if (selectedTimeframe.value === 'custom' && datumVon.value && datumBis.value) {
+    return `${datumVon.value} bis ${datumBis.value}`
+  }
+  const t=timeframes.value.find(x=>x.value===selectedTimeframe.value); return t?t.label:''
+}
 
 async function sendReport() {
   if (!reportEmail.value || !selectedCategory.value.length) return

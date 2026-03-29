@@ -298,8 +298,10 @@ async def search_gesetze(
     category: str,
     im_ris_seit: str,
     page: int = 1,
+    datum_von: str = "",
+    datum_bis: str = "",
 ) -> dict:
-    """Search Bundesrecht using RIS Index + ImRisSeit.
+    """Search Bundesrecht using RIS Index + ImRisSeit or date range.
 
     Strategy:
     1. Try Index parameter (official legal classification) + ImRisSeit
@@ -309,15 +311,19 @@ async def search_gesetze(
     searches = _CATEGORY_SEARCH.get(category, []) if category else []
 
     if searches:
-        return await _search_by_params(searches, im_ris_seit, page)
+        return await _search_by_params(searches, im_ris_seit, page, datum_von, datum_bis)
     else:
         # No category selected or unknown → broad search
         params: dict = {
             "Applikation": "BrKons",
             "DokumenteProSeite": DOCS_PER_PAGE,
             "Seitennummer": page,
-            "ImRisSeit": im_ris_seit,
         }
+        if datum_von and datum_bis:
+            params["Fassung.VonInkrafttretensdatum"] = datum_von
+            params["Fassung.BisInkrafttretensdatum"] = datum_bis
+        else:
+            params["ImRisSeit"] = im_ris_seit
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"
         return await _fetch(url, params)
 
@@ -326,17 +332,23 @@ async def _search_by_params(
     searches: list[dict],
     im_ris_seit: str,
     page: int,
+    datum_von: str = "",
+    datum_bis: str = "",
 ) -> dict:
     """Query RIS with multiple search param sets in parallel, combine results.
 
     Each search dict can have {"Index": "XX/YY"} or {"Titel": "LawName"}.
     """
 
-    # Compute date range for Fassung filter
-    days = _timeframe_to_days(im_ris_seit)
-    today = date.today()
-    von = (today - timedelta(days=days)).strftime("%Y-%m-%d")
-    bis = today.strftime("%Y-%m-%d")
+    # Compute date range for Fassung filter (custom dates override)
+    if datum_von and datum_bis:
+        von = datum_von
+        bis = datum_bis
+    else:
+        days = _timeframe_to_days(im_ris_seit)
+        today = date.today()
+        von = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+        bis = today.strftime("%Y-%m-%d")
 
     async def _query_one(search_params: dict) -> dict:
         url = f"{settings.RIS_API_BASE_URL}/Bundesrecht"

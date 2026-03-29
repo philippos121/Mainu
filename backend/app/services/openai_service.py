@@ -1,6 +1,6 @@
 """OpenAI GPT integration for summarising RIS search results.
 
-The API key is passed per-request from the frontend — no server-side key needed.
+API key from OPENAI_API_KEY env var or per-request fallback.
 """
 
 import logging
@@ -12,12 +12,20 @@ logger = logging.getLogger(__name__)
 
 GPT_MODEL = "gpt-4.1"
 
+# Source labels for GPT context
+_SOURCE_LABELS = {
+    "findok": "Findok/BMF",
+    "eurlex": "EUR-Lex/EU",
+}
+
 
 def _build_result_text(results: list[dict[str, Any]], include_urls: bool = False) -> str:
-    """Build a structured text block from RIS results for GPT context."""
+    """Build a structured text block from search results for GPT context."""
     lines: list[str] = []
-    for i, r in enumerate(results[:20], 1):
-        parts = [f"{i}. {r.get('title', 'Unbekannt')}"]
+    for i, r in enumerate(results[:30], 1):
+        source = r.get("source", "")
+        source_label = _SOURCE_LABELS.get(source, "RIS")
+        parts = [f"{i}. [{source_label}] {r.get('title', 'Unbekannt')}"]
         if r.get("artikel"):
             parts.append(f"  §/Artikel: {r['artikel']}")
         if r.get("date"):
@@ -32,8 +40,10 @@ def _build_result_text(results: list[dict[str, Any]], include_urls: bool = False
             parts.append(f"  GZ: {r['case_number']}")
         if r.get("normen"):
             parts.append(f"  Normen: {r['normen']}")
+        if r.get("rechtssatz"):
+            parts.append(f"  Rechtssatz: {r['rechtssatz'][:200]}")
         if include_urls and r.get("url"):
-            parts.append(f"  URL: {r['url']}")
+            parts.append(f"  Quelle: {r['url']}")
         lines.append("\n".join(parts))
 
     return "\n\n".join(lines)
@@ -91,8 +101,8 @@ async def generate_report_markdown(
     type_label = "Gesetze und Verordnungen" if doc_type == "gesetze" else "Gerichtsentscheidungen"
 
     system_prompt = (
-        "Du verfasst eine sachliche rechtliche Analyse aktueller Gesetzesänderungen "
-        "und Gerichtsentscheidungen.\n\n"
+        "Du verfasst als erfahrener österreichischer Rechtsanwalt eine sachliche "
+        "rechtliche Analyse aktueller Rechtsänderungen.\n\n"
         "STIL:\n"
         "- Sachlich, präzise, juristisch fundiert\n"
         "- KEINE Anrede ('Sehr geehrte Damen und Herren' etc.)\n"
@@ -105,26 +115,37 @@ async def generate_report_markdown(
         "   - **Thema** (nicht 'Rechtsfrage' — allgemeiner formulieren)\n"
         "   - Was hat sich geändert (Kerngehalt der Novelle)\n"
         "   - Praktische Auswirkungen (wer ist betroffen, was ist zu tun)\n"
+        "   - **Quellenangabe** mit klickbarem Link zur Originalquelle\n"
         "3. **Weitere Änderungen**: Kürzere Darstellung der übrigen Änderungen\n"
         "4. **Ausblick**: Trends und offene Fragen\n\n"
-        "REGELN:\n"
+        "QUELLEN:\n"
+        "- Ergebnisse sind mit [RIS], [Findok/BMF] oder [EUR-Lex/EU] gekennzeichnet\n"
+        "- Bei jeder Analyse die Quelle und URL angeben\n"
+        "- Format: [Kurztitel](URL) — klickbarer Markdown-Link\n"
+        "- BGBl-Nummern, CELEX-Nummern und Inkrafttretensdaten immer angeben\n\n"
+        "INHALTE:\n"
+        "- Gesetze und Verordnungen: Inhalt der Novelle analysieren\n"
+        "- Wenn VERSIONSVERGLEICHE vorliegen: konkret beschreiben was sich geändert hat\n"
+        "- Wenn GESETZESMATERIALIEN vorliegen: Intention des Gesetzgebers zusammenfassen\n"
+        "- Gerichtsentscheidungen: Kernaussage des Rechtssatzes\n"
+        "- BMF-Richtlinien/Erlässe (Findok): Rechtsansicht des BMF zusammenfassen\n"
+        "- EU-Recht (EUR-Lex): Auswirkungen auf österreichisches Recht\n"
         "- Schwerpunkt immer auf die rechtliche Aussage, nicht den Verfahrensgang\n"
-        "- Entscheidungen und Gesetze sinnvoll zusammenfassen\n"
-        "- Nur die konkret gelisteten Bestimmungen analysieren\n"
-        "- BGBl-Nummern und Inkrafttretensdaten angeben\n"
-        "- Markdown-Formatierung"
+        "- Markdown-Formatierung verwenden"
     )
 
     user_prompt = (
         f"Erstelle eine rechtliche Analyse der folgenden {total_hits} "
-        f"{type_label} im Rechtsgebiet '{category_label}' "
+        f"Rechtsakte im Bereich '{category_label}' "
         f"(Zeitraum: {timeframe_label}).\n\n"
-        f"Fokus auf die rechtliche Aussage und praktische Relevanz. "
-        f"Nicht den Verfahrensgang beschreiben:\n\n{result_text}"
+        f"Die Ergebnisse stammen aus verschiedenen Quellen: "
+        f"RIS (Bundesrecht, Judikatur), Findok (BMF-Richtlinien/Erlässe), "
+        f"EUR-Lex (EU-Recht). Analysiere alle sachlich mit Quellenangabe:\n\n"
+        f"{result_text}"
         f"{extra_context}"
     )
 
-    return await _chat(api_key, system_prompt, user_prompt, max_tokens=3000)
+    return await _chat(api_key, system_prompt, user_prompt, max_tokens=4000)
 
 
 async def _chat(api_key: str, system: str, user: str, max_tokens: int = 1500) -> str:

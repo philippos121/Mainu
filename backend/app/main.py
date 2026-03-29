@@ -90,15 +90,16 @@ async def get_courts():
 async def api_search_gesetze(
     category: str = Query("", description="Rechtsgebiet ID, empty for all"),
     im_ris_seit: str = Query("EinemMonat", description="Timeframe filter"),
+    datum_von: str = Query("", description="Custom start date YYYY-MM-DD"),
+    datum_bis: str = Query("", description="Custom end date YYYY-MM-DD"),
     page: int = Query(1, ge=1),
 ):
     """Search Gesetze und Verordnungen (Bundesrecht consolidated).
     Special categories 'unionsrecht' are routed to EUR-Lex + RIS EU-Integration."""
     if category == "unionsrecht":
-        # EUR-Lex for EU acts + RIS EU-Integration index for Austrian implementation
         import asyncio as _aio
         eurlex_task = search_eurlex(im_ris_seit=im_ris_seit)
-        ris_task = search_gesetze(category="eu_integration", im_ris_seit=im_ris_seit, page=page)
+        ris_task = search_gesetze(category="eu_integration", im_ris_seit=im_ris_seit, page=page, datum_von=datum_von, datum_bis=datum_bis)
         eurlex_results, ris_raw = await _aio.gather(eurlex_task, ris_task, return_exceptions=True)
         combined = []
         total = 0
@@ -111,8 +112,17 @@ async def api_search_gesetze(
             combined.extend(ris_parsed.get("results", []))
             total += ris_parsed.get("total_hits", 0)
         return {"results": combined, "total_hits": total}
-    raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page)
+    raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit, page=page, datum_von=datum_von, datum_bis=datum_bis)
     days = _timeframe_to_days(im_ris_seit)
+    if datum_von and datum_bis:
+        # Custom date range: compute days for filtering
+        from datetime import datetime as _dt
+        try:
+            d1 = _dt.strptime(datum_von, "%Y-%m-%d")
+            d2 = _dt.strptime(datum_bis, "%Y-%m-%d")
+            days = (d2 - d1).days + 1
+        except ValueError:
+            pass
     parsed = parse_bundesrecht_response(raw, timeframe_days=days)
     # For Steuerrecht/Finanzrecht categories, also fetch Findok (BMF Richtlinien, Erlässe, BFG)
     steuer_cats = {"einkommensteuer", "koerperschaftsteuer", "umsatzsteuer", "abgabenrecht",
@@ -471,7 +481,7 @@ async def _generate_full_report(req) -> dict:
     all_diffs = dict(req.diffs)
     diff_summaries = []
     import asyncio
-    missing = [r for r in req.results[:20]
+    missing = [r for r in req.results[:50]
                if r.get("id") and r["id"] not in all_diffs
                and r.get("gesetzesnummer") and r.get("artikel")]
     if missing:
@@ -630,15 +640,22 @@ def _build_email_report(
         inkraft = _h.escape(str(r.get("date", "")))
         bgbl = _h.escape(str(r.get("bgbl", "")))
         url = _h.escape(str(r.get("url", "")))
+        source = r.get("source", "")
+        source_badge = ""
+        if source == "findok":
+            source_badge = '<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:#fff7ed;color:#ea580c;margin-left:4px">Findok</span>'
+        elif source == "eurlex":
+            source_badge = '<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:#eff6ff;color:#2563eb;margin-left:4px">EUR-Lex</span>'
         bg = "#ffffff" if i % 2 == 0 else "#f9fafb"
+        link_label = "Findok →" if source == "findok" else "EUR-Lex →" if source == "eurlex" else "RIS →"
         results_rows += f'''<tr style="background:{bg}">
 <td style="padding:10px 12px;font-size:13px;color:#1a1a1a;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">
-  <strong>{title}</strong>{f" {artikel}" if artikel else ""}
+  <strong>{title}</strong>{f" {artikel}" if artikel else ""}{source_badge}
 </td>
 <td style="padding:10px 12px;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3;white-space:nowrap">{inkraft}</td>
 <td style="padding:10px 12px;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">{bgbl}</td>
 <td style="padding:10px 12px;font-size:12px;font-family:Arial,sans-serif;border-bottom:1px solid #f0f1f3">
-  {f'<a href="{url}" style="color:#007993;text-decoration:none">RIS →</a>' if url else ""}
+  {f'<a href="{url}" style="color:#007993;text-decoration:none">{link_label}</a>' if url else ""}
 </td>
 </tr>'''
 
