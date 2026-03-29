@@ -293,7 +293,7 @@ async def api_report_email(req: EmailReportRequest):
                         "Content-Type": "application/json",
                     },
                     json={
-                        "from": {"email": "monitoring@trial-z86org8d5x7gew13.mlsender.net", "name": "AI:ssociate Monitoring"},
+                        "from": {"email": "monitoring@test-3m5jgro09qzgdpyo.mlsender.net", "name": "AI:ssociate Monitoring"},
                         "to": [{"email": req.email}],
                         "subject": f"AI:ssociate Monitoring — {req.category_label} — {req.timeframe_label}",
                         "html": html_report,
