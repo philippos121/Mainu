@@ -135,20 +135,15 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
     inkraft = meta.get("Inkrafttretensdatum", "")
     doc_nr = meta.get("Dokumentnummer", "") or meta.get("ID", "")
 
-    # Step 3: Try inline Dokumentinhalt first (most reliable)
-    text = _extract_inline_text(d)
-    if text and len(text) > 30:
-        logger.info(f"Got inline text for {doc_nr}: {len(text)} chars")
-        return {"text": _clean_accessible(text), "inkrafttreten": inkraft, "url": ""}
-
-    # Step 4: Try ContentUrl (fetch HTML)
+    # Step 3: Fetch law text from ContentUrl (most reliable for actual paragraph text)
+    # DO NOT use inline Dokumentinhalt — it often contains only Kurzinformation/annotations
     content_urls = _find_urls(d)
     logger.info(f"Content URLs for {doc_nr}: {content_urls}")
 
+    best_text = ""
+    best_url = ""
+
     if content_urls:
-        # Fetch and pick the longest meaningful text
-        best_text = ""
-        best_url = ""
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
             for u in content_urls[:4]:
                 try:
@@ -156,30 +151,36 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
                     resp.raise_for_status()
                     raw = resp.text
                     t = _extract_law_text(raw, u)
-                    if t and len(t) > len(best_text):
+                    # Only accept substantial text (>200 chars = real law content)
+                    if t and len(t) > 200 and len(t) > len(best_text):
                         best_text = t
                         best_url = u
                 except Exception as e:
                     logger.warning(f"Content fetch error for {u}: {e}")
 
-        if best_text and len(best_text) > 30:
-            logger.info(f"Got content text from {best_url}: {len(best_text)} chars")
-            return {"text": _clean_accessible(best_text), "inkrafttreten": inkraft, "url": best_url}
+    if best_text:
+        logger.info(f"Got law text from {best_url}: {len(best_text)} chars")
+        return {"text": _clean_accessible(best_text), "inkrafttreten": inkraft, "url": best_url}
 
-    # Step 5: Fallback to RIS website
-    nor = doc_nr
-    if nor:
-        fallback_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={nor}"
+    # Step 4: Fallback — try RIS website Dokument.wxe
+    if doc_nr:
+        fallback_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={doc_nr}"
         logger.info(f"Fallback to website: {fallback_url}")
         try:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
                 resp = await client.get(fallback_url)
                 resp.raise_for_status()
                 t = _extract_text_section(resp.text)
-                if t and len(t) > 30:
+                if t and len(t) > 100:
                     return {"text": _clean_accessible(t), "inkrafttreten": inkraft, "url": fallback_url}
         except Exception as e:
             logger.error(f"Fallback fetch error: {e}")
+
+    # Step 5: Last resort — try inline text only if substantial (>500 chars)
+    inline = _extract_inline_text(d)
+    if inline and len(inline) > 500:
+        logger.info(f"Using inline text for {doc_nr}: {len(inline)} chars")
+        return {"text": _clean_accessible(inline), "inkrafttreten": inkraft, "url": ""}
 
     logger.warning(f"No text found for {doc_nr}")
     return None

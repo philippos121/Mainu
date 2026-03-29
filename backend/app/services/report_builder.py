@@ -50,8 +50,10 @@ def build_report(
         group_materialien = {}
         for r in group_results:
             bgbl = str(r.get("bgbl", ""))
+            aenderung = str(r.get("aenderung_bgbl", ""))
+            combined = f"{bgbl} {aenderung}"
             for key, mat in materialien.items():
-                if key in bgbl:
+                if key in combined:
                     group_materialien[key] = mat
 
         cards = ""

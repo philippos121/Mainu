@@ -337,20 +337,30 @@ async def fetch_materialien_for_results(results: list[dict]) -> dict[str, dict]:
     # because Materialien (Erläuterungen) are linked to the Novelle, not the original law
     bgbl_map: dict[str, dict] = {}
     for r in results:
-        # Use the Novellen-BGBl if available
+        # Use the Novellen-BGBl if available (Materialien belong to the Novelle)
         aenderung = r.get("aenderung_bgbl", "")
         bgbl = r.get("bgbl", "")
-        lookup_bgbl = aenderung if aenderung and "BGBl" in aenderung else bgbl
-        if lookup_bgbl and "BGBl" in lookup_bgbl:
-            m = re.search(r'Nr\.?\s*\d+/\d{4}', lookup_bgbl)
-            if m:
-                key = m.group(0)
-                if key not in bgbl_map:
-                    bgbl_map[key] = {
-                        "bgbl": lookup_bgbl,
-                        "gesetzesnummer": r.get("gesetzesnummer", ""),
-                        "materialien": r.get("materialien", ""),
-                    }
+
+        # Priority: explicit aenderung_bgbl > last Nr. in bgbl string
+        if aenderung and "BGBl" in aenderung:
+            lookup_bgbl = aenderung
+        elif bgbl and "BGBl" in bgbl:
+            lookup_bgbl = bgbl
+        else:
+            continue
+
+        # Find ALL Nr. patterns — use the LAST one (= the Novelle, not the Stammgesetz)
+        all_nrs = re.findall(r'Nr\.?\s*\d+/\d{4}', lookup_bgbl)
+        if not all_nrs:
+            continue
+        key = all_nrs[-1]  # Last match = most recent BGBl = the Novelle
+
+        if key not in bgbl_map:
+            bgbl_map[key] = {
+                "bgbl": lookup_bgbl,
+                "gesetzesnummer": r.get("gesetzesnummer", ""),
+                "materialien": r.get("materialien", ""),
+            }
 
     if not bgbl_map:
         return {}
