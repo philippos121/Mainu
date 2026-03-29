@@ -83,8 +83,12 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 
 const cvs = ref(null)
-let scrollY = 0 // NOT reactive — only canvas reads this
+let scrollY = 0
+let prevScrollY = -1
 let raf = 0
+let scrolling = false
+let scrollTimer = 0
+let renderLoop = () => {}
 
 // ── IntersectionObserver for reveals (no scroll listener needed) ──
 let observer = null
@@ -108,6 +112,9 @@ function setupObserver() {
 // ── Canvas — reads raw scrollY, no Vue reactivity ──
 function onScroll() {
   scrollY = window.scrollY || document.documentElement.scrollTop || 0
+  if (!scrolling) { scrolling = true; renderLoop() }
+  clearTimeout(scrollTimer)
+  scrollTimer = setTimeout(() => { scrolling = false }, 150)
 }
 
 function startCanvas() {
@@ -127,17 +134,15 @@ function startCanvas() {
   function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
   resize(); window.addEventListener('resize',resize)
 
-  let lastFrame=0
-  function frame(){
-    const t=performance.now()
-    if(t-lastFrame<32){raf=requestAnimationFrame(frame);return} // cap 30fps
-    lastFrame=t
+  function render(){
     const s=scrollY
-    const ry=s*.0002+t*.00004,rx=s*.0003
+    const ry=s*.0003,rx=s*.0002
     const cy=Math.cos(ry),sn=Math.sin(ry),cx=Math.cos(rx),sx=Math.sin(rx)
     const hw=W/2,hh=H/2
     for(let i=0;i<N;i++){
-      let x=ax[i]+=dx[i],y=ay[i]+=dy[i],z=az[i]+=dz[i]
+      // Only move nodes when scrolling
+      if(scrolling){ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]}
+      let x=ax[i],y=ay[i],z=az[i]
       if(x>1.3||x<-1.3)dx[i]*=-1;if(y>1.3||y<-1.3)dy[i]*=-1;if(z>1.3||z<-1.3)dz[i]*=-1
       const a=x*cy-z*sn,b=x*sn+z*cy,d=y*cx-b*sx,e=y*sx+b*cx
       const sc=2.5/(4+e);ox[i]=hw+a*W*.38*sc;oy[i]=hh+d*H*.32*sc;os[i]=sc
@@ -157,9 +162,18 @@ function startCanvas() {
       gl.fillStyle=sh[i]?`rgba(255,151,51,${a*.8})`:`rgba(34,201,232,${a*.6})`
       gl.fill()
     }
-    raf=requestAnimationFrame(frame)
   }
-  raf=requestAnimationFrame(frame)
+
+  // Render loop only runs while scrolling
+  renderLoop = function(){
+    if(!scrolling){return}
+    if(scrollY!==prevScrollY){render();prevScrollY=scrollY}
+    raf=requestAnimationFrame(renderLoop)
+  }
+
+  // Single initial render then stop
+  render()
+
   return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize)}
 }
 
