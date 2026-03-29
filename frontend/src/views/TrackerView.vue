@@ -2,55 +2,41 @@
 <div class="page">
   <canvas ref="cvs" class="bg-canvas"></canvas>
 
-  <div class="scroll-wrap">
-    <!-- Intro -->
-    <section class="s s-full reveal"><div class="sc">
-      <img src="/logo.svg" alt="AI:ssociate" class="logo" />
-      <div class="arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
-    </div></section>
+  <!-- Fixed center stage — text swaps here, page doesn't visually move -->
+  <div class="stage">
+    <div class="stage-text" id="stage-text">
+      <img src="/logo.svg" alt="AI:ssociate" class="logo" id="stage-logo" />
+      <span class="st-num" id="st-num"></span>
+      <h2 class="st-title" id="st-title"></h2>
+      <p class="st-sub" id="st-sub"></p>
+    </div>
+  </div>
 
-    <section class="s s-full reveal"><div class="sc">
-      <h2 class="t-legal">Legal</h2>
-      <h2 class="t-monitoring">Monitoring</h2>
-    </div></section>
+  <!-- Invisible scroll spacer — drives the text changes -->
+  <div class="scroll-driver" :style="{ height: totalHeight + 'px' }"></div>
 
-    <section class="s s-full reveal"><div class="sc">
-      <p class="tagline">Rechtsänderungen erkennen,<br/><em>bevor sie relevant werden.</em></p>
-    </div></section>
-
-    <!-- Rechtsgebiete — each appears as you scroll -->
-    <section class="s s-rg reveal" v-for="(k, i) in kernList" :key="k.id">
-      <div class="sc">
-        <span class="rg-num">0{{ i + 1 }}</span>
-        <h2 class="rg-name">{{ k.label }}</h2>
+  <!-- Form — appears at the bottom after scrolling through all -->
+  <div class="form-wrap" id="form-wrap">
+    <div class="form-inner">
+      <p class="form-title">Report generieren</p>
+      <div class="chips">
+        <button v-for="k in kernList" :key="k.id" class="chip"
+          :class="{ on: selectedCategory.includes(k.id) }"
+          @click="toggleCat(k.id)">{{ k.label }}</button>
       </div>
-    </section>
-
-    <!-- Form -->
-    <section class="s s-form">
-      <div class="form-dock reveal" id="form-dock">
-        <div class="form-inner">
-          <p class="form-title">Report generieren</p>
-          <div class="chips">
-            <button v-for="k in kernList" :key="k.id" class="chip"
-              :class="{ on: selectedCategory.includes(k.id) }"
-              @click="toggleCat(k.id)">{{ k.label }}</button>
-          </div>
-          <div class="form-row">
-            <div class="ff"><label>Zeitraum</label>
-              <select v-model="selectedTimeframe" class="inp">
-                <option v-for="t in timeframeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
-              </select>
-            </div>
-          </div>
-          <button class="btn-go" :disabled="!selectedCategory.length || generating" @click="generateReport">
-            <span v-if="generating" class="spin"></span>
-            <template v-else>Report erstellen ↓</template>
-          </button>
-          <p v-if="statusMsg" :class="['msg', statusOk ? 'msg-ok' : 'msg-err']">{{ statusMsg }}</p>
+      <div class="form-row">
+        <div class="ff"><label>Zeitraum</label>
+          <select v-model="selectedTimeframe" class="inp">
+            <option v-for="t in timeframeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
         </div>
       </div>
-    </section>
+      <button class="btn-go" :disabled="!selectedCategory.length || generating" @click="generateReport">
+        <span v-if="generating" class="spin"></span>
+        <template v-else>Report erstellen ↓</template>
+      </button>
+      <p v-if="statusMsg" :class="['msg', statusOk ? 'msg-ok' : 'msg-err']">{{ statusMsg }}</p>
+    </div>
   </div>
 </div>
 </template>
@@ -62,8 +48,19 @@ import { KERN } from '../lib/journeyNodes.js'
 import { createRenderer } from '../lib/canvasRenderer.js'
 
 const cvs = ref(null)
-let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, observer = null, raf = 0
-let renderLoop = () => {}
+let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, raf = 0
+let renderLoop = () => {}, prevSlide = -1
+
+// Slides: logo → Legal Monitoring → tagline → 9 Rechtsgebiete = 12 slides
+const slides = [
+  { type: 'logo' },
+  { type: 'text', title: 'Legal Monitoring', sub: '' },
+  { type: 'text', title: 'Rechtsänderungen erkennen,', sub: 'bevor sie relevant werden.' },
+  ...KERN.map((k, i) => ({ type: 'rg', num: String(i + 1).padStart(2, '0'), title: k.label })),
+]
+
+const SLIDE_H = 600 // px of scroll per slide
+const totalHeight = ref(slides.length * SLIDE_H + window.innerHeight)
 
 const kernList = KERN
 const selectedCategory = ref(KERN.map(k => k.id))
@@ -82,6 +79,47 @@ function onScroll() {
   if (!scrolling) { scrolling = true; renderLoop() }
   clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => { scrolling = false }, 150)
+  updateStage()
+}
+
+function updateStage() {
+  const slideIdx = Math.min(slides.length - 1, Math.floor(scrollY / SLIDE_H))
+  const progress = (scrollY % SLIDE_H) / SLIDE_H // 0..1 within slide
+
+  // Show form when past last slide
+  const formEl = document.getElementById('form-wrap')
+  if (formEl) {
+    formEl.style.opacity = slideIdx >= slides.length - 1 ? '1' : '0'
+    formEl.style.pointerEvents = slideIdx >= slides.length - 1 ? 'auto' : 'none'
+  }
+
+  if (slideIdx === prevSlide) return
+  prevSlide = slideIdx
+
+  const slide = slides[slideIdx]
+  const logo = document.getElementById('stage-logo')
+  const num = document.getElementById('st-num')
+  const title = document.getElementById('st-title')
+  const sub = document.getElementById('st-sub')
+  const text = document.getElementById('stage-text')
+  if (!title) return
+
+  // Fade out then in
+  text.style.opacity = '0'
+  text.style.transform = 'translateY(20px)'
+
+  setTimeout(() => {
+    logo.style.display = slide.type === 'logo' ? 'block' : 'none'
+    num.textContent = slide.num || ''
+    num.style.display = slide.num ? 'block' : 'none'
+    title.textContent = slide.type === 'logo' ? '' : slide.title || ''
+    title.className = slide.type === 'rg' ? 'st-title st-rg' : slide.type === 'text' && !slide.sub ? 'st-title st-hero' : 'st-title'
+    sub.textContent = slide.sub || ''
+    sub.style.display = slide.sub ? 'block' : 'none'
+
+    text.style.opacity = '1'
+    text.style.transform = 'translateY(0)'
+  }, 150)
 }
 
 function setupRenderer() {
@@ -94,28 +132,18 @@ function setupRenderer() {
   }
 }
 
-function setupObserver() {
-  if (observer) observer.disconnect()
-  observer = new IntersectionObserver(entries => {
-    for (const e of entries) if (e.isIntersecting) e.target.classList.add('on')
-  }, { threshold: 0.2 })
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
-}
-
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
   setupRenderer()
-  requestAnimationFrame(setupObserver)
+  updateStage()
   Promise.all([api.get('/categories'), api.get('/timeframes')]).then(([, b]) => {
     timeframeOptions.value = [...b.data, { value: 'custom', label: 'Benutzerdefiniert…' }]
   }).catch(() => { statusMsg.value = 'Verbindung fehlgeschlagen.'; statusOk.value = false })
 })
-
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
   cancelAnimationFrame(raf)
   if (renderer) renderer.destroy()
-  if (observer) observer.disconnect()
 })
 
 async function doSearch() {
@@ -130,13 +158,7 @@ async function doSearch() {
   }
   return { results: all, total_hits: hits }
 }
-
-function catLabel() {
-  const c = selectedCategory.value
-  if (c.length === KERN.length) return 'Alle Kernrechtsgebiete'
-  if (c.length === 1) { const f = KERN.find(x => x.id === c[0]); return f ? f.label : '' }
-  return `${c.length} Rechtsgebiete`
-}
+function catLabel() { const c = selectedCategory.value; if (c.length === KERN.length) return 'Alle Kernrechtsgebiete'; if (c.length === 1) { const f = KERN.find(x => x.id === c[0]); return f ? f.label : '' } return `${c.length} Rechtsgebiete` }
 function tfLabel() { const t = timeframeOptions.value.find(x => x.value === selectedTimeframe.value); return t ? t.label : '' }
 
 async function generateReport() {
@@ -160,44 +182,32 @@ async function generateReport() {
 <style scoped>
 .page{min-height:100vh;background:#070e12;color:#e4f0f2}
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none;contain:strict}
-.scroll-wrap{position:relative;z-index:2;will-change:transform;transform:translateZ(0)}
 
-.s{display:flex;align-items:center;justify-content:center;padding:24px}
-.s-full{min-height:100vh}
-.sc{text-align:center;max-width:680px;width:100%}
+/* Stage — fixed center, text swaps in place */
+.stage{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.stage-text{text-align:center;transition:opacity .3s ease,transform .3s ease;will-change:opacity,transform}
 
-/* Reveal */
-.reveal>.sc,.reveal>.form-inner{opacity:0;transform:translateY(40px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
-.reveal.on>.sc,.reveal.on>.form-inner{opacity:1;transform:none}
+.logo{height:52px;filter:brightness(10);display:block;margin:0 auto}
 
-/* Logo */
-.logo{height:60px;filter:brightness(10)}
-.arrow{margin-top:48px;animation:bob 2.5s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translateY(0);opacity:.15}50%{transform:translateY(8px);opacity:.35}}
+.st-num{font-size:12px;font-weight:700;color:rgba(34,201,232,.4);letter-spacing:3px;display:none;margin-bottom:10px}
+.st-title{font-size:36px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:-.5px;margin:0;line-height:1.2}
+.st-hero{font-size:48px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:linear-gradient(135deg,#ff9733,#ffbe6d 40%,#ff9733 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.st-rg{font-size:36px}
+.st-sub{font-size:22px;font-weight:300;color:#22c9e8;margin-top:10px;display:none}
 
-/* Titles */
-.t-legal{font-size:22px;font-weight:300;letter-spacing:12px;text-transform:uppercase;color:rgba(255,255,255,.35);margin:0 0 8px}
-.t-monitoring{font-size:60px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin:0;background:linear-gradient(135deg,#ff9733,#ffbe6d 40%,#ff9733 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.tagline{font-size:30px;font-weight:300;line-height:1.5;color:rgba(255,255,255,.6);margin:0}
-.tagline em{font-style:normal;color:#22c9e8;font-weight:500}
+/* Scroll driver — invisible tall div that creates scroll room */
+.scroll-driver{position:relative;z-index:1;pointer-events:none}
 
-/* Rechtsgebiete sections */
-.s-rg{min-height:70vh}
-.rg-num{font-size:12px;font-weight:700;color:rgba(34,201,232,.35);letter-spacing:3px;display:block;margin-bottom:8px}
-.rg-name{font-size:36px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:-.5px;margin:0}
-
-/* Form */
-.s-form{min-height:auto;position:sticky;bottom:0;padding:0 24px}
-.form-dock{max-width:600px;margin:0 auto}
-.form-inner{background:#0a1820;border-radius:16px 16px 0 0;border:1px solid rgba(255,255,255,.06);border-bottom:none;padding:22px 26px 26px;box-shadow:0 -8px 40px rgba(0,0,0,.5)}
-.form-title{font-size:15px;font-weight:700;margin:0 0 14px;color:rgba(255,255,255,.6)}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
-.chip{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.07);background:transparent;color:rgba(255,255,255,.4);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .2s}
-.chip:hover{color:rgba(255,255,255,.65);border-color:rgba(34,201,232,.2)}
-.chip.on{color:#22c9e8;border-color:rgba(34,201,232,.35);background:rgba(34,201,232,.07)}
-.form-row{margin-bottom:12px}
-.ff{flex:1;min-width:0}
-.ff label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.35);margin-bottom:4px}
+/* Form — fades in at the end, over the stage */
+.form-wrap{position:fixed;bottom:0;left:0;right:0;z-index:10;padding:0 24px;opacity:0;pointer-events:none;transition:opacity .4s ease}
+.form-inner{max-width:560px;margin:0 auto;background:#0a1820;border-radius:16px 16px 0 0;border:1px solid rgba(255,255,255,.06);border-bottom:none;padding:22px 24px 24px;box-shadow:0 -8px 40px rgba(0,0,0,.5)}
+.form-title{font-size:14px;font-weight:700;margin:0 0 12px;color:rgba(255,255,255,.55)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.06);background:transparent;color:rgba(255,255,255,.35);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .2s}
+.chip:hover{color:rgba(255,255,255,.6);border-color:rgba(34,201,232,.2)}
+.chip.on{color:#22c9e8;border-color:rgba(34,201,232,.3);background:rgba(34,201,232,.06)}
+.form-row{margin-bottom:10px}
+.ff label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.3);margin-bottom:4px}
 .inp{width:100%;padding:9px 12px;border:1px solid rgba(255,255,255,.06);border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:rgba(255,255,255,.03);color:#e4f0f2}
 .inp:focus{border-color:rgba(34,201,232,.3)}
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
@@ -205,12 +215,12 @@ select.inp option{background:#0b1922;color:#e4f0f2}
 .btn-go{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#ff9733,#e8870a);color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 4px 16px rgba(255,151,51,.2);transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px}
 .btn-go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,151,51,.3)}
 .btn-go:disabled{opacity:.3;cursor:not-allowed}
-.msg{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px}
-.msg-ok{background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(16,185,129,.1)}
-.msg-err{background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.1)}
+.msg{margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px}
+.msg-ok{background:rgba(16,185,129,.06);color:#34d399;border:1px solid rgba(16,185,129,.1)}
+.msg-err{background:rgba(239,68,68,.06);color:#f87171;border:1px solid rgba(239,68,68,.1)}
 .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-@media(max-width:640px){.t-monitoring{font-size:38px;letter-spacing:2px}.t-legal{font-size:16px;letter-spacing:8px}.tagline{font-size:22px}.rg-name{font-size:28px}.form-inner{padding:18px}.s{padding:20px 16px}}
-@media(prefers-reduced-motion:reduce){.reveal>.sc,.reveal>.form-inner{opacity:1;transform:none;transition:none}.bg-canvas{display:none}.page{background:#0c2230}}
+@media(max-width:640px){.st-hero{font-size:32px}.st-title{font-size:28px}.st-sub{font-size:18px}.form-inner{padding:18px}}
+@media(prefers-reduced-motion:reduce){.stage-text{transition:none}.bg-canvas{display:none}.page{background:#0c2230}}
 </style>
