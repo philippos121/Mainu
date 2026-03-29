@@ -1,11 +1,10 @@
 """Diff service: compare a provision with its previous version.
 
-Simple approach:
-1. Current version: fetch from RIS API by Gesetzesnummer + ArtikelParagraphAnlage (no FassungVom = today's version)
+Approach:
+1. Current version: fetch from RIS API by Gesetzesnummer + ArtikelParagraphAnlage
 2. Previous version: same query + Fassung.FassungVom = (Inkrafttretensdatum - 1 day)
-3. Both return metadata + ContentReference with HTML/XML URLs
-4. Fetch the HTML content URLs to get the actual legal text
-5. Diff the two texts
+3. Extract text from API response Dokumentinhalt or ContentUrl HTML
+4. Diff the two texts
 """
 
 import difflib
@@ -47,7 +46,7 @@ async def fetch_provision_diff(doc_id: str, gesetzesnummer: str, artikel: str, i
             "current": {"text": current["text"], "date": inkrafttreten},
             "previous": None,
             "diff_html": f'<p class="diff-info">Keine Vorversion vom {fv} verfügbar (Erstfassung?).</p>'
-                         f'<div class="diff-current">{html_module.escape(current["text"])}</div>',
+                         f'<div class="diff-current">{html_module.escape(current["text"][:500])}</div>',
             "has_changes": False,
         }
 
@@ -60,7 +59,7 @@ async def fetch_provision_diff(doc_id: str, gesetzesnummer: str, artikel: str, i
             "current": {"text": ct, "date": inkrafttreten},
             "previous": {"text": pt, "date": previous.get("inkrafttreten", fv)},
             "diff_html": f'<p class="diff-info">Kein Textunterschied zur Fassung vom {fv}.</p>'
-                         f'<div class="diff-current">{html_module.escape(ct)}</div>',
+                         f'<div class="diff-current">{html_module.escape(ct[:500])}</div>',
             "has_changes": False,
         }
 
@@ -76,14 +75,21 @@ async def debug_document(gesetzesnummer: str, artikel: str) -> dict:
     """Debug: show what the API returns."""
     result = {}
     cur = await _get_version_text(gesetzesnummer, artikel, fassung_vom=None)
-    result["current"] = {"text_len": len(cur["text"]) if cur else 0, "meta": cur} if cur else {"error": "no result"}
+    result["current"] = {"text_len": len(cur["text"]) if cur else 0, "text_preview": cur["text"][:300] if cur else "", "url": cur.get("url", "")} if cur else {"error": "no result"}
     return result
 
 
-# ── Core: get provision text via RIS API + content URL ──
+# ── Core: get provision text via RIS API ──
 
 async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str | None) -> dict | None:
-    """Query RIS API, get content URL, fetch HTML, extract text."""
+    """Query RIS API for a specific provision and extract its text.
+
+    Strategy:
+    1. Try API with ArtikelParagraphAnlage filter
+    2. Extract text from Dokumentinhalt (inline text in API response)
+    3. If no inline text, fetch the best ContentUrl HTML
+    4. Filter to pick the correct provision (matching artikel)
+    """
 
     # Step 1: Query API
     params = {
@@ -107,74 +113,149 @@ async def _get_version_text(gesetzesnummer: str, artikel: str, fassung_vom: str 
         logger.error(f"API error: {type(e).__name__}: {e}")
         return None
 
-    # Step 2: Parse response
+    # Step 2: Parse response — find the matching provision
     refs = data.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("OgdDocumentReference", [])
     if isinstance(refs, dict):
         refs = [refs]
     if not refs:
-        logger.info(f"No results for FassungVom={fassung_vom}")
+        logger.info(f"No results for GN={gesetzesnummer} Art={artikel} FV={fassung_vom}")
         return None
 
-    ref = refs[0]
-    d = ref.get("Data", {})
+    # Pick the best matching reference (match ArtikelParagraphAnlage)
+    best_ref = refs[0]
+    for ref in refs:
+        meta = _flatten(ref.get("Data", {}))
+        ref_art = meta.get("ArtikelParagraphAnlage", "")
+        if ref_art and artikel and _normalize_artikel(ref_art) == _normalize_artikel(artikel):
+            best_ref = ref
+            break
+
+    d = best_ref.get("Data", {})
     meta = _flatten(d)
     inkraft = meta.get("Inkrafttretensdatum", "")
+    doc_nr = meta.get("Dokumentnummer", "") or meta.get("ID", "")
 
-    # Step 3: Find content URL (HTML preferred)
+    # Step 3: Try inline Dokumentinhalt first (most reliable)
+    text = _extract_inline_text(d)
+    if text and len(text) > 30:
+        logger.info(f"Got inline text for {doc_nr}: {len(text)} chars")
+        return {"text": _clean_accessible(text), "inkrafttreten": inkraft, "url": ""}
+
+    # Step 4: Try ContentUrl (fetch HTML)
     content_urls = _find_urls(d)
-    logger.info(f"Content URLs: {len(content_urls)}")
+    logger.info(f"Content URLs for {doc_nr}: {content_urls}")
 
-    html_url = None
-    for u in content_urls:
-        if "html" in u.lower() or "Html" in u:
-            html_url = u
-            break
-    if not html_url and content_urls:
-        html_url = content_urls[0]
+    if content_urls:
+        # Fetch and pick the longest meaningful text
+        best_text = ""
+        best_url = ""
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
+            for u in content_urls[:4]:
+                try:
+                    resp = await client.get(u)
+                    resp.raise_for_status()
+                    raw = resp.text
+                    t = _extract_law_text(raw, u)
+                    if t and len(t) > len(best_text):
+                        best_text = t
+                        best_url = u
+                except Exception as e:
+                    logger.warning(f"Content fetch error for {u}: {e}")
 
-    if not html_url:
-        # Fallback: try RIS website
-        nor = meta.get("ID", "") or meta.get("Dokumentnummer", "")
-        if nor:
-            html_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={nor}"
-            logger.info(f"Fallback to website: {html_url}")
+        if best_text and len(best_text) > 30:
+            logger.info(f"Got content text from {best_url}: {len(best_text)} chars")
+            return {"text": _clean_accessible(best_text), "inkrafttreten": inkraft, "url": best_url}
 
-    if not html_url:
-        logger.warning("No content URL found")
-        return None
+    # Step 5: Fallback to RIS website
+    nor = doc_nr
+    if nor:
+        fallback_url = f"https://www.ris.bka.gv.at/Dokument.wxe?Abfrage=Bundesnormen&Dokumentnummer={nor}"
+        logger.info(f"Fallback to website: {fallback_url}")
+        try:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=_FETCH_HEADERS) as client:
+                resp = await client.get(fallback_url)
+                resp.raise_for_status()
+                t = _extract_text_section(resp.text)
+                if t and len(t) > 30:
+                    return {"text": _clean_accessible(t), "inkrafttreten": inkraft, "url": fallback_url}
+        except Exception as e:
+            logger.error(f"Fallback fetch error: {e}")
 
-    # Step 4: Fetch HTML content
-    text = await _fetch_html(html_url)
-    if not text:
-        return None
-
-    return {"text": text, "inkrafttreten": inkraft, "url": html_url}
+    logger.warning(f"No text found for {doc_nr}")
+    return None
 
 
-async def _fetch_html(url: str) -> str:
-    """Fetch HTML from URL, extract legal text."""
-    logger.info(f"Fetch content: {url}")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=headers) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            raw = resp.text
-    except Exception as e:
-        logger.error(f"Fetch error: {type(e).__name__}: {e}")
-        return ""
+_FETCH_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 
-    # If it's a full RIS page (Dokument.wxe), extract the "Text" section
-    if "Dokument.wxe" in url or len(raw) > 5000:
-        text = _extract_text_section(raw)
-        if text:
-            return _clean_accessible(text)
 
-    # Otherwise it's raw content from a ContentUrl
-    return _clean_accessible(_strip_html(raw))
+def _normalize_artikel(art: str) -> str:
+    """Normalize article/paragraph string for comparison."""
+    return re.sub(r'\s+', '', art.lower().strip())
+
+
+def _extract_inline_text(data_entry: dict) -> str:
+    """Extract Dokumentinhalt text directly from API response (no HTTP fetch needed).
+
+    The RIS API sometimes includes the law text inline in the response as:
+    - Data.Dokumentinhalt (HTML or text)
+    - Data.Dokumentliste.ContentReference.Nutzdaten.Abschnitt (structured XML)
+    """
+    # Try Dokumentinhalt
+    for key in ("Dokumentinhalt", "DokumentInhalt"):
+        content = data_entry.get(key, "")
+        if isinstance(content, str) and len(content) > 20:
+            return _strip_html(content)
+
+    # Try structured content in Dokumentliste
+    doku_liste = data_entry.get("Dokumentliste", {})
+    if isinstance(doku_liste, dict):
+        content_ref = doku_liste.get("ContentReference", [])
+        if isinstance(content_ref, dict):
+            content_ref = [content_ref]
+        if isinstance(content_ref, list):
+            for cr in content_ref:
+                if isinstance(cr, dict):
+                    nutzdaten = cr.get("Nutzdaten", {})
+                    if isinstance(nutzdaten, dict):
+                        # Look for Abschnitt text
+                        text = _extract_from_nutzdaten(nutzdaten)
+                        if text and len(text) > 20:
+                            return text
+                    elif isinstance(nutzdaten, str) and len(nutzdaten) > 20:
+                        return _strip_html(nutzdaten)
+
+    return ""
+
+
+def _extract_from_nutzdaten(nutzdaten: dict) -> str:
+    """Extract text from Nutzdaten XML structure."""
+    parts = []
+
+    def _collect(obj, depth=0):
+        if depth > 10:
+            return
+        if isinstance(obj, str):
+            clean = obj.strip()
+            if clean and len(clean) > 2:
+                parts.append(clean)
+        elif isinstance(obj, dict):
+            # Skip metadata keys
+            for k, v in obj.items():
+                if k.lower() in ("@xmlns", "@id", "@type", "#comment"):
+                    continue
+                if k.lower() in ("#text", "text", "inhalt", "absatz", "abs", "content"):
+                    _collect(v, depth + 1)
+                elif isinstance(v, (dict, list)):
+                    _collect(v, depth + 1)
+        elif isinstance(obj, list):
+            for item in obj:
+                _collect(item, depth + 1)
+
+    _collect(nutzdaten)
+    return "\n".join(parts)
 
 
 # ── Response parsing ──
@@ -199,10 +280,13 @@ def _flatten(data_entry: dict) -> dict:
 
 
 def _find_urls(data_entry: dict) -> list[str]:
-    """Recursively find ContentUrl values."""
+    """Recursively find ContentUrl values, prioritize HTML content URLs."""
     urls = []
     _walk(data_entry, urls, 0)
-    return urls
+    # Sort: HTML files first, then by URL length (longer = more specific)
+    html_urls = [u for u in urls if "html" in u.lower()]
+    other_urls = [u for u in urls if u not in html_urls]
+    return html_urls + other_urls
 
 
 def _walk(obj, urls, depth):
@@ -232,6 +316,34 @@ def _walk(obj, urls, depth):
 
 # ── Text extraction ──
 
+def _extract_law_text(html: str, url: str) -> str:
+    """Extract legal text from fetched HTML content.
+
+    Distinguishes between:
+    - Full RIS pages (Dokument.wxe) → extract "Text" section
+    - Raw content URLs → strip HTML and check if it's actual law text
+    """
+    if "Dokument.wxe" in url or len(html) > 10000:
+        return _extract_text_section(html)
+
+    text = _strip_html(html)
+
+    # Filter out non-law-text content (titles, metadata, navigation)
+    # Real law text typically has numbered paragraphs, legal phrases, etc.
+    if len(text) < 50:
+        return ""
+
+    # Check if this looks like actual law text vs. a title/index entry
+    # Index entries are typically short and contain only headings
+    lines = text.strip().split("\n")
+    if len(lines) <= 3 and all(len(l.strip()) < 100 for l in lines):
+        # Likely a title or index entry, not law text
+        logger.info(f"Skipping short content (likely title): {text[:80]}")
+        return ""
+
+    return text
+
+
 def _extract_text_section(html: str) -> str:
     """Extract the 'Text' section from a RIS Dokument.wxe page."""
     ends = ["Schlagworte", "Zuletzt aktualisiert", "Dokumentnummer",
@@ -254,7 +366,7 @@ def _extract_text_section(html: str) -> str:
 def _strip_html(text: str) -> str:
     """Strip HTML tags to plain text."""
     c = re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    c = re.sub(r'<span[^>]*class="[^"]*(?:Gld[A-Z][a-z]+|ScreenReader)[^"]*"[^>]*>.*?</span>', '', c, flags=re.DOTALL | re.IGNORECASE)
+    c = re.sub(r'<span[^>]*class="[^"]*(?:Gld[A-Z][a-z]+|ScreenReader)[^"]*"[^>]*>.*?</span>', '', c, flags=re.DOTALL)
     c = re.sub(r'<div[^>]*id="MainContent[^"]*"[^>]*/?>', '', c)
     c = re.sub(r'<(?:br|/p|/div|/tr|/li)\s*/?>', '\n', c, flags=re.IGNORECASE)
     c = re.sub(r'<[^>]+>', ' ', c)
@@ -266,7 +378,7 @@ def _strip_html(text: str) -> str:
 
 
 def _clean_accessible(text: str) -> str:
-    """Remove RIS accessible text duplicates."""
+    """Remove RIS accessible text duplicates (screenreader content)."""
     text = re.sub(r'(§\s*\d+[a-z]?\.?)\s*Paragraph\s*\d+[a-z]?,?\s*', r'\1 ', text)
     text = re.sub(r'(\(\d+[a-z]?\))\s*Absatz\s*(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|\d+\s*[a-z]?),?\s*', r'\1 ', text)
     text = re.sub(r'\bParagraph\s+\d+\s*[a-z]?,\s*', '', text)
@@ -282,9 +394,10 @@ def _clean_accessible(text: str) -> str:
     return text.strip()
 
 
-# ── Diff ──
+# ── Diff rendering ──
 
 def _diff(old: str, new: str) -> str:
+    """Generate word-level diff HTML."""
     ow, nw = old.split(), new.split()
     if not ow and not nw:
         return '<p class="diff-info">Beide Versionen leer.</p>'
@@ -297,9 +410,9 @@ def _diff(old: str, new: str) -> str:
             '<p class="diff-info">Umfassende Neufassung (&lt;40% Übereinstimmung):</p>'
             '<div class="diff-sidebyside">'
             f'<div class="diff-side diff-side-old"><div class="diff-side-label">Vorversion</div>'
-            f'<div class="diff-side-text">{html_module.escape(old)}</div></div>'
+            f'<div class="diff-side-text">{html_module.escape(old[:2000])}</div></div>'
             f'<div class="diff-side diff-side-new"><div class="diff-side-label">Neue Fassung</div>'
-            f'<div class="diff-side-text">{html_module.escape(new)}</div></div></div>'
+            f'<div class="diff-side-text">{html_module.escape(new[:2000])}</div></div></div>'
         )
 
     parts = []
