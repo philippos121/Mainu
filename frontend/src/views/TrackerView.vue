@@ -117,7 +117,9 @@ const cvs = ref(null)
 const sy = ref(0)
 let raf = 0
 
-function onScroll() { sy.value = window.scrollY }
+function onScroll() {
+  sy.value = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0
+}
 
 // ── Lightweight 3D network — deferred init ──
 function startCanvas() {
@@ -178,9 +180,14 @@ function startCanvas() {
 let stop=null
 onMounted(()=>{
   window.addEventListener('scroll',onScroll,{passive:true})
+  document.addEventListener('scroll',onScroll,{passive:true,capture:true})
   stop=startCanvas()
 })
-onUnmounted(()=>{window.removeEventListener('scroll',onScroll);if(stop)stop()})
+onUnmounted(()=>{
+  window.removeEventListener('scroll',onScroll)
+  document.removeEventListener('scroll',onScroll,{capture:true})
+  if(stop)stop()
+})
 
 const cinemaTexts = [
   { title: 'Alle Novellen erfassen', desc: 'Gesetze, Verordnungen, Entscheidungen, BMF-Richtlinien — lückenlos.' },
@@ -233,7 +240,7 @@ async function downloadReport(){if(!selectedCategory.value.length)return;generat
 </script>
 
 <style scoped>
-.page{min-height:100vh;background:#070e12;color:#e4f0f2;overflow-x:hidden}
+.page{min-height:100vh;background:#070e12;color:#e4f0f2;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none}
 .scroll-wrap{position:relative;z-index:2}
 
