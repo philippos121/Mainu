@@ -439,22 +439,26 @@ async def api_report(req: ReportRequest):
         report_md = "*Kein OpenAI API-Key angegeben — Report ohne KI-Zusammenfassung.*"
 
     # Auto-fetch diffs for Gesetze results that don't have diffs yet
-    all_diffs = dict(req.diffs)  # Start with frontend-provided diffs
+    # IMPORTANT: fetch sequentially (max 5) to avoid overwhelming the RIS website
+    all_diffs = dict(req.diffs)
     if req.doc_type == "gesetze":
         import asyncio
-        missing = [r for r in req.results[:20]
+        missing = [r for r in req.results[:10]
                    if r.get("id") and r["id"] not in all_diffs
                    and r.get("gesetzesnummer") and r.get("artikel")]
         if missing:
-            logging.info(f"Auto-fetching {len(missing)} diffs for report...")
-            tasks = [fetch_provision_diff(
-                doc_id=r["id"], gesetzesnummer=r.get("gesetzesnummer", ""),
-                artikel=r.get("artikel", ""), inkrafttreten=r.get("date", ""),
-            ) for r in missing]
-            results_diffs = await asyncio.gather(*tasks, return_exceptions=True)
-            for r, diff_result in zip(missing, results_diffs):
-                if isinstance(diff_result, dict) and diff_result.get("has_changes"):
-                    all_diffs[r["id"]] = diff_result
+            logging.info(f"Auto-fetching {len(missing)} diffs for report (sequential)...")
+            for r in missing[:5]:  # Max 5 to keep it fast
+                try:
+                    diff_result = await fetch_provision_diff(
+                        doc_id=r["id"], gesetzesnummer=r.get("gesetzesnummer", ""),
+                        artikel=r.get("artikel", ""), inkrafttreten=r.get("date", ""),
+                    )
+                    if isinstance(diff_result, dict) and diff_result.get("has_changes"):
+                        all_diffs[r["id"]] = diff_result
+                except Exception as e:
+                    logging.error(f"Diff fetch error for {r.get('id')}: {e}")
+                await asyncio.sleep(0.5)  # Be nice to RIS website
 
     try:
         today = date.today().strftime("%d.%m.%Y")
