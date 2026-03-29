@@ -415,7 +415,45 @@ async def api_report(req: ReportRequest):
     except Exception as e:
         logging.error(f"Materialien/Parliamentary error: {e}")
 
-    # GPT summary with Materialien + parliamentary context
+    # Auto-fetch diffs for ALL Gesetze results (sequential to avoid RIS throttling)
+    all_diffs = dict(req.diffs)
+    diff_summaries = []
+    import asyncio
+    missing = [r for r in req.results[:20]
+               if r.get("id") and r["id"] not in all_diffs
+               and r.get("gesetzesnummer") and r.get("artikel")]
+    if missing:
+        logging.info(f"Auto-fetching {len(missing)} diffs for report...")
+        for r in missing:
+            try:
+                diff_result = await fetch_provision_diff(
+                    doc_id=r["id"], gesetzesnummer=r.get("gesetzesnummer", ""),
+                    artikel=r.get("artikel", ""), inkrafttreten=r.get("date", ""),
+                )
+                if isinstance(diff_result, dict) and diff_result.get("has_changes"):
+                    all_diffs[r["id"]] = diff_result
+                    cur = diff_result.get("current", {}).get("text", "")[:300]
+                    prev = diff_result.get("previous", {}).get("text", "")[:300]
+                    if cur and prev:
+                        diff_summaries.append(
+                            f"- {r.get('title','')} {r.get('artikel','')}: "
+                            f"Vorversion: {prev}\n  Neue Fassung: {cur}"
+                        )
+            except Exception as e:
+                logging.error(f"Diff error {r.get('id')}: {e}")
+            await asyncio.sleep(0.3)
+
+    # Build diff context for GPT
+    diff_context = ""
+    if diff_summaries:
+        diff_context = (
+            "\n\n--- VERSIONSVERGLEICHE ---\n"
+            "Folgende Bestimmungen haben sich inhaltlich geändert.\n"
+            "Analysiere was sich jeweils geändert hat:\n"
+            + "\n\n".join(diff_summaries[:15])
+        )
+
+    # GPT summary with Materialien + diffs + parliamentary context
     report_md = ""
     if req.api_key and len(req.api_key) >= 10:
         try:
@@ -436,11 +474,11 @@ async def api_report(req: ReportRequest):
                     mat_lines.append(line)
                 extra_context += (
                     "\n\n--- GESETZESMATERIALIEN ---\n"
-                    "Folgende Erläuterungen (Materialien) zu den Novellen sind verfügbar:\n"
+                    "Folgende Erläuterungen (Materialien) zu den Novellen sind verfügbar.\n"
+                    "Fasse pro BGBl-Novelle einmal zusammen: Was war das Thema und die "
+                    "Intention des Gesetzgebers? Nicht für jede einzelne Bestimmung "
+                    "wiederholen, sondern einmal pro BGBl-Änderung:\n"
                     + "\n".join(mat_lines)
-                    + "\nFasse die Intention des Gesetzgebers zusammen. "
-                    "Was war die zugrundeliegende Rechtsfrage die die Novelle adressiert? "
-                    "Verwende die Materialien als Kontext für die Analyse.\n"
                 )
 
             # Parliamentary materials (Begut + RegV)
@@ -463,35 +501,13 @@ async def api_report(req: ReportRequest):
                 timeframe_label=req.timeframe_label,
                 total_hits=req.total_hits,
                 api_key=req.api_key,
-                extra_context=extra_context,
+                extra_context=extra_context + diff_context,
             )
         except Exception as e:
             logging.error(f"GPT report error: {e}")
             report_md = f"*KI-Zusammenfassung konnte nicht erstellt werden: {str(e)[:100]}*"
     else:
         report_md = "*Kein OpenAI API-Key angegeben — Report ohne KI-Zusammenfassung.*"
-
-    # Auto-fetch diffs for Gesetze results that don't have diffs yet
-    # IMPORTANT: fetch sequentially (max 5) to avoid overwhelming the RIS website
-    all_diffs = dict(req.diffs)
-    if req.doc_type == "gesetze":
-        import asyncio
-        missing = [r for r in req.results[:10]
-                   if r.get("id") and r["id"] not in all_diffs
-                   and r.get("gesetzesnummer") and r.get("artikel")]
-        if missing:
-            logging.info(f"Auto-fetching {len(missing)} diffs for report (sequential)...")
-            for r in missing[:5]:  # Max 5 to keep it fast
-                try:
-                    diff_result = await fetch_provision_diff(
-                        doc_id=r["id"], gesetzesnummer=r.get("gesetzesnummer", ""),
-                        artikel=r.get("artikel", ""), inkrafttreten=r.get("date", ""),
-                    )
-                    if isinstance(diff_result, dict) and diff_result.get("has_changes"):
-                        all_diffs[r["id"]] = diff_result
-                except Exception as e:
-                    logging.error(f"Diff fetch error for {r.get('id')}: {e}")
-                await asyncio.sleep(0.5)  # Be nice to RIS website
 
     try:
         today = date.today().strftime("%d.%m.%Y")
