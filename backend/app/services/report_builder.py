@@ -1,7 +1,7 @@
-"""Generate a scroll-driven dark HTML report with neural network background.
+"""Generate a clean, scientific HTML report for download.
 
-Same visual style as the frontend: dark bg, teal nodes, text swaps on scroll.
-Summary-focused — no long source lists, just concise analysis sections.
+Light theme, Inter font, summary-focused.
+No interactive elements — pure reading for print/PDF.
 """
 
 import html as _html
@@ -39,90 +39,57 @@ def build_report(
     slides_json += '{"t":"Report vollständig.","s":"","cls":"end"}'
     slides_json += ']'
 
+    # Build summary HTML from markdown
+    summary_html = _md_to_html(summary_md)
+
     return f'''<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Legal Monitoring — {_html.escape(category)}</title>
+<title>Legal Monitoring Report — {_html.escape(category)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Inter',system-ui,sans-serif;background:#070e12;color:#e4f0f2;overflow-x:hidden}}
-canvas{{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;contain:strict}}
-.stage{{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none}}
-.stage-text{{text-align:center;max-width:640px;padding:0 32px;transition:opacity .3s ease,transform .3s ease;will-change:opacity,transform}}
-.st-title{{font-size:36px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:-.5px;margin:0;line-height:1.2}}
-.st-title.hero{{font-size:42px;font-weight:800;background:linear-gradient(135deg,#ff9733,#ffbe6d 40%,#ff9733 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
-.st-title.stat{{font-size:28px;font-weight:300;color:rgba(255,255,255,.5)}}
-.st-title.analysis{{font-size:26px;font-weight:700;color:#22c9e8;margin-bottom:16px}}
-.st-title.end{{font-size:24px;font-weight:300;color:rgba(255,255,255,.4)}}
-.st-sub{{font-size:15px;font-weight:400;color:rgba(255,255,255,.45);margin-top:12px;line-height:1.7;max-height:50vh;overflow-y:auto}}
-.st-sub.hero{{font-size:16px;color:rgba(255,255,255,.3)}}
-.st-sub.stat{{font-size:22px;color:rgba(34,201,232,.5);letter-spacing:1px}}
-.st-sub.analysis{{font-size:14px;color:rgba(255,255,255,.5);text-align:left;line-height:1.8}}
-.scroll-driver{{position:relative;z-index:1;pointer-events:none}}
-@media(max-width:640px){{.st-title{{font-size:26px}}.st-title.hero{{font-size:30px}}.st-title.analysis{{font-size:22px}}.st-sub.analysis{{font-size:13px}}}}
-@media print{{body{{background:#fff;color:#1a1a1a}}canvas{{display:none}}.stage{{position:static;display:block}}.scroll-driver{{display:none}}.st-title,.st-sub{{color:#1a1a1a!important;-webkit-text-fill-color:#1a1a1a!important}}}}
+body{{font-family:'Inter',system-ui,sans-serif;background:#fafbfc;color:#1a2a3a;line-height:1.6}}
+.header{{padding:60px 24px 40px;text-align:center;border-bottom:1px solid #e8eaef}}
+.header h1{{font-size:28px;font-weight:800;color:#0a5062;letter-spacing:-.5px;margin-bottom:4px}}
+.header p{{font-size:14px;color:#6b7280}}
+.header .stats{{display:flex;justify-content:center;gap:32px;margin-top:20px}}
+.header .sn{{font-size:24px;font-weight:800;color:#007993;display:block}}
+.header .sl{{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#9ca3af}}
+.content{{max-width:640px;margin:0 auto;padding:48px 24px 80px}}
+.section{{margin-bottom:40px}}
+.section h2{{font-size:20px;font-weight:700;color:#0a5062;margin-bottom:12px;letter-spacing:-.3px}}
+.section h3{{font-size:17px;font-weight:600;color:#1a3a4a;margin:20px 0 8px}}
+.section h4{{font-size:15px;font-weight:600;color:#374151;margin:16px 0 6px}}
+.section p{{font-size:14px;color:#4b5563;line-height:1.8;margin-bottom:10px}}
+.section strong{{color:#1a2a3a}}
+.section ul{{padding-left:18px;margin:8px 0 12px}}
+.section li{{font-size:14px;color:#4b5563;margin-bottom:4px;line-height:1.7}}
+.section a{{color:#007993;text-decoration:none}}
+.section a:hover{{text-decoration:underline}}
+.footer{{text-align:center;padding:32px 24px;font-size:11px;color:#b0b8c0;border-top:1px solid #e8eaef}}
+@media print{{.header{{padding:30px 0}}.content{{padding:20px 0}}body{{background:#fff}}}}
+@media(max-width:640px){{.header h1{{font-size:22px}}.content{{padding:32px 16px}}}}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div class="stage"><div class="stage-text" id="st">
-  <h2 class="st-title" id="st-t"></h2>
-  <p class="st-sub" id="st-s"></p>
-</div></div>
-<div class="scroll-driver" id="drv"></div>
-<script>
-(function(){{
-  const slides={slides_json};
-  const SH=500,drv=document.getElementById('drv');
-  drv.style.height=(slides.length*SH+innerHeight)+'px';
-  const st=document.getElementById('st'),tt=document.getElementById('st-t'),ss=document.getElementById('st-s');
-  let prev=-1;
-
-  // Canvas
-  const c=document.getElementById('c'),g=c.getContext('2d',{{alpha:false}});
-  let W,H;const N=50,D=170*170;
-  const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N);
-  const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N);
-  const sr=new Float32Array(N),ox=new Float32Array(N),oy=new Float32Array(N),os=new Float32Array(N);
-  for(let i=0;i<N;i++){{ax[i]=Math.random()*2.6-1.3;ay[i]=Math.random()*2.6-1.3;az[i]=Math.random()*2.6-1.3;dx[i]=(Math.random()-.5)*.001;dy[i]=(Math.random()-.5)*.001;dz[i]=(Math.random()-.5)*.0008;sr[i]=1.2+Math.random()*1.8}}
-  function resize(){{W=c.width=innerWidth;H=c.height=innerHeight}}
-  resize();addEventListener('resize',resize);
-
-  function draw(sY,moving){{
-    const ry=sY*.00025,rx=sY*.00015;
-    const cy=Math.cos(ry),sn=Math.sin(ry),cx=Math.cos(rx),sx=Math.sin(rx),hw=W/2,hh=H/2;
-    if(moving)for(let i=0;i<N;i++){{ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i];if(ax[i]>1.3||ax[i]<-1.3)dx[i]*=-1;if(ay[i]>1.3||ay[i]<-1.3)dy[i]*=-1;if(az[i]>1.3||az[i]<-1.3)dz[i]*=-1}}
-    for(let i=0;i<N;i++){{const x=ax[i],y=ay[i],z=az[i],a=x*cy-z*sn,b=x*sn+z*cy,d=y*cx-b*sx,e=y*sx+b*cx,s=2.5/(4+e);ox[i]=hw+a*W*.36*s;oy[i]=hh+d*H*.3*s;os[i]=s}}
-    g.fillStyle='#070e12';g.fillRect(0,0,W,H);
-    g.beginPath();g.strokeStyle='rgba(34,201,232,0.06)';g.lineWidth=.5;
-    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){{const a=ox[i]-ox[j],b=oy[i]-oy[j];if(a*a+b*b<D){{g.moveTo(ox[i],oy[i]);g.lineTo(ox[j],oy[j])}}}}
-    g.stroke();
-    for(let i=0;i<N;i++){{const r=sr[i]*os[i],a=.2+os[i]*.4;g.beginPath();g.arc(ox[i],oy[i],r*3,0,6.28);g.fillStyle='rgba(34,201,232,'+(a*.05)+')';g.fill();g.beginPath();g.arc(ox[i],oy[i],r,0,6.28);g.fillStyle='rgba(34,201,232,'+(a*.5)+')';g.fill()}}
-  }}
-  draw(0,false);
-
-  let scrolling=false,timer=0,raf=0;
-  function loop(){{if(!scrolling)return;draw(scrollY,true);raf=requestAnimationFrame(loop)}}
-  addEventListener('scroll',function(){{
-    if(!scrolling){{scrolling=true;loop()}}
-    clearTimeout(timer);timer=setTimeout(function(){{scrolling=false}},150);
-    const idx=Math.min(slides.length-1,Math.floor(scrollY/SH));
-    if(idx===prev)return;prev=idx;
-    const sl=slides[idx];
-    st.style.opacity='0';st.style.transform='translateY(20px)';
-    setTimeout(function(){{
-      tt.textContent=sl.t;tt.className='st-title '+(sl.cls||'');
-      ss.textContent=sl.s;ss.className='st-sub '+(sl.cls||'');
-      ss.style.display=sl.s?'block':'none';
-      st.style.opacity='1';st.style.transform='translateY(0)';
-    }},150);
-  }},{{passive:true}});
-}})();
-</script>
+<div class="header">
+  <h1>Legal Monitoring Report</h1>
+  <p>{_html.escape(category)} · {_html.escape(timeframe)} · {date_str}</p>
+  <div class="stats">
+    <div><span class="sn">{total_hits}</span><span class="sl">{type_label}</span></div>
+    <div><span class="sn">{changes_count}</span><span class="sl">Änderungen</span></div>
+  </div>
+</div>
+<div class="content">
+  <div class="section">
+    {summary_html}
+  </div>
+</div>
+<div class="footer">AI:ssociate Legal Monitoring · RIS · Findok · EUR-Lex · parlament.gv.at</div>
 </body>
 </html>'''
 
