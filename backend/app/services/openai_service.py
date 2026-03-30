@@ -142,7 +142,7 @@ async def generate_report_markdown(
         f"{extra_context}"
     )
 
-    return await _chat(api_key, system_prompt, user_prompt, max_tokens=4000)
+    return await _chat(api_key, system_prompt, user_prompt, max_tokens=8000)
 
 
 async def _chat(api_key: str, system: str, user: str, max_tokens: int = 1500) -> str:

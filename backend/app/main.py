@@ -495,12 +495,20 @@ async def _generate_full_report(req) -> dict:
                 )
                 if isinstance(diff_result, dict) and diff_result.get("has_changes"):
                     all_diffs[r["id"]] = diff_result
-                    cur = diff_result.get("current", {}).get("text", "")[:300]
-                    prev = diff_result.get("previous", {}).get("text", "")[:300]
+                    cur = diff_result.get("current", {}).get("text", "")[:1500]
+                    prev = diff_result.get("previous", {}).get("text", "")[:1500]
                     if cur and prev:
                         diff_summaries.append(
-                            f"- {r.get('title','')} {r.get('artikel','')}: "
-                            f"Vorversion: {prev}\n  Neue Fassung: {cur}"
+                            f"- {r.get('title','')} {r.get('artikel','')} "
+                            f"(BGBl: {r.get('bgbl','')}, Inkrafttreten: {r.get('date','')}):\n"
+                            f"  VORVERSION:\n  {prev}\n"
+                            f"  NEUE FASSUNG:\n  {cur}"
+                        )
+                    elif cur:
+                        diff_summaries.append(
+                            f"- {r.get('title','')} {r.get('artikel','')} "
+                            f"(BGBl: {r.get('bgbl','')}, Inkrafttreten: {r.get('date','')}):\n"
+                            f"  NORMTEXT:\n  {cur}"
                         )
             except Exception as e:
                 logging.error(f"Diff error {r.get('id')}: {e}")
@@ -510,10 +518,10 @@ async def _generate_full_report(req) -> dict:
     diff_context = ""
     if diff_summaries:
         diff_context = (
-            "\n\n--- VERSIONSVERGLEICHE ---\n"
-            "Folgende Bestimmungen haben sich inhaltlich geändert.\n"
-            "Analysiere was sich jeweils geändert hat:\n"
-            + "\n\n".join(diff_summaries[:15])
+            "\n\n--- NORMTEXTE UND VERSIONSVERGLEICHE ---\n"
+            "Hier sind die tatsächlichen Gesetzestexte (Vorversion und neue Fassung). "
+            "Beschreibe die konkreten Änderungen basierend auf diesen Texten:\n\n"
+            + "\n\n".join(diff_summaries[:20])
         )
 
     # GPT summary with Materialien + diffs + parliamentary context
