@@ -260,7 +260,7 @@ function downloadHtml() {
 .st-num{font-size:11px;font-weight:700;color:rgba(0,121,147,.4);letter-spacing:3px;display:none;margin-bottom:8px}
 .st-title{font-size:34px;font-weight:700;color:#1a2a3a;letter-spacing:-.5px;margin:0;line-height:1.2}
 .st-hero{font-size:36px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#1a3a4a}
-.st-rg{font-size:34px;color:#1a2a3a}
+.st-rg{font-size:30px;font-weight:300;letter-spacing:2px;color:#2a3a4a}
 .st-sub{font-size:20px;font-weight:300;color:#007993;margin-top:8px;display:none}
 
 .scroll-driver{position:relative;z-index:1;pointer-events:none}
@@ -302,7 +302,7 @@ function downloadHtml() {
   .logo{height:36px}
   .st-hero{font-size:22px;letter-spacing:4px}
   .st-title{font-size:22px}
-  .st-rg{font-size:22px}
+  .st-rg{font-size:20px;letter-spacing:1px}
   .st-sub{font-size:16px}
   .st-num{font-size:10px}
   .form-center{padding:0 16px}
@@ -319,7 +319,7 @@ function downloadHtml() {
 }
 @media(max-width:380px){
   .st-hero{font-size:18px;letter-spacing:3px}
-  .st-title,.st-rg{font-size:19px}
+  .st-title{font-size:19px}.st-rg{font-size:17px;letter-spacing:1px}
   .chip{padding:5px 10px;font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){.stage-text,.result-stage{transition:none}.bg-canvas{display:none}.page{background:#fafbfc}}
