@@ -44,32 +44,31 @@ export function createRenderer(canvas) {
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // Soft connections — skip lines that cross the center zone
-    gl.lineWidth=.4
+    // Connections — full strength, but fade in center text zone
+    gl.lineWidth=.6
     for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
       const a=ox[i]-ox[j],b=oy[i]-oy[j]
       if(a*a+b*b<DSQ){
-        // Fade line based on how close its midpoint is to center
         const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
         const f=centerFade(mx,my)
-        if(f<.05) continue // skip lines in clear zone entirely
+        if(f<.05) continue
         gl.beginPath()
-        gl.strokeStyle=`rgba(8,30,42,${(0.04*f).toFixed(3)})`
+        gl.strokeStyle=`rgba(8,30,42,${(0.1*f).toFixed(3)})`
         gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])
         gl.stroke()
       }
     }}
 
-    // Dark nodes — fade near center
+    // Nodes — full strength, fade in center text zone
     for(let i=0;i<N;i++){
       const r=sr[i]*os[i],a=.2+os[i]*.45
       const f=centerFade(ox[i],oy[i])
-      if(f<.05) continue // skip nodes in clear zone
+      if(f<.05) continue
       gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
-      gl.fillStyle=`rgba(6,28,40,${(a*.06*f).toFixed(3)})`
+      gl.fillStyle=`rgba(6,28,40,${(a*.08*f).toFixed(3)})`
       gl.fill()
       gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-      gl.fillStyle=`rgba(6,28,40,${(a*.6*f).toFixed(3)})`
+      gl.fillStyle=`rgba(6,28,40,${(a*.65*f).toFixed(3)})`
       gl.fill()
     }
   }
