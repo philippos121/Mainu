@@ -71,7 +71,7 @@ const slides = [
   ...KERN.map((k, i) => ({ type: 'rg', num: String(i + 1).padStart(2, '0'), title: k.label })),
 ]
 
-const SLIDE_H = 600
+const SLIDE_H = window.innerWidth < 640 ? 400 : 600
 const totalHeight = ref(slides.length * SLIDE_H + window.innerHeight)
 const maxScroll = slides.length * SLIDE_H
 
@@ -298,6 +298,30 @@ function downloadHtml() {
 .btn-dl{padding:8px 20px;border:1px solid rgba(10,80,98,.12);border-radius:8px;background:rgba(255,255,255,.7);color:#007993;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .2s}
 .btn-dl:hover{background:rgba(0,121,147,.06);border-color:rgba(0,121,147,.25)}
 
-@media(max-width:640px){.st-hero{font-size:28px}.st-title{font-size:26px}.st-sub{font-size:16px}.form-line{flex-direction:column;width:100%}.sel,.btn-gen{width:100%}.sel-date{width:100%}.rs-title{font-size:20px}}
+@media(max-width:640px){
+  .stage-text{padding:0 20px}
+  .logo{height:36px}
+  .st-hero{font-size:24px;letter-spacing:0}
+  .st-title{font-size:22px}
+  .st-rg{font-size:22px}
+  .st-sub{font-size:16px}
+  .st-num{font-size:10px}
+  .form-center{padding:0 16px}
+  .chips{gap:5px}
+  .chip{padding:6px 12px;font-size:11px}
+  .form-line{flex-direction:column;width:100%;gap:8px}
+  .sel,.btn-gen{width:100%;text-align:center;justify-content:center}
+  .sel-date{width:100%}
+  .result-stage{padding:0 20px}
+  .rs-title{font-size:18px}
+  .rs-body{font-size:13px}
+  .dl-wrap{bottom:24px}
+  .btn-dl{font-size:11px;padding:8px 16px}
+}
+@media(max-width:380px){
+  .st-hero{font-size:20px}
+  .st-title,.st-rg{font-size:19px}
+  .chip{padding:5px 10px;font-size:10px}
+}
 @media(prefers-reduced-motion:reduce){.stage-text,.result-stage{transition:none}.bg-canvas{display:none}.page{background:#fafbfc}}
 </style>

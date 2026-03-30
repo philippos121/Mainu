@@ -18,11 +18,15 @@ export function createRenderer(canvas) {
   resize();window.addEventListener('resize',resize)
 
   // How much to fade an element based on distance to center
+  // On mobile (narrow screens), make the clear zone wider relative to screen
   function centerFade(x, y) {
-    const dx = (x - W/2) / (W * .35)
-    const dy = (y - H/2) / (H * .3)
-    const d = dx*dx + dy*dy // 0 at center, 1 at edge of zone
-    return Math.min(1, Math.max(0, d - .3) / .7) // 0 inside clear zone, 1 outside
+    const mobile = W < 640
+    const zw = mobile ? .5 : .35 // wider clear zone on mobile
+    const zh = mobile ? .35 : .3
+    const ddx = (x - W/2) / (W * zw)
+    const ddy = (y - H/2) / (H * zh)
+    const d = ddx*ddx + ddy*ddy
+    return Math.min(1, Math.max(0, d - .25) / .75)
   }
 
   function render(scrollY, moving){
