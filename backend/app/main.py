@@ -36,10 +36,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 @app.get("/api/health")
@@ -1218,3 +1219,19 @@ body {{
 
 </body>
 </html>"""
+
+
+# ── Serve frontend static files (single-container deploy) ──
+# Must be at the END so /api routes take priority.
+from pathlib import Path as _Path
+_static_dir = _Path(__file__).resolve().parent.parent / "static"
+if _static_dir.is_dir():
+    from starlette.responses import FileResponse as _FR
+
+    @app.get("/{path:path}")
+    async def _serve_frontend(path: str):
+        f = _static_dir / path
+        if path and f.is_file() and ".." not in path:
+            return _FR(f)
+        return _FR(_static_dir / "index.html", media_type="text/html",
+                    headers={"Cache-Control": "no-cache"})
