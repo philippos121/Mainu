@@ -22,24 +22,9 @@ def build_report(
 ) -> str:
     diffs = diffs or {}
     materialien = materialien or {}
+    type_label = "Gesetze" if doc_type == "gesetze" else "Entscheidungen"
+    changes_count = sum(1 for r in results[:50] if diffs.get(r.get("id", ""), {}).get("has_changes"))
 
-    # Split GPT summary into sections for slide-by-slide display
-    sections = _split_sections(summary_md)
-
-    # Build slides JSON for the JS scroll driver
-    slides_json = '['
-    # Slide 0: title
-    slides_json += f'{{"t":"{_js(category)}","s":"{_js(timeframe)} · {_js(date_str)}","cls":"hero"}},'
-    slides_json += f'{{"t":"{total_hits} Rechtsakte analysiert","s":"{len(diffs)} Änderungen · {len(materialien)} Materialien","cls":"stat"}},'
-    # Summary sections as slides
-    for sec in sections:
-        title = _js(sec["title"])
-        body = _js(sec["body"][:600])
-        slides_json += f'{{"t":"{title}","s":"{body}","cls":"analysis"}},'
-    slides_json += '{"t":"Report vollständig.","s":"","cls":"end"}'
-    slides_json += ']'
-
-    # Build summary HTML from markdown
     summary_html = _md_to_html(summary_md)
 
     return f'''<!DOCTYPE html>
