@@ -48,33 +48,32 @@ export function createRenderer(canvas) {
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // Connections — strong outside, faint in center
+    // Black connections — strong outside, faint in center
     gl.lineWidth=.7
     for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
       const a=ox[i]-ox[j],b=oy[i]-oy[j]
       if(a*a+b*b<DSQ){
         const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
         const f=centerFade(mx,my)
-        // Outside: 0.14, center: 0.02 (faint but visible)
         const alpha=0.02+0.12*f
         gl.beginPath()
-        gl.strokeStyle=`rgba(8,30,42,${alpha.toFixed(3)})`
+        gl.strokeStyle=`rgba(0,0,0,${alpha.toFixed(3)})`
         gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])
         gl.stroke()
       }
     }}
 
-    // Nodes — strong outside, faint in center
+    // Orange nodes — strong outside, faint in center
     for(let i=0;i<N;i++){
       const r=sr[i]*os[i],a=.2+os[i]*.45
       const f=centerFade(ox[i],oy[i])
-      // Glow: outside 0.1, center 0.015
+      // Glow
       gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
-      gl.fillStyle=`rgba(6,28,40,${(a*(.015+.085*f)).toFixed(3)})`
+      gl.fillStyle=`rgba(255,151,51,${(a*(.02+.1*f)).toFixed(3)})`
       gl.fill()
-      // Core: outside 0.7, center 0.08
+      // Core
       gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-      gl.fillStyle=`rgba(6,28,40,${(a*(.08+.62*f)).toFixed(3)})`
+      gl.fillStyle=`rgba(255,130,30,${(a*(.1+.7*f)).toFixed(3)})`
       gl.fill()
     }
   }
