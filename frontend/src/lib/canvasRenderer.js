@@ -38,7 +38,7 @@ export function createRenderer(canvas) {
     gl.fillRect(0,0,W,H)
 
     // Dark connections
-    gl.beginPath();gl.strokeStyle='rgba(10,40,55,0.06)';gl.lineWidth=.5
+    gl.beginPath();gl.strokeStyle='rgba(8,30,42,0.1)';gl.lineWidth=.6
     for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
       const a=ox[i]-ox[j],b=oy[i]-oy[j];if(a*a+b*b<DSQ){gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])}
     }
@@ -46,12 +46,12 @@ export function createRenderer(canvas) {
 
     // Dark nodes
     for(let i=0;i<N;i++){
-      const r=sr[i]*os[i],a=.15+os[i]*.35
+      const r=sr[i]*os[i],a=.2+os[i]*.45
       gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
-      gl.fillStyle=`rgba(10,50,70,${(a*.04).toFixed(3)})`
+      gl.fillStyle=`rgba(6,28,40,${(a*.08).toFixed(3)})`
       gl.fill()
       gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-      gl.fillStyle=`rgba(10,50,70,${(a*.4).toFixed(3)})`
+      gl.fillStyle=`rgba(6,28,40,${(a*.65).toFixed(3)})`
       gl.fill()
     }
   }
