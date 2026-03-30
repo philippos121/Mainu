@@ -140,7 +140,7 @@ _CATEGORY_SEARCH: dict[str, list[dict]] = {
     "eu_integration": [{"Index": "10/15"}],
     "aeusseres": [{"Index": "11/01"}, {"Index": "11/02"}, {"Index": "11/03"}, {"Index": "11/04"}],
     "landesverteidigung": [{"Index": "43/01"}, {"Index": "43/02"}, {"Index": "43/03"}],
-    "zivildienst": [{"Index": "44/01"}, {"Titel": "Zivildienstgesetz"}],
+    "zivildienst": [{"Index": "44/01"}],
     "voelkerrecht": [{"Index": "19/01"}, {"Index": "19/02"}, {"Index": "19/03"}, {"Index": "19/04"}],
     # 2: Zivil- und Strafrecht (20-29)
     "zivilrecht": [{"Index": "20/01"}],
@@ -149,84 +149,84 @@ _CATEGORY_SEARCH: dict[str, list[dict]] = {
     "gmbh_recht": [{"Index": "21/03"}],
     "genossenschaftsrecht": [{"Index": "21/04"}],
     "wertpapierrecht": [{"Index": "21/05"}, {"Index": "21/06"}],
-    "versicherungsrecht": [{"Index": "57/01"}, {"Titel": "Versicherungsvertragsgesetz"}],
+    "versicherungsrecht": [{"Index": "57/01"}],
     "zivilprozess": [{"Index": "22/01"}, {"Index": "22/02"}],
     "ausserstreit": [{"Index": "22/03"}],
     "exekutionsrecht": [{"Index": "23/04"}],
     "insolvenzrecht": [{"Index": "23/01"}],
     "justizverwaltung": [{"Index": "27/01"}, {"Index": "27/02"}],
-    "notariat": [{"Index": "27/02"}, {"Titel": "Notariatsordnung"}],
+    "notariat": [{"Index": "27/03"}],
     "urheberrecht": [{"Index": "20/08"}],
     "patentrecht": [{"Index": "26/02"}, {"Index": "26/03"}],
     # 3: Finanzrecht (30-39)
     "finanzrecht_allg": [{"Index": "30/01"}, {"Index": "31/01"}],
     "abgabenrecht": [{"Index": "32/01"}],
-    "einkommensteuer": [{"Index": "32/02"}, {"Titel": "Einkommensteuergesetz"}],
-    "koerperschaftsteuer": [{"Titel": "Körperschaftsteuergesetz"}],
+    "einkommensteuer": [{"Index": "32/02"}],
+    "koerperschaftsteuer": [{"Index": "32/02"}],
     "umsatzsteuer": [{"Index": "32/04"}],
     "gebuehrenrecht": [{"Index": "32/06"}, {"Index": "32/07"}],
     "bewertungsrecht": [{"Index": "32/03"}],
     "zollrecht": [{"Index": "35/01"}, {"Index": "35/02"}],
-    "finanzausgleich": [{"Index": "30/01"}, {"Titel": "Finanzausgleichsgesetz"}],
-    "finanzstrafrecht": [{"Titel": "Finanzstrafgesetz"}],
+    "finanzausgleich": [{"Index": "30/01"}],
+    "finanzstrafrecht": [{"Index": "32/01"}],
     # 4: Innere Verwaltung (40-49)
     "verwaltungsverfahren": [{"Index": "40/01"}, {"Index": "40/02"}, {"Index": "40/03"}],
     "staatsbuergerschaft": [{"Index": "41/02"}],
-    "personenstandsrecht": [{"Index": "41/01"}, {"Titel": "Personenstandsgesetz"}],
-    "sicherheitspolizei": [{"Index": "41/01"}],
-    "fremdenrecht": [{"Index": "41/02"}, {"Titel": "Fremdenpolizeigesetz"}, {"Titel": "AsylG"}],
-    "waffenrecht": [{"Index": "41/04"}, {"Titel": "Waffengesetz"}],
-    "vereinsrecht": [{"Index": "41/01"}, {"Titel": "Vereinsgesetz"}],
-    "datenschutz": [{"Titel": "Datenschutzgesetz"}, {"Titel": "DSG"}],
+    "personenstandsrecht": [{"Index": "41/01"}],
+    "sicherheitspolizei": [{"Index": "41/03"}],
+    "fremdenrecht": [{"Index": "41/02"}],
+    "waffenrecht": [{"Index": "41/04"}],
+    "vereinsrecht": [{"Index": "41/01"}],
+    "datenschutz": [{"Index": "10/10"}],
     # 5: Wirtschaft (50-59)
     "gewerberecht": [{"Index": "50/01"}, {"Index": "50/02"}, {"Index": "50/03"}],
-    "bergrecht": [{"Index": "58/01"}, {"Titel": "Mineralrohstoffgesetz"}],
-    "energierecht": [{"Index": "58/01"}, {"Index": "58/02"}],
-    "preisrecht": [{"Index": "26/01"}, {"Titel": "UWG"}, {"Titel": "Kartellgesetz"}],
-    "vergaberecht": [{"Titel": "Bundesvergabegesetz"}],
-    "bankrecht": [{"Index": "37/02"}, {"Titel": "Bankwesengesetz"}, {"Titel": "WAG"}],
-    # 9: Verkehr/Technik (90-99) — Strassenverkehr is 90, NOT Strafrecht!
+    "bergrecht": [{"Index": "58/01"}],
+    "energierecht": [{"Index": "58/02"}],
+    "preisrecht": [{"Index": "26/01"}],
+    "vergaberecht": [{"Index": "55/01"}],
+    "bankrecht": [{"Index": "37/02"}],
+    # 9: Verkehr/Technik (90-99)
     "verkehrsrecht": [{"Index": "90/01"}, {"Index": "90/02"}],
-    "schifffahrt": [{"Index": "94/01"}, {"Titel": "Schifffahrtsgesetz"}],
-    "luftfahrt": [{"Index": "92/01"}, {"Titel": "Luftfahrtgesetz"}],
-    "eisenbahn": [{"Index": "93/01"}, {"Titel": "Eisenbahngesetz"}],
-    "telekommunikation": [{"Index": "91/01"}, {"Titel": "TKG"}],
-    "postrecht": [{"Index": "91/01"}, {"Titel": "Postmarktgesetz"}],
+    "schifffahrt": [{"Index": "94/01"}],
+    "luftfahrt": [{"Index": "92/01"}],
+    "eisenbahn": [{"Index": "93/01"}],
+    "telekommunikation": [{"Index": "91/01"}],
+    "postrecht": [{"Index": "91/02"}],
     # 6: Arbeitsrecht, Dienstrecht, Sozialrecht (60-69)
     "arbeitsrecht": [{"Index": "60/01"}, {"Index": "60/02"}, {"Index": "60/03"}, {"Index": "60/04"}, {"Index": "60/05"}],
-    "arbeitsschutz": [{"Index": "60/02"}, {"Titel": "ArbeitnehmerInnenschutzgesetz"}],
-    "arbeitsmarkt": [{"Index": "62/01"}, {"Titel": "Arbeitslosenversicherungsgesetz"}],
+    "arbeitsschutz": [{"Index": "60/02"}],
+    "arbeitsmarkt": [{"Index": "62/01"}],
     "beamtendienstrecht": [{"Index": "63/01"}, {"Index": "63/02"}],
-    "personalvertretung": [{"Index": "63/07"}, {"Titel": "Personalvertretungsgesetz"}],
+    "personalvertretung": [{"Index": "63/07"}],
     "sozialversicherung": [{"Index": "66/01"}],
-    "pensionsrecht": [{"Index": "65/01"}, {"Titel": "Pensionsgesetz"}],
-    "pflegegeld": [{"Index": "68/01"}, {"Titel": "Bundespflegegeldgesetz"}],
-    "sozialhilfe": [{"Index": "67/01"}, {"Titel": "Sozialhilfe"}],
+    "pensionsrecht": [{"Index": "65/01"}],
+    "pflegegeld": [{"Index": "68/01"}],
+    "sozialhilfe": [{"Index": "67/01"}],
     # 7: Schulen, Wissenschaft, Kultur (70-79)
     "schulrecht": [{"Index": "70/01"}, {"Index": "70/02"}, {"Index": "70/03"}, {"Index": "70/04"}],
     "hochschulrecht": [{"Index": "72/01"}, {"Index": "72/02"}, {"Index": "72/03"}],
-    "forschung": [{"Index": "72/01"}, {"Titel": "Forschungsorganisationsgesetz"}],
-    "kulturrecht": [{"Index": "77/01"}, {"Index": "77/02"}, {"Titel": "Denkmalschutzgesetz"}],
-    "medienfoerderung": [{"Index": "77/01"}, {"Titel": "Presseförderungsgesetz"}],
-    "sportrecht": [{"Index": "78/01"}, {"Titel": "Bundes-Sportförderungsgesetz"}],
+    "forschung": [{"Index": "72/01"}],
+    "kulturrecht": [{"Index": "77/01"}, {"Index": "77/02"}],
+    "medienfoerderung": [{"Index": "77/01"}],
+    "sportrecht": [{"Index": "78/01"}],
     # 8: Land-/Forstwirtschaft, Gesundheit, Umwelt (80-89)
     "landwirtschaft": [{"Index": "80/01"}, {"Index": "80/02"}, {"Index": "80/03"}],
-    "tierschutz": [{"Index": "86/01"}, {"Titel": "Tierschutzgesetz"}],
-    "wasserrecht": [{"Index": "81/01"}, {"Titel": "Wasserrechtsgesetz"}],
+    "tierschutz": [{"Index": "86/01"}],
+    "wasserrecht": [{"Index": "81/01"}],
     "gesundheitsrecht": [{"Index": "82/03"}, {"Index": "82/06"}],
-    "arzneimittelrecht": [{"Index": "82/04"}, {"Titel": "Arzneimittelgesetz"}],
-    "lebensmittelrecht": [{"Index": "82/05"}, {"Titel": "LMSVG"}],
-    "umweltrecht": [{"Index": "83/01"}, {"Index": "83/02"}, {"Index": "83/03"}, {"Titel": "UVP-G"}],
-    "abfallrecht": [{"Index": "83/03"}, {"Titel": "Abfallwirtschaftsgesetz"}],
-    "chemikalienrecht": [{"Index": "83/04"}, {"Titel": "Chemikaliengesetz"}],
-    # 2: Strafrecht is 24/25, NOT 90!
+    "arzneimittelrecht": [{"Index": "82/04"}],
+    "lebensmittelrecht": [{"Index": "82/05"}],
+    "umweltrecht": [{"Index": "83/01"}, {"Index": "83/02"}, {"Index": "83/03"}],
+    "abfallrecht": [{"Index": "83/03"}],
+    "chemikalienrecht": [{"Index": "83/04"}],
+    # Strafrecht (24/25)
     "strafrecht": [{"Index": "24/01"}],
-    "nebenstrafrecht": [{"Index": "24/01"}, {"Titel": "Suchtmittelgesetz"}],
+    "nebenstrafrecht": [{"Index": "24/01"}],
     "strafprozess": [{"Index": "25/01"}],
     "strafvollzug": [{"Index": "25/02"}, {"Index": "24/02"}],
-    "opferschutz": [{"Index": "25/02"}, {"Titel": "Verbrechensopfergesetz"}, {"Titel": "Bewährungshilfegesetz"}],
-    # Sonderquellen (nicht über RIS Index, sondern über eigene APIs)
-    "unionsrecht": [],  # handled by eurlex_client.py
+    "opferschutz": [{"Index": "25/02"}],
+    # Sonderquellen
+    "unionsrecht": [],
 }
 
 # ── Timeframe options (ImRisSeit enum) ──
@@ -335,9 +335,9 @@ async def _search_by_params(
     datum_von: str = "",
     datum_bis: str = "",
 ) -> dict:
-    """Query RIS with multiple search param sets in parallel, combine results.
+    """Query RIS with multiple Index param sets in parallel, combine results.
 
-    Each search dict can have {"Index": "XX/YY"} or {"Titel": "LawName"}.
+    Each search dict has {"Index": "XX/YY"} — filtering exclusively by Index.
     """
 
     # Compute date range for Fassung filter (custom dates override)
@@ -530,21 +530,6 @@ async def search_gerichtsentscheidungen(
     }
     norm = _CATEGORY_NORMEN.get(category, "")
 
-    # Additional Suchworte for categories that share court sources
-    # This prevents cross-contamination between e.g. verwaltungsverfahren and fremdenrecht
-    _CATEGORY_SUCHWORTE: dict[str, str] = {
-        "verwaltungsverfahren": "Verwaltungsverfahren AVG",
-        "sicherheitspolizei": "Sicherheitspolizei SPG",
-        "fremdenrecht": "Fremd Asyl Aufenthalt",
-        "datenschutz": "Datenschutz",
-        "beamtendienstrecht": "Beamte Dienstrecht BDG",
-        "einkommensteuer": "Einkommensteuer",
-        "koerperschaftsteuer": "Körperschaftsteuer",
-        "umsatzsteuer": "Umsatzsteuer",
-        "finanzstrafrecht": "Finanzstrafrecht",
-    }
-    suchworte = _CATEGORY_SUCHWORTE.get(category, "")
-
     async def _query_court(court: str) -> tuple[list[dict], int]:
         params: dict = {
             "Applikation": court,
@@ -554,8 +539,6 @@ async def search_gerichtsentscheidungen(
         }
         if norm:
             params["Norm"] = norm
-        if suchworte:
-            params["Suchworte"] = suchworte
 
         url = f"{settings.RIS_API_BASE_URL}/Judikatur"
         data = await _fetch(url, params)
