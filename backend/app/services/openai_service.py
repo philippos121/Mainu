@@ -10,7 +10,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-GPT_MODEL = "gpt-4.1"
+GPT_MODEL = "gpt-5.4"
 
 # Source labels for GPT context
 _SOURCE_LABELS = {
