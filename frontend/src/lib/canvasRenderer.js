@@ -48,14 +48,14 @@ export function createRenderer(canvas) {
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // Black connections — strong outside, faint in center
-    gl.lineWidth=.7
+    // Black connections — thick outside, faint behind text
+    gl.lineWidth=1.2
     for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
       const a=ox[i]-ox[j],b=oy[i]-oy[j]
       if(a*a+b*b<DSQ){
         const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
         const f=centerFade(mx,my)
-        const alpha=0.02+0.12*f
+        const alpha=0.04+0.18*f
         gl.beginPath()
         gl.strokeStyle=`rgba(0,0,0,${alpha.toFixed(3)})`
         gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])
