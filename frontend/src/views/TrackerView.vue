@@ -76,7 +76,7 @@ const totalHeight = ref(slides.length * SLIDE_H + window.innerHeight)
 const maxScroll = slides.length * SLIDE_H
 
 const kernList = KERN
-const selectedCategory = ref(KERN.map(k => k.id))
+const selectedCategory = ref([])
 const selectedTimeframe = ref('EinemMonat')
 const datumVon = ref(''), datumBis = ref('')
 const timeframeOptions = ref([])
@@ -102,16 +102,23 @@ function onScroll() {
 function updateStage() {
   const slideIdx = Math.min(slides.length - 1, Math.floor(scrollY / SLIDE_H))
 
-  // Hide stage + show form when past all slides
   const stageEl = document.getElementById('stage')
   const formEl = document.getElementById('form-wrap')
   const pastSlides = slideIdx >= slides.length - 1
+  // Stage visible only during slides, hidden when form or results show
   if (stageEl) stageEl.style.opacity = pastSlides ? '0' : '1'
+  if (stageEl) stageEl.style.pointerEvents = pastSlides ? 'none' : 'none'
   if (formEl) {
-    formEl.style.opacity = pastSlides && !findings.value.length ? '1' : '0'
-    formEl.style.pointerEvents = pastSlides && !findings.value.length ? 'auto' : 'none'
+    const showForm = pastSlides && !findings.value.length
+    formEl.style.opacity = showForm ? '1' : '0'
+    formEl.style.pointerEvents = showForm ? 'auto' : 'none'
   }
 
+  // Also hide result stage when scrolling back to intro
+  const rs = document.getElementById('result-stage')
+  if (rs && !pastSlides) rs.style.opacity = '0'
+
+  // Always update slide content (handles scrolling back)
   if (slideIdx === prevSlide) return
   prevSlide = slideIdx
 
