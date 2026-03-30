@@ -154,7 +154,7 @@ async def _chat(api_key: str, system: str, user: str, max_tokens: int = 1500) ->
     payload = {
         "model": GPT_MODEL,
         "temperature": 0.3,
-        "max_tokens": max_tokens,
+        "max_completion_tokens": max_tokens,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
