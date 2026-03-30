@@ -64,10 +64,6 @@ body{{font-family:'Inter',system-ui,sans-serif;background:#fafbfc;color:#1a2a3a;
 <div class="header">
   <h1>Legal Monitoring Report</h1>
   <p>{_html.escape(category)} · {_html.escape(timeframe)} · {date_str}</p>
-  <div class="stats">
-    <div><span class="sn">{total_hits}</span><span class="sl">{type_label}</span></div>
-    <div><span class="sn">{changes_count}</span><span class="sl">Änderungen</span></div>
-  </div>
 </div>
 <div class="content">
   <div class="section">
