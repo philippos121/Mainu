@@ -67,7 +67,6 @@ const innerH = ref(typeof window !== 'undefined' ? window.innerHeight : 800)
 const slides = [
   { type: 'logo' },
   { type: 'text', title: 'Legal Monitoring', sub: '' },
-  { type: 'text', title: 'Rechtlich up to date bleiben', sub: '' },
   ...KERN.map((k, i) => ({ type: 'rg', num: String(i + 1).padStart(2, '0'), title: k.label })),
 ]
 
@@ -260,7 +259,7 @@ function downloadHtml() {
 .logo{height:48px;display:block;margin:0 auto}
 .st-num{font-size:11px;font-weight:700;color:rgba(0,121,147,.4);letter-spacing:3px;display:none;margin-bottom:8px}
 .st-title{font-size:34px;font-weight:700;color:#1a2a3a;letter-spacing:-.5px;margin:0;line-height:1.2}
-.st-hero{font-size:40px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#0a5062}
+.st-hero{font-size:36px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#1a3a4a}
 .st-rg{font-size:34px;color:#1a2a3a}
 .st-sub{font-size:20px;font-weight:300;color:#007993;margin-top:8px;display:none}
 
@@ -301,7 +300,7 @@ function downloadHtml() {
 @media(max-width:640px){
   .stage-text{padding:0 20px}
   .logo{height:36px}
-  .st-hero{font-size:24px;letter-spacing:0}
+  .st-hero{font-size:22px;letter-spacing:4px}
   .st-title{font-size:22px}
   .st-rg{font-size:22px}
   .st-sub{font-size:16px}
@@ -319,7 +318,7 @@ function downloadHtml() {
   .btn-dl{font-size:11px;padding:8px 16px}
 }
 @media(max-width:380px){
-  .st-hero{font-size:20px}
+  .st-hero{font-size:18px;letter-spacing:3px}
   .st-title,.st-rg{font-size:19px}
   .chip{padding:5px 10px;font-size:10px}
 }
