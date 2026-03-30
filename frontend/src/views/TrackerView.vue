@@ -67,7 +67,7 @@ const innerH = ref(typeof window !== 'undefined' ? window.innerHeight : 800)
 const slides = [
   { type: 'logo' },
   { type: 'text', title: 'Legal Monitoring', sub: '' },
-  { type: 'text', title: 'Rechtsänderungen erkennen,', sub: 'bevor sie relevant werden.' },
+  { type: 'text', title: 'Rechtlich up to date bleiben', sub: '' },
   ...KERN.map((k, i) => ({ type: 'rg', num: String(i + 1).padStart(2, '0'), title: k.label })),
 ]
 
@@ -270,9 +270,9 @@ function downloadHtml() {
 .form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
 .form-center{text-align:center;max-width:520px;width:100%;padding:0 24px}
 .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:18px}
-.chip{padding:5px 13px;border-radius:99px;border:1px solid rgba(10,80,98,.1);background:transparent;color:rgba(30,50,60,.4);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .2s}
-.chip:hover{color:#0a5062;border-color:rgba(0,121,147,.2)}
-.chip.on{color:#007993;border-color:rgba(0,121,147,.35);background:rgba(0,121,147,.05);font-weight:600}
+.chip{padding:7px 16px;border-radius:99px;border:1px solid rgba(10,80,98,.2);background:rgba(255,255,255,.7);color:#1a3a4a;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .2s}
+.chip:hover{color:#0a5062;border-color:rgba(0,121,147,.35);background:rgba(255,255,255,.9)}
+.chip.on{color:#fff;border-color:#007993;background:#007993;font-weight:600}
 .form-line{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
 .sel{padding:7px 14px;border:1px solid rgba(10,80,98,.1);border-radius:8px;font-size:12px;font-family:inherit;outline:none;background:rgba(255,255,255,.6);color:#1a2a3a;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(10,80,98,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px}
 .sel:focus{border-color:rgba(0,121,147,.3)}
