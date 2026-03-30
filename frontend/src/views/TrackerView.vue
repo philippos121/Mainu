@@ -40,7 +40,7 @@
 
   <!-- Inline results after generation — scroll through findings -->
   <div class="results-wrap" id="results-wrap" v-if="findings.length">
-    <div class="results-driver" :style="{ height: findings.length * 500 + innerH + 'px' }"></div>
+    <div class="results-driver" :style="{ height: findings.length * 400 + innerH + 'px' }"></div>
     <div class="result-stage" id="result-stage">
       <span class="rs-num" id="rs-num"></span>
       <h3 class="rs-title" id="rs-title"></h3>
@@ -153,10 +153,10 @@ function updateResults() {
   const rScroll = scrollY - rStart
   if (rScroll < 0) return
 
-  const idx = Math.min(findings.value.length - 1, Math.floor(rScroll / 500))
+  const idx = Math.min(findings.value.length - 1, Math.floor(rScroll / 400))
   const dlEl = document.getElementById('dl-wrap')
   if (dlEl) {
-    const pastAll = idx >= findings.value.length - 1 && rScroll > (findings.value.length - 1) * 500 + 300
+    const pastAll = idx >= findings.value.length - 1 && rScroll > (findings.value.length - 1) * 400 + 250
     dlEl.style.opacity = pastAll ? '1' : '0'
     dlEl.style.pointerEvents = pastAll ? 'auto' : 'none'
   }
@@ -170,9 +170,10 @@ function updateResults() {
   if (!rs) return
   rs.style.opacity = '0'
   setTimeout(() => {
-    document.getElementById('rs-num').textContent = String(idx + 1).padStart(2, '0')
-    document.getElementById('rs-title').textContent = f.title
-    document.getElementById('rs-body').textContent = f.body.slice(0, 400) + (f.body.length > 400 ? '…' : '')
+    document.getElementById('rs-num').textContent = f.title ? String(idx + 1).padStart(2, '0') : ''
+    document.getElementById('rs-title').textContent = f.title || ''
+    document.getElementById('rs-title').style.display = f.title ? 'block' : 'none'
+    document.getElementById('rs-body').textContent = f.body
     rs.style.opacity = '1'
   }, 120)
 }
