@@ -2,7 +2,6 @@
 <div class="page">
   <canvas ref="cvs" class="bg-canvas"></canvas>
 
-  <!-- Fixed center stage — text swaps here, page doesn't visually move -->
   <div class="stage">
     <div class="stage-text" id="stage-text">
       <img src="/logo.svg" alt="AI:ssociate" class="logo" id="stage-logo" />
@@ -12,29 +11,25 @@
     </div>
   </div>
 
-  <!-- Invisible scroll spacer — drives the text changes -->
   <div class="scroll-driver" :style="{ height: totalHeight + 'px' }"></div>
 
-  <!-- Form — appears at the bottom after scrolling through all -->
+  <!-- Form — blends into the light background at end -->
   <div class="form-wrap" id="form-wrap">
-    <div class="form-inner">
-      <p class="form-title">Report generieren</p>
+    <div class="form-center">
       <div class="chips">
         <button v-for="k in kernList" :key="k.id" class="chip"
           :class="{ on: selectedCategory.includes(k.id) }"
           @click="toggleCat(k.id)">{{ k.label }}</button>
       </div>
-      <div class="form-row">
-        <div class="ff"><label>Zeitraum</label>
-          <select v-model="selectedTimeframe" class="inp">
-            <option v-for="t in timeframeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
-          </select>
-        </div>
+      <div class="form-line">
+        <select v-model="selectedTimeframe" class="sel">
+          <option v-for="t in timeframeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+        </select>
+        <button class="btn-gen" :disabled="!selectedCategory.length || generating" @click="generateReport">
+          <span v-if="generating" class="spin"></span>
+          <template v-else>Report erstellen</template>
+        </button>
       </div>
-      <button class="btn-go" :disabled="!selectedCategory.length || generating" @click="generateReport">
-        <span v-if="generating" class="spin"></span>
-        <template v-else>Report erstellen ↓</template>
-      </button>
       <p v-if="statusMsg" :class="['msg', statusOk ? 'msg-ok' : 'msg-err']">{{ statusMsg }}</p>
     </div>
   </div>
@@ -42,7 +37,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 import { KERN } from '../lib/journeyNodes.js'
 import { createRenderer } from '../lib/canvasRenderer.js'
@@ -51,7 +46,6 @@ const cvs = ref(null)
 let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, raf = 0
 let renderLoop = () => {}, prevSlide = -1
 
-// Slides: logo → Legal Monitoring → tagline → 9 Rechtsgebiete = 12 slides
 const slides = [
   { type: 'logo' },
   { type: 'text', title: 'Legal Monitoring', sub: '' },
@@ -59,8 +53,9 @@ const slides = [
   ...KERN.map((k, i) => ({ type: 'rg', num: String(i + 1).padStart(2, '0'), title: k.label })),
 ]
 
-const SLIDE_H = 600 // px of scroll per slide
+const SLIDE_H = 600
 const totalHeight = ref(slides.length * SLIDE_H + window.innerHeight)
+const maxScroll = slides.length * SLIDE_H
 
 const kernList = KERN
 const selectedCategory = ref(KERN.map(k => k.id))
@@ -80,19 +75,41 @@ function onScroll() {
   clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => { scrolling = false }, 150)
   updateStage()
+  updateColors()
+}
+
+function updateColors() {
+  // Progress 0→1 as we scroll through all slides
+  const progress = Math.min(1, scrollY / maxScroll)
+
+  // Update CSS custom properties for text color transition
+  const stage = document.getElementById('stage-text')
+  if (stage) {
+    // Text: white on dark → dark on light
+    const textAlpha = progress < 0.5 ? 0.85 : 0.85 - (progress - 0.5) * 0.7
+    stage.style.setProperty('--text-color', progress > 0.7
+      ? `rgba(20,30,40,${0.15 + (progress - 0.7) * 2.8})`
+      : `rgba(255,255,255,${textAlpha})`)
+    stage.style.setProperty('--sub-color', progress > 0.7
+      ? `rgba(0,121,147,${0.3 + (progress - 0.7) * 2})`
+      : `rgba(34,201,232,1)`)
+    stage.style.setProperty('--num-color', progress > 0.7
+      ? `rgba(0,121,147,${0.2 + (progress - 0.7) * 1.5})`
+      : `rgba(34,201,232,0.4)`)
+  }
+
+  // Form visibility
+  const formEl = document.getElementById('form-wrap')
+  const slideIdx = Math.floor(scrollY / SLIDE_H)
+  if (formEl) {
+    const show = slideIdx >= slides.length - 1
+    formEl.style.opacity = show ? '1' : '0'
+    formEl.style.pointerEvents = show ? 'auto' : 'none'
+  }
 }
 
 function updateStage() {
   const slideIdx = Math.min(slides.length - 1, Math.floor(scrollY / SLIDE_H))
-  const progress = (scrollY % SLIDE_H) / SLIDE_H // 0..1 within slide
-
-  // Show form when past last slide
-  const formEl = document.getElementById('form-wrap')
-  if (formEl) {
-    formEl.style.opacity = slideIdx >= slides.length - 1 ? '1' : '0'
-    formEl.style.pointerEvents = slideIdx >= slides.length - 1 ? 'auto' : 'none'
-  }
-
   if (slideIdx === prevSlide) return
   prevSlide = slideIdx
 
@@ -104,19 +121,18 @@ function updateStage() {
   const text = document.getElementById('stage-text')
   if (!title) return
 
-  // Fade out then in
   text.style.opacity = '0'
-  text.style.transform = 'translateY(20px)'
+  text.style.transform = 'translateY(16px)'
 
   setTimeout(() => {
     logo.style.display = slide.type === 'logo' ? 'block' : 'none'
     num.textContent = slide.num || ''
     num.style.display = slide.num ? 'block' : 'none'
     title.textContent = slide.type === 'logo' ? '' : slide.title || ''
-    title.className = slide.type === 'rg' ? 'st-title st-rg' : slide.type === 'text' && !slide.sub ? 'st-title st-hero' : 'st-title'
+    title.className = slide.type === 'rg' ? 'st-title st-rg' :
+      slide.type === 'text' && !slide.sub ? 'st-title st-hero' : 'st-title'
     sub.textContent = slide.sub || ''
     sub.style.display = slide.sub ? 'block' : 'none'
-
     text.style.opacity = '1'
     text.style.transform = 'translateY(0)'
   }, 150)
@@ -124,10 +140,11 @@ function updateStage() {
 
 function setupRenderer() {
   renderer = createRenderer(cvs.value)
-  renderer.render(0, false)
+  renderer.render(0, false, 0)
   renderLoop = function () {
     if (!scrolling || !renderer) return
-    renderer.render(scrollY, true)
+    const progress = Math.min(1, scrollY / maxScroll)
+    renderer.render(scrollY, true, progress)
     raf = requestAnimationFrame(renderLoop)
   }
 }
@@ -136,6 +153,7 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
   setupRenderer()
   updateStage()
+  updateColors()
   Promise.all([api.get('/categories'), api.get('/timeframes')]).then(([, b]) => {
     timeframeOptions.value = [...b.data, { value: 'custom', label: 'Benutzerdefiniert…' }]
   }).catch(() => { statusMsg.value = 'Verbindung fehlgeschlagen.'; statusOk.value = false })
@@ -183,44 +201,61 @@ async function generateReport() {
 .page{min-height:100vh;background:#070e12;color:#e4f0f2}
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none;contain:strict}
 
-/* Stage — fixed center, text swaps in place */
 .stage{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.stage-text{text-align:center;transition:opacity .3s ease,transform .3s ease;will-change:opacity,transform}
+.stage-text{text-align:center;transition:opacity .3s ease,transform .3s ease;will-change:opacity,transform;
+  --text-color:rgba(255,255,255,.85);--sub-color:rgba(34,201,232,1);--num-color:rgba(34,201,232,.4)}
 
 .logo{height:52px;filter:brightness(10);display:block;margin:0 auto}
 
-.st-num{font-size:12px;font-weight:700;color:rgba(34,201,232,.4);letter-spacing:3px;display:none;margin-bottom:10px}
-.st-title{font-size:36px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:-.5px;margin:0;line-height:1.2}
-.st-hero{font-size:48px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:linear-gradient(135deg,#ff9733,#ffbe6d 40%,#ff9733 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.st-num{font-size:12px;font-weight:700;color:var(--num-color);letter-spacing:3px;display:none;margin-bottom:10px}
+.st-title{font-size:36px;font-weight:700;color:var(--text-color);letter-spacing:-.5px;margin:0;line-height:1.2;transition:color .5s}
+.st-hero{font-size:44px;font-weight:800;letter-spacing:1px;text-transform:uppercase;background:linear-gradient(135deg,#ff9733,#ffbe6d 40%,#ff9733 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .st-rg{font-size:36px}
-.st-sub{font-size:22px;font-weight:300;color:#22c9e8;margin-top:10px;display:none}
+.st-sub{font-size:22px;font-weight:300;color:var(--sub-color);margin-top:10px;display:none;transition:color .5s}
 
-/* Scroll driver — invisible tall div that creates scroll room */
 .scroll-driver{position:relative;z-index:1;pointer-events:none}
 
-/* Form — fades in at the end, over the stage */
-.form-wrap{position:fixed;bottom:0;left:0;right:0;z-index:10;padding:0 24px;opacity:0;pointer-events:none;transition:opacity .4s ease}
-.form-inner{max-width:560px;margin:0 auto;background:#0a1820;border-radius:16px 16px 0 0;border:1px solid rgba(255,255,255,.06);border-bottom:none;padding:22px 24px 24px;box-shadow:0 -8px 40px rgba(0,0,0,.5)}
-.form-title{font-size:14px;font-weight:700;margin:0 0 12px;color:rgba(255,255,255,.55)}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
-.chip{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.06);background:transparent;color:rgba(255,255,255,.35);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .2s}
-.chip:hover{color:rgba(255,255,255,.6);border-color:rgba(34,201,232,.2)}
-.chip.on{color:#22c9e8;border-color:rgba(34,201,232,.3);background:rgba(34,201,232,.06)}
-.form-row{margin-bottom:10px}
-.ff label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.3);margin-bottom:4px}
-.inp{width:100%;padding:9px 12px;border:1px solid rgba(255,255,255,.06);border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:rgba(255,255,255,.03);color:#e4f0f2}
-.inp:focus{border-color:rgba(34,201,232,.3)}
-select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
-select.inp option{background:#0b1922;color:#e4f0f2}
-.btn-go{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#ff9733,#e8870a);color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 4px 16px rgba(255,151,51,.2);transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px}
-.btn-go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,151,51,.3)}
-.btn-go:disabled{opacity:.3;cursor:not-allowed}
-.msg{margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px}
-.msg-ok{background:rgba(16,185,129,.06);color:#34d399;border:1px solid rgba(16,185,129,.1)}
-.msg-err{background:rgba(239,68,68,.06);color:#f87171;border:1px solid rgba(239,68,68,.1)}
-.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
+/* Form — transparent, blends into light bg, centered inline */
+.form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .5s ease}
+.form-center{text-align:center;max-width:480px;width:100%;padding:0 24px}
+
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:20px}
+.chip{
+  padding:5px 14px;border-radius:99px;
+  border:1px solid rgba(0,80,100,.12);background:transparent;
+  color:rgba(30,50,60,.45);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .2s;
+}
+.chip:hover{color:rgba(0,80,100,.7);border-color:rgba(0,121,147,.25)}
+.chip.on{color:#007993;border-color:rgba(0,121,147,.4);background:rgba(0,121,147,.06);font-weight:600}
+
+.form-line{display:inline-flex;align-items:center;gap:10px}
+
+.sel{
+  padding:8px 28px 8px 12px;border:1px solid rgba(0,80,100,.1);border-radius:8px;
+  font-size:13px;font-family:inherit;outline:none;
+  background:rgba(255,255,255,.5);color:rgba(20,40,50,.7);cursor:pointer;
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(0,80,100,0.35)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+}
+.sel:focus{border-color:rgba(0,121,147,.3)}
+.sel option{background:#fff;color:#1a2a3a}
+
+.btn-gen{
+  padding:8px 20px;border:none;border-radius:8px;
+  background:rgba(0,121,147,.12);color:#007993;
+  font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;
+  transition:all .2s;display:inline-flex;align-items:center;gap:5px;
+}
+.btn-gen:hover:not(:disabled){background:rgba(0,121,147,.18)}
+.btn-gen:disabled{opacity:.3;cursor:not-allowed}
+
+.msg{margin-top:12px;padding:8px 14px;border-radius:8px;font-size:12px;display:inline-block}
+.msg-ok{background:rgba(16,185,129,.08);color:#059669;border:1px solid rgba(16,185,129,.15)}
+.msg-err{background:rgba(239,68,68,.08);color:#dc2626;border:1px solid rgba(239,68,68,.15)}
+.spin{width:14px;height:14px;border:2px solid rgba(0,121,147,.2);border-top-color:#007993;border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-@media(max-width:640px){.st-hero{font-size:32px}.st-title{font-size:28px}.st-sub{font-size:18px}.form-inner{padding:18px}}
-@media(prefers-reduced-motion:reduce){.stage-text{transition:none}.bg-canvas{display:none}.page{background:#0c2230}}
+@media(max-width:640px){.st-hero{font-size:30px}.st-title{font-size:26px}.st-sub{font-size:18px}.form-center{padding:0 16px}.form-line{flex-direction:column;width:100%}.sel,.btn-gen{width:100%}}
+@media(prefers-reduced-motion:reduce){.stage-text{transition:none}.bg-canvas{display:none}.page{background:#f0f4f5}}
 </style>
