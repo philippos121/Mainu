@@ -60,7 +60,7 @@ import { KERN, parseFindings } from '../lib/journeyNodes.js'
 import { createRenderer } from '../lib/canvasRenderer.js'
 
 const cvs = ref(null)
-let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, raf = 0
+let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, raf = 0, slideProgress = 0
 let renderLoop = () => {}, prevSlide = -1, prevResult = -1
 const innerH = ref(typeof window !== 'undefined' ? window.innerHeight : 800)
 
@@ -91,6 +91,8 @@ function toggleCat(id) {
 
 function onScroll() {
   scrollY = window.scrollY || document.documentElement.scrollTop || 0
+  // Continuous slide progress for smooth camera movement
+  slideProgress = Math.min(slides.length - 1, scrollY / SLIDE_H)
   if (!scrolling) { scrolling = true; renderLoop() }
   clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => { scrolling = false }, 150)
@@ -180,10 +182,10 @@ function updateResults() {
 
 function setupRenderer() {
   renderer = createRenderer(cvs.value)
-  renderer.render(0, false)
+  renderer.render(0, false, 0)
   renderLoop = function () {
     if (!scrolling || !renderer) return
-    renderer.render(scrollY, true)
+    renderer.render(scrollY, true, slideProgress)
     raf = requestAnimationFrame(renderLoop)
   }
 }

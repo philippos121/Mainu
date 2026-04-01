@@ -1,103 +1,142 @@
-// 3D neural network — fly-through effect on scroll
+// 3D neural network — fly through node-to-node on scroll
+import { KERN, helix } from './journeyNodes.js'
+
 export function createRenderer(canvas) {
   const gl = canvas.getContext('2d', { alpha: false })
   let W = 0, H = 0
   const isMobile = window.innerWidth < 640
-  const N = isMobile ? 50 : 90
+  const N = isMobile ? 40 : 80
   const DSQ = 190 * 190
+
+  // Background particles
   const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N)
   const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N)
   const sr=new Float32Array(N)
   const ox=new Float32Array(N),oy=new Float32Array(N),os=new Float32Array(N)
 
-  // Spread nodes in a deep tunnel along Z (-3 to +3)
   for(let i=0;i<N;i++){
     ax[i]=Math.random()*3.2-1.6
     ay[i]=Math.random()*3.2-1.6
-    az[i]=Math.random()*6-3  // deep Z range for fly-through
-    const speed = isMobile ? 3 : 1
+    az[i]=Math.random()*3.2-1.6
+    const speed = isMobile ? 2.5 : 1
     dx[i]=(Math.random()-.5)*.001*speed
     dy[i]=(Math.random()-.5)*.001*speed
     dz[i]=(Math.random()-.5)*.0008*speed
     sr[i]=1.2+Math.random()*1.8
   }
 
-  let lastScrollY = 0, initialized = false
+  // Pre-compute slide node positions on helix
+  const totalSlides = 2 + KERN.length  // logo + title + KERN nodes
+  const slidePos = []
+  for(let i=0;i<totalSlides;i++){
+    const t = i / (totalSlides - 1)
+    const h = helix(t)
+    slidePos.push({ x: h.x, y: h.y, z: h.z })
+  }
+
+  let lastScrollY = 0, lastSlide = 0, initialized = false
 
   function resize(){
     W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight
-    if(initialized) render(lastScrollY, false)
+    if(initialized) render(lastScrollY, false, lastSlide)
   }
   resize();window.addEventListener('resize',resize)
 
-  // How much to fade an element based on distance to center
-  function centerFade(x, y) {
-    const mobile = W < 640
-    const zw = mobile ? .65 : .35
-    const zh = mobile ? .45 : .3
-    const ddx = (x - W/2) / (W * zw)
-    const ddy = (y - H/2) / (H * zh)
-    const d = ddx*ddx + ddy*ddy
-    return Math.min(1, Math.max(0, d - .35) / .65)
-  }
-
-  function render(scrollY, moving){
+  function render(scrollY, moving, slideProgress){
     initialized = true
     lastScrollY = scrollY
+    if(slideProgress !== undefined) lastSlide = slideProgress
     const mobile = W < 640
     const hw=W/2,hh=H/2
 
-    // Scroll drives camera forward through the Z axis
-    const flySpeed = mobile ? 0.004 : 0.002
-    const camZ = scrollY * flySpeed
+    // Camera follows the helix path based on continuous slide index
+    const camT = Math.max(0, Math.min(1, (slideProgress || 0) / (totalSlides - 1)))
+    const camNode = helix(camT)
+    // Camera looks slightly ahead
+    const lookT = Math.min(1, camT + 0.08)
+    const lookNode = helix(lookT)
 
-    // Gentle rotation for extra 3D feel
-    const rotSpeed = mobile ? 2.5 : 1
-    const ry=scrollY*.00012*rotSpeed
-    const cy=Math.cos(ry),sn=Math.sin(ry)
+    // Camera position + slight offset behind the path
+    const camX = camNode.x
+    const camY = camNode.y
+    const camZ = camNode.z - 0.6  // behind the node
+
+    // Slow ambient rotation
+    const rotSpeed = mobile ? 1.5 : 0.8
+    const ambientRot = scrollY * 0.00005 * rotSpeed
 
     if(moving){for(let i=0;i<N;i++){
       ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
       if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
       if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
-      if(az[i]>3||az[i]<-3)dz[i]*=-1
+      if(az[i]>1.6||az[i]<-1.6)dz[i]*=-1
     }}
 
-    // Project nodes with fly-through Z offset
-    const spreadX = mobile ? .55 : .36
-    const spreadY = mobile ? .45 : .3
-    for(let i=0;i<N;i++){
-      const x=ax[i],y=ay[i],z=az[i]
-      // Apply Y-axis rotation
-      const rx=x*cy-z*sn, rz=x*sn+z*cy
-      // Shift Z by camera position, wrap around for infinite tunnel
-      let tz = ((rz - camZ) % 6 + 9) % 6 - 3  // wrap to -3..+3
-      // Perspective projection — nodes closer = bigger & spread out
-      const depth = 4 + tz
-      if(depth < 0.5) { ox[i]=-999; continue }  // behind camera
+    // Project a 3D point to screen with camera offset
+    function project(px, py, pz) {
+      let rx = px - camX, ry = py - camY, rz = pz - camZ
+      // Apply ambient rotation around Y
+      const ca=Math.cos(ambientRot), sa=Math.sin(ambientRot)
+      const nx=rx*ca-rz*sa, nz=rx*sa+rz*ca
+      rx=nx; rz=nz
+      const depth = 3 + rz
+      if(depth < 0.3) return null
       const s = 2.5 / depth
-      ox[i]=hw+rx*W*spreadX*s
-      oy[i]=hh+y*H*spreadY*s
-      os[i]=s
+      const spreadX = mobile ? .55 : .4
+      const spreadY = mobile ? .45 : .35
+      return {
+        x: hw + rx * W * spreadX * s,
+        y: hh + ry * H * spreadY * s,
+        s: s,
+        depth: depth
+      }
+    }
+
+    // Find where the active slide node is on screen (for text fade zone)
+    const activeIdx = Math.round(slideProgress || 0)
+    const activePos = activeIdx < slidePos.length ? slidePos[activeIdx] : null
+    let activeScreenX = hw, activeScreenY = hh, activeRadius = 200
+    if(activePos) {
+      const ap = project(activePos.x, activePos.y, activePos.z)
+      if(ap) {
+        activeScreenX = ap.x
+        activeScreenY = ap.y
+        activeRadius = mobile ? W * 0.45 : W * 0.22
+      }
+    }
+
+    // Fade based on distance to active node's screen position
+    function textFade(sx, sy) {
+      const ddx = (sx - activeScreenX) / activeRadius
+      const ddy = (sy - activeScreenY) / activeRadius
+      const d = ddx*ddx + ddy*ddy
+      return Math.min(1, Math.max(0, d - 0.3) / 0.7)
     }
 
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // Draw connections
-    const lineAlphaBase = mobile ? 0.015 : 0.04
-    const lineAlphaMax = mobile ? 0.08 : 0.18
+    // Project background particles
+    for(let i=0;i<N;i++){
+      const p = project(ax[i], ay[i], az[i])
+      if(!p) { ox[i]=-999; continue }
+      ox[i]=p.x; oy[i]=p.y; os[i]=p.s
+    }
+
+    // Draw background connections
+    const lineAlphaBase = mobile ? 0.01 : 0.03
+    const lineAlphaMax = mobile ? 0.06 : 0.15
     const connDist = mobile ? 300*300 : DSQ
-    gl.lineWidth = mobile ? 0.8 : 1.2
+    gl.lineWidth = mobile ? 0.7 : 1
     for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
       if(ox[i]<-900||ox[j]<-900) continue
       const a=ox[i]-ox[j],b=oy[i]-oy[j]
       if(a*a+b*b<connDist){
         const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
-        const f=centerFade(mx,my)
-        // Depth-based alpha: closer nodes have stronger lines
-        const depthAlpha = Math.min(1, (os[i]+os[j]) * 0.7)
+        const f=textFade(mx,my)
+        const depthAlpha = Math.min(1, (os[i]+os[j]) * 0.6)
         const alpha=(lineAlphaBase+lineAlphaMax*f)*depthAlpha
+        if(alpha < 0.003) continue
         gl.beginPath()
         gl.strokeStyle=`rgba(0,0,0,${alpha.toFixed(3)})`
         gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])
@@ -105,18 +144,71 @@ export function createRenderer(canvas) {
       }
     }}
 
-    // Orange nodes — size scales with perspective
-    const glowMul = mobile ? 0.4 : 1
-    const coreMul = mobile ? 0.5 : 1
+    // Draw slide nodes on the helix path
+    for(let i=0;i<slidePos.length;i++){
+      const sp = slidePos[i]
+      const p = project(sp.x, sp.y, sp.z)
+      if(!p) continue
+
+      const isActive = Math.abs(i - (slideProgress || 0)) < 0.5
+      const nearness = 1 - Math.min(1, Math.abs(i - (slideProgress || 0)) / 2)
+
+      // Draw connections between consecutive slide nodes
+      if(i > 0) {
+        const prevP = project(slidePos[i-1].x, slidePos[i-1].y, slidePos[i-1].z)
+        if(prevP) {
+          const lineF = textFade((p.x+prevP.x)/2, (p.y+prevP.y)/2)
+          const la = (0.04 + 0.12 * lineF) * nearness
+          if(la > 0.003) {
+            gl.beginPath()
+            gl.strokeStyle=`rgba(0,121,147,${la.toFixed(3)})`
+            gl.lineWidth = mobile ? 1.5 : 2
+            gl.moveTo(prevP.x, prevP.y)
+            gl.lineTo(p.x, p.y)
+            gl.stroke()
+          }
+        }
+      }
+
+      // Node circle — bigger & brighter when active
+      const baseR = (mobile ? 5 : 7) * p.s
+      const r = isActive ? baseR * 2.2 : baseR * (0.6 + nearness * 0.6)
+      const nodeAlpha = isActive ? 0.9 : 0.15 + nearness * 0.3
+
+      // Glow ring for active node
+      if(isActive) {
+        gl.beginPath();gl.arc(p.x, p.y, r*3.5, 0, 6.28)
+        gl.fillStyle=`rgba(0,121,147,${(0.04 * p.s).toFixed(3)})`
+        gl.fill()
+      }
+
+      // Outer glow
+      gl.beginPath();gl.arc(p.x, p.y, r*2, 0, 6.28)
+      gl.fillStyle=`rgba(255,151,51,${(nodeAlpha*0.12).toFixed(3)})`
+      gl.fill()
+
+      // Core
+      gl.beginPath();gl.arc(p.x, p.y, r, 0, 6.28)
+      const coreColor = isActive ? `rgba(0,121,147,${nodeAlpha.toFixed(3)})` :
+        `rgba(255,130,30,${nodeAlpha.toFixed(3)})`
+      gl.fillStyle=coreColor
+      gl.fill()
+    }
+
+    // Draw background particles (nodes)
+    const glowMul = mobile ? 0.3 : 0.8
+    const coreMul = mobile ? 0.4 : 0.8
     for(let i=0;i<N;i++){
       if(ox[i]<-900) continue
-      const r=sr[i]*os[i],a=.2+os[i]*.45
-      const f=centerFade(ox[i],oy[i])
-      gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
-      gl.fillStyle=`rgba(255,151,51,${(a*(.02+.1*f)*glowMul).toFixed(3)})`
+      const r=sr[i]*os[i]*0.8, a=.2+os[i]*.35
+      const f=textFade(ox[i],oy[i])
+      const fa = a * f  // fade out near text
+      if(fa < 0.005) continue
+      gl.beginPath();gl.arc(ox[i],oy[i],r*2.5,0,6.28)
+      gl.fillStyle=`rgba(255,151,51,${(fa*0.06*glowMul).toFixed(3)})`
       gl.fill()
       gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-      gl.fillStyle=`rgba(255,130,30,${(a*(.1+.7*f)*coreMul).toFixed(3)})`
+      gl.fillStyle=`rgba(255,130,30,${(fa*0.5*coreMul).toFixed(3)})`
       gl.fill()
     }
   }
