@@ -14,10 +14,12 @@ export function createRenderer(canvas) {
   const sr=new Float32Array(N)
   const ox=new Float32Array(N),oy=new Float32Array(N),os=new Float32Array(N)
 
+  // Spread particles along a deep Z tunnel matching the slide depth
+  const maxZ = (2 + KERN.length) * 2.5 + 4
   for(let i=0;i<N;i++){
     ax[i]=Math.random()*3.2-1.6
     ay[i]=Math.random()*3.2-1.6
-    az[i]=Math.random()*3.2-1.6
+    az[i]=Math.random()*maxZ - 2       // spread along full tunnel depth
     const speed = isMobile ? 2.5 : 1
     dx[i]=(Math.random()-.5)*.001*speed
     dy[i]=(Math.random()-.5)*.001*speed
@@ -25,13 +27,19 @@ export function createRenderer(canvas) {
     sr[i]=1.2+Math.random()*1.8
   }
 
-  // Pre-compute slide node positions on helix
+  // Pre-compute slide node positions along a Z-depth tunnel
+  // Nodes are spaced along Z (into the screen) with slight X/Y sway
   const totalSlides = 2 + KERN.length  // logo + title + KERN nodes
   const slidePos = []
+  const TUNNEL_DEPTH = 2.5  // total Z range per node spacing
   for(let i=0;i<totalSlides;i++){
     const t = i / (totalSlides - 1)
-    const h = helix(t)
-    slidePos.push({ x: h.x, y: h.y, z: h.z })
+    const a = t * Math.PI * 1.5
+    slidePos.push({
+      x: 0.3 * Math.sin(a),          // gentle sway left-right
+      y: 0.15 * Math.cos(a * 0.7),   // subtle vertical bob
+      z: i * TUNNEL_DEPTH             // straight into the screen
+    })
   }
 
   let lastScrollY = 0, lastSlide = 0, initialized = false
@@ -49,30 +57,33 @@ export function createRenderer(canvas) {
     const mobile = W < 640
     const hw=W/2,hh=H/2
 
-    // Smooth interpolation of active node position
+    // Smooth interpolation of active node position along Z tunnel
     const sp = slideProgress || 0
     const idx0 = Math.min(Math.floor(sp), totalSlides - 1)
     const idx1 = Math.min(idx0 + 1, totalSlides - 1)
     const frac = sp - idx0
-    // Lerp between current and next node position
     const targetX = slidePos[idx0].x + (slidePos[idx1].x - slidePos[idx0].x) * frac
     const targetY = slidePos[idx0].y + (slidePos[idx1].y - slidePos[idx0].y) * frac
     const targetZ = slidePos[idx0].z + (slidePos[idx1].z - slidePos[idx0].z) * frac
 
-    // Camera sits directly behind the active node on Z axis
-    // This guarantees the active node projects to screen center
+    // Camera flies forward along Z, sitting behind the active node
     const camX = targetX
     const camY = targetY
-    const camZ = targetZ - 0.8
+    const camZ = targetZ - 1.2  // behind, looking forward into the tunnel
 
     if(moving){for(let i=0;i<N;i++){
       ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
       if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
       if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
-      if(az[i]>1.6||az[i]<-1.6)dz[i]*=-1
+      if(az[i]>maxZ||az[i]<-2)dz[i]*=-1
     }}
 
-    // Project a 3D point to screen — active node always at center
+    // Active node screen position: slightly above center (30% from top)
+    // Text appears below the node, so node sits above the text
+    const nodeScreenY = H * (mobile ? 0.28 : 0.30)
+
+    // Project a 3D point to screen
+    // Active node is offset upward on screen via yOffset
     const spreadX = mobile ? .55 : .4
     const spreadY = mobile ? .45 : .35
     function project(px, py, pz) {
@@ -82,17 +93,17 @@ export function createRenderer(canvas) {
       const s = 2.5 / depth
       return {
         x: hw + rx * W * spreadX * s,
-        y: hh + ry * H * spreadY * s,
+        y: nodeScreenY + ry * H * spreadY * s,
         s: s,
         depth: depth
       }
     }
 
-    // Text fade zone is always centered on screen (where active node is)
+    // Text fade zone: centered below the active node where text appears
     const activeIdx = Math.round(sp)
     const activeScreenX = hw
-    const activeScreenY = hh
-    const activeRadius = mobile ? W * 0.45 : W * 0.22
+    const activeScreenY = H * 0.5  // text area is in the center-bottom
+    const activeRadius = mobile ? W * 0.5 : W * 0.25
 
     // Fade based on distance to active node's screen position
     function textFade(sx, sy) {
