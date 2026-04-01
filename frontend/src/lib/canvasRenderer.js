@@ -49,21 +49,21 @@ export function createRenderer(canvas) {
     const mobile = W < 640
     const hw=W/2,hh=H/2
 
-    // Camera follows the helix path based on continuous slide index
-    const camT = Math.max(0, Math.min(1, (slideProgress || 0) / (totalSlides - 1)))
-    const camNode = helix(camT)
-    // Camera looks slightly ahead
-    const lookT = Math.min(1, camT + 0.08)
-    const lookNode = helix(lookT)
+    // Smooth interpolation of active node position
+    const sp = slideProgress || 0
+    const idx0 = Math.min(Math.floor(sp), totalSlides - 1)
+    const idx1 = Math.min(idx0 + 1, totalSlides - 1)
+    const frac = sp - idx0
+    // Lerp between current and next node position
+    const targetX = slidePos[idx0].x + (slidePos[idx1].x - slidePos[idx0].x) * frac
+    const targetY = slidePos[idx0].y + (slidePos[idx1].y - slidePos[idx0].y) * frac
+    const targetZ = slidePos[idx0].z + (slidePos[idx1].z - slidePos[idx0].z) * frac
 
-    // Camera position + slight offset behind the path
-    const camX = camNode.x
-    const camY = camNode.y
-    const camZ = camNode.z - 0.6  // behind the node
-
-    // Slow ambient rotation
-    const rotSpeed = mobile ? 1.5 : 0.8
-    const ambientRot = scrollY * 0.00005 * rotSpeed
+    // Camera sits directly behind the active node on Z axis
+    // This guarantees the active node projects to screen center
+    const camX = targetX
+    const camY = targetY
+    const camZ = targetZ - 0.8
 
     if(moving){for(let i=0;i<N;i++){
       ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
@@ -72,18 +72,14 @@ export function createRenderer(canvas) {
       if(az[i]>1.6||az[i]<-1.6)dz[i]*=-1
     }}
 
-    // Project a 3D point to screen with camera offset
+    // Project a 3D point to screen — active node always at center
+    const spreadX = mobile ? .55 : .4
+    const spreadY = mobile ? .45 : .35
     function project(px, py, pz) {
-      let rx = px - camX, ry = py - camY, rz = pz - camZ
-      // Apply ambient rotation around Y
-      const ca=Math.cos(ambientRot), sa=Math.sin(ambientRot)
-      const nx=rx*ca-rz*sa, nz=rx*sa+rz*ca
-      rx=nx; rz=nz
+      const rx = px - camX, ry = py - camY, rz = pz - camZ
       const depth = 3 + rz
       if(depth < 0.3) return null
       const s = 2.5 / depth
-      const spreadX = mobile ? .55 : .4
-      const spreadY = mobile ? .45 : .35
       return {
         x: hw + rx * W * spreadX * s,
         y: hh + ry * H * spreadY * s,
@@ -92,18 +88,11 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Find where the active slide node is on screen (for text fade zone)
-    const activeIdx = Math.round(slideProgress || 0)
-    const activePos = activeIdx < slidePos.length ? slidePos[activeIdx] : null
-    let activeScreenX = hw, activeScreenY = hh, activeRadius = 200
-    if(activePos) {
-      const ap = project(activePos.x, activePos.y, activePos.z)
-      if(ap) {
-        activeScreenX = ap.x
-        activeScreenY = ap.y
-        activeRadius = mobile ? W * 0.45 : W * 0.22
-      }
-    }
+    // Text fade zone is always centered on screen (where active node is)
+    const activeIdx = Math.round(sp)
+    const activeScreenX = hw
+    const activeScreenY = hh
+    const activeRadius = mobile ? W * 0.45 : W * 0.22
 
     // Fade based on distance to active node's screen position
     function textFade(sx, sy) {
