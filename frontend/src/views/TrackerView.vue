@@ -180,8 +180,15 @@ function updateResults() {
   }, 120)
 }
 
+// Labels for each slide node — drawn on canvas under each node
+const slideLabels = [
+  '',                    // logo
+  'Legal Monitoring',    // title slide
+  ...KERN.map(k => k.label),
+]
+
 function setupRenderer() {
-  renderer = createRenderer(cvs.value)
+  renderer = createRenderer(cvs.value, slideLabels)
   renderer.render(0, false, 0)
   renderLoop = function () {
     if (!scrolling || !renderer) return
@@ -256,9 +263,8 @@ function downloadHtml() {
 .page{min-height:100vh;background:#fafbfc;color:#1a2a3a}
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none;contain:strict}
 
-/* Stage */
-.stage{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:opacity .3s}
-.stage-text{text-align:center;transition:opacity .3s ease,transform .3s ease;will-change:opacity,transform}
+/* Stage — hidden, labels are now drawn on canvas under each 3D node */
+.stage{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:opacity .3s;opacity:0 !important}
 .logo{height:48px;display:block;margin:0 auto}
 .st-num{font-size:11px;font-weight:700;color:rgba(0,121,147,.4);letter-spacing:3px;display:none;margin-bottom:8px}
 .st-title{font-size:34px;font-weight:700;color:#1a2a3a;letter-spacing:-.5px;margin:0;line-height:1.2}

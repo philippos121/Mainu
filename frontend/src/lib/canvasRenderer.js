@@ -1,7 +1,7 @@
 // 3D neural network — fly through node-to-node on scroll
 import { KERN, helix } from './journeyNodes.js'
 
-export function createRenderer(canvas) {
+export function createRenderer(canvas, slideLabels) {
   const gl = canvas.getContext('2d', { alpha: false })
   let W = 0, H = 0
   const isMobile = window.innerWidth < 640
@@ -140,21 +140,21 @@ export function createRenderer(canvas) {
       }
     }}
 
-    // Draw slide nodes on the helix path
+    // Draw slide nodes with labels underneath
     for(let i=0;i<slidePos.length;i++){
-      const sp = slidePos[i]
-      const p = project(sp.x, sp.y, sp.z)
+      const sn = slidePos[i]
+      const p = project(sn.x, sn.y, sn.z)
       if(!p) continue
 
-      const isActive = Math.abs(i - (slideProgress || 0)) < 0.5
-      const nearness = 1 - Math.min(1, Math.abs(i - (slideProgress || 0)) / 2)
+      const dist = Math.abs(i - (slideProgress || 0))
+      const isActive = dist < 0.5
+      const nearness = 1 - Math.min(1, dist / 2.5)
 
-      // Draw connections between consecutive slide nodes
+      // Connections between consecutive slide nodes
       if(i > 0) {
         const prevP = project(slidePos[i-1].x, slidePos[i-1].y, slidePos[i-1].z)
         if(prevP) {
-          const lineF = textFade((p.x+prevP.x)/2, (p.y+prevP.y)/2)
-          const la = (0.04 + 0.12 * lineF) * nearness
+          const la = (0.04 + 0.14 * nearness)
           if(la > 0.003) {
             gl.beginPath()
             gl.strokeStyle=`rgba(0,121,147,${la.toFixed(3)})`
@@ -166,15 +166,15 @@ export function createRenderer(canvas) {
         }
       }
 
-      // Node circle — bigger & brighter when active
+      // Node circle
       const baseR = (mobile ? 5 : 7) * p.s
       const r = isActive ? baseR * 2.2 : baseR * (0.6 + nearness * 0.6)
-      const nodeAlpha = isActive ? 0.9 : 0.15 + nearness * 0.3
+      const nodeAlpha = isActive ? 0.9 : 0.15 + nearness * 0.4
 
       // Glow ring for active node
       if(isActive) {
         gl.beginPath();gl.arc(p.x, p.y, r*3.5, 0, 6.28)
-        gl.fillStyle=`rgba(0,121,147,${(0.04 * p.s).toFixed(3)})`
+        gl.fillStyle=`rgba(0,121,147,${(0.05 * p.s).toFixed(3)})`
         gl.fill()
       }
 
@@ -189,6 +189,31 @@ export function createRenderer(canvas) {
         `rgba(255,130,30,${nodeAlpha.toFixed(3)})`
       gl.fillStyle=coreColor
       gl.fill()
+
+      // Label text underneath the node — visible from afar, scales with perspective
+      const label = slideLabels && slideLabels[i] ? slideLabels[i] : ''
+      if(label && p.s > 0.15) {
+        const fontSize = Math.max(8, Math.min(mobile ? 28 : 34, (mobile ? 18 : 22) * p.s))
+        const textAlpha = isActive ? 0.95 : Math.min(0.7, nearness * 0.8)
+        if(textAlpha > 0.03) {
+          const textY = p.y + r + fontSize * 0.8  // just below the node
+          gl.font = `${isActive ? '700' : '400'} ${fontSize.toFixed(0)}px -apple-system, "Segoe UI", sans-serif`
+          gl.textAlign = 'center'
+          gl.textBaseline = 'top'
+          gl.fillStyle = isActive
+            ? `rgba(10,50,62,${textAlpha.toFixed(2)})`
+            : `rgba(30,60,80,${textAlpha.toFixed(2)})`
+          gl.fillText(label, p.x, textY)
+
+          // Number badge above node for KERN items
+          if(i >= 2) {
+            const numSize = Math.max(6, fontSize * 0.35)
+            gl.font = `700 ${numSize.toFixed(0)}px -apple-system, "Segoe UI", sans-serif`
+            gl.fillStyle = `rgba(0,121,147,${(textAlpha * 0.5).toFixed(2)})`
+            gl.fillText(String(i - 1).padStart(2, '0'), p.x, p.y - r - numSize * 1.2)
+          }
+        }
+      }
     }
 
     // Draw background particles (nodes)
