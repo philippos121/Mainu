@@ -15,7 +15,7 @@ export function createRenderer(canvas) {
   const ox=new Float32Array(N),oy=new Float32Array(N),os=new Float32Array(N)
 
   // Spread particles along a deep Z tunnel matching the slide depth
-  const maxZ = (2 + KERN.length) * 2.5 + 4
+  const maxZ = (2 + KERN.length) * 1.8 + 4
   for(let i=0;i<N;i++){
     ax[i]=Math.random()*3.2-1.6
     ay[i]=Math.random()*3.2-1.6
@@ -27,18 +27,17 @@ export function createRenderer(canvas) {
     sr[i]=1.2+Math.random()*1.8
   }
 
-  // Pre-compute slide node positions along a Z-depth tunnel
-  // Nodes are spaced along Z (into the screen) with slight X/Y sway
-  const totalSlides = 2 + KERN.length  // logo + title + KERN nodes
+  // Slide nodes along Z tunnel with strong left-right sway
+  const totalSlides = 2 + KERN.length
   const slidePos = []
-  const TUNNEL_DEPTH = 2.5  // total Z range per node spacing
+  const TUNNEL_DEPTH = 1.8  // tighter spacing = closer nodes
   for(let i=0;i<totalSlides;i++){
     const t = i / (totalSlides - 1)
-    const a = t * Math.PI * 1.5
+    const a = t * Math.PI * 2.5
     slidePos.push({
-      x: 0.3 * Math.sin(a),          // gentle sway left-right
-      y: 0.15 * Math.cos(a * 0.7),   // subtle vertical bob
-      z: i * TUNNEL_DEPTH             // straight into the screen
+      x: 0.7 * Math.sin(a),           // strong sway left-right
+      y: 0.25 * Math.cos(a * 1.3),    // noticeable vertical bob
+      z: i * TUNNEL_DEPTH              // forward into screen
     })
   }
 
@@ -66,10 +65,10 @@ export function createRenderer(canvas) {
     const targetY = slidePos[idx0].y + (slidePos[idx1].y - slidePos[idx0].y) * frac
     const targetZ = slidePos[idx0].z + (slidePos[idx1].z - slidePos[idx0].z) * frac
 
-    // Camera flies forward along Z, sitting behind the active node
+    // Camera flies forward along Z, close behind the active node
     const camX = targetX
     const camY = targetY
-    const camZ = targetZ - 1.2  // behind, looking forward into the tunnel
+    const camZ = targetZ - 0.6  // close behind — net feels near
 
     if(moving){for(let i=0;i<N;i++){
       ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
@@ -78,18 +77,15 @@ export function createRenderer(canvas) {
       if(az[i]>maxZ||az[i]<-2)dz[i]*=-1
     }}
 
-    // Active node screen position: slightly above center (30% from top)
-    // Text appears below the node, so node sits above the text
-    const nodeScreenY = H * (mobile ? 0.28 : 0.30)
+    // Active node just above text (~38% from top)
+    const nodeScreenY = H * (mobile ? 0.36 : 0.38)
 
-    // Project a 3D point to screen
-    // Active node is offset upward on screen via yOffset
     const spreadX = mobile ? .55 : .4
     const spreadY = mobile ? .45 : .35
     function project(px, py, pz) {
       const rx = px - camX, ry = py - camY, rz = pz - camZ
-      const depth = 3 + rz
-      if(depth < 0.3) return null
+      const depth = 1.8 + rz  // smaller base depth = everything closer
+      if(depth < 0.2) return null
       const s = 2.5 / depth
       return {
         x: hw + rx * W * spreadX * s,
