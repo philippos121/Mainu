@@ -908,3 +908,149 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
         "rechtssatz": rechtssatz,
         "doc_typ": doc_typ,
     }
+
+
+async def fetch_judikatur_texts(results: list[dict], max_results: int = 15) -> dict[str, str]:
+    """Fetch full decision texts for Judikatur results.
+
+    Queries RIS Judikatur API by Dokumentnummer, extracts text from
+    ContentUrl (MainDocument) or Dokumentinhalt.
+
+    Returns: {doc_id: text_content} for results where text was found.
+    """
+    import re
+
+    texts: dict[str, str] = {}
+    to_fetch = [r for r in results[:max_results] if r.get("id")]
+
+    if not to_fetch:
+        return texts
+
+    _HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    async def _fetch_one(r: dict) -> tuple[str, str]:
+        doc_id = r["id"]
+        # Query by Dokumentnummer to get full document with content
+        params = {
+            "Applikation": "Justiz",
+            "Dokumentnummer": doc_id,
+            "DokumenteProSeite": "One",
+        }
+        api_url = f"{settings.RIS_API_BASE_URL}/Judikatur"
+        try:
+            async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
+                resp = await client.get(api_url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+
+                refs = _extract_refs(data)
+                if not refs:
+                    return doc_id, ""
+
+                d = refs[0].get("Data", {})
+
+                # Try inline Dokumentinhalt first
+                for key in ("Dokumentinhalt", "DokumentInhalt"):
+                    content = d.get(key, "")
+                    if isinstance(content, str) and len(content) > 50:
+                        return doc_id, _strip_html_simple(content)
+
+                # Try ContentUrl (MainDocument)
+                main_url = _find_judikatur_content_url(d)
+                if main_url:
+                    try:
+                        r2 = await client.get(main_url, timeout=15.0)
+                        r2.raise_for_status()
+                        text = _strip_html_simple(r2.text)
+                        if len(text) > 50:
+                            return doc_id, text
+                    except Exception as e:
+                        logger.warning(f"Judikatur content fetch error {doc_id}: {e}")
+
+                # Fallback: RIS website
+                doc_url = r.get("url", "")
+                if doc_url and "ris.bka.gv.at" in doc_url:
+                    try:
+                        r3 = await client.get(doc_url, timeout=15.0)
+                        r3.raise_for_status()
+                        # Extract text section from RIS page
+                        m = re.search(r'(?:Entscheidungstext|Rechtssatz|Spruch).*?</[^>]+>(.*?)(?:Schlagworte|Dokumentnummer|European Legislation)', r3.text, re.DOTALL | re.IGNORECASE)
+                        if m:
+                            text = _strip_html_simple(m.group(1))
+                            if len(text) > 50:
+                                return doc_id, text
+                    except Exception:
+                        pass
+
+        except Exception as e:
+            logger.warning(f"Judikatur text fetch error {doc_id}: {e}")
+
+        return doc_id, ""
+
+    # Fetch sequentially to avoid RIS throttling
+    for r in to_fetch:
+        doc_id, text = await _fetch_one(r)
+        if text:
+            # Truncate to reasonable length for GPT context
+            texts[doc_id] = text[:3000]
+            logger.info(f"Judikatur text for {doc_id}: {len(text)} chars")
+        await asyncio.sleep(0.3)
+
+    logger.info(f"Fetched {len(texts)}/{len(to_fetch)} Judikatur texts")
+    return texts
+
+
+def _find_judikatur_content_url(data_entry: dict) -> str:
+    """Find the MainDocument content URL in a Judikatur API response."""
+    url = ""
+
+    def _search(obj, depth=0):
+        nonlocal url
+        if depth > 12 or url:
+            return
+        if isinstance(obj, dict):
+            ct = obj.get("ContentType", "")
+            cu = obj.get("ContentUrl")
+            candidate = ""
+            if isinstance(cu, str) and cu.startswith("http"):
+                candidate = cu
+            elif isinstance(cu, dict) and "Url" in cu:
+                candidate = cu["Url"]
+            elif isinstance(cu, list):
+                for item in cu:
+                    if isinstance(item, dict) and "Url" in item:
+                        candidate = item["Url"]
+                        break
+                    elif isinstance(item, str) and item.startswith("http"):
+                        candidate = item
+                        break
+            if candidate and (ct == "MainDocument" or obj.get("DataType") == "Xml"):
+                url = candidate
+                return
+            for val in obj.values():
+                _search(val, depth + 1)
+        elif isinstance(obj, list):
+            for item in obj:
+                _search(item, depth + 1)
+
+    _search(data_entry)
+    return url
+
+
+def _strip_html_simple(html: str) -> str:
+    """Strip HTML tags and clean up whitespace."""
+    import re
+    text = re.sub(r'<br\s*/?\s*>', '\n', html, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = re.sub(r'&nbsp;', ' ', text)
+    text = re.sub(r'&amp;', '&', text)
+    text = re.sub(r'&lt;', '<', text)
+    text = re.sub(r'&gt;', '>', text)
+    text = re.sub(r'&quot;', '"', text)
+    text = re.sub(r'&#\d+;', '', text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+    return text.strip()

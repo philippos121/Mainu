@@ -18,6 +18,7 @@ from app.services.ris_client import (
     search_begutachtung,
     search_regierungsvorlagen,
     parse_bundesrecht_response,
+    fetch_judikatur_texts,
     _timeframe_to_days,
 )
 from app.services.openai_service import summarise_results, generate_report_markdown
@@ -524,6 +525,33 @@ async def _generate_full_report(req) -> dict:
             + "\n\n".join(diff_summaries[:20])
         )
 
+    # Fetch full decision texts for Judikatur results
+    judikatur_context = ""
+    has_court_results = any(r.get("court") or r.get("case_number") for r in req.results[:50])
+    if has_court_results:
+        try:
+            jud_texts = await fetch_judikatur_texts(req.results, max_results=15)
+            if jud_texts:
+                jud_lines = []
+                for r in req.results[:50]:
+                    rid = r.get("id", "")
+                    if rid in jud_texts:
+                        jud_lines.append(
+                            f"- {r.get('court', '')} {r.get('case_number', '')} "
+                            f"({r.get('date', '')}):\n"
+                            f"  {jud_texts[rid]}"
+                        )
+                if jud_lines:
+                    judikatur_context = (
+                        "\n\n--- ENTSCHEIDUNGSTEXTE ---\n"
+                        "Hier sind die Volltexte der Gerichtsentscheidungen. "
+                        "Analysiere die konkreten Entscheidungsgründe und Rechtssätze:\n\n"
+                        + "\n\n".join(jud_lines)
+                    )
+                    logging.info(f"Judikatur context: {len(jud_lines)} texts, {len(judikatur_context)} chars")
+        except Exception as e:
+            logging.error(f"Judikatur text fetch error: {e}")
+
     # GPT summary with Materialien + diffs + parliamentary context
     from app.core.config import settings as _cfg
     api_key = _cfg.OPENAI_API_KEY or getattr(req, 'api_key', '')
@@ -579,7 +607,7 @@ async def _generate_full_report(req) -> dict:
                 timeframe_label=req.timeframe_label,
                 total_hits=req.total_hits,
                 api_key=api_key,
-                extra_context=extra_context + diff_context,
+                extra_context=extra_context + diff_context + judikatur_context,
             )
         except Exception as e:
             logging.error(f"GPT report error: {e}")
