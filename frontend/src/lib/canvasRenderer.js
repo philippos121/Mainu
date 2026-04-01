@@ -102,13 +102,23 @@ export function createRenderer(canvas, slideLabels) {
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // --- Particle movement (same particles always) ---
+    // --- Particle movement + wrapping ---
+    // During fly: wrap particles around camera so net is always present
+    const wrapRange = 6  // particles live in a Z window of ±wrapRange around camera
     if(moving){
       for(let i=0;i<N;i++){
         ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
         if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
         if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
         if(az[i]>3||az[i]<-3)dz[i]*=-1
+      }
+    }
+    // In fly phase: keep particles around the camera by wrapping Z
+    if(blend > 0.01) {
+      for(let i=0;i<N;i++){
+        const relZ = az[i] - camZ
+        if(relZ < -wrapRange) az[i] += wrapRange * 2
+        else if(relZ > wrapRange) az[i] -= wrapRange * 2
       }
     }
 
@@ -137,20 +147,20 @@ export function createRenderer(canvas, slideLabels) {
     const spreadY = mobile ? (.45) : (.30 + .05 * blend)
     const baseDepth = 4 - 2.5 * blend  // 4 during intro → 1.5 during fly
 
-    // Unified projection for particles — always surround the camera
-    // Particles are in camera-local space: they float around the camera
-    // regardless of where the camera flies to
+    // Unified projection for particles (world space, camera-relative)
     function projectP(px, py, pz) {
-      // Apply rotation (fades with blend)
+      // Apply intro rotation (fades out during fly)
       const rx = px * cy - pz * sn
       const ry = py
       const rz = px * sn + pz * cy
-      const depth = baseDepth + rz
+      // Camera offset
+      const ddx = rx - camX, ddy = ry - camY, ddz = rz - camZ
+      const depth = baseDepth + ddz
       if(depth < 0.3) return null
       const s = 2.5 / depth
       return {
-        x: Math.round(hw + rx * W * spreadX * s),
-        y: Math.round(screenCY + ry * H * spreadY * s),
+        x: Math.round(hw + ddx * W * spreadX * s),
+        y: Math.round(screenCY + ddy * H * spreadY * s),
         s, depth
       }
     }
