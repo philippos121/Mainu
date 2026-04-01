@@ -41,7 +41,7 @@ def _build_result_text(results: list[dict[str, Any]], include_urls: bool = False
         if r.get("normen"):
             parts.append(f"  Normen: {r['normen']}")
         if r.get("rechtssatz"):
-            parts.append(f"  Rechtssatz: {r['rechtssatz'][:200]}")
+            parts.append(f"  Rechtssatz: {r['rechtssatz']}")
         if include_urls and r.get("url"):
             parts.append(f"  Quelle: {r['url']}")
         lines.append("\n".join(parts))
