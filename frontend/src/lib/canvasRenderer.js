@@ -12,6 +12,7 @@ export function createRenderer(canvas, slideLabels) {
   const N = isMobile ? 30 : 55
   const DSQ = isMobile ? 280*280 : 200*200
 
+  // Particles live in LOCAL space around the camera — always
   const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N)
   const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N)
   const sr=new Float32Array(N)
@@ -23,7 +24,6 @@ export function createRenderer(canvas, slideLabels) {
 
   const FONT = '-apple-system,"Segoe UI",sans-serif'
 
-  // Particles — same set throughout, no redistribution
   function initParticles() {
     for(let i=0;i<N;i++){
       ax[i]=Math.random()*3.2-1.6
@@ -94,20 +94,28 @@ export function createRenderer(canvas, slideLabels) {
     const mobile = W < 640
     const hw=W/2, hh=H/2
 
-    // How far into fly-through (0 = still intro, >0 = flying)
     const flyProgress = Math.max(0, progress - INTRO_COUNT)
-    // Blend factor: 0 = full intro rotation, 1 = full fly-through
     const blend = Math.min(1, flyProgress / 1.5)
 
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
+
+    // --- Particle movement (local space, fixed bounds) ---
+    if(moving){
+      for(let i=0;i<N;i++){
+        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
+        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
+        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
+        if(az[i]>3||az[i]<-3)dz[i]*=-1
+      }
+    }
 
     // --- Intro rotation (fades out as fly begins) ---
     const rotSpeed = mobile ? 2.5 : 1
     const rot = scrollY * 0.00015 * rotSpeed * (1 - blend)
     const cy = Math.cos(rot), sn = Math.sin(rot)
 
-    // --- Camera: starts at center, moves forward into tunnel ---
+    // --- Camera position (for tunnel nodes only) ---
     let camX = 0, camY = 0, camZ = 0
     if(flyProgress > 0 && totalNodes > 0) {
       const sp = Math.min(totalNodes - 1, flyProgress)
@@ -120,80 +128,34 @@ export function createRenderer(canvas, slideLabels) {
       camZ = (n0.z + (n1.z - n0.z) * frac) * blend
     }
 
-    // --- Particle movement ---
-    // Bounce bounds are relative to camera so particles always surround it
-    const bx = 1.6, by = 1.6, bz = 4
-    if(moving){
-      for(let i=0;i<N;i++){
-        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
-        // Bounce relative to camera
-        const rx = ax[i] - camX, ry = ay[i] - camY, rz = az[i] - camZ
-        if(rx > bx || rx < -bx) dx[i]*=-1
-        if(ry > by || ry < -by) dy[i]*=-1
-        if(rz > bz || rz < -bz) dz[i]*=-1
-        // Wrap: if too far from camera, teleport back around it
-        if(rx > bx+1) ax[i] = camX - bx + Math.random()*0.5
-        else if(rx < -bx-1) ax[i] = camX + bx - Math.random()*0.5
-        if(ry > by+1) ay[i] = camY - by + Math.random()*0.5
-        else if(ry < -by-1) ay[i] = camY + by - Math.random()*0.5
-        if(rz > bz+1) az[i] = camZ - bz + Math.random()
-        else if(rz < -bz-1) az[i] = camZ + bz - Math.random()
-      }
-    }
-
-    // Projection center: screen center during intro, shifts up during fly
-    const flyTargetY = mobile ? 0.38 : 0.40
+    // Screen center shifts slightly during fly
+    const flyTargetY = mobile ? 0.42 : 0.44
     const screenCY = H * (0.5 + (flyTargetY - 0.5) * blend)
-    const spreadX = mobile ? (.55 - .13 * blend) : (.36 + .06 * blend)
-    const spreadY = mobile ? (.45) : (.30 + .05 * blend)
-    const baseDepth = 4 - 2.5 * blend  // 4 during intro → 1.5 during fly
 
-    // Unified projection for particles (world space, camera-relative)
-    function projectP(px, py, pz) {
-      // Apply intro rotation (fades out during fly)
-      const rx = px * cy - pz * sn
-      const ry = py
-      const rz = px * sn + pz * cy
-      // Camera offset
-      const ddx = rx - camX, ddy = ry - camY, ddz = rz - camZ
-      const depth = baseDepth + ddz
-      if(depth < 0.3) return null
-      const s = 2.5 / depth
-      return {
-        x: Math.round(hw + ddx * W * spreadX * s),
-        y: Math.round(screenCY + ddy * H * spreadY * s),
-        s, depth
-      }
-    }
-
-    // Projection for tunnel nodes (no rotation, just camera offset)
-    function projectNode(px, py, pz) {
-      const dx = px - camX, dy = py - camY, dz = pz - camZ
-      const depth = 1.5 + dz
-      if(depth < 0.15) return null
-      const s = 2.5 / depth
-      return {
-        x: Math.round(hw + dx * W * (mobile?.55:.42) * s),
-        y: Math.round(screenCY + dy * H * (mobile?.45:.35) * s),
-        s, depth
-      }
-    }
-
-    // Fade zone
-    const fadeX = hw, fadeY = H * (0.5 + 0.02 * blend)
-    const fadeR = mobile ? W * (0.45 - 0.03 * blend) : W * (0.22 - 0.02 * blend)
+    // --- CONSISTENT particle projection ---
+    // Same projection throughout: particles in local space, depth=4+z
+    // Only rotation changes (fades out). Net looks the same always.
+    const pSpreadX = mobile ? .55 : .36
+    const pSpreadY = mobile ? .45 : .30
+    const fadeX = hw, fadeY = hh
+    const fadeR = mobile ? W * 0.45 : W * 0.22
     const fadeRY = fadeR * 1.3
 
-    // Project particles
     for(let i=0;i<N;i++){
-      const p = projectP(ax[i], ay[i], az[i])
-      if(!p) { ox[i]=-999; continue }
-      ox[i]=p.x; oy[i]=p.y; os[i]=p.s
+      const x=ax[i],y=ay[i],z=az[i]
+      // Y-axis rotation (fades during fly)
+      const rx=x*cy-z*sn, rz=x*sn+z*cy
+      const depth = 4 + rz
+      if(depth < 0.5) { ox[i]=-999; continue }
+      const s = 2.5 / depth
+      ox[i]=Math.round(hw+rx*W*pSpreadX*s)
+      oy[i]=Math.round(hh+y*H*pSpreadY*s)
+      os[i]=s
     }
 
     // Connections
     const lineBase = mobile ? 0.02 : 0.04
-    const lineMax = mobile ? 0.08 + 0.04*blend : 0.16 + 0.04*blend
+    const lineMax = mobile ? 0.08 : 0.16
     gl.lineWidth = mobile ? 0.8 : 1.2
     for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
       if(ox[i]<-900||ox[j]<-900) continue
@@ -202,8 +164,8 @@ export function createRenderer(canvas, slideLabels) {
         const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
         const ddx=(mx-fadeX)/fadeR, ddy=(my-fadeY)/fadeRY
         const d=ddx*ddx+ddy*ddy
-        const f=Math.min(1, Math.max(0, d-0.15)/0.85)
-        const depthA=Math.min(1,(os[i]+os[j])*0.65)
+        const f=Math.min(1, Math.max(0, d-0.2)/0.8)
+        const depthA=Math.min(1,(os[i]+os[j])*0.7)
         const alpha=(lineBase+lineMax*f)*depthA
         if(alpha<0.004) continue
         gl.beginPath()
@@ -213,10 +175,24 @@ export function createRenderer(canvas, slideLabels) {
       }
     }}
 
-    // Draw tunnel nodes (only visible during fly phase)
+    // --- Draw tunnel nodes (fly phase) ---
     if(flyProgress > 0) {
       const sp = Math.min(totalNodes - 1, flyProgress)
       const kernCount = KERN.length
+
+      // Projection for tunnel nodes — camera-relative, perspective
+      function projectNode(px, py, pz) {
+        const ddx = px - camX, ddy = py - camY, ddz = pz - camZ
+        const depth = 1.5 + ddz
+        if(depth < 0.15) return null
+        const s = 2.5 / depth
+        return {
+          x: Math.round(hw + ddx * W * (mobile?.55:.42) * s),
+          y: Math.round(screenCY + ddy * H * (mobile?.45:.35) * s),
+          s, depth
+        }
+      }
+
       for(let i=0;i<totalNodes;i++){
         const nd = allNodes[i]
         const p = projectNode(nd.x, nd.y, nd.z)
@@ -284,17 +260,17 @@ export function createRenderer(canvas, slideLabels) {
       }
     }
 
-    // Particle dots
+    // Particle dots (on top of connections)
     const glowMul=mobile?0.4:0.9, coreMul=mobile?0.5:0.9
     for(let i=0;i<N;i++){
       if(ox[i]<-900) continue
-      const r=sr[i]*os[i]*0.8, a=.2+os[i]*.35
+      const r=sr[i]*os[i],a=.2+os[i]*.45
       const ddx=(ox[i]-fadeX)/fadeR, ddy=(oy[i]-fadeY)/fadeRY
       const d=ddx*ddx+ddy*ddy
-      const f=Math.min(1,Math.max(0,d-0.15)/0.85)
+      const f=Math.min(1,Math.max(0,d-0.2)/0.8)
       const fa=a*Math.max(0.15,f)
-      gl.beginPath();gl.arc(ox[i],oy[i],r*2.5,0,6.28)
-      gl.fillStyle=`rgba(255,151,51,${(fa*0.06*glowMul).toFixed(3)})`
+      gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
+      gl.fillStyle=`rgba(255,151,51,${(fa*0.02*glowMul).toFixed(3)})`
       gl.fill()
       gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
       gl.fillStyle=`rgba(255,130,30,${(fa*0.5*coreMul).toFixed(3)})`
