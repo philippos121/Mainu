@@ -162,7 +162,17 @@ async function generateReport() {
     const r = await api.post('/report', { results: d.results, doc_type: 'gesetze', category_label: catLabel(), timeframe_label: tfLabel(), total_hits: d.total_hits, diffs: {} })
     reportHtml = r.data.report_html
     const parsed = parseFindings(r.data.report_markdown)
-    findings.value = parsed.length ? parsed : [{ title: 'Analyse', body: r.data.report_markdown || 'Keine Zusammenfassung.' }]
+    // Merge continuation slides (empty title) into their parent finding
+    // so each finding = one 3D node, not multiple empty ones
+    const merged = []
+    for (const slide of parsed) {
+      if (slide.title || !merged.length) {
+        merged.push({ title: slide.title || 'Ergebnis', body: slide.body })
+      } else {
+        merged[merged.length - 1].body += '\n\n' + slide.body
+      }
+    }
+    findings.value = merged.length ? merged : [{ title: 'Analyse', body: r.data.report_markdown || 'Keine Zusammenfassung.' }]
     statusMsg.value = ''
 
     // Feed findings to the 3D renderer as new nodes
