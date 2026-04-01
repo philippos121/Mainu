@@ -2,9 +2,10 @@
 <div class="page">
   <canvas ref="cvs" class="bg-canvas"></canvas>
 
-  <!-- Logo — plain SVG, shown at start, fades on scroll -->
+  <!-- Logo + subtitle — plain HTML, fades on scroll -->
   <div class="logo-wrap" id="logo-wrap">
     <img src="/logo.svg" alt="AI:ssociate" class="logo" />
+    <span class="logo-sub">Legal Monitoring</span>
   </div>
 
   <div class="scroll-driver" :style="{ height: totalHeight + 'px' }"></div>
@@ -92,10 +93,10 @@ function updateUI() {
   const slideIdx = Math.floor(nodeProgress)
   const pastIntro = slideIdx >= introCount - 1
 
-  // Logo fades out after first node
+  // Logo + "Legal Monitoring" fade out over first 2 nodes
   const logoEl = document.getElementById('logo-wrap')
   if (logoEl) {
-    const logoA = Math.max(0, 1 - nodeProgress * 1.5)
+    const logoA = Math.max(0, 1 - nodeProgress * 0.8)
     logoEl.style.opacity = logoA.toFixed(2)
     logoEl.style.pointerEvents = logoA > 0.1 ? 'auto' : 'none'
   }
@@ -120,7 +121,7 @@ function updateUI() {
 
 const slideLabels = [
   '',                    // logo
-  'Legal Monitoring',    // title
+  '',                    // "Legal Monitoring" is HTML overlay
   ...KERN.map(k => k.label),
 ]
 
@@ -227,8 +228,9 @@ function downloadHtml() {
 .scroll-driver{position:relative;z-index:1;pointer-events:none}
 
 /* Logo overlay */
-.logo-wrap{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;height:100vh;pointer-events:none;transition:opacity .3s}
+.logo-wrap{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;pointer-events:none;transition:opacity .3s}
 .logo{height:52px;display:block}
+.logo-sub{margin-top:14px;font-size:18px;font-weight:300;letter-spacing:5px;text-transform:uppercase;color:#1a3a4a;opacity:.7}
 
 /* Form */
 .form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
@@ -257,7 +259,8 @@ function downloadHtml() {
 .btn-dl:hover{background:rgba(0,121,147,.08);border-color:rgba(0,121,147,.3)}
 
 @media(max-width:640px){
-  .logo{height:38px}
+  .logo{height:36px}
+  .logo-sub{font-size:14px;letter-spacing:3px;margin-top:10px}
   .form-center{padding:0 16px}
   .chips{gap:5px}
   .chip{padding:6px 12px;font-size:11px}

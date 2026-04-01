@@ -5,8 +5,8 @@ export function createRenderer(canvas, slideLabels) {
   const gl = canvas.getContext('2d', { alpha: false })
   let W = 0, H = 0
   const isMobile = window.innerWidth < 640
-  const N = isMobile ? 50 : 90
-  const DSQ = isMobile ? 320*320 : 220*220
+  const N = isMobile ? 30 : 55
+  const DSQ = isMobile ? 280*280 : 200*200
 
   const ax=new Float32Array(N),ay=new Float32Array(N),az=new Float32Array(N)
   const dx=new Float32Array(N),dy=new Float32Array(N),dz=new Float32Array(N)
