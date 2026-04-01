@@ -166,13 +166,18 @@ async function generateReport() {
     // so each finding = one 3D node, not multiple empty ones
     const merged = []
     for (const slide of parsed) {
-      if (slide.title || !merged.length) {
-        merged.push({ title: slide.title || 'Ergebnis', body: slide.body })
+      const hasTitle = slide.title && slide.title.trim()
+      const hasBody = slide.body && slide.body.trim()
+      if (!hasTitle && !hasBody) continue
+      if (hasTitle || !merged.length) {
+        merged.push({ title: (slide.title || '').trim() || 'Ergebnis', body: (slide.body || '').trim() })
       } else {
-        merged[merged.length - 1].body += '\n\n' + slide.body
+        merged[merged.length - 1].body += '\n\n' + slide.body.trim()
       }
     }
-    findings.value = merged.length ? merged : [{ title: 'Analyse', body: r.data.report_markdown || 'Keine Zusammenfassung.' }]
+    // Final filter: ensure every node has meaningful content
+    findings.value = merged.filter(f => f.title.trim() || f.body.trim().length > 2)
+    if (!findings.value.length) findings.value = [{ title: 'Analyse', body: r.data.report_markdown || 'Keine Zusammenfassung.' }]
     statusMsg.value = ''
 
     // Feed findings to the 3D renderer as new nodes

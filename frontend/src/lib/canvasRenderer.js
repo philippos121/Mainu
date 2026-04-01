@@ -16,14 +16,24 @@ export function createRenderer(canvas, slideLabels) {
   const TUNNEL_DEPTH = 1.8
   let allNodes = []
   let totalNodes = 0
-  // Pre-wrapped text cache: key = nodeIndex, value = {lines, wrapWidth, font}
-  const wrapCache = new Map()
 
-  // Load logo image
+  const FONT = '-apple-system,"Segoe UI",sans-serif'
+
+  // Logo: render at fixed high-res, cache as bitmap
   const logoImg = new Image()
   logoImg.src = '/logo.svg'
-  let logoLoaded = false
-  logoImg.onload = () => { logoLoaded = true }
+  let logoBitmap = null
+  logoImg.onload = () => {
+    // Pre-render logo at 4x for crisp retina display
+    const lc = document.createElement('canvas')
+    const s = 4
+    lc.width = 240 * s; lc.height = 72 * s
+    const lx = lc.getContext('2d')
+    lx.drawImage(logoImg, 0, 0, lc.width, lc.height)
+    logoBitmap = lc
+    // Re-render immediately so logo appears on first frame
+    if(initialized) render(lastScrollY, false, lastProgress)
+  }
 
   function buildIntroNodes() {
     const nodes = []
@@ -43,19 +53,41 @@ export function createRenderer(canvas, slideLabels) {
     return nodes
   }
 
+  function wrapAtChars(text, charsPerLine) {
+    // Pure character-count wrap — no font measurement, completely stable
+    const words = text.split(' ')
+    const lines = []
+    let line = ''
+    for(const w of words) {
+      const test = line ? line + ' ' + w : w
+      if(test.length > charsPerLine && line) {
+        lines.push(line)
+        line = w
+      } else { line = test }
+    }
+    if(line) lines.push(line)
+    return lines
+  }
+
   function rebuildNodes(reportFindings) {
-    wrapCache.clear()
     const intro = buildIntroNodes()
     const lastZ = intro.length ? intro[intro.length-1].z + TUNNEL_DEPTH : 0
-    const findings = (reportFindings || []).filter(f => f.title || f.body)
+    const findings = (reportFindings || []).filter(f => {
+      const t = (f.title || '').trim()
+      const b = (f.body || '').trim()
+      return t.length > 0 || b.length > 2
+    })
     const report = findings.map((r, i) => {
       const a = (i / Math.max(1, findings.length - 1)) * Math.PI * 2
+      const bodyPreview = (r.body || '').slice(0, 220) + ((r.body || '').length > 220 ? '…' : '')
+      const charsPerLine = isMobile ? 40 : 55
+      const wrappedLines = wrapAtChars(bodyPreview, charsPerLine)
       return {
         x: 0.5 * Math.sin(a + 1),
         y: 0.2 * Math.cos(a * 0.8),
         z: lastZ + (i + 1) * TUNNEL_DEPTH,
-        label: r.title || 'Ergebnis',
-        body: r.body || '',
+        label: (r.title || '').trim() || 'Ergebnis',
+        bodyLines: wrappedLines,
         isLogo: false,
         isReport: true
       }
@@ -83,40 +115,33 @@ export function createRenderer(canvas, slideLabels) {
 
   let lastScrollY = 0, lastProgress = 0, initialized = false
 
+  // Reusable projection vars — avoid closure allocation per frame
+  let _camX=0, _camY=0, _camZ=0, _hw=0, _nodeScreenY=0, _spreadX=0, _spreadY=0
+
+  function project(px, py, pz) {
+    const rx = px - _camX, ry = py - _camY, rz = pz - _camZ
+    const depth = 1.5 + rz
+    if(depth < 0.15) return null
+    const s = 2.5 / depth
+    return {
+      x: Math.round(_hw + rx * W * _spreadX * s),
+      y: Math.round(_nodeScreenY + ry * H * _spreadY * s),
+      s, depth
+    }
+  }
+
   function resize(){
     W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight
-    wrapCache.clear()  // re-wrap on resize
     if(initialized) render(lastScrollY, false, lastProgress)
   }
   resize();window.addEventListener('resize',resize)
-
-  // Wrap text once and cache it at a fixed width (not dependent on zoom)
-  function getCachedWrap(nodeIdx, text, fixedWidth) {
-    const key = nodeIdx + ':' + fixedWidth
-    if(wrapCache.has(key)) return wrapCache.get(key)
-    // Measure at a fixed reference font size
-    gl.font = '300 13px -apple-system, "Segoe UI", sans-serif'
-    const words = text.split(' ')
-    const lines = []
-    let line = ''
-    for(const w of words) {
-      const test = line ? line + ' ' + w : w
-      if(gl.measureText(test).width > fixedWidth && line) {
-        lines.push(line)
-        line = w
-      } else { line = test }
-    }
-    if(line) lines.push(line)
-    wrapCache.set(key, lines)
-    return lines
-  }
 
   function render(scrollY, moving, progress){
     initialized = true
     lastScrollY = scrollY
     if(progress !== undefined) lastProgress = progress
     const mobile = W < 640
-    const hw=W/2,hh=H/2
+    _hw=W/2
     if(!totalNodes) return
 
     const sp = Math.max(0, Math.min(totalNodes - 1, progress || 0))
@@ -124,9 +149,9 @@ export function createRenderer(canvas, slideLabels) {
     const idx1 = Math.min(idx0 + 1, totalNodes - 1)
     const frac = sp - idx0
     const n0 = allNodes[idx0], n1 = allNodes[idx1]
-    const camX = n0.x + (n1.x - n0.x) * frac
-    const camY = n0.y + (n1.y - n0.y) * frac
-    const camZ = (n0.z + (n1.z - n0.z) * frac) - 0.5
+    _camX = n0.x + (n1.x - n0.x) * frac
+    _camY = n0.y + (n1.y - n0.y) * frac
+    _camZ = (n0.z + (n1.z - n0.z) * frac) - 0.5
 
     const maxZ = totalNodes * TUNNEL_DEPTH + 4
     if(moving){for(let i=0;i<N;i++){
@@ -136,25 +161,14 @@ export function createRenderer(canvas, slideLabels) {
       if(az[i]>maxZ||az[i]<-2)dz[i]*=-1
     }}
 
-    const nodeScreenY = H * (mobile ? 0.38 : 0.40)
-    const spreadX = mobile ? .55 : .42
-    const spreadY = mobile ? .45 : .35
+    _nodeScreenY = H * (mobile ? 0.38 : 0.40)
+    _spreadX = mobile ? .55 : .42
+    _spreadY = mobile ? .45 : .35
 
-    function project(px, py, pz) {
-      const rx = px - camX, ry = py - camY, rz = pz - camZ
-      const depth = 1.5 + rz
-      if(depth < 0.15) return null
-      const s = 2.5 / depth
-      return { x: hw + rx * W * spreadX * s, y: nodeScreenY + ry * H * spreadY * s, s, depth }
-    }
-
-    const fadeX = hw, fadeY = H * 0.52
+    // Text fade zone
+    const fadeX = _hw, fadeY = H * 0.52
     const fadeR = mobile ? W * 0.42 : W * 0.2
-    function textFade(sx, sy) {
-      const ddx = (sx - fadeX) / fadeR, ddy = (sy - fadeY) / (fadeR * 1.3)
-      const d = ddx*ddx + ddy*ddy
-      return Math.min(1, Math.max(0, d - 0.15) / 0.85)
-    }
+    const fadeRY = fadeR * 1.3
 
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
@@ -175,10 +189,12 @@ export function createRenderer(canvas, slideLabels) {
       const a=ox[i]-ox[j],b=oy[i]-oy[j]
       if(a*a+b*b<DSQ){
         const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
-        const f=textFade(mx,my)
-        const depthA = Math.min(1, (os[i]+os[j]) * 0.65)
+        const ddx=(mx-fadeX)/fadeR, ddy=(my-fadeY)/fadeRY
+        const d=ddx*ddx+ddy*ddy
+        const f=Math.min(1, Math.max(0, d-0.15)/0.85)
+        const depthA=Math.min(1,(os[i]+os[j])*0.65)
         const alpha=(lineBase+lineMax*f)*depthA
-        if(alpha < 0.004) continue
+        if(alpha<0.004) continue
         gl.beginPath()
         gl.strokeStyle=`rgba(0,0,0,${alpha.toFixed(3)})`
         gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])
@@ -186,7 +202,7 @@ export function createRenderer(canvas, slideLabels) {
       }
     }}
 
-    // Draw nodes with labels
+    // Draw nodes
     for(let i=0;i<totalNodes;i++){
       const nd = allNodes[i]
       const p = project(nd.x, nd.y, nd.z)
@@ -200,96 +216,102 @@ export function createRenderer(canvas, slideLabels) {
       if(i > 0) {
         const pp = project(allNodes[i-1].x, allNodes[i-1].y, allNodes[i-1].z)
         if(pp) {
-          const la = 0.06 + 0.12 * nearness
           gl.beginPath()
-          gl.strokeStyle = `rgba(0,121,147,${la.toFixed(3)})`
+          gl.strokeStyle=`rgba(0,121,147,${(0.06+0.12*nearness).toFixed(3)})`
           gl.lineWidth = mobile ? 1.5 : 2
-          gl.moveTo(pp.x, pp.y); gl.lineTo(p.x, p.y)
+          gl.moveTo(pp.x,pp.y); gl.lineTo(p.x,p.y)
           gl.stroke()
         }
       }
 
       // Node dot
       const baseR = (mobile ? 5 : 7) * p.s
-      const r = isActive ? baseR * 2 : baseR * (0.5 + nearness * 0.5)
-      const nodeA = isActive ? 0.9 : 0.12 + nearness * 0.35
+      const r = Math.round(isActive ? baseR*2 : baseR*(0.5+nearness*0.5))
+      const nodeA = isActive ? 0.9 : 0.12+nearness*0.35
 
       if(isActive) {
-        gl.beginPath();gl.arc(p.x, p.y, r*3.5, 0, 6.28)
-        gl.fillStyle=`rgba(0,121,147,${(0.05 * p.s).toFixed(3)})`
+        gl.beginPath();gl.arc(p.x,p.y,r*3.5,0,6.28)
+        gl.fillStyle=`rgba(0,121,147,${(0.05*p.s).toFixed(3)})`
         gl.fill()
       }
-      gl.beginPath();gl.arc(p.x, p.y, r*2, 0, 6.28)
+      gl.beginPath();gl.arc(p.x,p.y,r*2,0,6.28)
       gl.fillStyle=`rgba(255,151,51,${(nodeA*0.1).toFixed(3)})`
       gl.fill()
-      gl.beginPath();gl.arc(p.x, p.y, r, 0, 6.28)
-      gl.fillStyle = isActive
-        ? `rgba(0,121,147,${nodeA.toFixed(3)})`
-        : `rgba(255,130,30,${nodeA.toFixed(3)})`
+      gl.beginPath();gl.arc(p.x,p.y,r,0,6.28)
+      gl.fillStyle=isActive?`rgba(0,121,147,${nodeA.toFixed(3)})`:`rgba(255,130,30,${nodeA.toFixed(3)})`
       gl.fill()
 
-      // Logo at first node
-      if(nd.isLogo && logoLoaded) {
-        const lh = Math.max(16, 48 * p.s)
-        const lw = lh * (logoImg.width / logoImg.height || 3)
-        const la = isActive ? 0.95 : Math.min(0.6, nearness * 0.7)
-        if(la > 0.05) {
-          gl.globalAlpha = la
-          gl.drawImage(logoImg, p.x - lw/2, p.y + r + 4, lw, lh)
-          gl.globalAlpha = 1
+      // Logo at first node — crisp high-res bitmap
+      if(nd.isLogo) {
+        if(logoBitmap) {
+          const lh = Math.round(Math.max(20, 48 * p.s))
+          const lw = Math.round(lh * (logoBitmap.width / logoBitmap.height))
+          const la = isActive ? 1 : Math.min(0.6, nearness*0.7)
+          if(la > 0.05) {
+            gl.globalAlpha = la
+            gl.imageSmoothingEnabled = true
+            gl.imageSmoothingQuality = 'high'
+            gl.drawImage(logoBitmap, p.x-lw/2, p.y+r+6, lw, lh)
+            gl.globalAlpha = 1
+          }
+        } else {
+          // Fallback text while logo loads
+          const fs = Math.round(Math.max(12, 24 * p.s))
+          gl.font = `600 ${fs}px ${FONT}`
+          gl.textAlign = 'center'
+          gl.textBaseline = 'top'
+          gl.fillStyle = `rgba(0,121,147,${(isActive ? 0.9 : nearness*0.5).toFixed(2)})`
+          gl.fillText('AI:ssociate', p.x, Math.round(p.y+r+6))
         }
-        continue  // no text label for logo
+        continue
       }
 
-      // Label text — always light weight, fixed font size steps to prevent jitter
-      const label = nd.label || ''
+      // Label — light weight, smooth alpha
+      const label = nd.label
       if(!label || p.s < 0.12) continue
-      // Snap font size to integer to prevent sub-pixel jitter
-      const rawSize = (mobile ? 16 : 20) * p.s
-      const fontSize = Math.round(Math.max(7, Math.min(mobile ? 26 : 32, rawSize)))
-      const textA = isActive ? 0.9 : Math.min(0.6, nearness * 0.7)
-      if(textA < 0.02) continue
+      const fontSize = Math.round(Math.max(8, Math.min(mobile?26:32, (mobile?16:20)*p.s)))
+      const textA = isActive ? 0.9 : Math.min(0.55, nearness*0.65)
+      if(textA < 0.03) continue
 
-      const textY = p.y + r + fontSize * 0.6
-      gl.font = `300 ${fontSize}px -apple-system, "Segoe UI", sans-serif`
+      const textY = Math.round(p.y + r + fontSize*0.6)
+      gl.font = `300 ${fontSize}px ${FONT}`
       gl.textAlign = 'center'
       gl.textBaseline = 'top'
       gl.fillStyle = `rgba(20,50,65,${textA.toFixed(2)})`
       gl.fillText(label, p.x, textY)
 
-      // Report body preview — fixed wrap width, cached lines
-      if(nd.isReport && nd.body && isActive) {
-        const bodySize = Math.round(Math.max(9, fontSize * 0.52))
-        const bodyPreview = nd.body.length > 220 ? nd.body.slice(0, 220) + '…' : nd.body
-        // Fixed wrap width based on screen, NOT zoom — prevents line reflow
-        const fixedWrapPx = mobile ? W * 0.85 : W * 0.4
-        const lines = getCachedWrap(i, bodyPreview, fixedWrapPx)
-        gl.font = `300 ${bodySize}px -apple-system, "Segoe UI", sans-serif`
-        gl.fillStyle = `rgba(30,60,80,0.6)`
-        let ly = textY + fontSize * 1.1
-        for(let li=0; li<Math.min(lines.length, 6); li++) {
-          gl.fillText(lines[li], p.x, ly)
-          ly += bodySize * 1.4
+      // Report body — pre-wrapped lines (character-based, zoom-independent)
+      if(nd.isReport && nd.bodyLines && nd.bodyLines.length && isActive) {
+        const bodySize = Math.round(Math.max(10, fontSize*0.5))
+        gl.font = `300 ${bodySize}px ${FONT}`
+        gl.fillStyle = 'rgba(30,60,80,0.55)'
+        const lineH = Math.round(bodySize*1.4)
+        let ly = Math.round(textY + fontSize*1.1)
+        const maxLines = Math.min(nd.bodyLines.length, 6)
+        for(let li=0; li<maxLines; li++) {
+          gl.fillText(nd.bodyLines[li], p.x, ly)
+          ly += lineH
         }
       }
 
-      // Number badge for KERN nodes
+      // Number badge
       if(!nd.isReport && i >= 2) {
-        const ns = Math.round(Math.max(6, fontSize * 0.35))
-        gl.font = `500 ${ns}px -apple-system, "Segoe UI", sans-serif`
-        gl.fillStyle = `rgba(0,121,147,${(textA * 0.45).toFixed(2)})`
-        gl.fillText(String(i - 1).padStart(2, '0'), p.x, p.y - r - ns * 1.2)
+        const ns = Math.round(Math.max(7, fontSize*0.35))
+        gl.font = `500 ${ns}px ${FONT}`
+        gl.fillStyle = `rgba(0,121,147,${(textA*0.45).toFixed(2)})`
+        gl.fillText(String(i-1).padStart(2,'0'), p.x, p.y-r-ns*1.2)
       }
     }
 
-    // Background particle dots
-    const glowMul = mobile ? 0.5 : 0.9
-    const coreMul = mobile ? 0.6 : 0.9
+    // Background particles
+    const glowMul=mobile?0.5:0.9, coreMul=mobile?0.6:0.9
     for(let i=0;i<N;i++){
       if(ox[i]<-900) continue
       const r=sr[i]*os[i]*0.8, a=.2+os[i]*.35
-      const f=textFade(ox[i],oy[i])
-      const fa = a * Math.max(0.15, f)
+      const ddx=(ox[i]-fadeX)/fadeR, ddy=(oy[i]-fadeY)/fadeRY
+      const d=ddx*ddx+ddy*ddy
+      const f=Math.min(1,Math.max(0,d-0.15)/0.85)
+      const fa=a*Math.max(0.15,f)
       gl.beginPath();gl.arc(ox[i],oy[i],r*2.5,0,6.28)
       gl.fillStyle=`rgba(255,151,51,${(fa*0.06*glowMul).toFixed(3)})`
       gl.fill()
@@ -299,9 +321,7 @@ export function createRenderer(canvas, slideLabels) {
     }
   }
 
-  function setReportFindings(findings) {
-    rebuildNodes(findings)
-  }
+  function setReportFindings(findings) { rebuildNodes(findings) }
   function getNodeCount() { return totalNodes }
   function destroy(){window.removeEventListener('resize',resize)}
   return { render, resize, destroy, setReportFindings, getNodeCount }
