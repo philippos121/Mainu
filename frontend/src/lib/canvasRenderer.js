@@ -1,4 +1,4 @@
-// 3D neural network — intro rotation, then fly through nodes
+// 3D neural network — intro rotation, then seamless fly through nodes
 import { KERN } from './journeyNodes.js'
 
 const INTRO_COUNT = 2  // logo + "Legal Monitoring" before fly-through starts
@@ -18,13 +18,13 @@ export function createRenderer(canvas, slideLabels) {
   const ox=new Float32Array(N),oy=new Float32Array(N),os=new Float32Array(N)
 
   const TUNNEL_DEPTH = 1.8
-  let allNodes = []  // only KERN + report nodes (no intro placeholders)
+  let allNodes = []
   let totalNodes = 0
 
   const FONT = '-apple-system,"Segoe UI",sans-serif'
 
-  // Intro particles — spread in a sphere, no tunnel
-  function initIntroParticles() {
+  // Particles — same set throughout, no redistribution
+  function initParticles() {
     for(let i=0;i<N;i++){
       ax[i]=Math.random()*3.2-1.6
       ay[i]=Math.random()*3.2-1.6
@@ -42,7 +42,6 @@ export function createRenderer(canvas, slideLabels) {
     for(let i=0;i<KERN.length;i++){
       const t = i / (KERN.length - 1)
       const a = t * Math.PI * 2.5
-      // First node at dead center so flight starts from "Legal Monitoring" position
       const sway = i === 0 ? 0 : 1
       nodes.push({
         x: 0.7 * Math.sin(a) * sway,
@@ -77,7 +76,7 @@ export function createRenderer(canvas, slideLabels) {
     totalNodes = allNodes.length
   }
 
-  initIntroParticles()
+  initParticles()
   rebuildNodes([])
 
   let lastScrollY = 0, lastProgress = 0, initialized = false
@@ -95,151 +94,96 @@ export function createRenderer(canvas, slideLabels) {
     const mobile = W < 640
     const hw=W/2, hh=H/2
 
-    const isIntro = progress < INTRO_COUNT
+    // How far into fly-through (0 = still intro, >0 = flying)
     const flyProgress = Math.max(0, progress - INTRO_COUNT)
+    // Blend factor: 0 = full intro rotation, 1 = full fly-through
+    const blend = Math.min(1, flyProgress / 1.5)
 
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // --- Particle movement ---
+    // --- Particle movement (same particles always) ---
     if(moving){
-      if(isIntro) {
-        for(let i=0;i<N;i++){
-          ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
-          if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
-          if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
-          if(az[i]>3||az[i]<-3)dz[i]*=-1
-        }
-      } else {
-        const maxZ = totalNodes * TUNNEL_DEPTH + 4
-        for(let i=0;i<N;i++){
-          ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
-          if(ax[i]>2||ax[i]<-2)dx[i]*=-1
-          if(ay[i]>2||ay[i]<-2)dy[i]*=-1
-          if(az[i]>maxZ||az[i]<-2)dz[i]*=-1
-        }
+      for(let i=0;i<N;i++){
+        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
+        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
+        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
+        if(az[i]>3||az[i]<-3)dz[i]*=-1
       }
     }
 
-    // --- INTRO PHASE: rotating net, camera at center ---
-    if(isIntro) {
-      const rotSpeed = mobile ? 2.5 : 1
-      const ry = scrollY * 0.00015 * rotSpeed
-      const cy = Math.cos(ry), sn = Math.sin(ry)
+    // --- Intro rotation (fades out as fly begins) ---
+    const rotSpeed = mobile ? 2.5 : 1
+    const rot = scrollY * 0.00015 * rotSpeed * (1 - blend)
+    const cy = Math.cos(rot), sn = Math.sin(rot)
 
-      const spreadX = mobile ? .55 : .36
-      const spreadY = mobile ? .45 : .3
-      const fadeX = hw, fadeY = hh
-      const fadeR = mobile ? W * 0.45 : W * 0.22
-
-      for(let i=0;i<N;i++){
-        const x=ax[i],y=ay[i],z=az[i]
-        const rx=x*cy-z*sn, rz=x*sn+z*cy
-        const depth = 4 + rz
-        if(depth < 0.5) { ox[i]=-999; continue }
-        const s = 2.5 / depth
-        ox[i]=Math.round(hw+rx*W*spreadX*s)
-        oy[i]=Math.round(hh+y*H*spreadY*s)
-        os[i]=s
-      }
-
-      // Connections
-      const lineBase = mobile ? 0.02 : 0.04
-      const lineMax = mobile ? 0.08 : 0.16
-      gl.lineWidth = mobile ? 0.8 : 1.2
-      for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
-        if(ox[i]<-900||ox[j]<-900) continue
-        const a=ox[i]-ox[j],b=oy[i]-oy[j]
-        if(a*a+b*b<DSQ){
-          const mx=(ox[i]+ox[j])/2,my=(oy[i]+oy[j])/2
-          const ddx=(mx-fadeX)/fadeR, ddy=(my-fadeY)/(fadeR*1.3)
-          const d=ddx*ddx+ddy*ddy
-          const f=Math.min(1, Math.max(0, d-0.2)/0.8)
-          const depthA=Math.min(1,(os[i]+os[j])*0.7)
-          const alpha=(lineBase+lineMax*f)*depthA
-          if(alpha<0.004) continue
-          gl.beginPath()
-          gl.strokeStyle=`rgba(0,0,0,${alpha.toFixed(3)})`
-          gl.moveTo(ox[i],oy[i]);gl.lineTo(ox[j],oy[j])
-          gl.stroke()
-        }
-      }}
-
-      // Particles
-      const glowMul=mobile?0.4:0.9, coreMul=mobile?0.5:0.9
-      for(let i=0;i<N;i++){
-        if(ox[i]<-900) continue
-        const r=sr[i]*os[i],a=.2+os[i]*.45
-        const ddx=(ox[i]-fadeX)/fadeR, ddy=(oy[i]-fadeY)/(fadeR*1.3)
-        const d=ddx*ddx+ddy*ddy
-        const f=Math.min(1,Math.max(0,d-0.2)/0.8)
-        const fa=a*Math.max(0.15,f)
-        gl.beginPath();gl.arc(ox[i],oy[i],r*3,0,6.28)
-        gl.fillStyle=`rgba(255,151,51,${(fa*0.02*glowMul).toFixed(3)})`
-        gl.fill()
-        gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-        gl.fillStyle=`rgba(255,130,30,${(fa*0.5*coreMul).toFixed(3)})`
-        gl.fill()
-      }
-      return
+    // --- Camera: starts at center, moves forward into tunnel ---
+    let camX = 0, camY = 0, camZ = 0
+    if(flyProgress > 0 && totalNodes > 0) {
+      const sp = Math.min(totalNodes - 1, flyProgress)
+      const idx0 = Math.min(Math.floor(sp), totalNodes - 1)
+      const idx1 = Math.min(idx0 + 1, totalNodes - 1)
+      const frac = sp - idx0
+      const n0 = allNodes[idx0], n1 = allNodes[idx1]
+      camX = (n0.x + (n1.x - n0.x) * frac) * blend
+      camY = (n0.y + (n1.y - n0.y) * frac) * blend
+      camZ = (n0.z + (n1.z - n0.z) * frac) * blend
     }
 
-    // --- FLY PHASE: camera follows tunnel nodes ---
-    // Transition: redistribute particles into tunnel on first fly frame
-    if(flyProgress < 0.05 && !render._transitioned) {
-      render._transitioned = true
-      const maxZ = totalNodes * TUNNEL_DEPTH + 4
-      for(let i=0;i<N;i++){
-        ax[i]=Math.random()*4-2
-        ay[i]=Math.random()*4-2
-        az[i]=Math.random()*(maxZ+4)-2
-      }
-    }
+    // Projection center: screen center during intro, shifts up during fly
+    const flyTargetY = mobile ? 0.38 : 0.40
+    const screenCY = H * (0.5 + (flyTargetY - 0.5) * blend)
+    const spreadX = mobile ? (.55 - .13 * blend) : (.36 + .06 * blend)
+    const spreadY = mobile ? (.45) : (.30 + .05 * blend)
+    const baseDepth = 4 - 2.5 * blend  // 4 during intro → 1.5 during fly
 
-    const sp = Math.min(totalNodes - 1, flyProgress)
-    const idx0 = Math.min(Math.floor(sp), totalNodes - 1)
-    const idx1 = Math.min(idx0 + 1, totalNodes - 1)
-    const frac = sp - idx0
-    const n0 = allNodes[idx0], n1 = allNodes[idx1]
-    const camX = n0.x + (n1.x - n0.x) * frac
-    const camY = n0.y + (n1.y - n0.y) * frac
-    const camZ = (n0.z + (n1.z - n0.z) * frac) - 0.5
-
-    // Smoothly shift horizon from center (0.5) to fly position over first 2 nodes
-    const flyTarget = mobile ? 0.38 : 0.40
-    const horizonT = Math.min(1, flyProgress / 2)
-    const nodeScreenY = H * (0.5 + (flyTarget - 0.5) * horizonT)
-    const spreadX = mobile ? .55 : .42
-    const spreadY = mobile ? .45 : .35
-
-    function project(px, py, pz) {
-      const rx = px - camX, ry = py - camY, rz = pz - camZ
-      const depth = 1.5 + rz
-      if(depth < 0.15) return null
+    // Unified projection for particles
+    function projectP(px, py, pz) {
+      // Apply rotation (fades with blend)
+      const rx = px * cy - pz * sn
+      const ry = py
+      const rz = px * sn + pz * cy
+      // Camera offset (grows with blend)
+      const dx = rx - camX, dy = ry - camY, dz = rz - camZ
+      const depth = baseDepth + dz
+      if(depth < 0.3) return null
       const s = 2.5 / depth
       return {
-        x: Math.round(hw + rx * W * spreadX * s),
-        y: Math.round(nodeScreenY + ry * H * spreadY * s),
+        x: Math.round(hw + dx * W * spreadX * s),
+        y: Math.round(screenCY + dy * H * spreadY * s),
         s, depth
       }
     }
 
-    // Text fade zone
-    const fadeX = hw, fadeY = H * 0.52
-    const fadeR = mobile ? W * 0.42 : W * 0.2
+    // Projection for tunnel nodes (no rotation, just camera offset)
+    function projectNode(px, py, pz) {
+      const dx = px - camX, dy = py - camY, dz = pz - camZ
+      const depth = 1.5 + dz
+      if(depth < 0.15) return null
+      const s = 2.5 / depth
+      return {
+        x: Math.round(hw + dx * W * (mobile?.55:.42) * s),
+        y: Math.round(screenCY + dy * H * (mobile?.45:.35) * s),
+        s, depth
+      }
+    }
+
+    // Fade zone
+    const fadeX = hw, fadeY = H * (0.5 + 0.02 * blend)
+    const fadeR = mobile ? W * (0.45 - 0.03 * blend) : W * (0.22 - 0.02 * blend)
     const fadeRY = fadeR * 1.3
 
     // Project particles
     for(let i=0;i<N;i++){
-      const p = project(ax[i], ay[i], az[i])
+      const p = projectP(ax[i], ay[i], az[i])
       if(!p) { ox[i]=-999; continue }
       ox[i]=p.x; oy[i]=p.y; os[i]=p.s
     }
 
-    // Background connections
-    const lineBase = mobile ? 0.025 : 0.05
-    const lineMax = mobile ? 0.12 : 0.2
-    gl.lineWidth = mobile ? 0.9 : 1.2
+    // Connections
+    const lineBase = mobile ? 0.02 : 0.04
+    const lineMax = mobile ? 0.08 + 0.04*blend : 0.16 + 0.04*blend
+    gl.lineWidth = mobile ? 0.8 : 1.2
     for(let i=0;i<N;i++){for(let j=i+1;j<N;j++){
       if(ox[i]<-900||ox[j]<-900) continue
       const a=ox[i]-ox[j],b=oy[i]-oy[j]
@@ -258,70 +202,73 @@ export function createRenderer(canvas, slideLabels) {
       }
     }}
 
-    // Draw nodes
-    for(let i=0;i<totalNodes;i++){
-      const nd = allNodes[i]
-      const p = project(nd.x, nd.y, nd.z)
-      if(!p) continue
+    // Draw tunnel nodes (only visible during fly phase)
+    if(flyProgress > 0) {
+      const sp = Math.min(totalNodes - 1, flyProgress)
+      for(let i=0;i<totalNodes;i++){
+        const nd = allNodes[i]
+        const p = projectNode(nd.x, nd.y, nd.z)
+        if(!p) continue
 
-      const dist = Math.abs(i - sp)
-      const isActive = dist < 0.5
-      const nearness = 1 - Math.min(1, dist / 3)
+        const dist = Math.abs(i - sp)
+        const isActive = dist < 0.5
+        const nearness = 1 - Math.min(1, dist / 3)
 
-      // Connection to previous
-      if(i > 0) {
-        const pp = project(allNodes[i-1].x, allNodes[i-1].y, allNodes[i-1].z)
-        if(pp) {
-          gl.beginPath()
-          gl.strokeStyle=`rgba(0,121,147,${(0.06+0.12*nearness).toFixed(3)})`
-          gl.lineWidth = mobile ? 1.5 : 2
-          gl.moveTo(pp.x,pp.y); gl.lineTo(p.x,p.y)
-          gl.stroke()
+        // Connection to previous
+        if(i > 0) {
+          const pp = projectNode(allNodes[i-1].x, allNodes[i-1].y, allNodes[i-1].z)
+          if(pp) {
+            gl.beginPath()
+            gl.strokeStyle=`rgba(0,121,147,${(0.06+0.12*nearness).toFixed(3)})`
+            gl.lineWidth = mobile ? 1.5 : 2
+            gl.moveTo(pp.x,pp.y); gl.lineTo(p.x,p.y)
+            gl.stroke()
+          }
         }
-      }
 
-      // Node dot
-      const baseR = (mobile ? 5 : 7) * p.s
-      const r = Math.round(isActive ? baseR*2 : baseR*(0.5+nearness*0.5))
-      const nodeA = isActive ? 0.9 : 0.12+nearness*0.35
+        // Node dot
+        const baseR = (mobile ? 5 : 7) * p.s
+        const r = Math.round(isActive ? baseR*2 : baseR*(0.5+nearness*0.5))
+        const nodeA = (isActive ? 0.9 : 0.12+nearness*0.35) * blend
 
-      if(isActive) {
-        gl.beginPath();gl.arc(p.x,p.y,r*3.5,0,6.28)
-        gl.fillStyle=`rgba(0,121,147,${(0.05*p.s).toFixed(3)})`
+        if(isActive) {
+          gl.beginPath();gl.arc(p.x,p.y,r*3.5,0,6.28)
+          gl.fillStyle=`rgba(0,121,147,${(0.05*p.s*blend).toFixed(3)})`
+          gl.fill()
+        }
+        gl.beginPath();gl.arc(p.x,p.y,r*2,0,6.28)
+        gl.fillStyle=`rgba(255,151,51,${(nodeA*0.1).toFixed(3)})`
         gl.fill()
-      }
-      gl.beginPath();gl.arc(p.x,p.y,r*2,0,6.28)
-      gl.fillStyle=`rgba(255,151,51,${(nodeA*0.1).toFixed(3)})`
-      gl.fill()
-      gl.beginPath();gl.arc(p.x,p.y,r,0,6.28)
-      gl.fillStyle=isActive?`rgba(0,121,147,${nodeA.toFixed(3)})`:`rgba(255,130,30,${nodeA.toFixed(3)})`
-      gl.fill()
+        gl.beginPath();gl.arc(p.x,p.y,r,0,6.28)
+        gl.fillStyle=isActive?`rgba(0,121,147,${nodeA.toFixed(3)})`:`rgba(255,130,30,${nodeA.toFixed(3)})`
+        gl.fill()
 
-      // Label
-      const label = nd.label
-      if(!label || p.s < 0.12) continue
-      const fontSize = Math.round(Math.max(8, Math.min(mobile?26:32, (mobile?16:20)*p.s)))
-      const textA = isActive ? 0.9 : Math.min(0.55, nearness*0.65)
-      if(textA < 0.03) continue
+        // Label
+        const label = nd.label
+        if(!label || p.s < 0.12) continue
+        const fontSize = Math.round(Math.max(8, Math.min(mobile?26:32, (mobile?16:20)*p.s)))
+        const textA = (isActive ? 0.9 : Math.min(0.55, nearness*0.65)) * blend
+        if(textA < 0.03) continue
 
-      const textY = Math.round(p.y + r + fontSize*0.6)
-      gl.font = `300 ${fontSize}px ${FONT}`
-      gl.textAlign = 'center'
-      gl.textBaseline = 'top'
-      gl.fillStyle = `rgba(20,50,65,${textA.toFixed(2)})`
-      gl.fillText(label, p.x, textY)
+        const textY = Math.round(p.y + r + fontSize*0.6)
+        gl.font = `300 ${fontSize}px ${FONT}`
+        gl.textAlign = 'center'
+        gl.textBaseline = 'top'
+        gl.fillStyle = `rgba(20,50,65,${textA.toFixed(2)})`
+        gl.fillText(label, p.x, textY)
 
-      // Number badge
-      if(!nd.isReport && i < KERN.length) {
-        const ns = Math.round(Math.max(7, fontSize*0.35))
-        gl.font = `500 ${ns}px ${FONT}`
-        gl.fillStyle = `rgba(0,121,147,${(textA*0.45).toFixed(2)})`
-        gl.fillText(String(i+1).padStart(2,'0'), p.x, p.y-r-ns*1.2)
+        // Number badge
+        if(!nd.isReport && i < KERN.length) {
+          const ns = Math.round(Math.max(7, fontSize*0.35))
+          gl.font = `500 ${ns}px ${FONT}`
+          gl.fillStyle = `rgba(0,121,147,${(textA*0.45).toFixed(2)})`
+          gl.fillText(String(i+1).padStart(2,'0'), p.x, p.y-r-ns*1.2)
+        }
       }
     }
 
-    // Background particles
-    const glowMul=mobile?0.5:0.9, coreMul=mobile?0.6:0.9
+    // Particle dots
+    const glowMul=mobile?0.4:0.9, coreMul=mobile?0.5:0.9
     for(let i=0;i<N;i++){
       if(ox[i]<-900) continue
       const r=sr[i]*os[i]*0.8, a=.2+os[i]*.35
@@ -338,10 +285,7 @@ export function createRenderer(canvas, slideLabels) {
     }
   }
 
-  function setReportFindings(findings) {
-    rebuildNodes(findings)
-    render._transitioned = false  // allow re-transition if needed
-  }
+  function setReportFindings(findings) { rebuildNodes(findings) }
   function getNodeCount() { return totalNodes + INTRO_COUNT }
   function destroy(){window.removeEventListener('resize',resize)}
   return { render, resize, destroy, setReportFindings, getNodeCount }
