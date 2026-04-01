@@ -205,6 +205,7 @@ export function createRenderer(canvas, slideLabels) {
     // Draw tunnel nodes (only visible during fly phase)
     if(flyProgress > 0) {
       const sp = Math.min(totalNodes - 1, flyProgress)
+      const kernCount = KERN.length
       for(let i=0;i<totalNodes;i++){
         const nd = allNodes[i]
         const p = projectNode(nd.x, nd.y, nd.z)
@@ -213,6 +214,11 @@ export function createRenderer(canvas, slideLabels) {
         const dist = Math.abs(i - sp)
         const isActive = dist < 0.5
         const nearness = 1 - Math.min(1, dist / 3)
+
+        // Hide last KERN node when camera reaches it (form appears)
+        const isLastKern = (i === kernCount - 1) && !nd.isReport
+        const lastKernFade = isLastKern ? Math.max(0, 1 - Math.max(0, sp - (kernCount - 2.5)) * 2) : 1
+        if(lastKernFade < 0.02) continue
 
         // Connection to previous
         if(i > 0) {
@@ -229,11 +235,11 @@ export function createRenderer(canvas, slideLabels) {
         // Node dot
         const baseR = (mobile ? 5 : 7) * p.s
         const r = Math.round(isActive ? baseR*2 : baseR*(0.5+nearness*0.5))
-        const nodeA = (isActive ? 0.9 : 0.12+nearness*0.35) * blend
+        const nodeA = (isActive ? 0.9 : 0.12+nearness*0.35) * blend * lastKernFade
 
-        if(isActive) {
+        if(isActive && lastKernFade > 0.1) {
           gl.beginPath();gl.arc(p.x,p.y,r*3.5,0,6.28)
-          gl.fillStyle=`rgba(0,121,147,${(0.05*p.s*blend).toFixed(3)})`
+          gl.fillStyle=`rgba(0,121,147,${(0.05*p.s*blend*lastKernFade).toFixed(3)})`
           gl.fill()
         }
         gl.beginPath();gl.arc(p.x,p.y,r*2,0,6.28)
@@ -247,7 +253,7 @@ export function createRenderer(canvas, slideLabels) {
         const label = nd.label
         if(!label || p.s < 0.12) continue
         const fontSize = Math.round(Math.max(8, Math.min(mobile?26:32, (mobile?16:20)*p.s)))
-        const textA = (isActive ? 0.9 : Math.min(0.55, nearness*0.65)) * blend
+        const textA = (isActive ? 0.9 : Math.min(0.55, nearness*0.65)) * blend * lastKernFade
         if(textA < 0.03) continue
 
         const textY = Math.round(p.y + r + fontSize*0.6)

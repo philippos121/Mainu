@@ -190,6 +190,16 @@ async function generateReport() {
         merged[merged.length - 1].body += '\n\n' + slide.body.trim()
       }
     }
+    // Clean titles: remove BGBl citations, paragraph refs for clean teasers
+    for (const f of merged) {
+      f.title = f.title
+        .replace(/\s*[-—–]\s*BGBl\.?.*$/i, '')
+        .replace(/\s*\(BGBl\.?[^)]*\)/gi, '')
+        .replace(/\s*BGBl\.?\s+[IV]+\s+Nr\.?\s*\d+\/\d+/gi, '')
+        .replace(/\s*§+\s*\d+[a-z]?\s+(ff\.?\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß]+/g, '')
+        .replace(/\s*idF\s+.*$/i, '')
+        .trim() || 'Ergebnis'
+    }
     // Final filter: ensure every node has meaningful content
     findings.value = merged.filter(f => f.title.trim() || f.body.trim().length > 2)
     if (!findings.value.length) findings.value = [{ title: 'Analyse', body: r.data.report_markdown || 'Keine Zusammenfassung.' }]
