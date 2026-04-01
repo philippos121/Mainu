@@ -69,6 +69,7 @@ export function createRenderer(canvas, slideLabels) {
         y: 0.2 * Math.cos(a * 0.8),
         z: lastZ + (i + 1) * TUNNEL_DEPTH,
         label: (r.title || '').trim() || 'Ergebnis',
+        body: (r.body || '').trim(),
         isReport: true
       }
     })
@@ -93,6 +94,7 @@ export function createRenderer(canvas, slideLabels) {
     if(progress !== undefined) lastProgress = progress
     const mobile = W < 640
     const hw=W/2, hh=H/2
+    let activeReport = null
 
     const flyProgress = Math.max(0, progress - INTRO_COUNT)
     const blend = Math.min(1, flyProgress / 1.5)
@@ -100,22 +102,7 @@ export function createRenderer(canvas, slideLabels) {
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // --- Particle movement (local space, fixed bounds) ---
-    if(moving){
-      for(let i=0;i<N;i++){
-        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
-        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
-        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
-        if(az[i]>3||az[i]<-3)dz[i]*=-1
-      }
-    }
-
-    // --- Intro rotation (fades out as fly begins) ---
-    const rotSpeed = mobile ? 2.5 : 1
-    const rot = scrollY * 0.00015 * rotSpeed * (1 - blend)
-    const cy = Math.cos(rot), sn = Math.sin(rot)
-
-    // --- Camera position (for tunnel nodes only) ---
+    // --- Camera position ---
     let camX = 0, camY = 0, camZ = 0
     if(flyProgress > 0 && totalNodes > 0) {
       const sp = Math.min(totalNodes - 1, flyProgress)
@@ -128,13 +115,42 @@ export function createRenderer(canvas, slideLabels) {
       camZ = (n0.z + (n1.z - n0.z) * frac) * blend
     }
 
+    // --- Particle movement + recycling ---
+    const WRAP_BEHIND = 3, WRAP_AHEAD = 6
+    if(moving){
+      for(let i=0;i<N;i++){
+        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
+        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
+        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
+        // During fly: recycle particles that fall behind camera
+        if(blend > 0.01) {
+          if(az[i] < camZ - WRAP_BEHIND) {
+            az[i] = camZ + WRAP_BEHIND + Math.random() * WRAP_AHEAD
+            ax[i] = (Math.random() * 3.2 - 1.6)
+            ay[i] = (Math.random() * 3.2 - 1.6)
+          } else if(az[i] > camZ + WRAP_BEHIND + WRAP_AHEAD) {
+            az[i] = camZ - WRAP_BEHIND + Math.random() * 0.5
+            ax[i] = (Math.random() * 3.2 - 1.6)
+            ay[i] = (Math.random() * 3.2 - 1.6)
+          }
+        } else {
+          if(az[i]>3||az[i]<-3)dz[i]*=-1
+        }
+      }
+    }
+
+    // --- Intro rotation (fades out as fly begins) ---
+    const rotSpeed = mobile ? 2.5 : 1
+    const rot = scrollY * 0.00015 * rotSpeed * (1 - blend)
+    const cy = Math.cos(rot), sn = Math.sin(rot)
+
     // Screen center shifts slightly during fly
     const flyTargetY = mobile ? 0.42 : 0.44
     const screenCY = H * (0.5 + (flyTargetY - 0.5) * blend)
 
-    // --- CONSISTENT particle projection ---
-    // Same projection throughout: particles in local space, depth=4+z
-    // Only rotation changes (fades out). Net looks the same always.
+    // --- Particle projection ---
+    // Intro: depth=4+rz (local space). Fly: depth=4+(rz-camZ) (world space parallax).
+    // blend smoothly transitions between the two.
     const pSpreadX = mobile ? .55 : .36
     const pSpreadY = mobile ? .45 : .30
     const fadeX = hw, fadeY = hh
@@ -145,11 +161,14 @@ export function createRenderer(canvas, slideLabels) {
       const x=ax[i],y=ay[i],z=az[i]
       // Y-axis rotation (fades during fly)
       const rx=x*cy-z*sn, rz=x*sn+z*cy
-      const depth = 4 + rz
+      // Camera-relative depth: during intro camZ=0 so no change; during fly gives parallax
+      const depth = 4 + rz - camZ * blend
       if(depth < 0.5) { ox[i]=-999; continue }
       const s = 2.5 / depth
-      ox[i]=Math.round(hw+rx*W*pSpreadX*s)
-      oy[i]=Math.round(hh+y*H*pSpreadY*s)
+      const projX = (rx - camX * blend) * W * pSpreadX * s
+      const projY = (y - camY * blend) * H * pSpreadY * s
+      ox[i]=Math.round(hw + projX)
+      oy[i]=Math.round(screenCY + projY - (screenCY - hh) * (1 - blend))
       os[i]=s
     }
 
@@ -236,8 +255,21 @@ export function createRenderer(canvas, slideLabels) {
         gl.fillStyle=isActive?`rgba(0,121,147,${nodeA.toFixed(3)})`:`rgba(255,130,30,${nodeA.toFixed(3)})`
         gl.fill()
 
-        // Label
+        // Label (KERN nodes only — report nodes use HTML overlay)
         const label = nd.label
+        if(nd.isReport) {
+          // Track active report node for HTML overlay
+          if(isActive && lastKernFade > 0.1) {
+            activeReport = {
+              x: p.x, y: p.y, r,
+              index: i - kernCount,
+              opacity: blend * lastKernFade,
+              title: nd.label,
+              body: nd.body || ''
+            }
+          }
+          continue
+        }
         if(!label || p.s < 0.12) continue
         const fontSize = Math.round(Math.max(8, Math.min(mobile?26:32, (mobile?16:20)*p.s)))
         const textA = (isActive ? 0.9 : Math.min(0.55, nearness*0.65)) * blend * lastKernFade
@@ -276,6 +308,8 @@ export function createRenderer(canvas, slideLabels) {
       gl.fillStyle=`rgba(255,130,30,${(fa*0.5*coreMul).toFixed(3)})`
       gl.fill()
     }
+
+    return activeReport
   }
 
   function setReportFindings(findings) { rebuildNodes(findings) }

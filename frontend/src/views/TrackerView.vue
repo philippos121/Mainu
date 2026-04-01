@@ -37,6 +37,16 @@
     </div>
   </div>
 
+  <!-- Report finding card overlay -->
+  <div class="report-card" id="report-card"
+       :style="{ opacity: reportCard.opacity, transform: `translate(${reportCard.x}px, ${reportCard.y}px)` }">
+    <div class="report-card-inner">
+      <div class="report-card-num" v-if="reportCard.index >= 0">{{ String(reportCard.index + 1).padStart(2, '0') }}</div>
+      <h3 class="report-card-title">{{ reportCard.title }}</h3>
+      <p class="report-card-body">{{ reportCard.body }}</p>
+    </div>
+  </div>
+
   <!-- Download button at the end of report fly-through -->
   <div class="dl-wrap" id="dl-wrap" v-if="findings.length">
     <button class="btn-dl" @click="downloadHtml">Report als HTML herunterladen</button>
@@ -45,7 +55,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import api from '../services/api'
 import { KERN, parseFindings } from '../lib/journeyNodes.js'
 import { createRenderer, INTRO_COUNT } from '../lib/canvasRenderer.js'
@@ -54,6 +64,7 @@ const cvs = ref(null)
 let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, raf = 0
 let nodeProgress = 0
 let renderLoop = () => {}
+const reportCard = reactive({ x: 0, y: 0, opacity: 0, index: -1, title: '', body: '' })
 const innerH = ref(typeof window !== 'undefined' ? window.innerHeight : 800)
 
 // Total intro+fly node count determines scroll height
@@ -126,12 +137,28 @@ function updateUI() {
 
 const slideLabels = KERN.map(k => k.label)
 
+function updateReportCard(info) {
+  if (info) {
+    const mobile = window.innerWidth < 640
+    const cardW = mobile ? 280 : 380
+    reportCard.x = Math.round(Math.min(window.innerWidth - cardW - 16, Math.max(16, info.x - cardW / 2)))
+    reportCard.y = Math.round(info.y + info.r + 16)
+    reportCard.opacity = info.opacity
+    reportCard.index = info.index
+    reportCard.title = info.title
+    reportCard.body = info.body
+  } else {
+    reportCard.opacity = 0
+  }
+}
+
 function setupRenderer() {
   renderer = createRenderer(cvs.value, slideLabels)
   renderer.render(0, false, 0)
   renderLoop = function () {
     if (!scrolling || !renderer) return
-    renderer.render(scrollY, true, nodeProgress)
+    const info = renderer.render(scrollY, true, nodeProgress)
+    updateReportCard(info)
     raf = requestAnimationFrame(renderLoop)
   }
 }
@@ -264,6 +291,13 @@ function downloadHtml() {
 .spin{width:13px;height:13px;border:2px solid rgba(0,121,147,.15);border-top-color:#007993;border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* Report finding card */
+.report-card{position:fixed;top:0;left:0;z-index:5;pointer-events:none;width:380px;will-change:transform,opacity;transition:opacity .15s ease-out}
+.report-card-inner{background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,121,147,.1);border-radius:12px;padding:20px 24px;box-shadow:0 4px 24px rgba(0,40,60,.06),0 1px 4px rgba(0,40,60,.04)}
+.report-card-num{font-size:10px;font-weight:600;letter-spacing:2px;color:rgba(0,121,147,.4);margin-bottom:6px;font-variant-numeric:tabular-nums}
+.report-card-title{font-size:15px;font-weight:600;color:#0a5062;line-height:1.35;margin-bottom:8px;letter-spacing:-.2px}
+.report-card-body{font-size:13px;font-weight:400;color:#4b5563;line-height:1.65;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}
+
 /* Download button */
 .dl-wrap{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:7;opacity:0;pointer-events:none;transition:opacity .4s}
 .btn-dl{padding:10px 24px;border:1px solid rgba(10,80,98,.15);border-radius:8px;background:rgba(255,255,255,.8);color:#007993;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .2s}
@@ -278,6 +312,10 @@ function downloadHtml() {
   .form-line{flex-direction:column;width:100%;gap:8px}
   .sel,.btn-gen{width:100%;text-align:center;justify-content:center}
   .sel-date{width:100%}
+  .report-card{width:280px}
+  .report-card-inner{padding:16px 18px;border-radius:10px}
+  .report-card-title{font-size:14px}
+  .report-card-body{font-size:12px;-webkit-line-clamp:4}
   .dl-wrap{bottom:24px}
   .btn-dl{font-size:11px;padding:8px 16px}
 }
