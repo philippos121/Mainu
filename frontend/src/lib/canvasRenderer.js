@@ -137,20 +137,20 @@ export function createRenderer(canvas, slideLabels) {
     const spreadY = mobile ? (.45) : (.30 + .05 * blend)
     const baseDepth = 4 - 2.5 * blend  // 4 during intro → 1.5 during fly
 
-    // Unified projection for particles
+    // Unified projection for particles — always surround the camera
+    // Particles are in camera-local space: they float around the camera
+    // regardless of where the camera flies to
     function projectP(px, py, pz) {
       // Apply rotation (fades with blend)
       const rx = px * cy - pz * sn
       const ry = py
       const rz = px * sn + pz * cy
-      // Camera offset (grows with blend)
-      const dx = rx - camX, dy = ry - camY, dz = rz - camZ
-      const depth = baseDepth + dz
+      const depth = baseDepth + rz
       if(depth < 0.3) return null
       const s = 2.5 / depth
       return {
-        x: Math.round(hw + dx * W * spreadX * s),
-        y: Math.round(screenCY + dy * H * spreadY * s),
+        x: Math.round(hw + rx * W * spreadX * s),
+        y: Math.round(screenCY + ry * H * spreadY * s),
         s, depth
       }
     }
