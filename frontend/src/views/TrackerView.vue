@@ -2,6 +2,11 @@
 <div class="page">
   <canvas ref="cvs" class="bg-canvas"></canvas>
 
+  <!-- Logo — plain SVG, shown at start, fades on scroll -->
+  <div class="logo-wrap" id="logo-wrap">
+    <img src="/logo.svg" alt="AI:ssociate" class="logo" />
+  </div>
+
   <div class="scroll-driver" :style="{ height: totalHeight + 'px' }"></div>
 
   <!-- Form — appears after last intro slide -->
@@ -86,6 +91,14 @@ function onScroll() {
 function updateUI() {
   const slideIdx = Math.floor(nodeProgress)
   const pastIntro = slideIdx >= introCount - 1
+
+  // Logo fades out after first node
+  const logoEl = document.getElementById('logo-wrap')
+  if (logoEl) {
+    const logoA = Math.max(0, 1 - nodeProgress * 1.5)
+    logoEl.style.opacity = logoA.toFixed(2)
+    logoEl.style.pointerEvents = logoA > 0.1 ? 'auto' : 'none'
+  }
 
   // Show form after intro, hide during report
   const formEl = document.getElementById('form-wrap')
@@ -213,6 +226,10 @@ function downloadHtml() {
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none;contain:strict}
 .scroll-driver{position:relative;z-index:1;pointer-events:none}
 
+/* Logo overlay */
+.logo-wrap{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;height:100vh;pointer-events:none;transition:opacity .3s}
+.logo{height:52px;display:block}
+
 /* Form */
 .form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
 .form-center{text-align:center;max-width:520px;width:100%;padding:0 24px}
@@ -240,6 +257,7 @@ function downloadHtml() {
 .btn-dl:hover{background:rgba(0,121,147,.08);border-color:rgba(0,121,147,.3)}
 
 @media(max-width:640px){
+  .logo{height:38px}
   .form-center{padding:0 16px}
   .chips{gap:5px}
   .chip{padding:6px 12px;font-size:11px}

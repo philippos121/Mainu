@@ -19,22 +19,6 @@ export function createRenderer(canvas, slideLabels) {
 
   const FONT = '-apple-system,"Segoe UI",sans-serif'
 
-  // Logo: render at fixed high-res, cache as bitmap
-  const logoImg = new Image()
-  logoImg.src = '/logo.svg'
-  let logoBitmap = null
-  logoImg.onload = () => {
-    // Pre-render logo at 4x for crisp retina display
-    const lc = document.createElement('canvas')
-    const s = 4
-    lc.width = 240 * s; lc.height = 72 * s
-    const lx = lc.getContext('2d')
-    lx.drawImage(logoImg, 0, 0, lc.width, lc.height)
-    logoBitmap = lc
-    // Re-render immediately so logo appears on first frame
-    if(initialized) render(lastScrollY, false, lastProgress)
-  }
-
   function buildIntroNodes() {
     const nodes = []
     const count = 2 + KERN.length
@@ -53,22 +37,6 @@ export function createRenderer(canvas, slideLabels) {
     return nodes
   }
 
-  function wrapAtChars(text, charsPerLine) {
-    // Pure character-count wrap — no font measurement, completely stable
-    const words = text.split(' ')
-    const lines = []
-    let line = ''
-    for(const w of words) {
-      const test = line ? line + ' ' + w : w
-      if(test.length > charsPerLine && line) {
-        lines.push(line)
-        line = w
-      } else { line = test }
-    }
-    if(line) lines.push(line)
-    return lines
-  }
-
   function rebuildNodes(reportFindings) {
     const intro = buildIntroNodes()
     const lastZ = intro.length ? intro[intro.length-1].z + TUNNEL_DEPTH : 0
@@ -79,15 +47,11 @@ export function createRenderer(canvas, slideLabels) {
     })
     const report = findings.map((r, i) => {
       const a = (i / Math.max(1, findings.length - 1)) * Math.PI * 2
-      const bodyPreview = (r.body || '').slice(0, 220) + ((r.body || '').length > 220 ? '…' : '')
-      const charsPerLine = isMobile ? 40 : 55
-      const wrappedLines = wrapAtChars(bodyPreview, charsPerLine)
       return {
         x: 0.5 * Math.sin(a + 1),
         y: 0.2 * Math.cos(a * 0.8),
         z: lastZ + (i + 1) * TUNNEL_DEPTH,
         label: (r.title || '').trim() || 'Ergebnis',
-        bodyLines: wrappedLines,
         isLogo: false,
         isReport: true
       }
@@ -241,30 +205,8 @@ export function createRenderer(canvas, slideLabels) {
       gl.fillStyle=isActive?`rgba(0,121,147,${nodeA.toFixed(3)})`:`rgba(255,130,30,${nodeA.toFixed(3)})`
       gl.fill()
 
-      // Logo at first node — crisp high-res bitmap
-      if(nd.isLogo) {
-        if(logoBitmap) {
-          const lh = Math.round(Math.max(20, 48 * p.s))
-          const lw = Math.round(lh * (logoBitmap.width / logoBitmap.height))
-          const la = isActive ? 1 : Math.min(0.6, nearness*0.7)
-          if(la > 0.05) {
-            gl.globalAlpha = la
-            gl.imageSmoothingEnabled = true
-            gl.imageSmoothingQuality = 'high'
-            gl.drawImage(logoBitmap, p.x-lw/2, p.y+r+6, lw, lh)
-            gl.globalAlpha = 1
-          }
-        } else {
-          // Fallback text while logo loads
-          const fs = Math.round(Math.max(12, 24 * p.s))
-          gl.font = `600 ${fs}px ${FONT}`
-          gl.textAlign = 'center'
-          gl.textBaseline = 'top'
-          gl.fillStyle = `rgba(0,121,147,${(isActive ? 0.9 : nearness*0.5).toFixed(2)})`
-          gl.fillText('AI:ssociate', p.x, Math.round(p.y+r+6))
-        }
-        continue
-      }
+      // Skip logo node — rendered as HTML overlay
+      if(nd.isLogo) continue
 
       // Label — light weight, smooth alpha
       const label = nd.label
@@ -279,20 +221,6 @@ export function createRenderer(canvas, slideLabels) {
       gl.textBaseline = 'top'
       gl.fillStyle = `rgba(20,50,65,${textA.toFixed(2)})`
       gl.fillText(label, p.x, textY)
-
-      // Report body — pre-wrapped lines (character-based, zoom-independent)
-      if(nd.isReport && nd.bodyLines && nd.bodyLines.length && isActive) {
-        const bodySize = Math.round(Math.max(10, fontSize*0.5))
-        gl.font = `300 ${bodySize}px ${FONT}`
-        gl.fillStyle = 'rgba(30,60,80,0.55)'
-        const lineH = Math.round(bodySize*1.4)
-        let ly = Math.round(textY + fontSize*1.1)
-        const maxLines = Math.min(nd.bodyLines.length, 6)
-        for(let li=0; li<maxLines; li++) {
-          gl.fillText(nd.bodyLines[li], p.x, ly)
-          ly += lineH
-        }
-      }
 
       // Number badge
       if(!nd.isReport && i >= 2) {
