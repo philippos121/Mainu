@@ -296,7 +296,7 @@ function downloadHtml() {
 .report-card-inner{background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,121,147,.1);border-radius:12px;padding:20px 24px;box-shadow:0 4px 24px rgba(0,40,60,.06),0 1px 4px rgba(0,40,60,.04)}
 .report-card-num{font-size:10px;font-weight:600;letter-spacing:2px;color:rgba(0,121,147,.4);margin-bottom:6px;font-variant-numeric:tabular-nums}
 .report-card-title{font-size:15px;font-weight:600;color:#0a5062;line-height:1.35;margin-bottom:8px;letter-spacing:-.2px}
-.report-card-body{font-size:13px;font-weight:400;color:#4b5563;line-height:1.65;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}
+.report-card-body{font-size:13px;font-weight:400;color:#4b5563;line-height:1.65;margin:0}
 
 /* Download button */
 .dl-wrap{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:7;opacity:0;pointer-events:none;transition:opacity .4s}
@@ -315,7 +315,7 @@ function downloadHtml() {
   .report-card{width:280px}
   .report-card-inner{padding:16px 18px;border-radius:10px}
   .report-card-title{font-size:14px}
-  .report-card-body{font-size:12px;-webkit-line-clamp:4}
+  .report-card-body{font-size:12px}
   .dl-wrap{bottom:24px}
   .btn-dl{font-size:11px;padding:8px 16px}
 }
