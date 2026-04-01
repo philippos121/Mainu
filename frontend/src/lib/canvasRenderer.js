@@ -120,22 +120,24 @@ export function createRenderer(canvas, slideLabels) {
       camZ = (n0.z + (n1.z - n0.z) * frac) * blend
     }
 
-    // --- Particle movement + wrapping (after camera is known) ---
+    // --- Particle movement ---
+    // Bounce bounds are relative to camera so particles always surround it
+    const bx = 1.6, by = 1.6, bz = 4
     if(moving){
       for(let i=0;i<N;i++){
         ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
-        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
-        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
-        if(az[i]>3||az[i]<-3)dz[i]*=-1
-      }
-    }
-    // In fly phase: wrap particles around camera so net is always present
-    if(camZ > 0.5) {
-      const wrapRange = 5
-      for(let i=0;i<N;i++){
-        const relZ = az[i] - camZ
-        if(relZ < -wrapRange) az[i] = camZ + wrapRange - Math.random() * 2
-        else if(relZ > wrapRange) az[i] = camZ - wrapRange + Math.random() * 2
+        // Bounce relative to camera
+        const rx = ax[i] - camX, ry = ay[i] - camY, rz = az[i] - camZ
+        if(rx > bx || rx < -bx) dx[i]*=-1
+        if(ry > by || ry < -by) dy[i]*=-1
+        if(rz > bz || rz < -bz) dz[i]*=-1
+        // Wrap: if too far from camera, teleport back around it
+        if(rx > bx+1) ax[i] = camX - bx + Math.random()*0.5
+        else if(rx < -bx-1) ax[i] = camX + bx - Math.random()*0.5
+        if(ry > by+1) ay[i] = camY - by + Math.random()*0.5
+        else if(ry < -by-1) ay[i] = camY + by - Math.random()*0.5
+        if(rz > bz+1) az[i] = camZ - bz + Math.random()
+        else if(rz < -bz-1) az[i] = camZ + bz - Math.random()
       }
     }
 
