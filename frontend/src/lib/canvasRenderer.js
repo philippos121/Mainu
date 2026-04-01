@@ -102,26 +102,6 @@ export function createRenderer(canvas, slideLabels) {
     gl.fillStyle='#fafbfc'
     gl.fillRect(0,0,W,H)
 
-    // --- Particle movement + wrapping ---
-    // During fly: wrap particles around camera so net is always present
-    const wrapRange = 6  // particles live in a Z window of ±wrapRange around camera
-    if(moving){
-      for(let i=0;i<N;i++){
-        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
-        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
-        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
-        if(az[i]>3||az[i]<-3)dz[i]*=-1
-      }
-    }
-    // In fly phase: keep particles around the camera by wrapping Z
-    if(blend > 0.01) {
-      for(let i=0;i<N;i++){
-        const relZ = az[i] - camZ
-        if(relZ < -wrapRange) az[i] += wrapRange * 2
-        else if(relZ > wrapRange) az[i] -= wrapRange * 2
-      }
-    }
-
     // --- Intro rotation (fades out as fly begins) ---
     const rotSpeed = mobile ? 2.5 : 1
     const rot = scrollY * 0.00015 * rotSpeed * (1 - blend)
@@ -138,6 +118,25 @@ export function createRenderer(canvas, slideLabels) {
       camX = (n0.x + (n1.x - n0.x) * frac) * blend
       camY = (n0.y + (n1.y - n0.y) * frac) * blend
       camZ = (n0.z + (n1.z - n0.z) * frac) * blend
+    }
+
+    // --- Particle movement + wrapping (after camera is known) ---
+    if(moving){
+      for(let i=0;i<N;i++){
+        ax[i]+=dx[i];ay[i]+=dy[i];az[i]+=dz[i]
+        if(ax[i]>1.6||ax[i]<-1.6)dx[i]*=-1
+        if(ay[i]>1.6||ay[i]<-1.6)dy[i]*=-1
+        if(az[i]>3||az[i]<-3)dz[i]*=-1
+      }
+    }
+    // In fly phase: wrap particles around camera so net is always present
+    if(camZ > 0.5) {
+      const wrapRange = 5
+      for(let i=0;i<N;i++){
+        const relZ = az[i] - camZ
+        if(relZ < -wrapRange) az[i] = camZ + wrapRange - Math.random() * 2
+        else if(relZ > wrapRange) az[i] = camZ - wrapRange + Math.random() * 2
+      }
     }
 
     // Projection center: screen center during intro, shifts up during fly
