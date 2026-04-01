@@ -42,9 +42,11 @@ export function createRenderer(canvas, slideLabels) {
     for(let i=0;i<KERN.length;i++){
       const t = i / (KERN.length - 1)
       const a = t * Math.PI * 2.5
+      // First node at dead center so flight starts from "Legal Monitoring" position
+      const sway = i === 0 ? 0 : 1
       nodes.push({
-        x: 0.7 * Math.sin(a),
-        y: 0.25 * Math.cos(a * 1.3),
+        x: 0.7 * Math.sin(a) * sway,
+        y: 0.25 * Math.cos(a * 1.3) * sway,
         z: i * TUNNEL_DEPTH,
         label: slideLabels ? slideLabels[i] || '' : '',
         isReport: false
@@ -203,7 +205,10 @@ export function createRenderer(canvas, slideLabels) {
     const camY = n0.y + (n1.y - n0.y) * frac
     const camZ = (n0.z + (n1.z - n0.z) * frac) - 0.5
 
-    const nodeScreenY = H * (mobile ? 0.38 : 0.40)
+    // Smoothly shift horizon from center (0.5) to fly position over first 2 nodes
+    const flyTarget = mobile ? 0.38 : 0.40
+    const horizonT = Math.min(1, flyProgress / 2)
+    const nodeScreenY = H * (0.5 + (flyTarget - 0.5) * horizonT)
     const spreadX = mobile ? .55 : .42
     const spreadY = mobile ? .45 : .35
 

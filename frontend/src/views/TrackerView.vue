@@ -231,7 +231,7 @@ function downloadHtml() {
 /* Intro overlays */
 .intro-overlay{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;height:100vh;pointer-events:none}
 .logo{height:52px;display:block}
-.intro-lm-text{font-size:20px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#1a3a4a;opacity:.8}
+.intro-lm-text{font-size:36px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#1a3a4a;opacity:.8}
 
 /* Form */
 .form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
@@ -261,7 +261,7 @@ function downloadHtml() {
 
 @media(max-width:640px){
   .logo{height:36px}
-  .intro-lm-text{font-size:15px;letter-spacing:4px}
+  .intro-lm-text{font-size:22px;letter-spacing:4px}
   .form-center{padding:0 16px}
   .chips{gap:5px}
   .chip{padding:6px 12px;font-size:11px}
