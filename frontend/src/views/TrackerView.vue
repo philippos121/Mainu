@@ -2,10 +2,12 @@
 <div class="page">
   <canvas ref="cvs" class="bg-canvas"></canvas>
 
-  <!-- Logo + subtitle — plain HTML, fades on scroll -->
-  <div class="logo-wrap" id="logo-wrap">
+  <!-- Intro overlays — sequential: logo first, then "Legal Monitoring" -->
+  <div class="intro-overlay" id="intro-logo">
     <img src="/logo.svg" alt="AI:ssociate" class="logo" />
-    <span class="logo-sub">Legal Monitoring</span>
+  </div>
+  <div class="intro-overlay" id="intro-lm">
+    <span class="intro-lm-text">Legal Monitoring</span>
   </div>
 
   <div class="scroll-driver" :style="{ height: totalHeight + 'px' }"></div>
@@ -46,7 +48,7 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import api from '../services/api'
 import { KERN, parseFindings } from '../lib/journeyNodes.js'
-import { createRenderer } from '../lib/canvasRenderer.js'
+import { createRenderer, INTRO_COUNT } from '../lib/canvasRenderer.js'
 
 const cvs = ref(null)
 let scrollY = 0, scrolling = false, scrollTimer = 0, renderer = null, raf = 0
@@ -54,12 +56,8 @@ let nodeProgress = 0
 let renderLoop = () => {}
 const innerH = ref(typeof window !== 'undefined' ? window.innerHeight : 800)
 
-const introSlides = [
-  { type: 'logo' },
-  { type: 'text', title: 'Legal Monitoring' },
-  ...KERN.map((k, i) => ({ type: 'rg', title: k.label })),
-]
-const introCount = introSlides.length
+// Total intro+fly node count determines scroll height
+const introCount = INTRO_COUNT + KERN.length
 
 const SLIDE_H = window.innerWidth < 640 ? 400 : 600
 const totalHeight = ref(introCount * SLIDE_H + innerH.value)
@@ -90,15 +88,22 @@ function onScroll() {
 }
 
 function updateUI() {
-  const slideIdx = Math.floor(nodeProgress)
-  const pastIntro = slideIdx >= introCount - 1
+  const pastIntro = nodeProgress >= introCount - 1
 
-  // Logo + "Legal Monitoring" fade out over first 2 nodes
-  const logoEl = document.getElementById('logo-wrap')
+  // Logo: visible at progress 0, fades out by progress ~1
+  const logoEl = document.getElementById('intro-logo')
   if (logoEl) {
-    const logoA = Math.max(0, 1 - nodeProgress * 0.8)
-    logoEl.style.opacity = logoA.toFixed(2)
-    logoEl.style.pointerEvents = logoA > 0.1 ? 'auto' : 'none'
+    const a = Math.max(0, 1 - nodeProgress * 1.2)
+    logoEl.style.opacity = a.toFixed(2)
+  }
+
+  // "Legal Monitoring": fades in around 0.5, fades out by ~2
+  const lmEl = document.getElementById('intro-lm')
+  if (lmEl) {
+    const fadeIn = Math.min(1, Math.max(0, (nodeProgress - 0.5) * 2))
+    const fadeOut = Math.max(0, 1 - Math.max(0, nodeProgress - 1.2) * 1.5)
+    const a = fadeIn * fadeOut
+    lmEl.style.opacity = a.toFixed(2)
   }
 
   // Show form after intro, hide during report
@@ -119,11 +124,7 @@ function updateUI() {
   }
 }
 
-const slideLabels = [
-  '',                    // logo
-  '',                    // "Legal Monitoring" is HTML overlay
-  ...KERN.map(k => k.label),
-]
+const slideLabels = KERN.map(k => k.label)
 
 function setupRenderer() {
   renderer = createRenderer(cvs.value, slideLabels)
@@ -227,10 +228,10 @@ function downloadHtml() {
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none;contain:strict}
 .scroll-driver{position:relative;z-index:1;pointer-events:none}
 
-/* Logo overlay */
-.logo-wrap{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;pointer-events:none;transition:opacity .3s}
+/* Intro overlays */
+.intro-overlay{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;height:100vh;pointer-events:none}
 .logo{height:52px;display:block}
-.logo-sub{margin-top:14px;font-size:18px;font-weight:300;letter-spacing:5px;text-transform:uppercase;color:#1a3a4a;opacity:.7}
+.intro-lm-text{font-size:20px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#1a3a4a;opacity:.8}
 
 /* Form */
 .form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
@@ -260,7 +261,7 @@ function downloadHtml() {
 
 @media(max-width:640px){
   .logo{height:36px}
-  .logo-sub{font-size:14px;letter-spacing:3px;margin-top:10px}
+  .intro-lm-text{font-size:15px;letter-spacing:4px}
   .form-center{padding:0 16px}
   .chips{gap:5px}
   .chip{padding:6px 12px;font-size:11px}
