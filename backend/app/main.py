@@ -304,6 +304,72 @@ async def api_debug_index():
     return results
 
 
+@app.get("/api/debug/gpt-context")
+async def api_debug_gpt_context(
+    category: str = Query("gmbh_recht", description="Category ID"),
+    im_ris_seit: str = Query("DreiMonaten", description="Timeframe"),
+):
+    """DEBUG: Show what gets sent to GPT — search results + diff texts + judikatur texts."""
+    from app.services.ris_client import fetch_judikatur_texts
+
+    # Search
+    gesetze = await search_gesetze(category=category, im_ris_seit=im_ris_seit)
+    judikatur = await search_gerichtsentscheidungen(category=category, im_ris_seit=im_ris_seit)
+
+    all_results = gesetze.get("results", []) + judikatur.get("results", [])
+
+    result_summaries = []
+    for r in all_results[:10]:
+        result_summaries.append({
+            "id": r.get("id", "")[:40],
+            "title": r.get("title", "")[:80],
+            "gesetzesnummer": r.get("gesetzesnummer", ""),
+            "artikel": r.get("artikel", ""),
+            "court": r.get("court", ""),
+            "case_number": r.get("case_number", ""),
+            "rechtssatz_len": len(r.get("rechtssatz", "")),
+            "entscheidungstext_len": len(r.get("entscheidungstext", "")),
+            "date": r.get("date", ""),
+        })
+
+    # Try diffs for gesetze results
+    diff_results = []
+    for r in gesetze.get("results", [])[:4]:
+        if r.get("gesetzesnummer") and r.get("artikel"):
+            try:
+                diff = await fetch_provision_diff(
+                    doc_id=r["id"], gesetzesnummer=r["gesetzesnummer"],
+                    artikel=r["artikel"], inkrafttreten=r.get("date", ""),
+                )
+                diff_results.append({
+                    "artikel": r.get("artikel", ""),
+                    "has_changes": diff.get("has_changes") if isinstance(diff, dict) else None,
+                    "error": diff.get("error") if isinstance(diff, dict) else str(diff),
+                    "current_text_len": len(diff.get("current", {}).get("text", "")) if isinstance(diff, dict) and isinstance(diff.get("current"), dict) else 0,
+                    "current_text_preview": (diff.get("current", {}).get("text", "")[:300]) if isinstance(diff, dict) and isinstance(diff.get("current"), dict) else "",
+                    "previous_text_len": len(diff.get("previous", {}).get("text", "")) if isinstance(diff, dict) and isinstance(diff.get("previous"), dict) else 0,
+                })
+            except Exception as e:
+                diff_results.append({"artikel": r.get("artikel", ""), "error": str(e)[:200]})
+
+    # Try judikatur text fetch
+    jud_texts = {}
+    court_results = [r for r in judikatur.get("results", [])[:5] if r.get("court")]
+    if court_results:
+        try:
+            jud_texts = await fetch_judikatur_texts(court_results, max_results=3)
+        except Exception as e:
+            jud_texts = {"error": str(e)[:200]}
+
+    return {
+        "gesetze_count": len(gesetze.get("results", [])),
+        "judikatur_count": len(judikatur.get("results", [])),
+        "results_sample": result_summaries,
+        "diff_results": diff_results,
+        "judikatur_texts": {k: f"len={len(v)}, preview={v[:200]}" for k, v in jud_texts.items()} if isinstance(jud_texts, dict) else jud_texts,
+    }
+
+
 # ── Email Report endpoint ──
 
 
