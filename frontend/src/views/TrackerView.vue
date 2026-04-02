@@ -261,14 +261,14 @@ function downloadHtml() {
 </script>
 
 <style scoped>
-.page{min-height:100vh;background:#fafbfc;color:#1a2a3a}
+.page{min-height:100vh;background:#081224;color:#c8dce6}
 .bg-canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;touch-action:none;contain:strict}
 .scroll-driver{position:relative;z-index:1;pointer-events:none}
 
 /* Intro overlays */
 .intro-overlay{position:fixed;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;height:100vh;pointer-events:none}
 .logo{height:52px;display:block}
-.intro-lm-text{font-size:36px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#1a3a4a;opacity:.8}
+.intro-lm-text{font-size:36px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:rgba(200,220,230,.85)}
 
 /* Form — dark glass on dark bg */
 .form-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}

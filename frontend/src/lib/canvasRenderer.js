@@ -124,19 +124,16 @@ export function createRenderer(canvas, slideLabels) {
     const flyProgress = Math.max(0, progress - INTRO_COUNT)
     const blend = Math.min(1, flyProgress / 1.5)
 
-    // Background: light → dark transition
-    const bg = lerpColor(BG_LIGHT, BG_DARK, blend)
-    gl.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`
+    // Background: dark from the start
+    gl.fillStyle = `rgb(${BG_DARK[0]},${BG_DARK[1]},${BG_DARK[2]})`
     gl.fillRect(0,0,W,H)
 
-    // Subtle radial vignette during fly
-    if(blend > 0.01) {
-      const vg = gl.createRadialGradient(hw, hh, 0, hw, hh, Math.max(W,H)*0.7)
-      vg.addColorStop(0, `rgba(${bg[0]},${bg[1]},${bg[2]},0)`)
-      vg.addColorStop(1, `rgba(0,0,0,${(0.3*blend).toFixed(2)})`)
-      gl.fillStyle = vg
-      gl.fillRect(0,0,W,H)
-    }
+    // Subtle radial vignette
+    const vg = gl.createRadialGradient(hw, hh, 0, hw, hh, Math.max(W,H)*0.7)
+    vg.addColorStop(0, `rgba(${BG_DARK[0]+6},${BG_DARK[1]+8},${BG_DARK[2]+12},0.3)`)
+    vg.addColorStop(1, `rgba(0,0,0,0.3)`)
+    gl.fillStyle = vg
+    gl.fillRect(0,0,W,H)
 
     // --- Camera position ---
     let camX = 0, camY = 0, camZ = 0
@@ -204,7 +201,7 @@ export function createRenderer(canvas, slideLabels) {
     }
 
     // --- Connections (teal glow during fly) ---
-    const connColor = lerpColor([0,0,0], TEAL, blend)
+    const connColor = TEAL
     const lineBase = mobile ? 0.02 : 0.04
     const lineMax = mobile ? 0.08 : 0.16
     gl.lineWidth = mobile ? 0.8 : 1.2
@@ -327,7 +324,7 @@ export function createRenderer(canvas, slideLabels) {
         gl.textAlign = 'center'
         gl.textBaseline = 'top'
         // Text color: dark on light bg, light on dark bg
-        const tc = lerpColor([20,50,65], [200,230,240], blend)
+        const tc = [200, 230, 240]
         gl.fillStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},${textA.toFixed(2)})`
         gl.fillText(label, p.x, textY)
 
@@ -392,7 +389,7 @@ export function createRenderer(canvas, slideLabels) {
 
       // Core particle
       gl.beginPath();gl.arc(ox[i],oy[i],r,0,6.28)
-      const pc = lerpColor(NODE_LO, GOLD, blend)
+      const pc = GOLD
       gl.fillStyle=`rgba(${pc[0]},${pc[1]},${pc[2]},${(fa*0.5).toFixed(3)})`
       gl.fill()
 

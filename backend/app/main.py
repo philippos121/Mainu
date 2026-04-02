@@ -483,6 +483,12 @@ async def _generate_full_report(req) -> dict:
     all_diffs = dict(req.diffs)
     diff_summaries = []
     import asyncio
+    # Log which results have gesetzesnummer/artikel for debugging
+    for r in req.results[:10]:
+        logging.info(
+            f"Result: id={r.get('id','?')[:30]} gn={r.get('gesetzesnummer','')} "
+            f"art={r.get('artikel','')} court={r.get('court','')} title={r.get('title','')[:50]}"
+        )
     missing = [r for r in req.results[:50]
                if r.get("id") and r["id"] not in all_diffs
                and r.get("gesetzesnummer") and r.get("artikel")]
@@ -490,14 +496,18 @@ async def _generate_full_report(req) -> dict:
         logging.info(f"Auto-fetching {len(missing)} diffs for report...")
         for r in missing:
             try:
+                logging.info(f"Fetching diff: gn={r.get('gesetzesnummer')} art={r.get('artikel')} date={r.get('date')}")
                 diff_result = await fetch_provision_diff(
                     doc_id=r["id"], gesetzesnummer=r.get("gesetzesnummer", ""),
                     artikel=r.get("artikel", ""), inkrafttreten=r.get("date", ""),
                 )
-                if isinstance(diff_result, dict) and diff_result.get("has_changes"):
-                    all_diffs[r["id"]] = diff_result
-                    cur = diff_result.get("current", {}).get("text", "")[:1500]
-                    prev = diff_result.get("previous", {}).get("text", "")[:1500]
+                logging.info(f"Diff result for {r.get('artikel','?')}: has_changes={diff_result.get('has_changes') if isinstance(diff_result, dict) else 'N/A'}, error={diff_result.get('error') if isinstance(diff_result, dict) else 'not dict'}")
+                if isinstance(diff_result, dict):
+                    cur = diff_result.get("current", {}).get("text", "")[:1500] if isinstance(diff_result.get("current"), dict) else ""
+                    prev = diff_result.get("previous", {}).get("text", "")[:1500] if isinstance(diff_result.get("previous"), dict) else ""
+                    if diff_result.get("has_changes"):
+                        all_diffs[r["id"]] = diff_result
+                    # Include text even without changes — GPT needs the content
                     if cur and prev:
                         diff_summaries.append(
                             f"- {r.get('title','')} {r.get('artikel','')} "
