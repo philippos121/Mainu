@@ -878,24 +878,35 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
     # Title: prefer Betreff (subject), then Kurztitel, fallback to court + case number
     betreff = _s(m.get("Betreff")) or ""
     kurztitel = _s(m.get("Kurztitel")) or ""
-    # Truncate very long titles
     title = betreff or kurztitel or f"{court_name} {case_number}"
     if len(title) > 200:
         title = title[:197] + "..."
 
     doc_url = _extract_doc_url(m, ref, data_entry)
     normen = _s(m.get("Norm")) or ""
-    # Truncate very long normen lists
     if len(normen) > 300:
         normen = normen[:297] + "..."
 
-    # Rechtssatz (legal principle) — short summary if available
+    # Rechtssatz (legal principle) — full text, no truncation
     rechtssatz = _s(m.get("Rechtssatz")) or _s(m.get("RechtssatzKurz")) or ""
-    if len(rechtssatz) > 500:
-        rechtssatz = rechtssatz[:497] + "..."
 
-    # Document type (Entscheidungstext vs Rechtssatz)
+    # Try to extract full document content (Entscheidungstext)
+    # The API may include it in Data.Dokumentinhalt or inline content
+    entscheidungstext = ""
+    for key in ("Dokumentinhalt", "DokumentInhalt"):
+        content = data_entry.get(key, "")
+        if isinstance(content, str) and len(content) > 50:
+            entscheidungstext = _strip_html_simple(content)
+            break
+
     doc_typ = _s(m.get("Dokumenttyp")) or _s(m.get("DokumentTyp")) or ""
+
+    # Log what we got for debugging
+    logger.info(
+        f"Judikatur doc {doc_id}: typ={doc_typ}, court={court_name}, "
+        f"rs_len={len(rechtssatz)}, et_len={len(entscheidungstext)}, "
+        f"data_keys={list(data_entry.keys())[:10]}"
+    )
 
     return {
         "id": doc_id,
@@ -906,6 +917,7 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
         "court": court_name,
         "normen": normen,
         "rechtssatz": rechtssatz,
+        "entscheidungstext": entscheidungstext,
         "doc_typ": doc_typ,
     }
 
