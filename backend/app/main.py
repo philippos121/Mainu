@@ -596,8 +596,10 @@ async def _generate_full_report(req) -> dict:
     if diff_summaries:
         diff_context = (
             "\n\n--- NORMTEXTE UND VERSIONSVERGLEICHE ---\n"
-            "Hier sind die tatsächlichen Gesetzestexte (Vorversion und neue Fassung). "
-            "Beschreibe die konkreten Änderungen basierend auf diesen Texten:\n\n"
+            "Hier sind die tatsächlichen Gesetzestexte. "
+            "BESCHREIBE DEN INHALT jeder Bestimmung — was regelt sie konkret? "
+            "Wenn Vorversion und neue Fassung identisch sind, beschreibe trotzdem "
+            "den aktuellen Inhalt der Norm (nicht nur sagen 'kein Unterschied'):\n\n"
             + "\n\n".join(diff_summaries[:20])
         )
 

@@ -137,9 +137,12 @@ async def generate_report_markdown(
         "REGELN:\n"
         "- NIEMALS BGBl-Nummern erfinden — nur die nennen die in den Daten stehen\n"
         "- NIEMALS Gesetzesänderungen beschreiben die nicht in den Daten vorkommen\n"
+        "- Wenn NORMTEXTE vorliegen: beschreibe den INHALT der Bestimmung (was regelt sie?)\n"
         "- Wenn VERSIONSVERGLEICHE vorliegen: beschreibe was sich geändert hat\n"
+        "- Wenn Vorversion und neue Fassung IDENTISCH sind: beschreibe trotzdem den aktuellen Norminhalt\n"
+        "- Wenn ENTSCHEIDUNGSTEXTE vorliegen: fasse die Kernaussage der Entscheidung zusammen\n"
         "- Wenn MATERIALIEN vorliegen: fasse die Erläuterungen zusammen\n"
-        "- Wenn zu wenig Information: ehrlich sagen 'Details nicht verfügbar'\n"
+        "- Sage NIEMALS 'Details nicht verfügbar' wenn Normtexte oder Entscheidungstexte geliefert wurden\n"
         "- Keine URL-Links, keine Quellenverzeichnisse"
     )
 
