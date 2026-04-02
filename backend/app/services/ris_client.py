@@ -696,8 +696,11 @@ def _s(val) -> str:
         return ""
     if isinstance(val, str):
         return val
+    if isinstance(val, dict):
+        # RIS API sometimes wraps values in {"item": "value"} or {"#text": "value"}
+        return _s(val.get("item") or val.get("#text") or val.get("value") or "")
     if isinstance(val, list):
-        return ", ".join(str(v) for v in val)
+        return ", ".join(_s(v) for v in val)
     return str(val)
 
 
@@ -1108,12 +1111,16 @@ def _extract_judikatur_page_text(html: str) -> str:
 
 
 def _find_judikatur_content_url(data_entry: dict) -> str:
-    """Find the MainDocument content URL in a Judikatur API response."""
-    url = ""
+    """Find content URL in a Judikatur API response.
+
+    Tries MainDocument first, falls back to any content URL found.
+    """
+    main_url = ""
+    any_url = ""
 
     def _search(obj, depth=0):
-        nonlocal url
-        if depth > 12 or url:
+        nonlocal main_url, any_url
+        if depth > 12 or main_url:
             return
         if isinstance(obj, dict):
             ct = obj.get("ContentType", "")
@@ -1121,19 +1128,29 @@ def _find_judikatur_content_url(data_entry: dict) -> str:
             candidate = ""
             if isinstance(cu, str) and cu.startswith("http"):
                 candidate = cu
-            elif isinstance(cu, dict) and "Url" in cu:
-                candidate = cu["Url"]
+            elif isinstance(cu, dict):
+                candidate = cu.get("Url", "") or cu.get("url", "")
             elif isinstance(cu, list):
                 for item in cu:
-                    if isinstance(item, dict) and "Url" in item:
-                        candidate = item["Url"]
-                        break
+                    if isinstance(item, dict):
+                        candidate = item.get("Url", "") or item.get("url", "")
+                        if candidate: break
                     elif isinstance(item, str) and item.startswith("http"):
                         candidate = item
                         break
-            if candidate and (ct == "MainDocument" or obj.get("DataType") == "Xml"):
-                url = candidate
-                return
+
+            if candidate and isinstance(candidate, str) and candidate.startswith("http"):
+                if ct == "MainDocument" or obj.get("DataType") == "Xml":
+                    main_url = candidate
+                    return
+                elif not any_url:
+                    any_url = candidate
+
+            # Also check for plain Url fields
+            plain_url = obj.get("Url", "")
+            if isinstance(plain_url, str) and plain_url.startswith("http") and not any_url:
+                any_url = plain_url
+
             for val in obj.values():
                 _search(val, depth + 1)
         elif isinstance(obj, list):
@@ -1141,7 +1158,10 @@ def _find_judikatur_content_url(data_entry: dict) -> str:
                 _search(item, depth + 1)
 
     _search(data_entry)
-    return url
+    result = main_url or any_url
+    if result:
+        logger.info(f"Found content URL: {result[:100]} (main={'yes' if main_url else 'no'})")
+    return result
 
 
 def _strip_html_simple(html: str) -> str:
