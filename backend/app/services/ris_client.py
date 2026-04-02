@@ -891,7 +891,7 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
     rechtssatz = _s(m.get("Rechtssatz")) or _s(m.get("RechtssatzKurz")) or ""
 
     # Try to extract full document content (Entscheidungstext)
-    # The API may include it in Data.Dokumentinhalt or inline content
+    # The API rarely includes text inline — usually it's in ContentUrl
     entscheidungstext = ""
     for key in ("Dokumentinhalt", "DokumentInhalt"):
         content = data_entry.get(key, "")
@@ -899,12 +899,16 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
             entscheidungstext = _strip_html_simple(content)
             break
 
+    # Extract ContentUrl for later fetching (text usually lives here)
+    content_url = _find_judikatur_content_url(data_entry)
+
     doc_typ = _s(m.get("Dokumenttyp")) or _s(m.get("DokumentTyp")) or ""
 
     # Log what we got for debugging
     logger.info(
         f"Judikatur doc {doc_id}: typ={doc_typ}, court={court_name}, "
         f"rs_len={len(rechtssatz)}, et_len={len(entscheidungstext)}, "
+        f"content_url={'yes' if content_url else 'no'}, "
         f"data_keys={list(data_entry.keys())[:10]}"
     )
 
@@ -918,6 +922,7 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
         "normen": normen,
         "rechtssatz": rechtssatz,
         "entscheidungstext": entscheidungstext,
+        "content_url": content_url,
         "doc_typ": doc_typ,
     }
 
@@ -964,9 +969,22 @@ async def fetch_judikatur_texts(results: list[dict], max_results: int = 15) -> d
 
     async def _fetch_one(r: dict) -> tuple[str, str]:
         doc_id = r["id"]
-        logger.info(f"Fetching Judikatur text for {doc_id} (court={r.get('court','')})")
+        logger.info(f"Fetching Judikatur text for {doc_id} (court={r.get('court','')}, content_url={'yes' if r.get('content_url') else 'no'})")
 
         async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
+            # Strategy 0: Use ContentUrl from search results (fastest — no re-query)
+            content_url = r.get("content_url", "")
+            if content_url:
+                try:
+                    resp = await client.get(content_url, timeout=15.0)
+                    resp.raise_for_status()
+                    text = _strip_html_simple(resp.text)
+                    if len(text) > 50:
+                        logger.info(f"Got text via search content_url for {doc_id}: {len(text)} chars")
+                        return doc_id, text
+                except Exception as e:
+                    logger.warning(f"ContentUrl fetch error {doc_id}: {e}")
+
             # Strategy 1: Re-query API with correct Applikation
             apps = _guess_applikation(r)
             for app in apps:
