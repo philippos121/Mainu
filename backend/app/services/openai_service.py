@@ -42,6 +42,10 @@ def _build_result_text(results: list[dict[str, Any]], include_urls: bool = False
             parts.append(f"  Normen: {r['normen']}")
         if r.get("rechtssatz"):
             parts.append(f"  Rechtssatz: {r['rechtssatz']}")
+        if r.get("entscheidungstext"):
+            # Include full decision text (up to 2000 chars) directly in results
+            et = r['entscheidungstext'][:2000]
+            parts.append(f"  Entscheidungstext:\n  {et}")
         if include_urls and r.get("url"):
             parts.append(f"  Quelle: {r['url']}")
         lines.append("\n".join(parts))
