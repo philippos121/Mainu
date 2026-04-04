@@ -669,42 +669,30 @@ def _extract_hits(data: dict) -> int:
 def _collect_metadata(metadata: dict, section_keys: list[str]) -> dict:
     """Merge nested metadata sections into a flat dict.
 
-    Recursively flattens ALL nested dicts/lists within each section,
-    not just hardcoded subkeys. This handles both Bundesrecht and Judikatur
-    API response structures.
+    Uses simple update() to preserve all key-value pairs including dict values
+    like {"item": "value"} which _s() knows how to extract.
+    Then merges known sub-sections one level deeper.
     """
     merged: dict = {}
-
-    def _merge(obj, depth=0):
-        if depth > 5:
-            return
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                if isinstance(v, str) or isinstance(v, (int, float, bool)):
-                    # Don't overwrite existing values with empty strings
-                    if k not in merged or (not merged[k] and v):
-                        merged[k] = v
-                elif isinstance(v, dict):
-                    _merge(v, depth + 1)
-                elif isinstance(v, list):
-                    if v and isinstance(v[0], dict):
-                        _merge(v[0], depth + 1)
-                    elif v and isinstance(v[0], str):
-                        if k not in merged:
-                            merged[k] = ", ".join(str(x) for x in v)
-
     for key in section_keys:
         section = metadata.get(key)
         if isinstance(section, list) and section and isinstance(section[0], dict):
             section = section[0]
         if isinstance(section, dict):
-            _merge(section, 0)
-
+            merged.update(section)
+            # One level deeper: court-specific sub-sections
+            for subkey in ("BrKons", "LrKons", "Justiz", "Vfgh", "Vwgh", "Bvwg", "Lvwg",
+                           "Begut", "RegV", "Findok"):
+                sub = section.get(subkey)
+                if isinstance(sub, list) and sub and isinstance(sub[0], dict):
+                    sub = sub[0]
+                if isinstance(sub, dict):
+                    merged.update(sub)
     # Fallback: fields directly on metadata
     known = {"Kurztitel", "Langtitel", "Dokumentnummer", "DokumentUrl"}
     if not merged or not (known & set(merged.keys())):
         if known & set(metadata.keys()):
-            _merge(metadata, 0)
+            merged.update(metadata)
     return merged
 
 
@@ -960,8 +948,7 @@ async def fetch_judikatur_texts(results: list[dict], max_results: int = 15) -> d
     Returns: {doc_id: text_content} for results where text was found.
     """
     texts: dict[str, str] = {}
-    to_fetch = [r for r in results[:max_results]
-                if r.get("id") and (r.get("court") or r.get("case_number"))]
+    to_fetch = [r for r in results[:max_results] if r.get("id")]
 
     if not to_fetch:
         return texts
