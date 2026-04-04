@@ -667,12 +667,7 @@ def _extract_hits(data: dict) -> int:
 
 
 def _collect_metadata(metadata: dict, section_keys: list[str]) -> dict:
-    """Merge nested metadata sections into a flat dict.
-
-    Uses simple update() to preserve all key-value pairs including dict values
-    like {"item": "value"} which _s() knows how to extract.
-    Then merges known sub-sections one level deeper.
-    """
+    """Merge nested metadata sections into a flat dict."""
     merged: dict = {}
     for key in section_keys:
         section = metadata.get(key)
@@ -680,7 +675,7 @@ def _collect_metadata(metadata: dict, section_keys: list[str]) -> dict:
             section = section[0]
         if isinstance(section, dict):
             merged.update(section)
-            # One level deeper: court-specific sub-sections
+            # One level deeper (e.g., Bundesrecht.BrKons)
             for subkey in ("BrKons", "LrKons", "Justiz", "Vfgh", "Vwgh", "Bvwg", "Lvwg",
                            "Begut", "RegV", "Findok"):
                 sub = section.get(subkey)
@@ -887,39 +882,24 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
     # Title: prefer Betreff (subject), then Kurztitel, fallback to court + case number
     betreff = _s(m.get("Betreff")) or ""
     kurztitel = _s(m.get("Kurztitel")) or ""
+    # Truncate very long titles
     title = betreff or kurztitel or f"{court_name} {case_number}"
     if len(title) > 200:
         title = title[:197] + "..."
 
     doc_url = _extract_doc_url(m, ref, data_entry)
     normen = _s(m.get("Norm")) or ""
+    # Truncate very long normen lists
     if len(normen) > 300:
         normen = normen[:297] + "..."
 
-    # Rechtssatz (legal principle) — full text, no truncation
+    # Rechtssatz (legal principle) — short summary if available
     rechtssatz = _s(m.get("Rechtssatz")) or _s(m.get("RechtssatzKurz")) or ""
+    if len(rechtssatz) > 500:
+        rechtssatz = rechtssatz[:497] + "..."
 
-    # Try to extract full document content (Entscheidungstext)
-    # The API rarely includes text inline — usually it's in ContentUrl
-    entscheidungstext = ""
-    for key in ("Dokumentinhalt", "DokumentInhalt"):
-        content = data_entry.get(key, "")
-        if isinstance(content, str) and len(content) > 50:
-            entscheidungstext = _strip_html_simple(content)
-            break
-
-    # Extract ContentUrl for later fetching (text usually lives here)
-    content_url = _find_judikatur_content_url(data_entry)
-
+    # Document type (Entscheidungstext vs Rechtssatz)
     doc_typ = _s(m.get("Dokumenttyp")) or _s(m.get("DokumentTyp")) or ""
-
-    # Log what we got for debugging
-    logger.info(
-        f"Judikatur doc {doc_id}: typ={doc_typ}, court={court_name}, "
-        f"rs_len={len(rechtssatz)}, et_len={len(entscheidungstext)}, "
-        f"content_url={'yes' if content_url else 'no'}, "
-        f"data_keys={list(data_entry.keys())[:10]}"
-    )
 
     return {
         "id": doc_id,
@@ -930,8 +910,6 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
         "court": court_name,
         "normen": normen,
         "rechtssatz": rechtssatz,
-        "entscheidungstext": entscheidungstext,
-        "content_url": content_url,
         "doc_typ": doc_typ,
     }
 
@@ -939,14 +917,13 @@ def _parse_judikatur_doc(ref: dict, court_app: str) -> dict | None:
 async def fetch_judikatur_texts(results: list[dict], max_results: int = 15) -> dict[str, str]:
     """Fetch full decision texts for Judikatur results.
 
-    Strategy (in order of reliability):
-    1. ContentUrl from search results (fastest)
-    2. Dokument.wxe with correct Abfrage per court (most reliable)
-    3. Document URL from search results
-    4. Re-query API for inline Dokumentinhalt + ContentUrl
+    Queries RIS Judikatur API by Dokumentnummer, extracts text from
+    ContentUrl (MainDocument) or Dokumentinhalt.
 
     Returns: {doc_id: text_content} for results where text was found.
     """
+    import re
+
     texts: dict[str, str] = {}
     to_fetch = [r for r in results[:max_results] if r.get("id")]
 
@@ -958,202 +935,85 @@ async def fetch_judikatur_texts(results: list[dict], max_results: int = 15) -> d
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
 
-    # Map court names to RIS Abfrage parameter values (for Dokument.wxe URLs)
-    _COURT_TO_ABFRAGE = {
-        "OGH": "Justiz", "OLG": "Justiz", "LG": "Justiz", "BG": "Justiz",
-        "VfGH": "Vfgh", "VwGH": "Vwgh", "BVwG": "Bvwg", "LVwG": "Lvwg",
-        "GRS": "Justiz", "AUSL": "Justiz",
-    }
-
-    def _guess_abfrage(r: dict) -> list[str]:
-        """Guess RIS Abfrage values from court name."""
-        court = r.get("court", "")
-        for prefix, abfrage in _COURT_TO_ABFRAGE.items():
-            if prefix.lower() in court.lower():
-                return [abfrage]
-        return ["Justiz", "Vfgh", "Vwgh", "Bvwg"]
-
     async def _fetch_one(r: dict) -> tuple[str, str]:
         doc_id = r["id"]
-        abfrage_list = _guess_abfrage(r)
-        logger.info(
-            f"Fetching text for {doc_id} (court={r.get('court','')}, "
-            f"abfrage={abfrage_list[0]}, content_url={'yes' if r.get('content_url') else 'no'})"
-        )
+        # Query by Dokumentnummer to get full document with content
+        params = {
+            "Applikation": "Justiz",
+            "Dokumentnummer": doc_id,
+            "DokumenteProSeite": "One",
+        }
+        api_url = f"{settings.RIS_API_BASE_URL}/Judikatur"
+        try:
+            async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
+                resp = await client.get(api_url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
 
-        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, headers=_HEADERS) as client:
-            # Strategy 1: ContentUrl from search results (fastest)
-            content_url = r.get("content_url", "")
-            if content_url:
-                try:
-                    resp = await client.get(content_url, timeout=15.0)
-                    resp.raise_for_status()
-                    text = _strip_html_simple(resp.text)
-                    if len(text) > 50:
-                        logger.info(f"Got text via content_url for {doc_id}: {len(text)} chars")
-                        return doc_id, text
-                except Exception as e:
-                    logger.warning(f"ContentUrl fetch error {doc_id}: {e}")
+                refs = _extract_refs(data)
+                if not refs:
+                    return doc_id, ""
 
-            # Strategy 2: Dokument.wxe — try each possible Abfrage value
-            # This is the MOST RELIABLE strategy: it always returns the full HTML page
-            if doc_id:
-                for abfrage in abfrage_list:
+                d = refs[0].get("Data", {})
+
+                # Try inline Dokumentinhalt first
+                for key in ("Dokumentinhalt", "DokumentInhalt"):
+                    content = d.get(key, "")
+                    if isinstance(content, str) and len(content) > 50:
+                        return doc_id, _strip_html_simple(content)
+
+                # Try ContentUrl (MainDocument)
+                main_url = _find_judikatur_content_url(d)
+                if main_url:
                     try:
-                        wxe_url = (
-                            f"https://www.ris.bka.gv.at/Dokument.wxe"
-                            f"?Abfrage={abfrage}&Dokumentnummer={doc_id}"
-                        )
-                        resp = await client.get(wxe_url, timeout=15.0)
-                        resp.raise_for_status()
-                        text = _extract_judikatur_page_text(resp.text)
-                        if text and len(text) > 50:
-                            logger.info(f"Got Dokument.wxe text for {doc_id} (Abfrage={abfrage}): {len(text)} chars")
+                        r2 = await client.get(main_url, timeout=15.0)
+                        r2.raise_for_status()
+                        text = _strip_html_simple(r2.text)
+                        if len(text) > 50:
                             return doc_id, text
                     except Exception as e:
-                        logger.warning(f"Dokument.wxe error {doc_id} Abfrage={abfrage}: {e}")
+                        logger.warning(f"Judikatur content fetch error {doc_id}: {e}")
 
-            # Strategy 3: Document URL from search results
-            doc_url = r.get("url", "")
-            if doc_url and "ris.bka.gv.at" in doc_url:
-                try:
-                    resp = await client.get(doc_url, timeout=15.0)
-                    resp.raise_for_status()
-                    text = _extract_judikatur_page_text(resp.text)
-                    if text and len(text) > 50:
-                        logger.info(f"Got page text for {doc_id} from URL: {len(text)} chars")
-                        return doc_id, text
-                except Exception as e:
-                    logger.warning(f"URL fetch error {doc_id}: {e}")
-
-            # Strategy 4: Re-query API for inline content or ContentUrl
-            for abfrage in abfrage_list:
-                try:
-                    params = {
-                        "Applikation": abfrage,
-                        "Dokumentnummer": doc_id,
-                        "DokumenteProSeite": "One",
-                    }
-                    api_url = f"{settings.RIS_API_BASE_URL}/Judikatur"
-                    resp = await client.get(api_url, params=params)
-                    resp.raise_for_status()
-                    data = resp.json()
-
-                    refs = _extract_refs(data)
-                    if not refs:
-                        continue
-
-                    d = refs[0].get("Data", {})
-
-                    # Try inline Dokumentinhalt
-                    for key in ("Dokumentinhalt", "DokumentInhalt"):
-                        content = d.get(key, "")
-                        if isinstance(content, str) and len(content) > 50:
-                            text = _strip_html_simple(content)
+                # Fallback: RIS website
+                doc_url = r.get("url", "")
+                if doc_url and "ris.bka.gv.at" in doc_url:
+                    try:
+                        r3 = await client.get(doc_url, timeout=15.0)
+                        r3.raise_for_status()
+                        # Extract text section from RIS page
+                        m = re.search(r'(?:Entscheidungstext|Rechtssatz|Spruch).*?</[^>]+>(.*?)(?:Schlagworte|Dokumentnummer|European Legislation)', r3.text, re.DOTALL | re.IGNORECASE)
+                        if m:
+                            text = _strip_html_simple(m.group(1))
                             if len(text) > 50:
-                                logger.info(f"Got inline text for {doc_id} via API ({abfrage}): {len(text)} chars")
                                 return doc_id, text
+                    except Exception:
+                        pass
 
-                    # Try ContentUrl from API response
-                    main_url = _find_judikatur_content_url(d)
-                    if main_url:
-                        try:
-                            r2 = await client.get(main_url, timeout=15.0)
-                            r2.raise_for_status()
-                            text = _strip_html_simple(r2.text)
-                            if len(text) > 50:
-                                logger.info(f"Got API ContentUrl text for {doc_id}: {len(text)} chars")
-                                return doc_id, text
-                        except Exception as e:
-                            logger.warning(f"API ContentUrl fetch error {doc_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Judikatur text fetch error {doc_id}: {e}")
 
-                except Exception as e:
-                    logger.warning(f"API query error {doc_id} app={abfrage}: {e}")
-
-        logger.warning(f"No text found for {doc_id} after all strategies")
         return doc_id, ""
 
     # Fetch sequentially to avoid RIS throttling
     for r in to_fetch:
         doc_id, text = await _fetch_one(r)
         if text:
-            texts[doc_id] = text[:5000]
+            # Truncate to reasonable length for GPT context
+            texts[doc_id] = text[:3000]
+            logger.info(f"Judikatur text for {doc_id}: {len(text)} chars")
         await asyncio.sleep(0.3)
 
     logger.info(f"Fetched {len(texts)}/{len(to_fetch)} Judikatur texts")
     return texts
 
 
-def _extract_judikatur_page_text(html: str) -> str:
-    """Extract decision text from a RIS Judikatur HTML page.
-
-    RIS pages use a consistent structure with sections like:
-    Kopf, Spruch, Text/Begründung, Rechtssatz, Schlagworte.
-    The content lives inside the main document container.
-    """
-    import re
-
-    # Strategy A: Find content between known section headers
-    # RIS uses <h2>, <h3>, or <p class="..."> for section headers
-    patterns = [
-        # Text/Begründung section (decision reasoning — the most valuable part)
-        r'>(?:\s*)(?:Text|Begr[uü]ndung|Entscheidungsgr[uü]nde)(?:\s*)</?\w[^>]*>(.*?)(?:>(?:\s*)(?:Schlagworte|European\s+Case|Zuletzt\s+aktualisiert|Dokumentnummer)(?:\s*)<)',
-        # Spruch (operative part) + everything until footer
-        r'>(?:\s*)Spruch(?:\s*)</?\w[^>]*>(.*?)(?:>(?:\s*)(?:Schlagworte|European\s+Case|Zuletzt\s+aktualisiert|Dokumentnummer)(?:\s*)<)',
-        # Rechtssatz section (legal principles)
-        r'>(?:\s*)Rechtssatz(?:\s*)</?\w[^>]*>(.*?)(?:>(?:\s*)(?:Schlagworte|European\s+Case|Zuletzt\s+aktualisiert|Dokumentnummer)(?:\s*)<)',
-        # Kopf (header) + all content until footer
-        r'>(?:\s*)Kopf(?:\s*)</?\w[^>]*>(.*?)(?:>(?:\s*)(?:Schlagworte|European\s+Case|Zuletzt\s+aktualisiert|Dokumentnummer)(?:\s*)<)',
-    ]
-
-    for pat in patterns:
-        m = re.search(pat, html, re.DOTALL | re.IGNORECASE)
-        if m:
-            text = _strip_html_simple(m.group(1))
-            if len(text) > 100:
-                return text
-
-    # Strategy B: Look for RIS document container divs
-    container_patterns = [
-        # RIS uses class="dokumentinhalt" or similar
-        r'<div[^>]*(?:class|id)="[^"]*(?:dokumentinhalt|docContent|contentBlock|RISJudworker)[^"]*"[^>]*>(.*?)</div>',
-        # Any div with "doc" in the class
-        r'<div[^>]*class="[^"]*\bdoc\b[^"]*"[^>]*>(.*?)</div>',
-    ]
-
-    for pat in container_patterns:
-        m = re.search(pat, html, re.DOTALL | re.IGNORECASE)
-        if m:
-            text = _strip_html_simple(m.group(1))
-            if len(text) > 100:
-                return text
-
-    # Strategy C: Extract everything between <body> tags, strip, take middle
-    body_match = re.search(r'<body[^>]*>(.*?)</body>', html, re.DOTALL | re.IGNORECASE)
-    body_text = _strip_html_simple(body_match.group(1)) if body_match else _strip_html_simple(html)
-
-    if len(body_text) > 300:
-        # Skip navigation/header (first ~15%) and footer (last ~10%)
-        start = len(body_text) // 7
-        end = len(body_text) * 9 // 10
-        section = body_text[start:end].strip()
-        if len(section) > 100:
-            return section
-
-    return ""
-
-
 def _find_judikatur_content_url(data_entry: dict) -> str:
-    """Find content URL in a Judikatur API response.
-
-    Tries MainDocument first, falls back to any content URL found.
-    """
-    main_url = ""
-    any_url = ""
+    """Find the MainDocument content URL in a Judikatur API response."""
+    url = ""
 
     def _search(obj, depth=0):
-        nonlocal main_url, any_url
-        if depth > 12 or main_url:
+        nonlocal url
+        if depth > 12 or url:
             return
         if isinstance(obj, dict):
             ct = obj.get("ContentType", "")
@@ -1161,29 +1021,19 @@ def _find_judikatur_content_url(data_entry: dict) -> str:
             candidate = ""
             if isinstance(cu, str) and cu.startswith("http"):
                 candidate = cu
-            elif isinstance(cu, dict):
-                candidate = cu.get("Url", "") or cu.get("url", "")
+            elif isinstance(cu, dict) and "Url" in cu:
+                candidate = cu["Url"]
             elif isinstance(cu, list):
                 for item in cu:
-                    if isinstance(item, dict):
-                        candidate = item.get("Url", "") or item.get("url", "")
-                        if candidate: break
+                    if isinstance(item, dict) and "Url" in item:
+                        candidate = item["Url"]
+                        break
                     elif isinstance(item, str) and item.startswith("http"):
                         candidate = item
                         break
-
-            if candidate and isinstance(candidate, str) and candidate.startswith("http"):
-                if ct == "MainDocument" or obj.get("DataType") == "Xml":
-                    main_url = candidate
-                    return
-                elif not any_url:
-                    any_url = candidate
-
-            # Also check for plain Url fields
-            plain_url = obj.get("Url", "")
-            if isinstance(plain_url, str) and plain_url.startswith("http") and not any_url:
-                any_url = plain_url
-
+            if candidate and (ct == "MainDocument" or obj.get("DataType") == "Xml"):
+                url = candidate
+                return
             for val in obj.values():
                 _search(val, depth + 1)
         elif isinstance(obj, list):
@@ -1191,10 +1041,7 @@ def _find_judikatur_content_url(data_entry: dict) -> str:
                 _search(item, depth + 1)
 
     _search(data_entry)
-    result = main_url or any_url
-    if result:
-        logger.info(f"Found content URL: {result[:100]} (main={'yes' if main_url else 'no'})")
-    return result
+    return url
 
 
 def _strip_html_simple(html: str) -> str:
