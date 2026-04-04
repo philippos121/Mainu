@@ -310,10 +310,12 @@ async def api_debug_gpt_context(
     im_ris_seit: str = Query("DreiMonaten", description="Timeframe"),
 ):
     """DEBUG: Show what gets sent to GPT — search results + diff texts + judikatur texts."""
-    from app.services.ris_client import fetch_judikatur_texts
+    from app.services.ris_client import fetch_judikatur_texts, parse_bundesrecht_response
 
     # Search
-    gesetze = await search_gesetze(category=category, im_ris_seit=im_ris_seit)
+    gesetze_raw = await search_gesetze(category=category, im_ris_seit=im_ris_seit)
+    days = _timeframe_to_days(im_ris_seit)
+    gesetze = parse_bundesrecht_response(gesetze_raw, timeframe_days=days)
     judikatur = await search_gerichtsentscheidungen(category=category, im_ris_seit=im_ris_seit)
 
     all_results = gesetze.get("results", []) + judikatur.get("results", [])
@@ -610,6 +612,11 @@ async def _generate_full_report(req) -> dict:
         try:
             jud_texts = await fetch_judikatur_texts(req.results, max_results=15)
             if jud_texts:
+                # Also inject fetched texts into result objects for _build_result_text
+                for r in req.results:
+                    rid = r.get("id", "")
+                    if rid in jud_texts and not r.get("entscheidungstext"):
+                        r["entscheidungstext"] = jud_texts[rid][:2000]
                 jud_lines = []
                 for r in req.results[:50]:
                     rid = r.get("id", "")
