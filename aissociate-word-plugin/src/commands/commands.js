@@ -29,6 +29,10 @@ async function askAboutSelection(event) {
         question:
           `Legal text:\n"""\n${selectedText}\n"""\n\n` +
           "Provide a concise legal analysis: key risks, obligations, and notable clauses.",
+        law: null,
+        sub_law: null,
+        file_context: [],
+        file_query_type: "general",
       };
 
       const response = await fetch(
@@ -37,7 +41,7 @@ async function askAboutSelection(event) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            "x-api-key": apiKey,
           },
           body: JSON.stringify(body),
         }
@@ -47,7 +51,7 @@ async function askAboutSelection(event) {
         throw new Error(`API returned ${response.status}`);
       }
 
-      // Collect streamed response
+      // Collect streamed SSE response
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -66,9 +70,12 @@ async function askAboutSelection(event) {
             if (dataStr === "[DONE]") continue;
             try {
               const data = JSON.parse(dataStr);
-              if (data.text) fullResponse += data.text;
+              // Only accumulate actual message text
+              if (data.type === "message" && data.text) {
+                fullResponse += data.text;
+              }
             } catch {
-              if (!dataStr.startsWith("{")) fullResponse += dataStr;
+              // skip unparseable lines
             }
           }
         }
@@ -77,7 +84,7 @@ async function askAboutSelection(event) {
       if (!fullResponse && buffer) {
         try {
           const data = JSON.parse(buffer);
-          fullResponse = data.text || data.message || buffer;
+          fullResponse = data.text || buffer;
         } catch {
           fullResponse = buffer;
         }

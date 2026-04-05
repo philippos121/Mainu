@@ -281,14 +281,18 @@
     let fullResponse = "";
 
     try {
-      const body = { question: fullQuestion };
-      if (legalArea) body.legal_area = legalArea;
-      if (scope) body.scope = scope;
+      const body = {
+        question: fullQuestion,
+        law: legalArea || null,
+        sub_law: scope || null,
+        file_context: [],
+        file_query_type: "general"
+      };
       if (threadId) body.thread_id = threadId;
 
       const response = await fetch(AISSOCIATE_BASE_URL + AISSOCIATE_ASK_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + getApiKey() },
+        headers: { "Content-Type": "application/json", "x-api-key": getApiKey() },
         body: JSON.stringify(body)
       });
 
@@ -308,26 +312,30 @@
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
+        let currentEventType = "message";
         for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEventType = line.slice(7).trim();
+            continue;
+          }
           if (line.startsWith("data: ")) {
             const dataStr = line.slice(6).trim();
             if (dataStr === "[DONE]") continue;
             try {
               const data = JSON.parse(dataStr);
-              if (data.thread_id) threadId = data.thread_id;
-              if (data.text) {
+              if (currentEventType === "error") throw new Error(data.text || "API error");
+              if (data.type === "qa_metadata" && data.meta?.qa_metadata?.thread_id) {
+                threadId = data.meta.qa_metadata.thread_id;
+              }
+              if (data.type === "message" && data.text) {
                 fullResponse += data.text;
                 contentEl.textContent = fullResponse;
                 scrollChatToBottom();
               }
-              if (data.event === "error") throw new Error(data.text || "API error");
             } catch (pe) {
-              if (!dataStr.startsWith("{")) {
-                fullResponse += dataStr;
-                contentEl.textContent = fullResponse;
-                scrollChatToBottom();
-              }
+              if (currentEventType === "error") throw pe;
             }
+            currentEventType = "message";
           }
         }
       }
@@ -335,7 +343,7 @@
       if (!fullResponse && buffer) {
         try {
           const data = JSON.parse(buffer);
-          fullResponse = data.text || data.message || data.response || buffer;
+          fullResponse = data.text || buffer;
         } catch { fullResponse = buffer; }
         contentEl.textContent = fullResponse;
       }

@@ -151,9 +151,13 @@
 
     try {
       const apiKey = getApiKey();
-      const body = { question: fullQuestion };
-      if (legalArea) body.legal_area = legalArea;
-      if (scope) body.scope = scope;
+      const body = {
+        question: fullQuestion,
+        law: legalArea || null,
+        sub_law: scope || null,
+        file_context: [],
+        file_query_type: "general",
+      };
       if (threadId) body.thread_id = threadId;
 
       const response = await fetch(
@@ -162,7 +166,7 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            "x-api-key": apiKey,
           },
           body: JSON.stringify(body),
         }
@@ -174,9 +178,11 @@
       }
 
       // Parse SSE stream
+      // Format: "id: ...\nevent: message|error\ndata: {json}\n\n"
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentEventType = "message";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -187,6 +193,12 @@
         buffer = lines.pop() || "";
 
         for (const line of lines) {
+          // Track SSE event type
+          if (line.startsWith("event: ")) {
+            currentEventType = line.slice(7).trim();
+            continue;
+          }
+
           if (line.startsWith("data: ")) {
             const dataStr = line.slice(6).trim();
             if (dataStr === "[DONE]") continue;
@@ -194,44 +206,39 @@
             try {
               const data = JSON.parse(dataStr);
 
-              // Extract thread_id if present
-              if (data.thread_id) {
-                threadId = data.thread_id;
+              if (currentEventType === "error") {
+                throw new Error(data.text || "API error");
               }
 
-              // Handle message events
-              if (data.event === "message" && data.text) {
-                fullResponse += data.text;
-                contentEl.textContent = fullResponse;
-                scrollChatToBottom();
-              } else if (data.event === "error") {
-                throw new Error(data.text || "API error");
-              } else if (data.text) {
-                // Fallback: treat any text as content
+              // Extract thread_id from qa_metadata
+              if (data.type === "qa_metadata" && data.meta?.qa_metadata?.thread_id) {
+                threadId = data.meta.qa_metadata.thread_id;
+              }
+
+              // Only accumulate actual message text (type "message")
+              if (data.type === "message" && data.text) {
                 fullResponse += data.text;
                 contentEl.textContent = fullResponse;
                 scrollChatToBottom();
               }
             } catch (parseErr) {
-              // If not JSON, might be raw text chunk
-              if (!dataStr.startsWith("{")) {
-                fullResponse += dataStr;
-                contentEl.textContent = fullResponse;
-                scrollChatToBottom();
+              // Re-throw API errors
+              if (parseErr.message && parseErr.message !== "API error") {
+                if (currentEventType === "error") throw parseErr;
               }
             }
+
+            // Reset event type after processing data
+            currentEventType = "message";
           }
         }
       }
 
-      // If no streaming worked, try reading as plain JSON response
+      // Handle any remaining buffer content
       if (!fullResponse && buffer) {
         try {
           const data = JSON.parse(buffer);
-          if (data.text) fullResponse = data.text;
-          else if (data.message) fullResponse = data.message;
-          else if (data.response) fullResponse = data.response;
-          else fullResponse = buffer;
+          fullResponse = data.text || buffer;
         } catch {
           fullResponse = buffer;
         }
