@@ -3,24 +3,21 @@
 (function () {
   "use strict";
 
-  const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+  // ── AIssociate API config ─────────────────────────────────────────
+  const AISSOCIATE_BASE_URL = "https://aissociate.at";
+  const AISSOCIATE_ASK_ENDPOINT = "/api/public/v1/chat/ask";
+  const DEFAULT_API_KEY =
+    "ck:2a4fb1fc-fdd8-477d-b353-602573944fdb:46a20ebd-abad-4a7d-b1ed-ec4ab8a535ac";
 
-  const LEGAL_SYSTEM_PROMPT =
-    "You are AI:ssociate, an expert legal AI assistant. " +
-    "You help lawyers and legal professionals analyze contracts, clauses, and legal documents. " +
-    "Provide clear, concise, and accurate legal analysis. Identify risks, obligations, key terms, " +
-    "and potential issues. When asked to respond in a specific language, always comply. " +
-    "Format your response in plain text suitable for a Word comment (no markdown).";
-
-  // ── State ──────────────────────────────────────────────────────────
+  // ── State ─────────────────────────────────────────────────────────
   let currentSelection = "";
-  let currentResponse = "";
-  let history = [];
+  let threadId = null;
+  let isStreaming = false;
 
-  // ── DOM refs ───────────────────────────────────────────────────────
+  // ── DOM refs ──────────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
 
-  // ── Init ───────────────────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────────
   Office.onReady(({ host }) => {
     if (host === Office.HostType.Word) {
       init();
@@ -29,66 +26,62 @@
 
   function init() {
     loadSettings();
-    loadHistory();
     bindEvents();
     refreshSelection();
   }
 
-  // ── Settings ───────────────────────────────────────────────────────
+  // ── Settings ──────────────────────────────────────────────────────
   function loadSettings() {
-    $("api-url").value =
-      localStorage.getItem("aissociate_api_url") || OPENAI_ENDPOINT;
-    $("api-key").value = localStorage.getItem("aissociate_api_key") || "";
-    $("model-select").value =
-      localStorage.getItem("aissociate_model") || "gpt-4o";
+    $("api-key-input").value =
+      localStorage.getItem("aissociate_api_key") || DEFAULT_API_KEY;
     $("language-select").value =
       localStorage.getItem("aissociate_language") || "auto";
   }
 
   function saveSettings() {
-    const url = $("api-url").value.trim() || OPENAI_ENDPOINT;
-    const key = $("api-key").value.trim();
-    const model = $("model-select").value;
+    const key = $("api-key-input").value.trim() || DEFAULT_API_KEY;
     const lang = $("language-select").value;
-
-    if (!key) {
-      showStatus("settings-status", "Please enter an API key.", "error");
-      return;
-    }
-
-    localStorage.setItem("aissociate_api_url", url);
     localStorage.setItem("aissociate_api_key", key);
-    localStorage.setItem("aissociate_model", model);
     localStorage.setItem("aissociate_language", lang);
-    showStatus("settings-status", "Settings saved.", "success");
-    updateAskButton();
+    showStatus("settings-status", "Saved!", "success");
+    $("settings-overlay").classList.add("hidden");
+    updateSendButton();
   }
 
-  // ── Events ─────────────────────────────────────────────────────────
+  function getApiKey() {
+    return localStorage.getItem("aissociate_api_key") || DEFAULT_API_KEY;
+  }
+
+  // ── Events ────────────────────────────────────────────────────────
   function bindEvents() {
+    // Settings
     $("settings-toggle").addEventListener("click", () => {
-      const panel = $("settings-panel");
-      const expanded = !panel.classList.contains("collapsed");
-      panel.classList.toggle("collapsed");
-      $("settings-toggle").setAttribute("aria-expanded", !expanded);
+      $("settings-overlay").classList.remove("hidden");
     });
-
+    $("settings-close").addEventListener("click", () => {
+      $("settings-overlay").classList.add("hidden");
+    });
     $("save-settings").addEventListener("click", saveSettings);
-
-    $("toggle-key-visibility").addEventListener("click", () => {
-      const input = $("api-key");
+    $("toggle-key-vis").addEventListener("click", () => {
+      const input = $("api-key-input");
       input.type = input.type === "password" ? "text" : "password";
     });
 
+    // Selection
     $("grab-selection-btn").addEventListener("click", refreshSelection);
-    $("ask-btn").addEventListener("click", askQuestion);
-    $("insert-comment-btn").addEventListener("click", insertComment);
-    $("copy-response-btn").addEventListener("click", copyResponse);
-    $("clear-history-btn").addEventListener("click", clearHistory);
-    $("question-input").addEventListener("input", updateAskButton);
+
+    // Chat input
+    $("question-input").addEventListener("input", updateSendButton);
+    $("question-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    $("send-btn").addEventListener("click", sendMessage);
   }
 
-  // ── Selection ──────────────────────────────────────────────────────
+  // ── Selection ─────────────────────────────────────────────────────
   async function refreshSelection() {
     try {
       await Word.run(async (context) => {
@@ -101,217 +94,257 @@
 
         if (currentSelection) {
           const truncated =
-            currentSelection.length > 500
-              ? currentSelection.substring(0, 500) + "..."
+            currentSelection.length > 300
+              ? currentSelection.substring(0, 300) + "..."
               : currentSelection;
           preview.innerHTML = `<div class="selected-text">${escapeHtml(truncated)}</div>`;
         } else {
           preview.innerHTML =
-            '<p class="placeholder">Select text in your document to get started.</p>';
+            '<p class="placeholder">Highlight text in your document to get started.</p>';
         }
-        updateAskButton();
+        updateSendButton();
       });
     } catch {
       $("selection-preview").innerHTML =
-        '<p class="placeholder">Could not read selection. Try again.</p>';
+        '<p class="placeholder">Could not read selection.</p>';
     }
   }
 
-  // ── Ask AI (OpenAI Chat Completions) ───────────────────────────────
-  async function askQuestion() {
-    const apiUrl =
-      localStorage.getItem("aissociate_api_url") || OPENAI_ENDPOINT;
-    const apiKey = localStorage.getItem("aissociate_api_key");
-    const model = localStorage.getItem("aissociate_model") || "gpt-4o";
-    const language = localStorage.getItem("aissociate_language") || "auto";
-
-    if (!apiKey) {
-      $("settings-panel").classList.remove("collapsed");
-      showStatus("settings-status", "Please configure your API key first.", "error");
-      return;
-    }
-
-    await refreshSelection();
-
-    if (!currentSelection) {
-      showStatus("comment-status", "Please select text in your document first.", "error");
-      return;
-    }
+  // ── Send message ──────────────────────────────────────────────────
+  async function sendMessage() {
+    if (isStreaming) return;
 
     const question = $("question-input").value.trim();
     if (!question) return;
 
-    setLoading(true);
+    await refreshSelection();
 
-    const langInstruction =
-      language !== "auto"
-        ? ` Please respond in ${languageLabel(language)}.`
-        : "";
+    const legalArea = $("legal-area-select").value || null;
+    const scope = $("scope-select").value || null;
+    const language = localStorage.getItem("aissociate_language") || "auto";
 
-    const userMessage =
-      `Legal text for analysis:\n"""\n${currentSelection}\n"""\n\n` +
-      `Question: ${question}${langInstruction}`;
+    // Build the full question with context
+    let fullQuestion = question;
+    if (currentSelection) {
+      const langNote =
+        language !== "auto"
+          ? ` Please respond in ${({ en: "English", de: "German", fr: "French" })[language] || language}.`
+          : "";
+      fullQuestion =
+        `Regarding this legal text:\n"""\n${currentSelection}\n"""\n\n${question}${langNote}`;
+    }
+
+    // Add user message to chat
+    addChatMessage("user", question);
+    $("question-input").value = "";
+    updateSendButton();
+
+    // Create assistant message placeholder
+    const assistantBubble = addChatMessage("assistant", "");
+    const contentEl = assistantBubble.querySelector(".msg-text");
+    const actionsEl = assistantBubble.querySelector(".msg-actions");
+
+    isStreaming = true;
+    setSendLoading(true);
+
+    let fullResponse = "";
 
     try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { role: "system", content: LEGAL_SYSTEM_PROMPT },
-            { role: "user", content: userMessage },
-          ],
-          temperature: 0.3,
-          max_tokens: 1024,
-        }),
-      });
+      const apiKey = getApiKey();
+      const body = { question: fullQuestion };
+      if (legalArea) body.legal_area = legalArea;
+      if (scope) body.scope = scope;
+      if (threadId) body.thread_id = threadId;
+
+      const response = await fetch(
+        AISSOCIATE_BASE_URL + AISSOCIATE_ASK_ENDPOINT,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        }
+      );
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        const msg = errorBody?.error?.message || `HTTP ${response.status}`;
-        throw new Error(msg);
+        const errText = await response.text().catch(() => "");
+        throw new Error(`HTTP ${response.status}: ${errText || "Request failed"}`);
       }
 
-      const data = await response.json();
-      currentResponse =
-        data?.choices?.[0]?.message?.content?.trim() ||
-        "No response received.";
+      // Parse SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      $("response-content").textContent = currentResponse;
-      $("response-panel").classList.remove("hidden");
-      $("comment-status").classList.add("hidden");
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      addToHistory(question, currentResponse);
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === "[DONE]") continue;
+
+            try {
+              const data = JSON.parse(dataStr);
+
+              // Extract thread_id if present
+              if (data.thread_id) {
+                threadId = data.thread_id;
+              }
+
+              // Handle message events
+              if (data.event === "message" && data.text) {
+                fullResponse += data.text;
+                contentEl.textContent = fullResponse;
+                scrollChatToBottom();
+              } else if (data.event === "error") {
+                throw new Error(data.text || "API error");
+              } else if (data.text) {
+                // Fallback: treat any text as content
+                fullResponse += data.text;
+                contentEl.textContent = fullResponse;
+                scrollChatToBottom();
+              }
+            } catch (parseErr) {
+              // If not JSON, might be raw text chunk
+              if (!dataStr.startsWith("{")) {
+                fullResponse += dataStr;
+                contentEl.textContent = fullResponse;
+                scrollChatToBottom();
+              }
+            }
+          }
+        }
+      }
+
+      // If no streaming worked, try reading as plain JSON response
+      if (!fullResponse && buffer) {
+        try {
+          const data = JSON.parse(buffer);
+          if (data.text) fullResponse = data.text;
+          else if (data.message) fullResponse = data.message;
+          else if (data.response) fullResponse = data.response;
+          else fullResponse = buffer;
+        } catch {
+          fullResponse = buffer;
+        }
+        contentEl.textContent = fullResponse;
+      }
+
+      if (!fullResponse) {
+        contentEl.textContent = "No response received.";
+      } else {
+        // Show approve/reject actions
+        actionsEl.classList.remove("hidden");
+        setupActions(actionsEl, fullResponse);
+      }
     } catch (err) {
-      $("response-content").textContent = "Error: " + err.message;
-      $("response-panel").classList.remove("hidden");
-      currentResponse = "";
+      contentEl.textContent = "Error: " + err.message;
+      assistantBubble.classList.add("msg-error");
     } finally {
-      setLoading(false);
+      isStreaming = false;
+      setSendLoading(false);
+      scrollChatToBottom();
     }
   }
 
-  // ── Insert comment ─────────────────────────────────────────────────
-  async function insertComment() {
-    if (!currentResponse) return;
+  // ── Chat UI helpers ───────────────────────────────────────────────
+  function addChatMessage(role, text) {
+    const messages = $("chat-messages");
 
-    try {
-      await Word.run(async (context) => {
-        const selection = context.document.getSelection();
-        selection.load("text");
-        await context.sync();
+    // Remove welcome message if present
+    const welcome = messages.querySelector(".chat-welcome");
+    if (welcome) welcome.remove();
 
-        const commentText = `[AI:ssociate] ${currentResponse}`;
+    const bubble = document.createElement("div");
+    bubble.className = `msg msg-${role}`;
 
-        if (selection.insertComment) {
-          selection.insertComment(commentText);
-          await context.sync();
-          showStatus("comment-status", "Comment inserted successfully.", "success");
-        } else {
-          await navigator.clipboard.writeText(commentText);
-          showStatus(
-            "comment-status",
-            "Your Word version doesn't support programmatic comments. Response copied — paste manually (Ctrl+Alt+M).",
-            "error"
-          );
-        }
-      });
-    } catch (err) {
-      showStatus("comment-status", "Failed to insert comment: " + err.message, "error");
-    }
-  }
-
-  // ── Copy ───────────────────────────────────────────────────────────
-  async function copyResponse() {
-    if (!currentResponse) return;
-    try {
-      await navigator.clipboard.writeText(currentResponse);
-      const btn = $("copy-response-btn");
-      const original = btn.textContent;
-      btn.textContent = "Copied!";
-      setTimeout(() => { btn.textContent = original; }, 1500);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = currentResponse;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-  }
-
-  // ── History ────────────────────────────────────────────────────────
-  function loadHistory() {
-    try {
-      history = JSON.parse(localStorage.getItem("aissociate_history") || "[]");
-    } catch {
-      history = [];
-    }
-    renderHistory();
-  }
-
-  function addToHistory(question, answer) {
-    history.unshift({ question, answer, timestamp: new Date().toISOString() });
-    if (history.length > 50) history = history.slice(0, 50);
-    localStorage.setItem("aissociate_history", JSON.stringify(history));
-    renderHistory();
-  }
-
-  function renderHistory() {
-    const list = $("history-list");
-    const panel = $("history-panel");
-
-    if (history.length === 0) {
-      panel.classList.add("hidden");
-      return;
+    if (role === "user") {
+      bubble.innerHTML = `<div class="msg-content"><div class="msg-text">${escapeHtml(text)}</div></div>`;
+    } else {
+      bubble.innerHTML = `
+        <div class="msg-content">
+          <div class="msg-label">AI:ssociate</div>
+          <div class="msg-text">${escapeHtml(text)}</div>
+          <div class="msg-actions hidden">
+            <button class="action-btn approve-btn" title="Apply suggestion to document">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Apply
+            </button>
+            <button class="action-btn reject-btn" title="Dismiss suggestion">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              Dismiss
+            </button>
+          </div>
+        </div>`;
     }
 
-    panel.classList.remove("hidden");
-    list.innerHTML = history
-      .map(
-        (item, i) =>
-          `<li data-index="${i}">
-            <div class="history-q">${escapeHtml(item.question)}</div>
-            <div class="history-a">${escapeHtml(item.answer)}</div>
-          </li>`
-      )
-      .join("");
+    messages.appendChild(bubble);
+    scrollChatToBottom();
+    return bubble;
+  }
 
-    list.querySelectorAll("li").forEach((li) => {
-      li.addEventListener("click", () => {
-        const item = history[parseInt(li.dataset.index, 10)];
-        if (item) {
-          $("question-input").value = item.question;
-          currentResponse = item.answer;
-          $("response-content").textContent = item.answer;
-          $("response-panel").classList.remove("hidden");
-        }
-      });
+  function setupActions(actionsEl, responseText) {
+    const approveBtn = actionsEl.querySelector(".approve-btn");
+    const rejectBtn = actionsEl.querySelector(".reject-btn");
+
+    approveBtn.addEventListener("click", async () => {
+      try {
+        await applyToDocument(responseText);
+        actionsEl.innerHTML =
+          '<span class="action-status success">Applied to document</span>';
+      } catch (err) {
+        actionsEl.innerHTML =
+          `<span class="action-status error">Failed: ${escapeHtml(err.message)}</span>`;
+      }
+    });
+
+    rejectBtn.addEventListener("click", () => {
+      actionsEl.innerHTML =
+        '<span class="action-status dismissed">Dismissed</span>';
     });
   }
 
-  function clearHistory() {
-    history = [];
-    localStorage.removeItem("aissociate_history");
-    renderHistory();
+  async function applyToDocument(text) {
+    await Word.run(async (context) => {
+      const selection = context.document.getSelection();
+      selection.load("text");
+      await context.sync();
+
+      // Replace the selected text with the AI suggestion
+      selection.insertText(text, Word.InsertLocation.replace);
+      await context.sync();
+    });
+    // Refresh selection to show new text
+    await refreshSelection();
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────
-  function updateAskButton() {
-    const hasKey = !!localStorage.getItem("aissociate_api_key");
+  function scrollChatToBottom() {
+    const container = $("chat-messages");
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // ── UI state helpers ──────────────────────────────────────────────
+  function updateSendButton() {
     const hasQuestion = $("question-input").value.trim().length > 0;
-    $("ask-btn").disabled = !(hasKey && hasQuestion);
+    $("send-btn").disabled = !hasQuestion || isStreaming;
   }
 
-  function setLoading(loading) {
-    $("ask-btn").disabled = loading;
-    $("ask-btn-text").textContent = loading ? "Thinking..." : "Ask AI:ssociate";
-    $("ask-spinner").classList.toggle("hidden", !loading);
+  function setSendLoading(loading) {
+    $("send-btn").disabled = loading;
     $("question-input").disabled = loading;
+    if (loading) {
+      $("send-btn").classList.add("loading");
+    } else {
+      $("send-btn").classList.remove("loading");
+    }
   }
 
   function showStatus(elementId, message, type) {
@@ -319,12 +352,7 @@
     el.textContent = message;
     el.className = `status-msg ${type}`;
     el.classList.remove("hidden");
-    setTimeout(() => el.classList.add("hidden"), 6000);
-  }
-
-  function languageLabel(code) {
-    const map = { en: "English", de: "German", fr: "French" };
-    return map[code] || code;
+    setTimeout(() => el.classList.add("hidden"), 4000);
   }
 
   function escapeHtml(str) {

@@ -11,13 +11,14 @@
   <ProviderName>AI:ssociate</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="AI:ssociate - Legal AI Assistant" />
-  <Description DefaultValue="Ask AI:ssociate questions about selected legal text. Answers appear as Word comments." />
+  <Description DefaultValue="AI:ssociate Legal AI — highlight text, get AI-powered legal analysis and suggestions via chat. Apply changes directly to your document." />
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
   <SupportUrl DefaultValue="https://github.com/your-org/aissociate-word-plugin" />
 
   <AppDomains>
     <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://aissociate.at</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -111,9 +112,9 @@
         <bt:String id="Taskpane.Tooltip.Title" DefaultValue="AI:ssociate Panel" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Select text and ask AI:ssociate legal questions. Answers appear as comments." />
-        <bt:String id="AskAI.Tooltip.Desc" DefaultValue="Quick-analyze the selected text with AI:ssociate and add the response as a comment." />
-        <bt:String id="Taskpane.Tooltip.Desc" DefaultValue="Open the AI:ssociate panel to ask custom questions and configure settings." />
+        <bt:String id="GetStarted.Description" DefaultValue="Highlight text, chat with AI:ssociate about legal questions, and apply suggestions directly." />
+        <bt:String id="AskAI.Tooltip.Desc" DefaultValue="Quick-analyze the selected text with AI:ssociate." />
+        <bt:String id="Taskpane.Tooltip.Desc" DefaultValue="Open the AI:ssociate chat panel for legal AI analysis and suggestions." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

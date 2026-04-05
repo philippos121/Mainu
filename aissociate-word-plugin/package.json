@@ -1,7 +1,7 @@
 {
   "name": "aissociate-word-plugin",
   "version": "1.0.0",
-  "description": "Microsoft Word Add-in for AI:ssociate — a legal AI assistant. Select text, ask questions, get answers as comments.",
+  "description": "Microsoft Word Add-in for AI:ssociate — a legal AI assistant. Highlight text, chat for analysis and suggestions, approve to apply changes directly.",
   "scripts": {
     "start": "webpack serve --config webpack.config.js --mode development",
     "build": "webpack --config webpack.config.js --mode production",
