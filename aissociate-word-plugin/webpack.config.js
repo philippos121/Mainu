@@ -23,6 +23,13 @@ module.exports = {
     ],
   },
   plugins: [
+    // Landing / download page at root
+    new HtmlWebpackPlugin({
+      filename: "index.html",
+      template: "./src/landing/index.html",
+      chunks: [],
+      inject: false,
+    }),
     new HtmlWebpackPlugin({
       filename: "taskpane.html",
       template: "./src/taskpane/taskpane.html",

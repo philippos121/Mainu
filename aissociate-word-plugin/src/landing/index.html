@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI:ssociate — Word Plugin Download</title>
+  <style>
+    :root {
+      --primary: #1a3a5c;
+      --primary-light: #2a5a8c;
+      --accent: #d4a843;
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --text: #1e1e1e;
+      --text-muted: #6b7280;
+      --border: #e0e3e8;
+      --success: #16a34a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: #fff;
+      text-align: center;
+      padding: 60px 24px 48px;
+    }
+
+    .hero-logo {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .hero-logo .colon { color: var(--accent); }
+
+    .hero-tagline {
+      font-size: 18px;
+      opacity: 0.85;
+      margin-top: 8px;
+      font-weight: 400;
+    }
+
+    .hero-desc {
+      max-width: 540px;
+      margin: 20px auto 0;
+      font-size: 15px;
+      opacity: 0.75;
+      line-height: 1.7;
+    }
+
+    /* Download section */
+    .download-section {
+      max-width: 640px;
+      margin: -32px auto 0;
+      padding: 0 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .download-card {
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+      padding: 36px 32px;
+      text-align: center;
+    }
+
+    .download-card h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+
+    .download-card p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 14px 36px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .download-btn:hover {
+      background: var(--primary-light);
+      transform: translateY(-1px);
+    }
+
+    .download-btn:active { transform: translateY(0); }
+
+    .download-btn svg {
+      flex-shrink: 0;
+    }
+
+    .file-info {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Steps */
+    .steps-section {
+      max-width: 640px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .steps-section h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      position: relative;
+    }
+
+    .step-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      width: 36px;
+    }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-connector {
+      width: 2px;
+      flex: 1;
+      background: var(--border);
+      min-height: 20px;
+    }
+
+    .step:last-child .step-connector { display: none; }
+
+    .step-content {
+      padding-bottom: 28px;
+      padding-top: 6px;
+    }
+
+    .step-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .step-desc code {
+      background: #f0f1f3;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--primary);
+    }
+
+    /* Platform tabs */
+    .platform-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .platform-tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: var(--bg);
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .platform-tab:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+
+    .platform-tab.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .platform-instructions {
+      display: none;
+    }
+
+    .platform-instructions.active {
+      display: block;
+    }
+
+    /* Features */
+    .features-section {
+      max-width: 640px;
+      margin: 0 auto 48px;
+      padding: 0 20px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .feature-card p {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 500px) {
+      .hero { padding: 40px 16px 36px; }
+      .hero-logo { font-size: 32px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .download-btn { font-size: 14px; padding: 12px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1 class="hero-logo">AI<span class="colon">:</span>ssociate</h1>
+    <p class="hero-tagline">Legal AI Assistant for Microsoft Word</p>
+    <p class="hero-desc">
+      Highlight text in Word, get AI-powered legal analysis and suggestions in a side chat.
+      Apply changes to your document with one click.
+    </p>
+  </section>
+
+  <!-- Download card -->
+  <section class="download-section">
+    <div class="download-card">
+      <h2>Download the Word Plugin</h2>
+      <p>Works with Word Desktop (Windows &amp; Mac) and Word Online.</p>
+      <a href="/manifest.xml" download="aissociate-manifest.xml" class="download-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download Plugin
+      </a>
+      <p class="file-info">aissociate-manifest.xml — small config file, no install needed</p>
+    </div>
+  </section>
+
+  <!-- Install steps -->
+  <section class="steps-section">
+    <h2>How to Install</h2>
+
+    <div class="platform-tabs">
+      <button class="platform-tab active" data-target="desktop">Word Desktop</button>
+      <button class="platform-tab" data-target="online">Word Online</button>
+      <button class="platform-tab" data-target="admin">IT Admin</button>
+    </div>
+
+    <!-- Word Desktop -->
+    <div id="instructions-desktop" class="platform-instructions active">
+      <div class="steps">
+        <div class="step">
+          <div class="step-line"><div class="step-num">1</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Download the plugin file</div>
+            <div class="step-desc">Click the download button above. Save the <code>aissociate-manifest.xml</code> file somewhere you can find it.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">2</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Open Word and go to Add-ins</div>
+            <div class="step-desc">In Word, click <code>Insert</code> tab in the ribbon, then click <code>Get Add-ins</code> (or <code>Office Add-ins</code>).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">3</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Upload the plugin</div>
+            <div class="step-desc">Click <code>My Add-ins</code> tab, then <code>Upload My Add-in</code>. Browse to the downloaded <code>aissociate-manifest.xml</code> file and click Upload.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">4</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Start using AI:ssociate</div>
+            <div class="step-desc">The AI:ssociate group appears in your <code>Home</code> tab. Click <code>Open Panel</code> to launch the chat sidebar. Highlight text and ask away!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Word Online -->
+    <div id="instructions-online" class="platform-instructions">
+      <div class="steps">
+        <div class="step">
+          <div class="step-line"><div class="step-num">1</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Download the plugin file</div>
+            <div class="step-desc">Click the download button above to get <code>aissociate-manifest.xml</code>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">2</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Open a document on office.com</div>
+            <div class="step-desc">Go to <code>office.com</code> and open any Word document.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">3</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Upload the add-in</div>
+            <div class="step-desc">Click <code>Insert</code> &rarr; <code>Office Add-ins</code> &rarr; <code>Upload My Add-in</code>. Select the downloaded XML file.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">4</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Open the panel</div>
+            <div class="step-desc">The AI:ssociate panel opens on the right. Highlight text, type your question, and get instant legal AI analysis.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IT Admin -->
+    <div id="instructions-admin" class="platform-instructions">
+      <div class="steps">
+        <div class="step">
+          <div class="step-line"><div class="step-num">1</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Open Microsoft 365 Admin Center</div>
+            <div class="step-desc">Go to <code>admin.microsoft.com</code> &rarr; <code>Settings</code> &rarr; <code>Integrated Apps</code>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">2</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Upload custom app</div>
+            <div class="step-desc">Click <code>Upload custom apps</code>, choose <code>Provide link to manifest file</code>, and enter:<br/>
+            <code id="manifest-url"></code></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-num">3</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Assign to users</div>
+            <div class="step-desc">Choose which users or groups should get the plugin. It will appear automatically in their Word ribbon — no action needed from them.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features-section">
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">&#9997;</div>
+        <h3>Highlight &amp; Ask</h3>
+        <p>Select any text in Word, then ask questions or request rewrites in the chat panel.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9889;</div>
+        <h3>AI Suggestions</h3>
+        <p>Get legal analysis, risk identification, and rewrite suggestions powered by AI:ssociate.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#10003;</div>
+        <h3>One-Click Apply</h3>
+        <p>Approve a suggestion and it replaces the selected text in your document instantly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9878;</div>
+        <h3>Austrian Legal AI</h3>
+        <p>Filter by legal area (civil, criminal, tax, public) and Austrian jurisdiction scope.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    AI:ssociate &mdash; Legal AI Assistant &mdash; &copy; 2026
+  </footer>
+
+  <script>
+    // Platform tab switching
+    document.querySelectorAll(".platform-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        document.querySelectorAll(".platform-tab").forEach(function (t) { t.classList.remove("active"); });
+        document.querySelectorAll(".platform-instructions").forEach(function (p) { p.classList.remove("active"); });
+        tab.classList.add("active");
+        document.getElementById("instructions-" + tab.dataset.target).classList.add("active");
+      });
+    });
+
+    // Set manifest URL dynamically based on current host
+    var manifestUrl = window.location.origin + "/manifest.xml";
+    var el = document.getElementById("manifest-url");
+    if (el) el.textContent = manifestUrl;
+  </script>
+</body>
+</html>
