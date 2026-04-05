@@ -44,6 +44,8 @@ module.exports = {
       patterns: [
         { from: "assets", to: "assets" },
         { from: "manifest.xml", to: "manifest.xml" },
+        { from: "src/legal/privacy.html", to: "privacy.html" },
+        { from: "src/legal/terms.html", to: "terms.html" },
       ],
     }),
   ],
