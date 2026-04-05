@@ -12,9 +12,9 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="AI:ssociate" />
   <Description DefaultValue="AI:ssociate Legal AI — highlight text, get AI-powered legal analysis and suggestions via chat. Apply changes directly to your document." />
-  <IconUrl DefaultValue="http://localhost:3000/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="http://localhost:3000/assets/icon-64.png" />
-  <SupportUrl DefaultValue="http://localhost:3000" />
+  <IconUrl DefaultValue="https://aissociate-word-plugin.onrender.com/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://aissociate-word-plugin.onrender.com/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://aissociate-word-plugin.onrender.com" />
 
   <AppDomains>
     <AppDomain>https://aissociate.at</AppDomain>
@@ -25,7 +25,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="http://localhost:3000/taskpane.html" />
+    <SourceLocation DefaultValue="https://aissociate-word-plugin.onrender.com/taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -88,14 +88,14 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="http://localhost:3000/assets/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="http://localhost:3000/assets/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="http://localhost:3000/assets/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://aissociate-word-plugin.onrender.com/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://aissociate-word-plugin.onrender.com/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://aissociate-word-plugin.onrender.com/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="http://localhost:3000/taskpane.html" />
-        <bt:Url id="Commands.Url" DefaultValue="http://localhost:3000/commands.html" />
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="http://localhost:3000" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://aissociate-word-plugin.onrender.com/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://aissociate-word-plugin.onrender.com/commands.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://aissociate-word-plugin.onrender.com" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with AI:ssociate" />
