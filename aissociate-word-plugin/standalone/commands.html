@@ -5,48 +5,80 @@
   <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
   <script>
   /* global Office, Word */
-  const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-  const SYSTEM_PROMPT =
-    "You are AI:ssociate, an expert legal AI assistant. Provide concise legal analysis " +
-    "suitable for a Word comment (no markdown). Identify key risks, obligations, and notable clauses.";
+  var AISSOCIATE_BASE_URL = "https://aissociate.at";
+  var AISSOCIATE_ASK_ENDPOINT = "/api/public/v1/chat/ask";
+  var DEFAULT_API_KEY = "ck:2a4fb1fc-fdd8-477d-b353-602573944fdb:46a20ebd-abad-4a7d-b1ed-ec4ab8a535ac";
 
-  Office.onReady(() => {
+  Office.onReady(function () {
     Office.actions.associate("askAboutSelection", askAboutSelection);
   });
 
   async function askAboutSelection(event) {
-    const apiKey = localStorage.getItem("aissociate_api_key") || "";
-    const model  = localStorage.getItem("aissociate_model") || "gpt-4o";
-    if (!apiKey) { event.completed(); return; }
+    var apiKey = localStorage.getItem("aissociate_api_key") || DEFAULT_API_KEY;
 
     try {
-      await Word.run(async (ctx) => {
-        const sel = ctx.document.getSelection();
+      await Word.run(async function (ctx) {
+        var sel = ctx.document.getSelection();
         sel.load("text");
         await ctx.sync();
-        const text = sel.text.trim();
+        var text = sel.text.trim();
         if (!text) { event.completed(); return; }
 
-        const res = await fetch(OPENAI_ENDPOINT, {
+        var body = {
+          question: 'Legal text:\n"""\n' + text + '\n"""\n\nProvide a concise legal analysis: key risks, obligations, and notable clauses.',
+          law: null,
+          sub_law: null,
+          file_context: [],
+          file_query_type: "general"
+        };
+
+        var response = await fetch(AISSOCIATE_BASE_URL + AISSOCIATE_ASK_ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: `Legal text:\n"""\n${text}\n"""\n\nProvide a concise analysis: key risks, obligations, and notable clauses.` }
-            ],
-            temperature: 0.3,
-            max_tokens: 512
-          })
+          headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+          body: JSON.stringify(body)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const answer = data?.choices?.[0]?.message?.content?.trim() || "No response.";
-        if (sel.insertComment) { sel.insertComment(`[AI:ssociate] ${answer}`); await ctx.sync(); }
+        if (!response.ok) throw new Error("HTTP " + response.status);
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = "";
+        var fullResponse = "";
+
+        while (true) {
+          var result = await reader.read();
+          if (result.done) break;
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (var i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith("data: ")) {
+              var dataStr = lines[i].slice(6).trim();
+              if (dataStr === "[DONE]") continue;
+              try {
+                var data = JSON.parse(dataStr);
+                if (data.type === "message" && data.text) {
+                  fullResponse += data.text;
+                }
+              } catch (e) { /* skip */ }
+            }
+          }
+        }
+
+        if (!fullResponse && buffer) {
+          try {
+            var d = JSON.parse(buffer);
+            fullResponse = d.text || buffer;
+          } catch (e) { fullResponse = buffer; }
+        }
+
+        if (fullResponse && sel.insertComment) {
+          sel.insertComment("[AI:ssociate] " + fullResponse);
+          await ctx.sync();
+        }
         event.completed();
       });
-    } catch { event.completed(); }
+    } catch (e) { event.completed(); }
   }
   </script>
 </head>
