@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Advokat Akten-Import Schema (Oesterreich)
+  Pragmatisches XSD fuer den Akten-Import in Advokat (Advokat
+  Unternehmensberatung GmbH). Feldnamen entsprechen der oeffentlichen
+  Advokat-Oberflaeche (Aktnummer, Aktbezeichnung, Mandant, Gegner,
+  Rechtsgebiet, Schriftstuecke ...).
+-->
+<xs:schema xmlns="http://schema.advokat.at/akten-import/1.0"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://schema.advokat.at/akten-import/1.0"
+           elementFormDefault="qualified">
+
+  <xs:element name="AdvokatImport">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Akt" type="AktType" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="version"     type="xs:string"   use="required"/>
+      <xs:attribute name="erstelltAm"  type="xs:dateTime" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="AktType">
+    <xs:sequence>
+      <xs:element name="Aktnummer"             type="xs:string" minOccurs="0"/>
+      <xs:element name="Aktbezeichnung"        type="xs:string"/>
+      <xs:element name="Mandant"               type="PersonSimpleType"/>
+      <xs:element name="Gegner"                type="PersonSimpleType" minOccurs="0"/>
+      <xs:element name="Rechtsgebiet"          type="xs:string" minOccurs="0"/>
+      <xs:element name="Sachbearbeiter"        type="xs:string" minOccurs="0"/>
+      <xs:element name="EroeffnetAm"           type="xs:date"   minOccurs="0"/>
+      <xs:element name="Streitwert"            type="StreitwertType" minOccurs="0"/>
+      <xs:element name="GeschaeftszahlGericht" type="xs:string" minOccurs="0"/>
+      <xs:element name="Gericht"               type="GerichtType" minOccurs="0"/>
+      <xs:element name="Parteien"              type="ParteienType" minOccurs="0"/>
+      <xs:element name="Schriftstuecke"        type="SchriftstueckeType" minOccurs="0"/>
+      <xs:element name="Notizen"               type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="PersonSimpleType">
+    <xs:sequence>
+      <xs:element name="Nachname" type="xs:string"/>
+      <xs:element name="Vorname"  type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="StreitwertType">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="Waehrung" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="GerichtType">
+    <xs:sequence>
+      <xs:element name="GerichtsCode" type="xs:string"/>
+      <xs:element name="Bezeichnung"  type="xs:string"/>
+      <xs:element name="Abteilung"    type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ParteienType">
+    <xs:sequence>
+      <xs:element name="Partei" type="ParteiType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ParteiType">
+    <xs:sequence>
+      <xs:choice>
+        <xs:sequence>
+          <xs:element name="Nachname"     type="xs:string"/>
+          <xs:element name="Vorname"      type="xs:string" minOccurs="0"/>
+          <xs:element name="Geburtsdatum" type="xs:date"   minOccurs="0"/>
+        </xs:sequence>
+        <xs:sequence>
+          <xs:element name="Firmenwortlaut" type="xs:string"/>
+          <xs:element name="FN"              type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+      </xs:choice>
+      <xs:element name="Adresse"         type="AdresseType" minOccurs="0"/>
+      <xs:element name="Vertreter-RCode" type="xs:string"   minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="Rolle" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="AdresseType">
+    <xs:sequence>
+      <xs:element name="Strasse" type="xs:string" minOccurs="0"/>
+      <xs:element name="PLZ"     type="xs:string" minOccurs="0"/>
+      <xs:element name="Ort"     type="xs:string" minOccurs="0"/>
+      <xs:element name="Land"    type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SchriftstueckeType">
+    <xs:sequence>
+      <xs:element name="Schriftstueck" type="SchriftstueckType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SchriftstueckType">
+    <xs:sequence>
+      <xs:element name="Bezeichnung" type="xs:string"/>
+      <xs:element name="Dateiname"   type="xs:string"/>
+      <xs:element name="Typ"         type="xs:string"/>
+      <xs:element name="MimeType"    type="xs:string"/>
+      <xs:element name="Anmerkung"   type="xs:string" minOccurs="0"/>
+      <xs:element name="ErstelltAm"  type="xs:dateTime" minOccurs="0"/>
+      <xs:element name="Pruefsumme"  type="PruefsummeType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="Id" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="PruefsummeType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="Algorithmus" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+</xs:schema>

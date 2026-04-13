@@ -1,0 +1,28 @@
+{
+  "ai_output": {
+    "betreff": "Klage auf Zahlung EUR 12.500,00 s.A.",
+    "freitext": "Der Kläger hat im Zeitraum Jänner–März 2026 für die Beklagte Werkleistungen im Wert von EUR 12.500,00 erbracht. Die Rechnung vom 10.03.2026 ist trotz zweimaliger Mahnung unbeglichen. Gestützt auf §§ 1151 ff ABGB wird die Verurteilung der Beklagten zur Zahlung beantragt.",
+    "rechtsgebiet": "Zivilrecht / Vertragsrecht",
+    "ris_referenzen": ["ABGB §§ 1151 ff", "UGB § 354"],
+    "judikatur_referenzen": ["OGH 6 Ob 123/23x"],
+    "verfahrensgegenstand": "Forderung aus Werkvertrag",
+    "streitwert_eur": 12500.00
+  },
+  "einbringer": {
+    "kanzlei_name": "AI:SSOCIATE Rechtsanwälte GmbH",
+    "r_code": "R123456",
+    "anwalt_name": "Dr. Philippos Musterhofer",
+    "email": "kanzlei@aissociate.at"
+  },
+  "gericht": {
+    "gerichts_code": "0017",
+    "bezeichnung": "BG Innere Stadt Wien",
+    "abteilung": "4"
+  },
+  "parteien": [
+    {"rolle": "Kläger", "name": "Mustermann", "vorname": "Max", "ist_firma": false, "vertreter_anwalt_code": "R123456"},
+    {"rolle": "Beklagter", "name": "ACME Handels GmbH", "ist_firma": true, "firmenbuchnummer": "FN 123456a"}
+  ],
+  "nachrichten_art": "KL",
+  "zielformat": "beides"
+}

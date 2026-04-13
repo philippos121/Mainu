@@ -1,0 +1,41 @@
+{
+  "akt_nummer": null,
+  "akt_bezeichnung": "Mustermann ./. ACME — Werklohnklage",
+  "mandant_name": "Mustermann",
+  "mandant_vorname": "Max",
+  "gegner_name": "ACME Handels GmbH",
+  "rechtsgebiet": "Zivilrecht / Vertragsrecht",
+  "sachbearbeiter": "Dr. Philippos Musterhofer",
+  "eroeffnet_am": "2026-04-13",
+  "streitwert_eur": 12500.00,
+  "aktenzeichen_gericht": "4 C 123/26",
+  "gericht": {
+    "gerichts_code": "0017",
+    "bezeichnung": "BG Innere Stadt Wien",
+    "abteilung": "4"
+  },
+  "parteien": [
+    {
+      "rolle": "Kläger",
+      "name": "Mustermann",
+      "vorname": "Max",
+      "ist_firma": false
+    },
+    {
+      "rolle": "Beklagter",
+      "name": "ACME Handels GmbH",
+      "ist_firma": true,
+      "firmenbuchnummer": "FN 123456a"
+    }
+  ],
+  "dokumente": [
+    {
+      "dok_id": "D001",
+      "typ": "Schriftsatz",
+      "dateiname": "klage.pdf",
+      "mime_type": "application/pdf",
+      "titel": "Klage"
+    }
+  ],
+  "notizen": "Aus Legal-AI generierter Klage-Entwurf, Review durch Dr. M. erforderlich."
+}

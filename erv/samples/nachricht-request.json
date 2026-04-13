@@ -1,0 +1,83 @@
+{
+  "kopfdaten": {
+    "nachrichten_id": "11111111-2222-3333-4444-555555555555",
+    "nachrichten_art": "SV",
+    "erstellt_am": "2026-04-13T09:00:00",
+    "version": "1.0"
+  },
+  "grunddaten": {
+    "einbringer": {
+      "kanzlei_name": "AI:SSOCIATE Rechtsanwälte GmbH",
+      "r_code": "R123456",
+      "anwalt_name": "Dr. Philippos Musterhofer",
+      "email": "kanzlei@aissociate.at",
+      "telefon": "+43 1 234 5678",
+      "adresse": {
+        "strasse": "Kärntner Ring 10",
+        "plz": "1010",
+        "ort": "Wien",
+        "land": "AT"
+      }
+    },
+    "gericht": {
+      "gerichts_code": "0017",
+      "bezeichnung": "BG Innere Stadt Wien",
+      "aktenzeichen": "4 C 123/26",
+      "abteilung": "4"
+    },
+    "parteien": [
+      {
+        "rolle": "Kläger",
+        "name": "Mustermann",
+        "vorname": "Max",
+        "ist_firma": false,
+        "geburtsdatum": "1980-05-12",
+        "adresse": {
+          "strasse": "Musterweg 1",
+          "plz": "1020",
+          "ort": "Wien",
+          "land": "AT"
+        },
+        "vertreter_anwalt_code": "R123456"
+      },
+      {
+        "rolle": "Beklagter",
+        "name": "ACME Handels GmbH",
+        "ist_firma": true,
+        "firmenbuchnummer": "FN 123456a",
+        "adresse": {
+          "strasse": "Industriestraße 5",
+          "plz": "2320",
+          "ort": "Schwechat",
+          "land": "AT"
+        }
+      }
+    ],
+    "streitwert_eur": 12500.00,
+    "verfahrensgegenstand": "Forderung aus Werkvertrag"
+  },
+  "fachdaten": {
+    "betreff": "Klage auf Zahlung EUR 12.500,00 s.A.",
+    "freitext": "Der Kläger begehrt die Zahlung des offenen Werklohns …",
+    "rechtsgebiet": "Zivilrecht / Vertragsrecht",
+    "ris_referenzen": ["ABGB §§ 1151 ff", "UGB § 354"],
+    "judikatur_referenzen": ["OGH 6 Ob 123/23x"]
+  },
+  "dokumente": [
+    {
+      "dok_id": "D001",
+      "typ": "Schriftsatz",
+      "dateiname": "klage.pdf",
+      "mime_type": "application/pdf",
+      "titel": "Klage",
+      "beschreibung": "Hauptschriftsatz"
+    },
+    {
+      "dok_id": "D002",
+      "typ": "Beilage",
+      "dateiname": "werkvertrag.pdf",
+      "mime_type": "application/pdf",
+      "titel": "Beilage ./A — Werkvertrag"
+    }
+  ]
+}

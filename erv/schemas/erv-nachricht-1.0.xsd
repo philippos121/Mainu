@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ERV-Nachricht Schema (Oesterreich, webERV)
+  Eigenes, am publizierten Strukturdatensatz des oesterreichischen
+  Elektronischen Rechtsverkehrs (BMJ / BRZ) orientiertes XSD.
+  Vor Produktiveinsatz ist gegen die Originalschemas des
+  zugelassenen Gateway-Providers (Postserver, BRZ, manz.at) zu
+  validieren.
+-->
+<xs:schema xmlns="http://www.edikte.justiz.gv.at/erv/nachricht/1.0"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.edikte.justiz.gv.at/erv/nachricht/1.0"
+           elementFormDefault="qualified">
+
+  <!-- ==================================================================
+       Root
+       ================================================================== -->
+  <xs:element name="ervNachricht">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Kopfdaten"  type="KopfdatenType"/>
+        <xs:element name="Grunddaten" type="GrunddatenType"/>
+        <xs:element name="Fachdaten"  type="FachdatenType"/>
+        <xs:element name="Dokumente"  type="DokumenteType" minOccurs="0"/>
+      </xs:sequence>
+      <xs:attribute name="version" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ==================================================================
+       Kopfdaten
+       ================================================================== -->
+  <xs:complexType name="KopfdatenType">
+    <xs:sequence>
+      <xs:element name="NachrichtenId"   type="xs:string"/>
+      <xs:element name="NachrichtenArt"  type="NachrichtenArtType"/>
+      <xs:element name="ErstelltAm"      type="xs:dateTime"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="NachrichtenArtType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="SV"/> <!-- Schriftsatz -->
+      <xs:enumeration value="KL"/> <!-- Klage -->
+      <xs:enumeration value="MA"/> <!-- Mahnklage -->
+      <xs:enumeration value="AN"/> <!-- Antrag -->
+      <xs:enumeration value="RM"/> <!-- Rechtsmittel -->
+      <xs:enumeration value="ZV"/> <!-- Zustellverfügung -->
+      <xs:enumeration value="EX"/> <!-- Exekutionsantrag -->
+      <xs:enumeration value="GB"/> <!-- Grundbuchantrag -->
+      <xs:enumeration value="FB"/> <!-- Firmenbuchantrag -->
+      <xs:enumeration value="SO"/> <!-- Sonstige -->
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ==================================================================
+       Grunddaten
+       ================================================================== -->
+  <xs:complexType name="GrunddatenType">
+    <xs:sequence>
+      <xs:element name="Einbringer"            type="EinbringerType"/>
+      <xs:element name="Gericht"               type="GerichtType"/>
+      <xs:element name="Parteien"              type="ParteienType" minOccurs="0"/>
+      <xs:element name="Streitwert"            type="StreitwertType" minOccurs="0"/>
+      <xs:element name="Verfahrensgegenstand"  type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EinbringerType">
+    <xs:sequence>
+      <xs:element name="RCode"       type="xs:string"/>
+      <xs:element name="KanzleiName" type="xs:string"/>
+      <xs:element name="AnwaltName"  type="xs:string" minOccurs="0"/>
+      <xs:element name="Email"       type="xs:string" minOccurs="0"/>
+      <xs:element name="Telefon"     type="xs:string" minOccurs="0"/>
+      <xs:element name="Adresse"     type="AdresseType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="GerichtType">
+    <xs:sequence>
+      <xs:element name="GerichtsCode"   type="xs:string"/>
+      <xs:element name="Bezeichnung"    type="xs:string"/>
+      <xs:element name="Abteilung"      type="xs:string" minOccurs="0"/>
+      <xs:element name="Geschaeftszahl" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ParteienType">
+    <xs:sequence>
+      <xs:element name="Partei" type="ParteiType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ParteiType">
+    <xs:sequence>
+      <xs:choice>
+        <xs:element name="NatuerlichePerson" type="NatuerlichePersonType"/>
+        <xs:element name="Firma"             type="FirmaType"/>
+      </xs:choice>
+      <xs:element name="Adresse"   type="AdresseType"   minOccurs="0"/>
+      <xs:element name="Vertreter" type="VertreterType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="rolle" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="NatuerlichePersonType">
+    <xs:sequence>
+      <xs:element name="Nachname"      type="xs:string"/>
+      <xs:element name="Vorname"       type="xs:string" minOccurs="0"/>
+      <xs:element name="Geburtsdatum"  type="xs:date"   minOccurs="0"/>
+      <xs:element name="ZmrZahl"       type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="FirmaType">
+    <xs:sequence>
+      <xs:element name="Firmenwortlaut"     type="xs:string"/>
+      <xs:element name="Firmenbuchnummer"   type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="VertreterType">
+    <xs:sequence>
+      <xs:element name="RCode" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AdresseType">
+    <xs:sequence>
+      <xs:element name="Strasse" type="xs:string" minOccurs="0"/>
+      <xs:element name="Plz"     type="xs:string" minOccurs="0"/>
+      <xs:element name="Ort"     type="xs:string" minOccurs="0"/>
+      <xs:element name="Land"    type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="StreitwertType">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="waehrung" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <!-- ==================================================================
+       Fachdaten
+       ================================================================== -->
+  <xs:complexType name="FachdatenType">
+    <xs:sequence>
+      <xs:element name="Betreff"               type="xs:string"/>
+      <xs:element name="Rechtsgebiet"          type="xs:string" minOccurs="0"/>
+      <xs:element name="Freitext"              type="xs:string" minOccurs="0"/>
+      <xs:element name="RisReferenzen"         type="RisRefsType" minOccurs="0"/>
+      <xs:element name="JudikaturReferenzen"   type="JudikaturRefsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="RisRefsType">
+    <xs:sequence>
+      <xs:element name="Dokumentnummer" type="xs:string" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="JudikaturRefsType">
+    <xs:sequence>
+      <xs:element name="Geschaeftszahl" type="xs:string" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ==================================================================
+       Dokumente
+       ================================================================== -->
+  <xs:complexType name="DokumenteType">
+    <xs:sequence>
+      <xs:element name="Dokument" type="DokumentType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DokumentType">
+    <xs:sequence>
+      <xs:element name="Dateiname"    type="xs:string"/>
+      <xs:element name="MimeType"     type="xs:string"/>
+      <xs:element name="Titel"        type="xs:string" minOccurs="0"/>
+      <xs:element name="Beschreibung" type="xs:string" minOccurs="0"/>
+      <xs:element name="Pruefsumme"   type="PruefsummeType" minOccurs="0"/>
+      <xs:element name="GroesseBytes" type="xs:nonNegativeInteger" minOccurs="0"/>
+      <xs:element name="ErstelltAm"   type="xs:dateTime" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="id"  type="xs:string" use="required"/>
+    <xs:attribute name="typ" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="PruefsummeType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="algorithmus" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+</xs:schema>
