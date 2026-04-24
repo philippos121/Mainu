@@ -1,0 +1,35 @@
+services:
+  # ---- OpenClaw sandbox ----
+  openclaw:
+    image: openclaw/openclaw:latest
+    container_name: openclaw-sandbox
+    ports:
+      - "${OPENCLAW_PORT:-18789}:18789"
+      - "18790:18790"
+    volumes:
+      - ./data/config:/home/node/.openclaw
+      - ./data/workspace:/home/node/.openclaw/workspace
+    env_file:
+      - ./data/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:18789/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---- Setup wizard (this app) ----
+  setup-wizard:
+    build:
+      context: .
+      dockerfile: Dockerfile.wizard
+    container_name: openclaw-wizard
+    ports:
+      - "${WIZARD_PORT:-9090}:9090"
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - OPENCLAW_CONTAINER=openclaw-sandbox
+    depends_on: []
