@@ -1,4 +1,6 @@
 .env
+openclaw-data/*
+!openclaw-data/.gitkeep
 workspace/inbox/*
 workspace/outbox/email/*
 workspace/outbox/teams/*
