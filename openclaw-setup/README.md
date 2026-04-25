@@ -40,55 +40,47 @@ du leitest weiter. OpenClaw hat **keinen** Direktzugang zu Dritten.
 
 - **Docker Desktop** (macOS / Windows) oder Docker Engine (Linux)
 - **Anthropic API Key** — [console.anthropic.com](https://console.anthropic.com)
-- **Outlook-Postfach** für Weiterleitungen (kann dein bestehendes sein)
+- **App-Passwort** für dein E-Mail-Konto (siehe Schritt 1)
 - **WhatsApp** auf deinem Handy
 
-### Schritt 1: Repo klonen
+### Schritt 1: Starten — das Skript fragt alles
 
 ```bash
 cd openclaw-setup
+./start.sh
 ```
 
-### Schritt 2: .env ausfüllen
+Das Skript fragt interaktiv 4 Dinge:
 
-```bash
-cp .env.example .env
-nano .env   # oder: code .env
-```
+| Frage | Was eintragen | Woher |
+|-------|---------------|-------|
+| **API Key** | `sk-ant-...` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| **E-Mail** | `name@kanzlei.at` | Deine Kanzlei-Adresse |
+| **App-Passwort** | `xxxx-xxxx-xxxx` | Siehe unten |
+| **Teams-Webhook** | URL oder Enter | Optional, überspringen mit Enter |
 
-**Minimum:**
+IMAP-Server, SMTP-Server und Port werden **automatisch** aus deiner
+E-Mail-Domain abgeleitet (Microsoft 365, Gmail, etc.).
 
-| Variable           | Woher                          | Beispiel                           |
-|--------------------|--------------------------------|------------------------------------|
-| `ANTHROPIC_API_KEY`| console.anthropic.com → API Keys| `sk-ant-api03-...`                |
-| `MY_EMAIL`         | Deine Kanzlei-E-Mail          | `ra.muster@kanzlei.at`            |
-| `IMAP_SERVER`      | Outlook: `outlook.office365.com`| `outlook.office365.com`           |
-| `IMAP_USER`        | E-Mail-Adresse des Postfachs   | `weiterleitung@kanzlei.at`       |
-| `IMAP_PASSWORD`    | Passwort oder App-Passwort     | `...`                              |
-| `SMTP_SERVER`      | Outlook: `smtp.office365.com`  | `smtp.office365.com`              |
-| `SMTP_PORT`        | Outlook: `587`                 | `587`                              |
-| `SMTP_USER`        | Gleich wie IMAP_USER           | `weiterleitung@kanzlei.at`       |
-| `SMTP_PASSWORD`    | Gleich wie IMAP_PASSWORD       | `...`                              |
+**App-Passwort erstellen (einmalig):**
+- Microsoft 365: [mysignins.microsoft.com/security-info](https://mysignins.microsoft.com/security-info) → "+ Anmeldemethode hinzufügen" → "App-Kennwort"
+- Gmail: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 
-**Für Teams (optional):**
+**Nochmal einrichten?** `./start.sh --setup`
 
-| Variable                 | Woher                                   |
-|--------------------------|-----------------------------------------|
-| `TEAMS_OUTGOING_WEBHOOK` | Teams → Kanal → Connectors → Incoming Webhook → URL kopieren |
-
-### Schritt 3: Outlook-Weiterleitung einrichten
+### Schritt 2: Outlook-Weiterleitung einrichten
 
 In Outlook (Desktop oder Web):
 
 1. **Regeln** → Neue Regel erstellen
 2. Bedingung: "Alle eingehenden Nachrichten" (oder ein Filter)
-3. Aktion: **Weiterleiten an** `weiterleitung@kanzlei.at` (= `IMAP_USER`)
+3. Aktion: **Weiterleiten an** deine eigene E-Mail-Adresse (die du in Schritt 1 angegeben hast)
 4. Speichern
 
 Die Bridge pollt dieses Postfach alle 30 Sekunden und legt neue
 Nachrichten in `workspace/inbox/` ab.
 
-### Schritt 4: Teams-Weiterleitung einrichten (optional)
+### Schritt 3: Teams-Weiterleitung einrichten (optional)
 
 In **Power Automate** (flow.microsoft.com):
 
@@ -111,19 +103,7 @@ In **Power Automate** (flow.microsoft.com):
 (VPN / lokales WLAN). Alternativ: ngrok oder Tailscale für externen
 Zugang.
 
-### Schritt 5: Starten
-
-```bash
-./start.sh
-```
-
-Das Skript:
-- Prüft Docker
-- Prüft .env
-- Baut die Bridge
-- Startet alles
-
-### Schritt 6: WhatsApp verbinden
+### Schritt 4: WhatsApp verbinden
 
 ```bash
 docker logs -f openclaw-sandbox
@@ -135,6 +115,8 @@ Warte auf den **QR-Code** in den Logs. Scanne ihn mit WhatsApp
 ### Fertig!
 
 Schreib auf WhatsApp: **"Was liegt an?"**
+
+**Zusammenfassung: Du tippst `./start.sh`, beantwortest 4 Fragen, scannst einen QR-Code. Das war's.**
 
 ---
 
