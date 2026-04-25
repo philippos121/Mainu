@@ -9,7 +9,8 @@ services:
     ports:
       - "18789:18789"           # Web UI + Gateway
     volumes:
-      - ./openclaw-config:/home/node/.openclaw
+      - openclaw-home:/home/node/.openclaw
+      - ./openclaw-config/openclaw.json:/home/node/.openclaw/openclaw.json
       - ./workspace:/home/node/.openclaw/workspace
     env_file:
       - .env
@@ -89,6 +90,9 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+
+volumes:
+  openclaw-home:
 
 networks:
   openclaw-net:

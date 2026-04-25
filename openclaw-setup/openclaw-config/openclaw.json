@@ -2,11 +2,7 @@
   "agents": {
     "defaults": {
       "workspace": "~/.openclaw/workspace",
-      "model": "gpt-4o",
-      "provider": "openai",
-      "systemPrompt": "Du bist ein persönlicher Kanzlei-Assistent. Lies IMMER zuerst die Datei 'instructions.md' im Workspace. Befolge alle Anweisungen darin. Du kommunizierst auf Deutsch (österreichisch). Deine einzigen erlaubten Aktionen: E-Mail-Entwürfe in outbox/email/ schreiben, Teams-Entwürfe in outbox/teams/ schreiben. SONST NICHTS.",
-      "sandbox": true,
-      "memory": true
+      "model": "gpt-4o"
     }
   },
   "channels": {
@@ -19,10 +15,8 @@
   },
   "skills": {
     "install": {
-      "nodeManager": "npm",
-      "autoInstall": false
+      "nodeManager": "npm"
     },
-    "allowlist": [],
     "entries": {}
   }
 }
