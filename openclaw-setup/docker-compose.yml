@@ -1,7 +1,7 @@
 services:
 
   # ================================================================
-  # OpenClaw — AI-Agent (Claude), erreichbar über WhatsApp + Web UI
+  # OpenClaw — AI-Agent (GPT-4o), erreichbar über WhatsApp + Web UI
   # ================================================================
   openclaw:
     image: openclaw/openclaw:latest

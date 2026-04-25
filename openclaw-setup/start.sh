@@ -24,7 +24,7 @@ ask()  { echo -en "  ${YELLOW}?${RESET} $1"; }
 echo ""
 echo -e "${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
 echo -e "${BOLD}║  OpenClaw — Legal AI Assistent (Sandboxed)           ║${RESET}"
-echo -e "${BOLD}║  Outlook + Teams → Claude → WhatsApp                 ║${RESET}"
+echo -e "${BOLD}║  Outlook + Teams → GPT-4o → WhatsApp                 ║${RESET}"
 echo -e "${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
@@ -56,8 +56,8 @@ if [ ! -f .env ] || [ "${1:-}" = "--setup" ]; then
   echo ""
 
   # --- 1. API Key ---
-  echo -e "  ${BOLD}1/4 Anthropic API Key${RESET}"
-  echo -e "  ${DIM}Hol dir einen auf: https://console.anthropic.com → API Keys${RESET}"
+  echo -e "  ${BOLD}1/4 OpenAI API Key${RESET}"
+  echo -e "  ${DIM}Hol dir einen auf: https://platform.openai.com/api-keys${RESET}"
   ask "API Key: "
   read -r API_KEY
   if [ -z "$API_KEY" ]; then
@@ -142,7 +142,7 @@ if [ ! -f .env ] || [ "${1:-}" = "--setup" ]; then
   # --- .env schreiben ---
   cat > .env <<ENVFILE
 # Generiert von start.sh am $(date +%Y-%m-%d)
-ANTHROPIC_API_KEY=${API_KEY}
+OPENAI_API_KEY=${API_KEY}
 MY_EMAIL=${EMAIL}
 IMAP_SERVER=${IMAP_SRV}
 IMAP_USER=${EMAIL}
@@ -165,8 +165,8 @@ fi
 # ================================================================
 source .env 2>/dev/null || true
 
-if [ -z "${ANTHROPIC_API_KEY:-}" ] || [ "$ANTHROPIC_API_KEY" = "sk-ant-HIER-DEINEN-KEY" ]; then
-  fail "ANTHROPIC_API_KEY fehlt. Nochmal: ./start.sh --setup"
+if [ -z "${OPENAI_API_KEY:-}" ] || [ "$OPENAI_API_KEY" = "sk-HIER-DEINEN-KEY" ]; then
+  fail "OPENAI_API_KEY fehlt. Nochmal: ./start.sh --setup"
   exit 1
 fi
 

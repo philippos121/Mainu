@@ -1,6 +1,6 @@
 # OpenClaw — Legal AI Assistent (Sandboxed)
 
-> **Outlook + Teams → OpenClaw (Claude) ← WhatsApp → E-Mail- & Teams-Entwürfe an dich**
+> **Outlook + Teams → OpenClaw (GPT-4o) ← WhatsApp → E-Mail- & Teams-Entwürfe an dich**
 >
 > Ein-Kommando-Setup. Alles läuft lokal in Docker. OpenClaw kann
 > **ausschließlich** E-Mails und Teams-Nachrichten an dich senden.
@@ -12,7 +12,7 @@
 ┌──────────┐  Outlook-Regel    ┌─────────┐   inbox/    ┌──────────┐
 │ Outlook  │ ──weiterleiten──→ │  Bridge │ ─schreibt─→ │          │
 └──────────┘                   │ (IMAP)  │             │ OpenClaw │
-                               │         │   inbox/    │ (Claude) │
+                               │         │   inbox/    │ (GPT-4o) │
 ┌──────────┐  Power Automate   │ (Webhook│ ─schreibt─→ │          │
 │  Teams   │ ──POST JSON────→  │  :8080) │             │          │
 └──────────┘                   └─────────┘             └────┬─────┘
@@ -39,7 +39,7 @@ du leitest weiter. OpenClaw hat **keinen** Direktzugang zu Dritten.
 ### Voraussetzungen
 
 - **Docker Desktop** (macOS / Windows) oder Docker Engine (Linux)
-- **Anthropic API Key** — [console.anthropic.com](https://console.anthropic.com)
+- **OpenAI API Key** — [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 - **App-Passwort** für dein E-Mail-Konto (siehe Schritt 1)
 - **WhatsApp** auf deinem Handy
 
@@ -54,7 +54,7 @@ Das Skript fragt interaktiv 4 Dinge:
 
 | Frage | Was eintragen | Woher |
 |-------|---------------|-------|
-| **API Key** | `sk-ant-...` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| **API Key** | `sk-...` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 | **E-Mail** | `name@kanzlei.at` | Deine Kanzlei-Adresse |
 | **App-Passwort** | `xxxx-xxxx-xxxx` | Siehe unten |
 | **Teams-Webhook** | URL oder Enter | Optional, überspringen mit Enter |
@@ -150,7 +150,7 @@ Schreib auf WhatsApp: **"Was liegt an?"**
 ### Was OpenClaw NICHT darf
 
 - Direkt an Mandanten / Gerichte / Dritte senden
-- Auf externe APIs zugreifen (außer Anthropic)
+- Auf externe APIs zugreifen (außer OpenAI)
 - Dateien außerhalb des Workspace lesen oder ändern
 - Skills installieren (gesperrt in `openclaw.json`)
 - Neue Prozesse starten (PID-Limit)
@@ -176,7 +176,7 @@ network: openclaw-net (bridge)  # Eigenes Netzwerk (Isolation)
 
 ### API-Key-Sicherheit
 
-- Dein Anthropic API Key liegt nur in `.env` (gitignored)
+- Dein OpenAI API Key liegt nur in `.env` (gitignored)
 - Wird nie in Logs geschrieben
 - Wird nie an die Bridge weitergegeben (nur OpenClaw bekommt ihn)
 
@@ -195,7 +195,7 @@ openclaw-setup/
 │   ├── requirements.txt
 │   └── app.py                        ← IMAP-Poller + Teams-Webhook + SMTP-Sender
 ├── openclaw-config/
-│   └── openclaw.json                 ← OpenClaw-Config (WhatsApp + Claude, Skills gesperrt)
+│   └── openclaw.json                 ← OpenClaw-Config (WhatsApp + GPT-4o, Skills gesperrt)
 ├── workspace/
 │   ├── instructions.md               ← Ton, Stil, Regeln (ANPASSEN!)
 │   ├── inbox/                        ← Hier landen eingehende Nachrichten
@@ -231,9 +231,9 @@ jeder neuen Konversation. Kein Neustart nötig.
 
 In `.env`: `POLL_INTERVAL_SECONDS=60` (Default: 30 Sekunden).
 
-### Anderen Claude-Modell verwenden
+### Anderes GPT-Modell verwenden
 
 In `openclaw-config/openclaw.json` → `agents.defaults.model`:
-- `claude-opus-4-7` — mächtiger, teurer
-- `claude-sonnet-4-6` — Standard (empfohlen)
-- `claude-haiku-4-5-20251001` — schneller, günstiger
+- `gpt-4o` — Standard (empfohlen)
+- `gpt-4o-mini` — schneller, günstiger
+- `o3` — stärkstes Reasoning
