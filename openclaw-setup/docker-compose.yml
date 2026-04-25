@@ -9,19 +9,15 @@ services:
     ports:
       - "18789:18789"           # Web UI + Gateway
     volumes:
-      - ./openclaw-config/openclaw.json:/home/node/.openclaw/openclaw.json:ro
+      - ./openclaw-config:/home/node/.openclaw
       - ./workspace:/home/node/.openclaw/workspace
-      - openclaw-data:/home/node/.openclaw/credentials
-      - openclaw-logs:/home/node/.openclaw/logs
     env_file:
       - .env
     restart: unless-stopped
 
     # --- Sandbox-Härtung ---
-    read_only: true                          # Root-FS read-only
     tmpfs:
       - /tmp:size=100M
-      - /home/node/.npm:size=50M             # npm cache
     security_opt:
       - no-new-privileges:true               # Kein setuid/setgid
     cap_drop:
@@ -93,10 +89,6 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-
-volumes:
-  openclaw-data:
-  openclaw-logs:
 
 networks:
   openclaw-net:
