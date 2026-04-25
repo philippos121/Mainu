@@ -10,7 +10,6 @@ services:
       - "18789:18789"           # Web UI + Gateway
     volumes:
       - ./openclaw-data:/home/node/.openclaw
-      - ./openclaw-config/openclaw.json:/home/node/.openclaw/openclaw.json
       - ./workspace:/home/node/.openclaw/workspace
     env_file:
       - .env

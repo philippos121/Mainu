@@ -185,6 +185,11 @@ ok "Konfiguration"
 # ================================================================
 # Start
 # ================================================================
+
+# Config in openclaw-data kopieren (OpenClaw braucht Schreibzugriff)
+mkdir -p openclaw-data
+cp -n openclaw-config/openclaw.json openclaw-data/openclaw.json 2>/dev/null || true
+
 echo ""
 info "Starte Bridge + OpenClaw ..."
 docker compose up -d --build 2>&1 | tail -5
