@@ -1,93 +1,87 @@
 #!/usr/bin/env bash
-#
-# OpenClaw Setup Wizard — One-Command Launcher
-#
-# Usage:
-#   ./start.sh              — Start wizard on port 9090
-#   ./start.sh --port 8080  — Start wizard on custom port
-#   ./start.sh --no-docker  — Run wizard directly (no Docker, needs Python 3.12+)
-#
 set -euo pipefail
+cd "$(dirname "$0")"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
-
-WIZARD_PORT=9090
-USE_DOCKER=true
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --port)    WIZARD_PORT="$2"; shift 2 ;;
-    --no-docker) USE_DOCKER=false; shift ;;
-    -h|--help)
-      echo "Usage: $0 [--port PORT] [--no-docker]"
-      echo ""
-      echo "  --port PORT    Wizard-UI port (default: 9090)"
-      echo "  --no-docker    Run wizard directly with Python (needs pip, Python 3.12+)"
-      echo ""
-      echo "After starting, open http://localhost:\$PORT in your browser."
-      exit 0
-      ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
-  esac
-done
-
-mkdir -p data
-
-echo "╔══════════════════════════════════════════════════╗"
-echo "║       OpenClaw Sandbox Setup Wizard              ║"
-echo "╠══════════════════════════════════════════════════╣"
-echo "║  Guided setup for OpenClaw in Docker.            ║"
-echo "║  Minimum work. Maximum sandbox.                  ║"
-echo "╚══════════════════════════════════════════════════╝"
+echo ""
+echo "╔═══════════════════════════════════════════════════════╗"
+echo "║  OpenClaw — Legal AI Assistent (Sandboxed)           ║"
+echo "║  Outlook + Teams → Claude → WhatsApp                 ║"
+echo "╚═══════════════════════════════════════════════════════╝"
 echo ""
 
-# --- Check Docker ---
+# --- Checks ---
 if ! command -v docker &>/dev/null; then
-  echo "⚠ Docker not found."
-  echo ""
-  echo "Install Docker first:"
+  echo "✗ Docker nicht gefunden."
   echo "  macOS:   brew install --cask docker"
   echo "  Ubuntu:  curl -fsSL https://get.docker.com | sh"
-  echo "  Windows: https://docs.docker.com/desktop/install/windows-install/"
-  echo ""
-  echo "Or run with --no-docker (needs Python 3.12+)."
   exit 1
 fi
 
 if ! docker info &>/dev/null 2>&1; then
-  echo "⚠ Docker daemon is not running. Please start Docker Desktop or dockerd."
+  echo "✗ Docker-Daemon läuft nicht. Bitte Docker Desktop starten."
   exit 1
 fi
-
 echo "✓ Docker OK"
 
-if [ "$USE_DOCKER" = true ]; then
-  echo "→ Building wizard image..."
-  WIZARD_PORT="$WIZARD_PORT" docker compose build setup-wizard 2>&1 | tail -3
-  echo "→ Starting wizard on port $WIZARD_PORT..."
-  WIZARD_PORT="$WIZARD_PORT" docker compose up -d setup-wizard
+# --- .env ---
+if [ ! -f .env ]; then
   echo ""
-  echo "════════════════════════════════════════════"
-  echo "  Open http://localhost:${WIZARD_PORT}"
-  echo "  to configure and start OpenClaw."
-  echo "════════════════════════════════════════════"
-else
-  echo "→ Running without Docker (local Python)..."
-  if ! command -v python3 &>/dev/null; then
-    echo "⚠ Python 3 not found. Install Python 3.12+."
-    exit 1
-  fi
-  if [ ! -d ".venv" ]; then
-    echo "→ Creating virtualenv..."
-    python3 -m venv .venv
-  fi
-  source .venv/bin/activate
-  pip install -q -r requirements.txt
+  echo "  Noch keine .env-Datei gefunden."
+  echo "  Kopiere .env.example und trage deine Daten ein:"
   echo ""
-  echo "════════════════════════════════════════════"
-  echo "  Open http://localhost:${WIZARD_PORT}"
-  echo "════════════════════════════════════════════"
+  echo "    cp .env.example .env"
+  echo "    nano .env            # oder vim / code"
   echo ""
-  uvicorn app.main:app --host 0.0.0.0 --port "$WIZARD_PORT"
+  echo "  Mindestens nötig:"
+  echo "    ANTHROPIC_API_KEY    — Claude API Key"
+  echo "    MY_EMAIL             — Deine E-Mail-Adresse"
+  echo "    IMAP_SERVER/USER/PW  — Für Outlook-Weiterleitung"
+  echo "    SMTP_SERVER/USER/PW  — Für den Entwurf-Versand"
+  echo ""
+  cp .env.example .env
+  echo "  .env.example wurde als .env kopiert. Bitte ausfüllen."
+  exit 0
 fi
+
+echo "✓ .env vorhanden"
+
+# --- Quick validation ---
+source .env 2>/dev/null || true
+if [ -z "${ANTHROPIC_API_KEY:-}" ] || [ "$ANTHROPIC_API_KEY" = "sk-ant-HIER-DEINEN-KEY" ]; then
+  echo "✗ ANTHROPIC_API_KEY in .env ist leer oder Platzhalter."
+  echo "  Bitte eintragen: nano .env"
+  exit 1
+fi
+echo "✓ API Key gesetzt"
+
+if [ -z "${MY_EMAIL:-}" ] || [ "$MY_EMAIL" = "du@deinekanzlei.at" ]; then
+  echo "✗ MY_EMAIL in .env ist leer oder Platzhalter."
+  exit 1
+fi
+echo "✓ E-Mail-Empfänger: ${MY_EMAIL}"
+
+# --- Start ---
+echo ""
+echo "→ Starte Bridge + OpenClaw ..."
+docker compose up -d --build
+
+echo ""
+echo "════════════════════════════════════════════════════════"
+echo ""
+echo "  ✓ Alles läuft!"
+echo ""
+echo "  OpenClaw Web UI:   http://localhost:18789"
+echo "  Bridge Health:     http://localhost:8080/health"
+echo ""
+echo "  Nächster Schritt: WhatsApp verbinden"
+echo "  → docker logs -f openclaw-sandbox"
+echo "    (QR-Code scannen, wenn er erscheint)"
+echo ""
+echo "  Teams-Webhook empfängt auf:"
+echo "    http://DEIN-LAPTOP:8080/webhook/teams"
+echo ""
+echo "  Stoppen:   docker compose down"
+echo "  Logs:      docker compose logs -f"
+echo "  Reset:     docker compose down -v && rm -rf workspace/sent/*"
+echo ""
+echo "════════════════════════════════════════════════════════"

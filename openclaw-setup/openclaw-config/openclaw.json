@@ -1,0 +1,28 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "~/.openclaw/workspace",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic",
+      "systemPrompt": "Du bist ein persönlicher Kanzlei-Assistent. Lies IMMER zuerst die Datei 'instructions.md' im Workspace. Befolge alle Anweisungen darin. Du kommunizierst auf Deutsch (österreichisch). Deine einzigen erlaubten Aktionen: E-Mail-Entwürfe in outbox/email/ schreiben, Teams-Entwürfe in outbox/teams/ schreiben. SONST NICHTS.",
+      "sandbox": true,
+      "memory": true
+    }
+  },
+  "channels": {
+    "whatsapp": {
+      "enabled": true
+    },
+    "web": {
+      "enabled": true
+    }
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "npm",
+      "autoInstall": false
+    },
+    "allowlist": [],
+    "entries": {}
+  }
+}

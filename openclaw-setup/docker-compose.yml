@@ -1,35 +1,96 @@
 services:
-  # ---- OpenClaw sandbox ----
+
+  # ================================================================
+  # OpenClaw — AI-Agent (Claude), erreichbar über WhatsApp + Web UI
+  # ================================================================
   openclaw:
     image: openclaw/openclaw:latest
     container_name: openclaw-sandbox
     ports:
-      - "${OPENCLAW_PORT:-18789}:18789"
-      - "18790:18790"
+      - "18789:18789"           # Web UI + Gateway
     volumes:
-      - ./data/config:/home/node/.openclaw
-      - ./data/workspace:/home/node/.openclaw/workspace
+      - ./openclaw-config:/home/node/.openclaw:ro   # Config (read-only)
+      - ./workspace:/home/node/.openclaw/workspace  # Shared workspace (read-write)
     env_file:
-      - ./data/.env
+      - .env
     restart: unless-stopped
+
+    # --- Sandbox-Härtung ---
+    read_only: true                          # Root-FS read-only
+    tmpfs:
+      - /tmp:size=100M,noexec,nosuid         # /tmp nur im RAM
+    security_opt:
+      - no-new-privileges:true               # Kein setuid/setgid
+    cap_drop:
+      - ALL                                  # Alle Capabilities weg
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE                         # Minimum für Node.js
+    pids_limit: 256                          # Fork-Bomb-Schutz
+    mem_limit: 2g                            # Max 2 GB RAM
+    memswap_limit: 2g                        # Kein Swap
+    cpus: 2.0                                # Max 2 CPU-Kerne
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openclaw-net
+
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:18789/health"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 45s
 
-  # ---- Setup wizard (this app) ----
-  setup-wizard:
-    build:
-      context: .
-      dockerfile: Dockerfile.wizard
-    container_name: openclaw-wizard
+  # ================================================================
+  # Bridge — Holt Emails (IMAP), empfängt Teams (Webhook),
+  #          sendet Entwürfe aus outbox/ per SMTP / Teams-Webhook
+  # ================================================================
+  bridge:
+    build: ./bridge
+    container_name: openclaw-bridge
     ports:
-      - "${WIZARD_PORT:-9090}:9090"
+      - "8080:8080"             # Teams-Webhook-Endpunkt
     volumes:
-      - ./data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./workspace:/workspace  # Shared workspace mit OpenClaw
+    env_file:
+      - .env
     environment:
-      - OPENCLAW_CONTAINER=openclaw-sandbox
-    depends_on: []
+      - WORKSPACE_DIR=/workspace
+      - POLL_INTERVAL_SECONDS=30
+    restart: unless-stopped
+
+    # --- Sandbox-Härtung ---
+    read_only: true
+    tmpfs:
+      - /tmp:size=50M,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - openclaw-net
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  openclaw-net:
+    driver: bridge

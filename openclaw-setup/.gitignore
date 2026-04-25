@@ -1,5 +1,12 @@
-data/
-.venv/
+.env
+workspace/inbox/*
+workspace/outbox/email/*
+workspace/outbox/teams/*
+workspace/sent/*
+!workspace/inbox/.gitkeep
+!workspace/outbox/email/.gitkeep
+!workspace/outbox/teams/.gitkeep
+!workspace/sent/.gitkeep
 __pycache__/
 *.pyc
 .port
