@@ -15,15 +15,6 @@ services:
       - .env
     restart: unless-stopped
 
-    # --- Sandbox-Härtung ---
-    tmpfs:
-      - /tmp:size=100M
-    security_opt:
-      - no-new-privileges:true               # Kein setuid/setgid
-    pids_limit: 512                          # Fork-Bomb-Schutz
-    mem_limit: 4g                            # Max 4 GB RAM
-    memswap_limit: 4g                        # Kein Swap
-    cpus: 2.0                                # Max 2 CPU-Kerne
     logging:
       driver: json-file
       options:
