@@ -28,8 +28,8 @@ services:
       - SETGID
       - DAC_OVERRIDE                         # Minimum für Node.js
     pids_limit: 256                          # Fork-Bomb-Schutz
-    mem_limit: 2g                            # Max 2 GB RAM
-    memswap_limit: 2g                        # Kein Swap
+    mem_limit: 4g                            # Max 4 GB RAM
+    memswap_limit: 4g                        # Kein Swap
     cpus: 2.0                                # Max 2 CPU-Kerne
     logging:
       driver: json-file
