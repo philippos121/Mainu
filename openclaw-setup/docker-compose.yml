@@ -10,6 +10,7 @@ services:
       - "18789:18789"           # Web UI + Gateway
     volumes:
       - ./openclaw-data:/home/node/.openclaw
+      - openclaw-plugins:/home/node/.openclaw/plugin-runtime-deps
       - ./workspace:/home/node/.openclaw/workspace
     env_file:
       - .env
@@ -73,6 +74,9 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+
+volumes:
+  openclaw-plugins:
 
 networks:
   openclaw-net:
