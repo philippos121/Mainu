@@ -380,6 +380,7 @@ Browser actions (a browser is launched automatically the first time you use one)
 {"thought":"...","action":"extract"}
 
 Computer actions (no browser needed):
+{"thought":"...","action":"python","code":"import pandas as pd; df=pd.read_csv('/home/user/x.csv'); print(df.head())"}
 {"thought":"...","action":"shell","command":"ls -la"}
 {"thought":"...","action":"read_file","path":"/home/user/x.csv"}
 {"thought":"...","action":"write_file","path":"/home/user/out.txt","text":"content"}
@@ -395,6 +396,7 @@ Rules:
 - Prefer APIs over browser clicking when available (e.g. Microsoft Graph for SharePoint/OneDrive).
 - SECRETS available: ${secrets}. NEVER guess them. Use them ONLY as placeholders like {{NAME}} inside text/headers/url. You never see the real values; they are substituted at execution time.
 - The working directory is /home/user. Files you create there are returned to the user at the end.
+- Prefer "python" for editing files or data (pandas, python-docx, openpyxl, PyPDF2, Pillow). The Python kernel is PERSISTENT — variables and imports carry over between python steps. Always print() what you want to see.
 - Use "extract" for page text; "shell"/"read_file" for local data; "http" for APIs. When the TASK is achieved use "done"; if truly stuck use "fail".`
 }
 
@@ -460,6 +462,7 @@ function describeAction(d) {
     case 'key': return `key ${Array.isArray(d.keys) ? d.keys.join('+') : d.keys || d.key || ''}`
     case 'press': return `press ${d.key || 'Enter'}${Number.isInteger(d.ref) ? ` [${d.ref}]` : ''}`
     case 'scroll': return `scroll ${d.direction || ''} ${d.amount || 800}`.trim()
+    case 'python': return `python: ${String(d.code || '').split('\n')[0].slice(0, 70)}`
     case 'shell': return `shell: ${d.command || ''}`
     case 'read_file': return `read_file ${d.path || ''}`
     case 'write_file': return `write_file ${d.path || ''}`
@@ -509,6 +512,16 @@ function buildActionPy(d, secrets) {
       return wrap(`await page.wait_for_timeout(${Math.min(Math.max(Number(d.seconds) || 2, 1), 10) * 1000})\nprint("OK")`)
     case 'extract':
       return wrap('_t = await page.inner_text("body")\nprint("<<<TEXT>>>"+_t[:4000])')
+    case 'python': {
+      const codeStr = substituteSecrets(String(d.code || ''), secrets)
+      return wrap(
+        'import io, contextlib\n' +
+        '_buf = io.StringIO()\n' +
+        `_src = ${J(codeStr)}\n` +
+        'with contextlib.redirect_stdout(_buf):\n    exec(_src, globals())\n' +
+        'print("<<<TEXT>>>"+(_buf.getvalue() or "(kein Output)")[:4000])',
+      )
+    }
     case 'shell': {
       const cmd = substituteSecrets(String(d.command || ''), secrets)
       return wrap(
