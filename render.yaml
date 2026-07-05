@@ -1,0 +1,18 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# If this app lives in a subfolder of a larger repo, set "rootDir: e2b-code-chat".
+services:
+  - type: web
+    name: e2b-code-chat
+    runtime: node
+    plan: free
+    # rootDir: e2b-code-chat   # <- uncomment if deploying from the Mainu monorepo
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false   # set the value in the Render dashboard
+      - key: E2B_API_KEY
+        sync: false   # set the value in the Render dashboard
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
