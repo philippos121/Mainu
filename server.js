@@ -35,6 +35,9 @@ const BROWSER_RUN_TIMEOUT_MS = 180_000
 const BROWSER_SETUP_TIMEOUT_MS = 260_000
 const SANDBOX_LIFETIME_MS = 300_000
 
+// Optional custom E2B desktop template (e.g. one with LibreOffice pre-baked).
+const DESKTOP_TEMPLATE = process.env.E2B_DESKTOP_TEMPLATE || ''
+
 // Cost estimation. Defaults are the real OpenAI GPT-5.5 API rates (USD per 1M
 // tokens): $5 input, $0.50 cached input, $30 output. Override via env. Token
 // counts are exact (from the OpenAI usage field), including cached tokens.
@@ -927,13 +930,23 @@ async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, sen
     send('status', { message: 'Live-Ansicht konnte nicht gestartet werden: ' + (e?.message || e) })
   }
 
-  // Report whether LibreOffice is available, so failures are explainable.
+  // Ensure LibreOffice is available (the default desktop image ships without
+  // it). If missing, install it once — slow, but then "open <doc>" works.
   try {
-    const chk = await desktop.commands.run('which soffice libreoffice || true', { timeoutMs: 15_000 })
+    const chk = await desktop.commands.run('which soffice libreoffice 2>/dev/null || true', { timeoutMs: 15_000 })
     if (!((chk.stdout || '').trim())) {
-      send('status', { message: 'Hinweis: LibreOffice ist im Desktop-Image nicht gefunden worden.' })
+      send('status', { message: 'LibreOffice fehlt im Image — wird installiert (einmalig, 1–3 Min)…' })
+      const inst = await desktop.commands.run(
+        'sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc',
+        { timeoutMs: 300_000 },
+      )
+      const ok = (await desktop.commands.run('which soffice libreoffice 2>/dev/null || true', { timeoutMs: 15_000 })).stdout?.trim()
+      if (ok) send('status', { message: 'LibreOffice installiert.' })
+      else send('status', { message: 'LibreOffice-Installation fehlgeschlagen: ' + ((inst.stderr || inst.stdout || '').slice(-300) || 'unbekannt') + '. Für sofortigen Start ein eigenes Desktop-Template mit LibreOffice nutzen (E2B_DESKTOP_TEMPLATE).' })
     }
-  } catch {}
+  } catch (e) {
+    send('status', { message: 'LibreOffice-Prüfung fehlgeschlagen: ' + (e?.message || e) })
+  }
 
   const recent = []
   let lastTool = null
@@ -977,6 +990,10 @@ app.post('/api/agent', async (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders?.()
   const send = (event, data) => res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`)
+  // Keep the connection alive during long steps (e.g. LibreOffice install).
+  const heartbeat = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 15_000)
+  heartbeat.unref?.()
+  res.on('close', () => clearInterval(heartbeat))
 
   if (!OPENAI_API_KEY || !E2B_API_KEY) {
     send('error', { message: 'Server: OPENAI_API_KEY oder E2B_API_KEY fehlt.' })
@@ -1014,7 +1031,9 @@ app.post('/api/agent', async (req, res) => {
     let desktop
     try {
       send('status', { message: 'Desktop wird gestartet…' })
-      desktop = await DesktopSandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
+      desktop = DESKTOP_TEMPLATE
+        ? await DesktopSandbox.create(DESKTOP_TEMPLATE, { apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
+        : await DesktopSandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
       if (secretNames.length) send('status', { message: `Secrets geladen: ${secretNames.join(', ')}` })
       await writeUploads(desktop, uploads, send)
       await runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt, uploadNames })
