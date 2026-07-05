@@ -638,6 +638,7 @@ Respond with ONLY the next action as a JSON object.`
       { role: 'system', content: agentSystemPrompt(secretNames) },
       { role: 'user', content: user },
     ],
+    response_format: { type: 'json_object' },
   })
   addUsage(cost, completion.usage)
   const raw = completion.choices[0]?.message?.content ?? ''
@@ -773,6 +774,7 @@ Respond with ONLY the next action as a JSON object.`
         ],
       },
     ],
+    response_format: { type: 'json_object' },
   })
   addUsage(cost, completion.usage)
   const raw = completion.choices[0]?.message?.content ?? ''
