@@ -138,6 +138,7 @@
       .trace-thought { font-size: 14px; margin: 7px 0; }
       .trace-act { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
       .trace-out { margin-top: 8px; max-height: 220px; overflow: auto; font-size: 12px; }
+      .chat-answer { margin: 6px 0 4px; line-height: 1.6; white-space: pre-wrap; }
       .trace-err { margin-top: 8px; font-size: 12.5px; color: var(--err); }
       .desk-live { margin: 0 0 14px; }
       .desk-live-lbl { font-size: 12px; color: var(--faint); margin-bottom: 6px; }
@@ -432,6 +433,24 @@
         return (bytes / 1024 / 1024).toFixed(1) + ' MB'
       }
 
+      function renderFileInto(container, f) {
+        if (f.tooLarge || !f.base64) {
+          container.appendChild(el('div', 'file-note', `${f.name} — zu groß`))
+          return
+        }
+        if (IMG_RE.test(f.name)) {
+          const img = el('img', 'result'); img.src = `data:image/png;base64,${f.base64}`; container.appendChild(img)
+        } else if (/\.pdf$/i.test(f.name)) {
+          const e = document.createElement('embed'); e.className = 'pdf-preview'; e.type = 'application/pdf'; e.src = `data:application/pdf;base64,${f.base64}`; container.appendChild(e)
+        } else if (/\.html?$/i.test(f.name)) {
+          const fr = document.createElement('iframe'); fr.className = 'html-preview'; fr.setAttribute('sandbox', ''); fr.src = `data:text/html;base64,${f.base64}`; container.appendChild(fr)
+        }
+        const a = el('a', 'file-link', `${f.name} · ${fmtSize(f.size)}`)
+        a.href = `data:application/octet-stream;base64,${f.base64}`
+        a.download = f.name
+        container.appendChild(a)
+      }
+
       function addMessage(role) {
         empty?.remove()
         const wrap = el('div', 'msg ' + role)
@@ -515,6 +534,88 @@
           addCost(data.cost)
         }
         chat.scrollTop = chat.scrollHeight
+      }
+
+      async function runChat(prompt, uploads = []) {
+        const bubble = addMessage('assistant')
+        bubble.innerHTML = ''
+        const spin = el('div', 'trace-status')
+        spin.innerHTML = '<span class="spinner"></span> Startet…'
+        bubble.appendChild(spin)
+
+        let curOut = null // current step's live output <pre>
+        let codeShown = false
+
+        function handle(ev) {
+          if (ev.event === 'status') {
+            spin.innerHTML = '<span class="spinner"></span> ' + ev.message
+          } else if (ev.event === 'code') {
+            codeShown = true
+            bubble.insertBefore(el('div', 'label', 'Code'), spin)
+            bubble.insertBefore(el('pre', null, ev.code || ''), spin)
+            curOut = el('pre', 'trace-out')
+            bubble.insertBefore(curOut, spin)
+          } else if (ev.event === 'stdout') {
+            if (!curOut) { curOut = el('pre', 'trace-out'); bubble.insertBefore(curOut, spin) }
+            curOut.textContent += ev.chunk
+          } else if (ev.event === 'stderr') {
+            if (!curOut) { curOut = el('pre', 'trace-out'); bubble.insertBefore(curOut, spin) }
+            curOut.textContent += ev.chunk
+          } else if (ev.event === 'final') {
+            spin.remove()
+            if (ev.answer) bubble.appendChild(el('div', 'chat-answer', ev.answer))
+            const ex = ev.execution || {}
+            ex.images?.forEach((src) => { const img = el('img', 'result'); img.src = src; bubble.appendChild(img) })
+            if (ex.files?.length) {
+              bubble.appendChild(el('div', 'label', 'Dateien'))
+              ex.files.forEach((f) => renderFileInto(bubble, f))
+            }
+            if (ev.cost) { bubble.appendChild(el('div', 'cost-line', costLineText(ev.cost))); addCost(ev.cost) }
+            history.push({ role: 'user', content: prompt })
+            if (ev.answer) history.push({ role: 'assistant', content: ev.answer })
+          } else if (ev.event === 'error') {
+            spin.remove()
+            bubble.appendChild(el('div', 'label err', 'Fehler'))
+            bubble.appendChild(el('pre', null, ev.message))
+          }
+          chat.scrollTop = chat.scrollHeight
+        }
+
+        try {
+          const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt,
+              history,
+              sessionId,
+              files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
+            }),
+          })
+          if (!resp.ok || !resp.body) {
+            let msg = 'Anfrage fehlgeschlagen'
+            try { msg = (await resp.json()).error || msg } catch {}
+            throw new Error(msg)
+          }
+          const reader = resp.body.getReader()
+          const decoder = new TextDecoder()
+          let buf = ''
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += decoder.decode(value, { stream: true })
+            let idx
+            while ((idx = buf.indexOf('\n\n')) >= 0) {
+              const chunk = buf.slice(0, idx)
+              buf = buf.slice(idx + 2)
+              if (chunk.startsWith('data: ')) {
+                try { handle(JSON.parse(chunk.slice(6))) } catch {}
+              }
+            }
+          }
+        } catch (err) {
+          handle({ event: 'error', message: err.message })
+        }
       }
 
       async function runAgent(task, mode, uploads = []) {
@@ -666,39 +767,12 @@
           userBubble.appendChild(note)
         }
 
-        if (agentMode || desktopMode) {
-          try {
-            await runAgent(prompt, desktopMode ? 'desktop' : 'web', uploads)
-          } finally {
-            send.disabled = false
-            input.focus()
-          }
-          return
-        }
-
-        const bubble = addMessage('assistant')
-        bubble.innerHTML = '<span class="spinner"></span> Wird ausgeführt…'
-
         try {
-          const r = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt,
-              history,
-              sessionId,
-              files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
-            }),
-          })
-          const data = await r.json()
-          if (!r.ok) throw new Error(data.error || 'Anfrage fehlgeschlagen')
-          renderResult(bubble, data)
-          history.push({ role: 'user', content: prompt })
-          if (data.code || data.explanation) {
-            history.push({ role: 'assistant', content: (data.explanation || '') + (data.code ? '\n\n```python\n' + data.code + '\n```' : '') })
+          if (agentMode || desktopMode) {
+            await runAgent(prompt, desktopMode ? 'desktop' : 'web', uploads)
+          } else {
+            await runChat(prompt, uploads)
           }
-        } catch (err) {
-          renderResult(bubble, { error: err.message })
         } finally {
           send.disabled = false
           input.focus()

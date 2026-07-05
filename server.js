@@ -169,6 +169,35 @@ function extractCode(text) {
   return match ? match[1].trim() : null
 }
 
+// Chat = a code-interpreter loop: the model may run Python several times
+// (persistent kernel) and then answer in natural language. This supports
+// multi-step tasks (e.g. transform a document, then summarise the changes).
+const CHAT_MAX_STEPS = 6
+const CHAT_SYSTEM = `You are a data & document analyst with a PERSISTENT Python sandbox (working dir /home/user, internet enabled).
+Use the run_python tool to execute Python. You may call it MULTIPLE times; variables, imports and files persist between calls.
+Uploaded files are already in /home/user. Save any output files there — they are returned to the user as downloads.
+
+Guidelines:
+- Install packages when needed (e.g. deep-translator for translation, python-docx for Word, openpyxl, PyPDF2/pdfplumber, Pillow). Use: import subprocess,sys; subprocess.run([sys.executable,"-m","pip","install","-q","<pkg>"]).
+- MAKE RESULTS VIEWABLE (the UI previews .html/.pdf/images inline): for document edits also save a viewable .html or .pdf. For comparisons/redlines/track-changes produce a red/green diff as .html AND a Word file (.docx) with additions in green and deletions in red strikethrough (RGBColor). Note: true Word revision marks are limited via python-docx; a colored redline is the practical representation.
+- Read documents: .docx via python-docx, .pdf via PyPDF2/pdfplumber, .csv/.txt directly.
+- Always print() the key facts you need to see.
+
+Work step by step: run code, inspect the output, run more code if needed. When the whole task is done, STOP calling tools and reply with a concise natural-language summary for the user (what you changed, key findings). Reply in the user's language.`
+
+const CHAT_TOOL = {
+  type: 'function',
+  function: {
+    name: 'run_python',
+    description: 'Execute Python in the persistent sandbox and return its stdout/results.',
+    parameters: {
+      type: 'object',
+      properties: { code: { type: 'string', description: 'Python source to run.' } },
+      required: ['code'],
+    },
+  },
+}
+
 const app = express()
 app.use(express.json({ limit: '30mb' })) // room for base64-encoded uploads
 app.use(express.static(path.join(__dirname, 'public')))
@@ -183,36 +212,48 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.post('/api/chat', async (req, res) => {
+  // Streamed (SSE) so the user sees progress: status -> generated code ->
+  // live output -> final result.
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders?.()
+  const send = (event, data) => res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`)
+  const heartbeat = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 15_000)
+  heartbeat.unref?.()
+  res.on('close', () => clearInterval(heartbeat))
+
+  if (!OPENAI_API_KEY || !E2B_API_KEY) {
+    send('error', { message: 'Server: OPENAI_API_KEY oder E2B_API_KEY fehlt.' })
+    return res.end()
+  }
+
+  const { prompt, history = [], files: rawUploads = [], sessionId } = req.body ?? {}
+  if (!prompt || typeof prompt !== 'string') {
+    send('error', { message: 'Feld "prompt" fehlt.' })
+    return res.end()
+  }
+  const persistent = typeof sessionId === 'string' && sessionId.length > 0
+
+  // Validate & normalize uploaded files.
+  const uploads = []
+  for (const u of Array.isArray(rawUploads) ? rawUploads : []) {
+    if (!u || typeof u.name !== 'string' || typeof u.base64 !== 'string') continue
+    const name = path.basename(u.name).replace(/[^\w.\- ]/g, '_')
+    const buf = Buffer.from(u.base64, 'base64')
+    if (!name || buf.length === 0) continue
+    if (buf.length > MAX_UPLOAD_BYTES) {
+      send('error', { message: `Datei „${name}" überschreitet ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.` })
+      return res.end()
+    }
+    uploads.push({ name, buf })
+    if (uploads.length >= MAX_UPLOADS) break
+  }
+
+  const usage = { inTok: 0, outTok: 0, cachedTok: 0 }
+  let sandbox
   try {
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OPENAI_API_KEY is not set on the server.' })
-    }
-    if (!E2B_API_KEY) {
-      return res.status(500).json({ error: 'E2B_API_KEY is not set on the server.' })
-    }
-
-    const { prompt, history = [], files: rawUploads = [], browser = false, sessionId } = req.body ?? {}
-    if (!prompt || typeof prompt !== 'string') {
-      return res.status(400).json({ error: 'Missing "prompt" string in request body.' })
-    }
-    const browserMode = browser === true
-    const persistent = typeof sessionId === 'string' && sessionId.length > 0
-
-    // Validate & normalize uploaded files: strip any path, cap count/size.
-    const uploads = []
-    for (const u of Array.isArray(rawUploads) ? rawUploads : []) {
-      if (!u || typeof u.name !== 'string' || typeof u.base64 !== 'string') continue
-      const name = path.basename(u.name).replace(/[^\w.\- ]/g, '_')
-      const buf = Buffer.from(u.base64, 'base64')
-      if (!name || buf.length === 0) continue
-      if (buf.length > MAX_UPLOAD_BYTES) {
-        return res.status(413).json({ error: `Uploaded file "${name}" exceeds the ${MAX_UPLOAD_BYTES / 1024 / 1024} MB limit.` })
-      }
-      uploads.push({ name, buf })
-      if (uploads.length >= MAX_UPLOADS) break
-    }
-
-    // 1) Ask OpenAI to write the code.
     const uploadNote = uploads.length
       ? {
           role: 'system',
@@ -222,136 +263,112 @@ app.post('/api/chat', async (req, res) => {
         }
       : null
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT + (browserMode ? '\n' + BROWSER_PROMPT : '') },
+      { role: 'system', content: CHAT_SYSTEM },
       ...(uploadNote ? [uploadNote] : []),
-      ...history
-        .filter((m) => m && m.role && typeof m.content === 'string')
-        .slice(-10),
+      ...history.filter((m) => m && m.role && typeof m.content === 'string').slice(-10),
       { role: 'user', content: prompt },
     ]
-    // Note: no custom `temperature` — several newer models only accept the
-    // default, and code generation is fine at the default sampling.
-    const usage = { inTok: 0, outTok: 0, cachedTok: 0 }
-    const completion = await getOpenAI().chat.completions.create({
-      model: OPENAI_MODEL,
-      messages,
-    })
-    addUsage(usage, completion.usage)
-    const reply = completion.choices[0]?.message?.content ?? ''
-    const code = extractCode(reply)
-    const explanation = reply.replace(/```[\s\S]*?```/g, '').trim()
 
-    // Nothing to run — return the assistant's text as-is.
-    if (!code) {
-      return res.json({ explanation: reply, code: null, execution: null, cost: computeCost(usage.inTok, usage.outTok, 0, usage.cachedTok) })
-    }
-
-    // 2) Run the generated code. With a sessionId we reuse a persistent
-    // sandbox so follow-up questions build on earlier files/variables;
-    // otherwise a fresh, disposable one.
+    send('status', { message: persistent ? 'Sandbox (Session) wird vorbereitet…' : 'Sandbox wird gestartet…' })
     const sandboxStart = Date.now()
-    const sandbox = persistent
+    sandbox = persistent
       ? await getChatSandbox(sessionId)
       : await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
-    let execution
-    let files = []
-    let setupNote = null
+
+    const allImages = []
+    const files = []
+    let answer = ''
+
     try {
-      // Push any uploaded files into the sandbox so the code can use them.
       for (const u of uploads) {
         const ab = u.buf.buffer.slice(u.buf.byteOffset, u.buf.byteOffset + u.buf.byteLength)
         await sandbox.files.write(`${WORKDIR}/${u.name}`, ab)
       }
+      if (uploads.length) send('status', { message: `${uploads.length} Datei(en) hochgeladen.` })
 
-      // Browser mode: install Playwright + headless Chromium up front so the
-      // generated code can assume they're ready. This MUST run inside the same
-      // kernel (via runCode) that later launches the browser, so Chromium lands
-      // in the cache path that kernel uses (running commands.run separately put
-      // it under a different user's cache and launch couldn't find it).
-      if (browserMode) {
-        const setupCode = [
-          'import subprocess, sys',
-          'subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "playwright"], check=True)',
-          'subprocess.run([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"], check=True)',
-          'print("BROWSER_SETUP_DONE")',
-        ].join('\n')
-        const setup = await sandbox.runCode(setupCode, { timeoutMs: BROWSER_SETUP_TIMEOUT_MS })
-        if (setup.error) {
-          setupNote = `Browser setup failed: ${setup.error.name}: ${setup.error.value}`
-          console.error('browser setup failed:', setup.error.value)
-        }
-      }
-
-      // Snapshot the working dir (uploads included) so we can detect files the
-      // code creates or modifies afterwards.
       const before = new Map()
       try {
         for (const e of await sandbox.files.list(WORKDIR)) {
           if (e.type === 'file') before.set(e.path, e.size)
         }
-      } catch {
-        /* dir may not be listable; ignore */
+      } catch {}
+
+      // Code-interpreter loop: run code, feed results back, until the model
+      // answers in natural language (or we hit the step cap).
+      for (let step = 1; step <= CHAT_MAX_STEPS; step++) {
+        send('status', { message: step === 1 ? 'Modell schreibt Code…' : 'Modell denkt weiter…' })
+        const completion = await getOpenAI().chat.completions.create({
+          model: OPENAI_MODEL,
+          messages,
+          tools: [CHAT_TOOL],
+          tool_choice: 'auto',
+        })
+        addUsage(usage, completion.usage)
+        const msg = completion.choices[0]?.message
+        if (!msg) break
+        const calls = msg.tool_calls || []
+        if (!calls.length) {
+          answer = msg.content || ''
+          break
+        }
+        messages.push(msg)
+        for (const tc of calls) {
+          let codeStr = ''
+          try { codeStr = JSON.parse(tc.function.arguments || '{}').code || '' } catch {}
+          send('code', { step, code: codeStr })
+          send('status', { message: 'Code wird ausgeführt…' })
+          let ex
+          try {
+            ex = await sandbox.runCode(codeStr, {
+              timeoutMs: RUN_TIMEOUT_MS,
+              onStdout: (m) => send('stdout', { step, chunk: m.line ?? String(m) }),
+              onStderr: (m) => send('stderr', { step, chunk: m.line ?? String(m) }),
+            })
+          } catch (e) {
+            ex = { logs: { stdout: [], stderr: [String(e?.message || e)] }, results: [], error: { name: 'Error', value: String(e?.message || e) } }
+          }
+          ;(ex.results || []).forEach((r) => { if (r.png) allImages.push(`data:image/png;base64,${r.png}`) })
+          const out = (ex.logs?.stdout ?? []).join('')
+          const errOut = (ex.logs?.stderr ?? []).join('')
+          const textRes = (ex.results || []).map((r) => r.text).filter(Boolean).join('\n')
+          const errObj = ex.error ? `ERROR ${ex.error.name}: ${ex.error.value}` : ''
+          const toolContent = [out, textRes, errOut, errObj].filter(Boolean).join('\n').slice(0, 4000) || '(kein Output)'
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: toolContent })
+        }
       }
+      if (!answer) answer = 'Fertig.'
 
-      execution = await sandbox.runCode(code, {
-        timeoutMs: browserMode ? BROWSER_RUN_TIMEOUT_MS : RUN_TIMEOUT_MS,
-      })
-
-      // Capture new or changed files (e.g. .docx, .csv, .xlsx, .zip) and
-      // hand them back to the browser as downloads.
+      // Capture new/changed files as downloads.
       try {
         const after = await sandbox.files.list(WORKDIR)
-        const changed = after.filter(
-          (e) => e.type === 'file' && before.get(e.path) !== e.size,
-        )
+        const changed = after.filter((e) => e.type === 'file' && before.get(e.path) !== e.size)
         for (const e of changed.slice(0, MAX_FILES)) {
           if (e.size > MAX_FILE_BYTES) {
             files.push({ name: e.name, size: e.size, tooLarge: true })
             continue
           }
           const bytes = await sandbox.files.read(e.path, { format: 'bytes' })
-          files.push({
-            name: e.name,
-            size: e.size,
-            base64: Buffer.from(bytes).toString('base64'),
-          })
+          files.push({ name: e.name, size: e.size, base64: Buffer.from(bytes).toString('base64') })
         }
       } catch (e) {
         console.error('file capture failed:', e?.message)
       }
     } finally {
-      // Keep persistent session sandboxes alive for follow-ups; the idle
-      // reaper cleans them up later. Only kill throwaway ones.
-      if (!persistent) {
+      if (!persistent && sandbox) {
         try { await sandbox.kill() } catch {}
       }
     }
 
-    const results = execution.results ?? []
-    const images = results
-      .filter((r) => r.png)
-      .map((r) => `data:image/png;base64,${r.png}`)
-    const textResults = results.map((r) => r.text).filter(Boolean)
-
-    res.json({
-      explanation,
-      code,
-      execution: {
-        stdout: (execution.logs?.stdout ?? []).join(''),
-        stderr: (execution.logs?.stderr ?? []).join(''),
-        error: execution.error
-          ? `${execution.error.name}: ${execution.error.value}\n${execution.error.traceback ?? ''}`
-          : null,
-        text: textResults,
-        images,
-        files,
-        note: setupNote,
-      },
+    send('final', {
+      answer,
+      execution: { images: allImages, files },
       cost: computeCost(usage.inTok, usage.outTok, (Date.now() - sandboxStart) / 1000, usage.cachedTok),
     })
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: err?.message ?? 'Unknown server error.' })
+    console.error('chat error:', err)
+    send('error', { message: err?.message ?? 'Unbekannter Fehler.' })
+  } finally {
+    res.end()
   }
 })
 
