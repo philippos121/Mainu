@@ -35,18 +35,25 @@ const BROWSER_RUN_TIMEOUT_MS = 180_000
 const BROWSER_SETUP_TIMEOUT_MS = 260_000
 const SANDBOX_LIFETIME_MS = 300_000
 
-// Cost estimation. Prices are configurable via env (USD). Token counts are
-// exact (from the OpenAI usage field); the $ figures are estimates.
-const PRICE_IN = Number(process.env.OPENAI_PRICE_IN || 1.25) // USD / 1M input tokens
-const PRICE_OUT = Number(process.env.OPENAI_PRICE_OUT || 10) // USD / 1M output tokens
+// Cost estimation. Defaults are the real OpenAI GPT-5.5 API rates (USD per 1M
+// tokens): $5 input, $0.50 cached input, $30 output. Override via env. Token
+// counts are exact (from the OpenAI usage field), including cached tokens.
+const PRICE_IN = Number(process.env.OPENAI_PRICE_IN || 5) // USD / 1M input tokens
+const PRICE_CACHED = Number(process.env.OPENAI_PRICE_CACHED || 0.5) // USD / 1M cached input tokens
+const PRICE_OUT = Number(process.env.OPENAI_PRICE_OUT || 30) // USD / 1M output tokens
 const E2B_PRICE_PER_SEC = Number(process.env.E2B_PRICE_PER_SEC || 0.00014) // USD / sandbox-second
 
-function computeCost(inTok, outTok, seconds) {
-  const openaiUsd = (inTok / 1e6) * PRICE_IN + (outTok / 1e6) * PRICE_OUT
+function computeCost(inTok, outTok, seconds, cachedTok = 0) {
+  const nonCached = Math.max(0, inTok - (cachedTok || 0))
+  const openaiUsd =
+    (nonCached / 1e6) * PRICE_IN +
+    ((cachedTok || 0) / 1e6) * PRICE_CACHED +
+    (outTok / 1e6) * PRICE_OUT
   const e2bUsd = (seconds || 0) * E2B_PRICE_PER_SEC
   return {
     inTok,
     outTok,
+    cachedTok: cachedTok || 0,
     seconds: Math.round(seconds || 0),
     openaiUsd: +openaiUsd.toFixed(4),
     e2bUsd: +e2bUsd.toFixed(4),
@@ -58,6 +65,7 @@ function addUsage(acc, usage) {
   if (usage) {
     acc.inTok += usage.prompt_tokens || 0
     acc.outTok += usage.completion_tokens || 0
+    acc.cachedTok += usage.prompt_tokens_details?.cached_tokens || 0
   }
 }
 
@@ -186,7 +194,7 @@ app.post('/api/chat', async (req, res) => {
     ]
     // Note: no custom `temperature` — several newer models only accept the
     // default, and code generation is fine at the default sampling.
-    const usage = { inTok: 0, outTok: 0 }
+    const usage = { inTok: 0, outTok: 0, cachedTok: 0 }
     const completion = await getOpenAI().chat.completions.create({
       model: OPENAI_MODEL,
       messages,
@@ -198,7 +206,7 @@ app.post('/api/chat', async (req, res) => {
 
     // Nothing to run — return the assistant's text as-is.
     if (!code) {
-      return res.json({ explanation: reply, code: null, execution: null, cost: computeCost(usage.inTok, usage.outTok, 0) })
+      return res.json({ explanation: reply, code: null, execution: null, cost: computeCost(usage.inTok, usage.outTok, 0, usage.cachedTok) })
     }
 
     // 2) Run the generated code in a fresh, disposable E2B sandbox.
@@ -297,7 +305,7 @@ app.post('/api/chat', async (req, res) => {
         files,
         note: setupNote,
       },
-      cost: computeCost(usage.inTok, usage.outTok, (Date.now() - sandboxStart) / 1000),
+      cost: computeCost(usage.inTok, usage.outTok, (Date.now() - sandboxStart) / 1000, usage.cachedTok),
     })
   } catch (err) {
     console.error(err)
@@ -786,12 +794,12 @@ async function runWebAgent(sandbox, { task, secrets, secretNames, steps, send, c
 
     const r = await agentExecute(sandbox, d, secrets)
     lastTool = r.text || (r.error ? 'ERROR ' + r.error : null)
+    send('result', { step, text: r.text ? r.text.slice(0, 1500) : null, error: r.error || null })
     recent.push(
       summary +
         (r.error ? ` -> ERROR ${r.error}` : '') +
         (r.text ? ` -> ${r.text.replace(/\s+/g, ' ').slice(0, 400)}` : ''),
     )
-    if (r.error) send('status', { message: `Schritt ${step}: ${summary} — ${r.error}` })
   }
 
   if (answer == null) answer = 'Schrittlimit erreicht.'
@@ -800,7 +808,7 @@ async function runWebAgent(sandbox, { task, secrets, secretNames, steps, send, c
   if (browserReady) {
     try { screenshot = (await agentObserve(sandbox)).screenshot } catch {}
   }
-  send('final', { answer, files, screenshot, cost: computeCost(cost.inTok, cost.outTok, (Date.now() - startedAt) / 1000) })
+  send('final', { answer, files, screenshot, cost: computeCost(cost.inTok, cost.outTok, (Date.now() - startedAt) / 1000, cost.cachedTok) })
 }
 
 // ---- Desktop / GUI agent (E2B desktop sandbox, vision-driven) ----
@@ -886,15 +894,15 @@ async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, sen
     } catch (e) {
       err = e?.message || String(e)
     }
+    if (lastTool || err) send('result', { step, text: lastTool ? lastTool.slice(0, 1500) : null, error: err })
     recent.push(summary + (err ? ` -> ERROR ${err}` : '') + (lastTool ? ` -> ${lastTool.replace(/\s+/g, ' ').slice(0, 200)}` : ''))
-    if (err) send('status', { message: `Schritt ${step}: ${summary} — ${err}` })
     await desktop.wait(600)
   }
 
   if (answer == null) answer = 'Schrittlimit erreicht.'
   let screenshot = null
   try { screenshot = Buffer.from(await desktop.screenshot()).toString('base64') } catch {}
-  send('final', { answer, screenshot, files: [], cost: computeCost(cost.inTok, cost.outTok, (Date.now() - startedAt) / 1000) })
+  send('final', { answer, screenshot, files: [], cost: computeCost(cost.inTok, cost.outTok, (Date.now() - startedAt) / 1000, cost.cachedTok) })
 }
 
 app.post('/api/agent', async (req, res) => {
@@ -935,7 +943,7 @@ app.post('/api/agent', async (req, res) => {
   }
   const uploadNames = uploads.map((u) => u.name)
 
-  const cost = { inTok: 0, outTok: 0 }
+  const cost = { inTok: 0, outTok: 0, cachedTok: 0 }
   const startedAt = Date.now()
 
   if (mode === 'desktop') {

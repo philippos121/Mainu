@@ -126,6 +126,8 @@
       .trace-step .stephead { font-size: 12px; color: var(--faint); word-break: break-all; }
       .trace-thought { font-size: 14px; margin: 7px 0; }
       .trace-act { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
+      .trace-out { margin-top: 8px; max-height: 220px; overflow: auto; font-size: 12px; }
+      .trace-err { margin-top: 8px; font-size: 12.5px; color: var(--err); }
       .trace-shot { max-width: 360px; width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; display: block; }
       .trace-status { font-size: 13px; color: var(--muted); margin: 7px 0; }
       .trace-final { border: 1px solid var(--border-strong); border-radius: 12px; padding: 15px; margin-top: 16px; }
@@ -241,11 +243,7 @@
             <button id="attach" class="tool" title="Dateien anhängen" aria-label="Dateien anhängen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
             </button>
-            <button id="browserToggle" class="tool" title="Browser-Modus" aria-label="Browser-Modus">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
-              <span class="tlabel">Browser</span>
-            </button>
-            <button id="agentToggle" class="tool" title="Agent-Modus (Web, Shell, Dateien, APIs)" aria-label="Agent-Modus">
+            <button id="agentToggle" class="tool" title="Agent-Modus (Code, Shell, Dateien, APIs, Browser)" aria-label="Agent-Modus">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5 13.7 9 19 10.5 13.7 12 12 17.5 10.3 12 5 10.5 10.3 9 12 3.5Z"/><path d="M18.5 16.5 19 18.5 21 19 19 19.5 18.5 21.5 18 19.5 16 19 18 18.5 18.5 16.5Z"/></svg>
               <span class="tlabel">Agent</span>
             </button>
@@ -276,7 +274,6 @@
       const attach = document.getElementById('attach')
       const fileInput = document.getElementById('fileInput')
       const attachments = document.getElementById('attachments')
-      const browserToggle = document.getElementById('browserToggle')
       const agentToggle = document.getElementById('agentToggle')
       const desktopToggle = document.getElementById('desktopToggle')
       const secretsToggle = document.getElementById('secretsToggle')
@@ -288,7 +285,6 @@
 
       const history = []
       let pendingFiles = []
-      let browserMode = false
       let agentMode = false
       let desktopMode = false
       const secretRows = []
@@ -320,10 +316,8 @@
         hint.textContent = desktopMode
           ? 'Desktop-Modus aktiv — steuert eine grafische Linux-Oberfläche (z. B. LibreOffice) per Screenshot.'
           : agentMode
-            ? 'Agent-Modus aktiv — Shell, Dateien, APIs und Browser, schrittweise. Für Logins Secrets hinzufügen.'
-            : browserMode
-              ? 'Browser-Modus aktiv — headless Chromium (erster Lauf ~1 Min).'
-              : 'Enter senden · Shift+Enter neue Zeile'
+            ? 'Agent-Modus aktiv — Code, Shell, Dateien, APIs und Browser, schrittweise. Für Logins Secrets hinzufügen.'
+            : 'Enter senden · Shift+Enter neue Zeile'
       }
 
       function renderSecrets() {
@@ -530,6 +524,13 @@
             const s = stepEl(ev.step)
             if (ev.thought) s.appendChild(el('div', 'trace-thought', ev.thought))
             s.appendChild(el('div', 'trace-act', ev.summary))
+          } else if (ev.event === 'result') {
+            const s = stepEl(ev.step)
+            if (ev.error) {
+              s.appendChild(el('div', 'trace-err', 'Fehler: ' + ev.error))
+            } else if (ev.text) {
+              s.appendChild(el('pre', 'trace-out', ev.text))
+            }
           } else if (ev.event === 'final') {
             spin.remove()
             const f = el('div', 'trace-final')
@@ -635,9 +636,7 @@
         }
 
         const bubble = addMessage('assistant')
-        bubble.innerHTML = browserMode
-          ? '<span class="spinner"></span> Wird im Browser-Sandbox ausgeführt (erster Lauf ~1 Min)…'
-          : '<span class="spinner"></span> Wird ausgeführt…'
+        bubble.innerHTML = '<span class="spinner"></span> Wird ausgeführt…'
 
         try {
           const r = await fetch('/api/chat', {
@@ -646,7 +645,6 @@
             body: JSON.stringify({
               prompt,
               history,
-              browser: browserMode,
               files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
             }),
           })
@@ -666,15 +664,12 @@
       }
 
       function setMode(which) {
-        browserMode = which === 'browser'
         agentMode = which === 'agent'
         desktopMode = which === 'desktop'
-        browserToggle.classList.toggle('active', browserMode)
         agentToggle.classList.toggle('active', agentMode)
         desktopToggle.classList.toggle('active', desktopMode)
         updateHint()
       }
-      browserToggle.addEventListener('click', () => setMode(browserMode ? null : 'browser'))
       agentToggle.addEventListener('click', () => setMode(agentMode ? null : 'agent'))
       desktopToggle.addEventListener('click', () => setMode(desktopMode ? null : 'desktop'))
       secretsToggle.addEventListener('click', () => {
