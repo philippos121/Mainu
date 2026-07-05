@@ -77,6 +77,39 @@ function getOpenAI() {
   return _openai
 }
 
+// Persistent per-session sandboxes for the chat, so follow-up questions can
+// build on earlier files and variables (the Python kernel keeps its state).
+const CHAT_SESSION_TTL_MS = 15 * 60 * 1000
+const chatSessions = new Map() // sessionId -> { sandbox, lastUsed }
+
+async function getChatSandbox(sessionId) {
+  const existing = sessionId && chatSessions.get(sessionId)
+  if (existing) {
+    try {
+      await existing.sandbox.setTimeout(SANDBOX_LIFETIME_MS) // keep it alive
+      existing.lastUsed = Date.now()
+      return existing.sandbox
+    } catch {
+      try { await existing.sandbox.kill() } catch {}
+      chatSessions.delete(sessionId)
+    }
+  }
+  const sandbox = await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
+  if (sessionId) chatSessions.set(sessionId, { sandbox, lastUsed: Date.now() })
+  return sandbox
+}
+
+// Reap idle session sandboxes.
+setInterval(() => {
+  const now = Date.now()
+  for (const [id, s] of chatSessions) {
+    if (now - s.lastUsed > CHAT_SESSION_TTL_MS) {
+      s.sandbox.kill().catch(() => {})
+      chatSessions.delete(id)
+    }
+  }
+}, 60_000).unref?.()
+
 const SYSTEM_PROMPT = `You are a coding assistant whose code is executed in a secure E2B Python sandbox
 (a Jupyter-like environment with internet access).
 
@@ -155,11 +188,12 @@ app.post('/api/chat', async (req, res) => {
       return res.status(500).json({ error: 'E2B_API_KEY is not set on the server.' })
     }
 
-    const { prompt, history = [], files: rawUploads = [], browser = false } = req.body ?? {}
+    const { prompt, history = [], files: rawUploads = [], browser = false, sessionId } = req.body ?? {}
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'Missing "prompt" string in request body.' })
     }
     const browserMode = browser === true
+    const persistent = typeof sessionId === 'string' && sessionId.length > 0
 
     // Validate & normalize uploaded files: strip any path, cap count/size.
     const uploads = []
@@ -209,12 +243,13 @@ app.post('/api/chat', async (req, res) => {
       return res.json({ explanation: reply, code: null, execution: null, cost: computeCost(usage.inTok, usage.outTok, 0, usage.cachedTok) })
     }
 
-    // 2) Run the generated code in a fresh, disposable E2B sandbox.
+    // 2) Run the generated code. With a sessionId we reuse a persistent
+    // sandbox so follow-up questions build on earlier files/variables;
+    // otherwise a fresh, disposable one.
     const sandboxStart = Date.now()
-    const sandbox = await Sandbox.create({
-      apiKey: E2B_API_KEY,
-      timeoutMs: SANDBOX_LIFETIME_MS,
-    })
+    const sandbox = persistent
+      ? await getChatSandbox(sessionId)
+      : await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
     let execution
     let files = []
     let setupNote = null
@@ -282,7 +317,11 @@ app.post('/api/chat', async (req, res) => {
         console.error('file capture failed:', e?.message)
       }
     } finally {
-      await sandbox.kill()
+      // Keep persistent session sandboxes alive for follow-ups; the idle
+      // reaper cleans them up later. Only kill throwaway ones.
+      if (!persistent) {
+        try { await sandbox.kill() } catch {}
+      }
     }
 
     const results = execution.results ?? []
@@ -431,7 +470,8 @@ Actions:
 
 Rules:
 - Look at the screenshot carefully and click precise pixel coordinates of the target.
-- Applications such as LibreOffice (writer/calc/impress), a file manager and a terminal are available; start them with "launch".
+- To edit an uploaded document, prefer {"action":"open","target":"/home/user/<file>"} — it opens the file in its default app (LibreOffice). Then use {"action":"wait","seconds":5} and check the next screenshot before interacting; apps can take several seconds to appear.
+- You can also start apps with {"action":"launch","app":"libreoffice --writer"}.
 - After opening or clicking, the next screenshot shows the result — verify before continuing; use "wait" if an app is still loading.
 - SECRETS available: ${secrets}. Use ONLY as placeholders {{NAME}} in "type"; they are substituted at execution time and never shown to you.
 - When the TASK is achieved use "done"; if stuck use "fail".`
@@ -872,6 +912,29 @@ async function desktopExecute(desktop, d, secrets) {
 
 async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt, uploadNames }) {
   const size = await desktop.getScreenSize()
+
+  // Live view: start the VNC stream and hand a view-only URL to the browser.
+  try {
+    await desktop.stream.start({ requireAuth: true })
+    const url = desktop.stream.getUrl({
+      authKey: desktop.stream.getAuthKey(),
+      viewOnly: true,
+      autoConnect: true,
+      resize: 'scale',
+    })
+    send('stream', { url })
+  } catch (e) {
+    send('status', { message: 'Live-Ansicht konnte nicht gestartet werden: ' + (e?.message || e) })
+  }
+
+  // Report whether LibreOffice is available, so failures are explainable.
+  try {
+    const chk = await desktop.commands.run('which soffice libreoffice || true', { timeoutMs: 15_000 })
+    if (!((chk.stdout || '').trim())) {
+      send('status', { message: 'Hinweis: LibreOffice ist im Desktop-Image nicht gefunden worden.' })
+    }
+  } catch {}
+
   const recent = []
   let lastTool = null
   let answer = null
@@ -896,7 +959,8 @@ async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, sen
     }
     if (lastTool || err) send('result', { step, text: lastTool ? lastTool.slice(0, 1500) : null, error: err })
     recent.push(summary + (err ? ` -> ERROR ${err}` : '') + (lastTool ? ` -> ${lastTool.replace(/\s+/g, ' ').slice(0, 200)}` : ''))
-    await desktop.wait(600)
+    // Give launched apps time to appear before the next screenshot.
+    await desktop.wait(d.action === 'launch' || d.action === 'open' ? 4000 : 800)
   }
 
   if (answer == null) answer = 'Schrittlimit erreicht.'

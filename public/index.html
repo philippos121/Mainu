@@ -128,6 +128,9 @@
       .trace-act { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
       .trace-out { margin-top: 8px; max-height: 220px; overflow: auto; font-size: 12px; }
       .trace-err { margin-top: 8px; font-size: 12.5px; color: var(--err); }
+      .desk-live { margin: 0 0 14px; }
+      .desk-live-lbl { font-size: 12px; color: var(--faint); margin-bottom: 6px; }
+      .desk-frame { width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--border); border-radius: 10px; background: #000; }
       .trace-shot { max-width: 360px; width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; display: block; }
       .trace-status { font-size: 13px; color: var(--muted); margin: 7px 0; }
       .trace-final { border: 1px solid var(--border-strong); border-radius: 12px; padding: 15px; margin-top: 16px; }
@@ -291,6 +294,8 @@
       let sessionCostUsd = 0
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
+      // Stable per-tab id so chat follow-ups reuse the same sandbox (context).
+      const sessionId = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2)
 
       function fmtUsd(n) { return '$' + (n < 0.01 ? n.toFixed(4) : n.toFixed(3)) }
       function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(1) + 'k' : String(t) }
@@ -512,6 +517,15 @@
         function handle(ev) {
           if (ev.event === 'status') {
             spin.innerHTML = '<span class="spinner"></span> ' + ev.message
+          } else if (ev.event === 'stream') {
+            const wrap = el('div', 'desk-live')
+            wrap.appendChild(el('div', 'desk-live-lbl', 'Live-Ansicht'))
+            const frame = document.createElement('iframe')
+            frame.src = ev.url
+            frame.className = 'desk-frame'
+            frame.allow = 'clipboard-read; clipboard-write'
+            wrap.appendChild(frame)
+            trace.insertBefore(wrap, trace.firstChild)
           } else if (ev.event === 'observation') {
             const s = stepEl(ev.step)
             s.querySelector('.stephead').textContent = `Schritt ${ev.step} — ${ev.url || ''}`
@@ -645,6 +659,7 @@
             body: JSON.stringify({
               prompt,
               history,
+              sessionId,
               files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
             }),
           })
