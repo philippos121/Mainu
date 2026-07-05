@@ -188,15 +188,21 @@ app.post('/api/chat', async (req, res) => {
       }
 
       // Browser mode: install Playwright + headless Chromium up front so the
-      // generated code can assume they're ready.
+      // generated code can assume they're ready. This MUST run inside the same
+      // kernel (via runCode) that later launches the browser, so Chromium lands
+      // in the cache path that kernel uses (running commands.run separately put
+      // it under a different user's cache and launch couldn't find it).
       if (browserMode) {
-        const setup = await sandbox.commands.run(
-          'pip install --quiet playwright && playwright install --with-deps chromium',
-          { timeoutMs: BROWSER_SETUP_TIMEOUT_MS },
-        )
-        if (setup.exitCode !== 0) {
-          setupNote = 'Browser setup reported a non-zero exit code; the run may fail.'
-          console.error('browser setup failed:', (setup.stderr || '').slice(-500))
+        const setupCode = [
+          'import subprocess, sys',
+          'subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "playwright"], check=True)',
+          'subprocess.run([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"], check=True)',
+          'print("BROWSER_SETUP_DONE")',
+        ].join('\n')
+        const setup = await sandbox.runCode(setupCode, { timeoutMs: BROWSER_SETUP_TIMEOUT_MS })
+        if (setup.error) {
+          setupNote = `Browser setup failed: ${setup.error.name}: ${setup.error.value}`
+          console.error('browser setup failed:', setup.error.value)
         }
       }
 
