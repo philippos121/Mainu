@@ -85,7 +85,24 @@
         padding: 14px 20px;
         background: var(--panel);
       }
-      .composer { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; }
+      .composer { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+      button.ghost {
+        background: transparent; border: 1px solid var(--border); color: var(--text);
+        padding: 0 14px; font-size: 18px; height: 48px; flex: 0 0 auto;
+      }
+      button.ghost:hover { border-color: var(--accent); }
+      #attachments { max-width: 860px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+      #attachments:empty { display: none; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 8px; font-size: 12px;
+        background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 5px 10px; color: var(--text);
+      }
+      .chip button {
+        background: none; border: none; color: var(--muted); cursor: pointer;
+        padding: 0; font-size: 15px; line-height: 1; border-radius: 0;
+      }
+      .chip button:hover { color: var(--err); }
       textarea {
         flex: 1;
         resize: none;
@@ -132,16 +149,20 @@
       <div class="empty" id="empty">
         <h2>Describe what you want to build or compute</h2>
         <p>Your prompt is turned into Python by OpenAI, executed in a fresh E2B sandbox,
-        and the output (text, tables, charts) is shown back here.</p>
+        and the output (text, tables, charts, files) is shown back here.
+        Attach files with 📎 to have the code read and modify them, then download the result.</p>
       </div>
     </main>
 
     <footer>
+      <div id="attachments"></div>
       <div class="composer">
-        <textarea id="input" placeholder="e.g. Plot a sine wave, or scrape the title of example.com" rows="1"></textarea>
+        <input type="file" id="fileInput" multiple hidden />
+        <button id="attach" class="ghost" title="Attach files">📎</button>
+        <textarea id="input" placeholder="e.g. Add a column to my CSV, or convert my image to grayscale" rows="1"></textarea>
         <button id="send">Run</button>
       </div>
-      <div class="hint">Enter to send · Shift+Enter for a new line</div>
+      <div class="hint">Enter to send · Shift+Enter for a new line · attach files to have the code modify them</div>
     </footer>
 
     <script>
@@ -151,8 +172,56 @@
       const send = document.getElementById('send')
       const statusEl = document.getElementById('status')
       const e2bDot = document.getElementById('e2bDot')
+      const attach = document.getElementById('attach')
+      const fileInput = document.getElementById('fileInput')
+      const attachments = document.getElementById('attachments')
 
       const history = [] // {role, content} pairs sent back to the model for context
+      let pendingFiles = [] // {name, base64, size} to upload with the next prompt
+
+      const MAX_UPLOADS = 5
+      const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
+      function readAsBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result).split(',')[1] || '')
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+      }
+
+      async function addFiles(fileList) {
+        for (const file of fileList) {
+          if (pendingFiles.length >= MAX_UPLOADS) {
+            alert(`You can attach at most ${MAX_UPLOADS} files per message.`)
+            break
+          }
+          if (file.size > MAX_UPLOAD_BYTES) {
+            alert(`"${file.name}" is ${fmtSize(file.size)} — over the ${MAX_UPLOAD_BYTES / 1024 / 1024} MB limit.`)
+            continue
+          }
+          const base64 = await readAsBase64(file)
+          pendingFiles.push({ name: file.name, base64, size: file.size })
+        }
+        renderAttachments()
+      }
+
+      function renderAttachments() {
+        attachments.innerHTML = ''
+        pendingFiles.forEach((f, i) => {
+          const chip = el('span', 'chip', '')
+          chip.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`))
+          const x = el('button', null, '×')
+          x.title = 'Remove'
+          x.addEventListener('click', () => {
+            pendingFiles.splice(i, 1)
+            renderAttachments()
+          })
+          chip.appendChild(x)
+          attachments.appendChild(chip)
+        })
+      }
 
       async function checkHealth() {
         try {
@@ -252,7 +321,16 @@
         input.style.height = 'auto'
         send.disabled = true
 
-        addMessage('user').textContent = prompt
+        const uploads = pendingFiles.slice()
+        pendingFiles = []
+        renderAttachments()
+
+        const userBubble = addMessage('user')
+        userBubble.textContent = prompt
+        if (uploads.length) {
+          const note = el('div', 'file-note', '📎 ' + uploads.map((f) => f.name).join(', '))
+          userBubble.appendChild(note)
+        }
         const bubble = addMessage('assistant')
         bubble.innerHTML = '<span class="spinner"></span> Generating & running…'
 
@@ -260,7 +338,11 @@
           const r = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, history }),
+            body: JSON.stringify({
+              prompt,
+              history,
+              files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
+            }),
           })
           const data = await r.json()
           if (!r.ok) throw new Error(data.error || 'Request failed')
@@ -277,6 +359,11 @@
         }
       }
 
+      attach.addEventListener('click', () => fileInput.click())
+      fileInput.addEventListener('change', async () => {
+        await addFiles(fileInput.files)
+        fileInput.value = '' // allow re-selecting the same file
+      })
       send.addEventListener('click', submit)
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {

@@ -22,7 +22,9 @@ const E2B_API_KEY =
 // how many/how large the files we return to the browser can be.
 const WORKDIR = '/home/user'
 const MAX_FILES = 10
-const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB per file
+const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB per file (download)
+const MAX_UPLOADS = 5
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024 // 15 MB per uploaded file
 
 // Created lazily so the server still boots (and /api/health can report the
 // problem) when a key is missing, instead of crashing at startup.
@@ -44,7 +46,10 @@ Rules:
   "!pip install <package>" on the first lines of the code.
 - Always produce visible output: print() results, or render charts/tables. Matplotlib figures are
   captured automatically, so just call plt.show().
-- Keep the code self-contained and runnable top-to-bottom. Do not ask follow-up questions.`
+- Keep the code self-contained and runnable top-to-bottom. Do not ask follow-up questions.
+- If the user uploaded files, they are already saved in the current working directory. Read them by
+  their exact filename. Save any modified or generated file to the working directory (a new filename
+  is fine) so it can be returned to the user for download.`
 
 /** Pull the first fenced python block out of the model's reply. */
 function extractCode(text) {
@@ -53,7 +58,7 @@ function extractCode(text) {
 }
 
 const app = express()
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({ limit: '30mb' })) // room for base64-encoded uploads
 app.use(express.static(path.join(__dirname, 'public')))
 
 app.get('/api/health', (_req, res) => {
@@ -74,14 +79,37 @@ app.post('/api/chat', async (req, res) => {
       return res.status(500).json({ error: 'E2B_API_KEY is not set on the server.' })
     }
 
-    const { prompt, history = [] } = req.body ?? {}
+    const { prompt, history = [], files: rawUploads = [] } = req.body ?? {}
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'Missing "prompt" string in request body.' })
     }
 
+    // Validate & normalize uploaded files: strip any path, cap count/size.
+    const uploads = []
+    for (const u of Array.isArray(rawUploads) ? rawUploads : []) {
+      if (!u || typeof u.name !== 'string' || typeof u.base64 !== 'string') continue
+      const name = path.basename(u.name).replace(/[^\w.\- ]/g, '_')
+      const buf = Buffer.from(u.base64, 'base64')
+      if (!name || buf.length === 0) continue
+      if (buf.length > MAX_UPLOAD_BYTES) {
+        return res.status(413).json({ error: `Uploaded file "${name}" exceeds the ${MAX_UPLOAD_BYTES / 1024 / 1024} MB limit.` })
+      }
+      uploads.push({ name, buf })
+      if (uploads.length >= MAX_UPLOADS) break
+    }
+
     // 1) Ask OpenAI to write the code.
+    const uploadNote = uploads.length
+      ? {
+          role: 'system',
+          content: `The user uploaded these files, already saved in the working directory: ${uploads
+            .map((u) => u.name)
+            .join(', ')}. Read them by these exact filenames.`,
+        }
+      : null
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
+      ...(uploadNote ? [uploadNote] : []),
       ...history
         .filter((m) => m && m.role && typeof m.content === 'string')
         .slice(-10),
@@ -106,7 +134,14 @@ app.post('/api/chat', async (req, res) => {
     let execution
     let files = []
     try {
-      // Snapshot the working dir so we can detect files the code creates.
+      // Push any uploaded files into the sandbox so the code can use them.
+      for (const u of uploads) {
+        const ab = u.buf.buffer.slice(u.buf.byteOffset, u.buf.byteOffset + u.buf.byteLength)
+        await sandbox.files.write(`${WORKDIR}/${u.name}`, ab)
+      }
+
+      // Snapshot the working dir (uploads included) so we can detect files the
+      // code creates or modifies afterwards.
       const before = new Map()
       try {
         for (const e of await sandbox.files.list(WORKDIR)) {

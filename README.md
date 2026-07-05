@@ -2,7 +2,10 @@
 
 A minimal chat interface where you type a coding prompt, **OpenAI** turns it into Python,
 the code runs in a disposable **[E2B](https://e2b.dev) sandbox**, and the output
-(text, tables, charts) is streamed back into the chat. Built to deploy on **Render**.
+(text, tables, charts, files) is streamed back into the chat. Built to deploy on **Render**.
+
+You can also **attach files** (📎): they are uploaded into the sandbox, the generated code
+reads/modifies them, and any resulting files come back as downloads.
 
 ```
 You ──prompt──▶ Express server ──▶ OpenAI (writes Python)
