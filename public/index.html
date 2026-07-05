@@ -1,201 +1,322 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>E2B Code Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pippos Playground · AI:ssociate</title>
+    <link rel="icon" href="/aissociate-logo.png" />
     <style>
       :root {
-        --bg: #0d1117;
-        --panel: #161b22;
-        --panel-2: #1c2230;
-        --border: #30363d;
-        --text: #e6edf3;
-        --muted: #8b949e;
-        --accent: #4f8cff;
-        --accent-2: #2ea043;
+        --bg: #070b12;
+        --bg-glow-1: rgba(14, 124, 138, 0.22);
+        --bg-glow-2: rgba(31, 182, 205, 0.10);
+        --panel: rgba(20, 27, 38, 0.72);
+        --panel-2: rgba(30, 40, 54, 0.7);
+        --panel-solid: #111925;
+        --border: rgba(255, 255, 255, 0.09);
+        --border-strong: rgba(255, 255, 255, 0.16);
+        --text: #e9eff5;
+        --muted: #8b9aad;
+        --brand: #0e7c8a;
+        --brand-2: #1fb6cd;
+        --accent: #1fb6cd;
+        --accent-soft: rgba(31, 182, 205, 0.16);
+        --accent-2: #3fb950;
         --err: #f85149;
         --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        --radius: 16px;
+        --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
       }
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: var(--bg);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: var(--text);
-        height: 100vh;
+        height: 100dvh;
         display: flex;
         flex-direction: column;
+        background:
+          radial-gradient(1100px 600px at 8% -8%, var(--bg-glow-1), transparent 55%),
+          radial-gradient(900px 500px at 100% 0%, var(--bg-glow-2), transparent 50%),
+          var(--bg);
+        -webkit-font-smoothing: antialiased;
       }
+
+      /* ---------- header ---------- */
       header {
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border);
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 14px;
+        padding: 12px 20px;
+        padding-top: max(12px, env(safe-area-inset-top));
         background: var(--panel);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
-      header h1 { font-size: 16px; margin: 0; font-weight: 600; }
-      header .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-      header .dot.ok { background: var(--accent-2); }
-      header .dot.bad { background: var(--err); }
-      header .status { color: var(--muted); font-size: 12px; margin-left: auto; }
-      #chat {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
+      .brand-logo { height: 26px; width: auto; display: block; }
+      .brand-text { display: flex; flex-direction: column; line-height: 1.1; border-left: 1px solid var(--border-strong); padding-left: 14px; }
+      .brand-title {
+        font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+        background: linear-gradient(90deg, #fff, #b9e6ee);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
       }
-      .msg { max-width: 860px; width: 100%; margin: 0 auto; }
-      .role { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      .brand-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+      .status-pill {
+        margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+        background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border);
+        border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted);
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 3px rgba(255,255,255,0.03); }
+      .dot.ok { background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2); }
+      .dot.bad { background: var(--err); box-shadow: 0 0 8px var(--err); }
+
+      /* ---------- chat ---------- */
+      #chat { flex: 1; overflow-y: auto; padding: 24px 20px 8px; display: flex; flex-direction: column; gap: 18px; }
+      .msg { max-width: 880px; width: 100%; margin: 0 auto; }
+      .role { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
       .bubble {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 14px 16px;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-wrap: break-word;
+        background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 16px 18px; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word;
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow);
       }
-      .msg.user .bubble { background: var(--panel-2); }
+      .msg.user .bubble {
+        background: linear-gradient(135deg, rgba(31,182,205,0.14), rgba(14,124,138,0.10));
+        border-color: rgba(31,182,205,0.28);
+      }
       pre {
-        background: #0b0f16;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 12px 14px;
-        overflow-x: auto;
-        font-family: var(--mono);
-        font-size: 13px;
-        margin: 10px 0 0;
+        background: rgba(3, 6, 11, 0.72); border: 1px solid var(--border); border-radius: 10px;
+        padding: 12px 14px; overflow-x: auto; font-family: var(--mono); font-size: 13px; margin: 10px 0 0;
       }
-      .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 4px; }
+      .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 4px; }
       .label.err { color: var(--err); }
-      img.result { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border); }
+      img.result { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 1px solid var(--border); }
       a.file-link {
-        display: inline-flex; align-items: center; gap: 6px; margin: 8px 8px 0 0;
-        padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--border);
-        border-radius: 8px; color: var(--accent); text-decoration: none; font-size: 13px;
+        display: inline-flex; align-items: center; gap: 6px; margin: 8px 8px 0 0; padding: 9px 13px;
+        background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+        color: var(--brand-2); text-decoration: none; font-size: 13px; transition: border-color .15s, transform .15s;
       }
-      a.file-link:hover { border-color: var(--accent); }
+      a.file-link:hover { border-color: var(--brand-2); transform: translateY(-1px); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
-      /* secrets panel */
-      #secretsPanel { max-width: 860px; margin: 0 auto 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-      .secrets-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-      .secrets-head code { background: var(--bg); padding: 1px 5px; border-radius: 4px; color: var(--accent); }
-      .secret-row { display: flex; gap: 8px; margin-bottom: 6px; }
-      .secret-row input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
-      .secret-row input.k { width: 160px; flex: 0 0 auto; }
-      .secret-row input.v { flex: 1; }
-      .secret-row button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; cursor: pointer; padding: 0 10px; }
+
+      /* ---------- welcome / hero ---------- */
+      .empty { max-width: 880px; width: 100%; margin: 8px auto; }
+      .hero { text-align: center; padding: 18px 6px 6px; }
+      .hero-logo { height: 46px; width: auto; margin-bottom: 18px; filter: drop-shadow(0 4px 20px rgba(31,182,205,0.35)); }
+      .hero-title {
+        font-size: clamp(30px, 7vw, 46px); margin: 0 0 10px; font-weight: 800; letter-spacing: -0.02em;
+        background: linear-gradient(100deg, #ffffff 10%, var(--brand-2) 60%, var(--brand) 100%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .hero-tag { color: var(--text); font-size: 16px; margin: 0 auto 14px; max-width: 620px; }
+      .hero-tag strong { color: var(--brand-2); }
+      .hero-lead { color: var(--muted); font-size: 14.5px; line-height: 1.6; max-width: 660px; margin: 0 auto; }
+      .tiles-head { text-align: center; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 34px 0 14px; }
+      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+      .tile {
+        background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 18px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        transition: border-color .18s, transform .18s; position: relative; overflow: hidden;
+      }
+      .tile::before { content: ""; position: absolute; inset: 0; background: radial-gradient(120px 80px at 90% -10%, var(--accent-soft), transparent 70%); opacity: 0; transition: opacity .18s; }
+      .tile:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+      .tile:hover::before { opacity: 1; }
+      .tile .ico { font-size: 22px; margin-bottom: 10px; }
+      .tile h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+      .tile p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+      .examples { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+      .ex-label { font-size: 12px; color: var(--muted); width: 100%; text-align: center; margin-bottom: 2px; }
+      button.ex {
+        background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+        border-radius: 999px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; text-align: left;
+        max-width: 420px; transition: border-color .15s, transform .15s; font-weight: 400;
+      }
+      button.ex:hover { border-color: var(--brand-2); transform: translateY(-1px); }
+      .hero-note { text-align: center; color: var(--muted); font-size: 12.5px; margin: 26px auto 6px; max-width: 620px; line-height: 1.5; }
+
+      /* ---------- secrets panel ---------- */
+      #secretsPanel { max-width: 880px; margin: 0 auto 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; backdrop-filter: blur(12px); }
+      .secrets-head { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+      .secrets-head code { background: rgba(0,0,0,0.35); padding: 1px 6px; border-radius: 5px; color: var(--brand-2); }
+      .secret-row { display: flex; gap: 8px; margin-bottom: 8px; }
+      .secret-row input { background: rgba(3,6,11,0.6); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; font-size: 13px; }
+      .secret-row input.k { width: 170px; flex: 0 0 auto; }
+      .secret-row input.v { flex: 1; min-width: 0; }
+      .secret-row input:focus { outline: none; border-color: var(--brand-2); }
+      .secret-row button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 10px; cursor: pointer; padding: 0 12px; }
       .secret-row button:hover { color: var(--err); border-color: var(--err); }
-      button.mini { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; padding: 6px 10px; border-radius: 8px; }
-      button.mini:hover { border-color: var(--accent); color: var(--accent); }
-      /* agent trace */
-      .trace-step { border-left: 2px solid var(--border); padding: 4px 0 4px 12px; margin: 10px 0; }
-      .trace-step .stephead { font-size: 12px; color: var(--muted); }
-      .trace-thought { font-size: 13px; margin: 4px 0; }
-      .trace-act { font-family: var(--mono); font-size: 12px; background: #0b0f16; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-top: 4px; display: inline-block; }
-      .trace-shot { max-width: 320px; border: 1px solid var(--border); border-radius: 6px; margin-top: 6px; display: block; }
-      .trace-status { font-size: 12px; color: var(--muted); font-style: italic; margin: 4px 0; }
-      .trace-final { border: 1px solid var(--accent-2); border-radius: 8px; padding: 12px; margin-top: 12px; }
-      .trace-final .lbl { font-size: 11px; text-transform: uppercase; color: var(--accent-2); letter-spacing: .05em; }
-      .trace-final img { max-width: 100%; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
+      button.mini { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; padding: 7px 12px; border-radius: 10px; cursor: pointer; }
+      button.mini:hover { border-color: var(--brand-2); color: var(--brand-2); }
+
+      /* ---------- agent trace ---------- */
+      .trace-step { border-left: 2px solid var(--border-strong); padding: 4px 0 6px 14px; margin: 12px 0; }
+      .trace-step .stephead { font-size: 12px; color: var(--muted); word-break: break-all; }
+      .trace-thought { font-size: 13.5px; margin: 6px 0; line-height: 1.5; }
+      .trace-act { font-family: var(--mono); font-size: 12px; background: rgba(3,6,11,0.7); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; margin-top: 4px; display: inline-block; color: var(--brand-2); }
+      .trace-shot { max-width: 340px; width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; display: block; }
+      .trace-status { font-size: 12.5px; color: var(--muted); font-style: italic; margin: 6px 0; }
+      .trace-final { border: 1px solid rgba(63,185,80,0.5); background: rgba(63,185,80,0.06); border-radius: 12px; padding: 14px; margin-top: 14px; }
+      .trace-final .lbl { font-size: 11px; text-transform: uppercase; color: var(--accent-2); letter-spacing: 0.06em; margin-bottom: 4px; }
+      .trace-final img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; }
+
+      /* ---------- footer / composer ---------- */
       footer {
-        border-top: 1px solid var(--border);
-        padding: 14px 20px;
-        background: var(--panel);
+        border-top: 1px solid var(--border); padding: 14px 20px;
+        padding-bottom: max(14px, env(safe-area-inset-bottom));
+        background: var(--panel); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
       }
-      .composer { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
-      button.ghost {
-        background: transparent; border: 1px solid var(--border); color: var(--text);
-        padding: 0 14px; font-size: 18px; height: 48px; flex: 0 0 auto;
-      }
-      button.ghost:hover { border-color: var(--accent); }
-      button.ghost.active { border-color: var(--accent); background: rgba(79,140,255,.15); }
-      #attachments { max-width: 860px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+      #attachments { max-width: 880px; margin: 0 auto 10px; display: flex; flex-wrap: wrap; gap: 8px; }
       #attachments:empty { display: none; }
-      .chip {
-        display: inline-flex; align-items: center; gap: 8px; font-size: 12px;
-        background: var(--panel-2); border: 1px solid var(--border);
-        border-radius: 999px; padding: 5px 10px; color: var(--text);
-      }
-      .chip button {
-        background: none; border: none; color: var(--muted); cursor: pointer;
-        padding: 0; font-size: 15px; line-height: 1; border-radius: 0;
-      }
+      .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; color: var(--text); }
+      .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
+      .composer {
+        max-width: 880px; margin: 0 auto; background: rgba(3,6,11,0.5); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 10px; transition: border-color .15s;
+      }
+      .composer:focus-within { border-color: rgba(31,182,205,0.45); box-shadow: 0 0 0 3px rgba(31,182,205,0.10); }
       textarea {
-        flex: 1;
-        resize: none;
-        background: var(--bg);
-        color: var(--text);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 12px 14px;
-        font-family: inherit;
-        font-size: 14px;
-        min-height: 48px;
-        max-height: 180px;
+        width: 100%; resize: none; background: transparent; color: var(--text); border: none;
+        padding: 8px 8px 4px; font-family: inherit; font-size: 15px; line-height: 1.45;
+        min-height: 26px; max-height: 180px;
       }
-      button {
-        background: var(--accent);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 0 20px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
+      textarea:focus { outline: none; }
+      textarea::placeholder { color: var(--muted); }
+      .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+      .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+      button.tool {
+        display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border); color: var(--text); height: 40px; padding: 0 13px;
+        font-size: 16px; border-radius: 12px; cursor: pointer; transition: all .15s;
       }
-      button:disabled { opacity: .5; cursor: not-allowed; }
-      .hint { max-width: 860px; margin: 8px auto 0; color: var(--muted); font-size: 11px; }
-      .empty { text-align: center; color: var(--muted); margin: auto; max-width: 480px; }
-      .empty h2 { color: var(--text); font-weight: 600; }
-      .spinner {
-        display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted);
-        border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite;
-        vertical-align: middle;
+      button.tool .tlabel { font-size: 12.5px; font-weight: 500; }
+      button.tool:hover { border-color: var(--border-strong); background: rgba(255,255,255,0.06); }
+      button.tool.active { border-color: var(--brand-2); background: var(--accent-soft); color: var(--brand-2); box-shadow: 0 0 0 1px rgba(31,182,205,0.25); }
+      #send {
+        margin-left: auto; background: linear-gradient(135deg, var(--brand-2), var(--brand));
+        color: #04121a; border: none; border-radius: 12px; padding: 0 22px; height: 40px;
+        font-size: 14px; font-weight: 700; cursor: pointer; transition: transform .12s, opacity .15s; flex: 0 0 auto;
       }
+      #send:hover { transform: translateY(-1px); }
+      #send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+      .hint { max-width: 880px; margin: 9px auto 0; color: var(--muted); font-size: 11.5px; text-align: center; }
+
+      .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 4px; }
       @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ---------- mobile ---------- */
+      @media (max-width: 640px) {
+        header { padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); gap: 10px; }
+        .brand-logo { height: 22px; }
+        .brand-sub { display: none; }
+        .brand-title { font-size: 15px; }
+        .status-pill .status { display: none; }
+        #chat { padding: 16px 12px 6px; gap: 14px; }
+        .bubble { padding: 14px 15px; border-radius: 14px; }
+        footer { padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+        button.tool { height: 42px; padding: 0 12px; }
+        button.tool .tlabel { display: none; }
+        #send { padding: 0 18px; height: 42px; }
+        .tiles { grid-template-columns: 1fr; }
+        .hero-logo { height: 38px; }
+        button.ex { max-width: 100%; }
+      }
     </style>
   </head>
   <body>
     <header>
-      <span class="dot" id="e2bDot" title="E2B"></span>
-      <h1>E2B Code Chat</h1>
-      <span class="status" id="status">checking…</span>
+      <img class="brand-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
+      <div class="brand-text">
+        <span class="brand-title">Pippos Playground</span>
+        <span class="brand-sub">AI Sandbox</span>
+      </div>
+      <div class="status-pill">
+        <span class="dot" id="e2bDot"></span>
+        <span class="status" id="status">…</span>
+      </div>
     </header>
 
     <main id="chat">
       <div class="empty" id="empty">
-        <h2>Describe what you want to build or compute</h2>
-        <p>Your prompt is turned into Python by OpenAI, executed in a fresh E2B sandbox,
-        and the output (text, tables, charts, files) is shown back here.
-        Attach files with 📎 to have the code read and modify them, then download the result.</p>
+        <div class="hero">
+          <img class="hero-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
+          <h1 class="hero-title">Pippos&nbsp;Playground</h1>
+          <p class="hero-tag">Ein Experimentierfeld für KI-Funktionen — mögliche Erweiterungen für <strong>AI:ssociate</strong>.</p>
+          <p class="hero-lead">Hier kannst du in Echtzeit ausprobieren, was eine KI leisten kann, wenn sie nicht nur Text schreibt, sondern echten Code in einer sicheren, isolierten Sandbox ausführt – und sogar einen echten Browser steuert. Jede Funktion unten ist ein Baustein für zukünftige AI:ssociate-Features.</p>
+        </div>
+
+        <h2 class="tiles-head">Was du hier testen kannst</h2>
+        <div class="tiles">
+          <div class="tile">
+            <div class="ico">💻</div>
+            <h3>Code & Datenanalyse</h3>
+            <p>Stelle eine Aufgabe in natürlicher Sprache – die KI schreibt Python, führt es in der Sandbox aus und zeigt Ergebnisse, Tabellen und Diagramme. Ideal für exakte juristische Berechnungen: Fristen, Gebühren (RATG/GGG), Zinsen, Unterhalt.</p>
+          </div>
+          <div class="tile">
+            <div class="ico">📄</div>
+            <h3>Dokumente erstellen</h3>
+            <p>Lass Verträge, Schriftsätze oder Berichte als echte Word-/PDF-Dateien generieren – aus Vorlagen und Falldaten, direkt zum Download.</p>
+          </div>
+          <div class="tile">
+            <div class="ico">📎</div>
+            <h3>Dateien bearbeiten</h3>
+            <p>Lade eigene Dateien hoch (CSV, Excel, Verträge). Die KI liest, verändert und gibt sie bearbeitet zurück – z. B. Klauseln extrahieren, Tabellen auswerten oder Dokumente anonymisieren (DSGVO).</p>
+          </div>
+          <div class="tile">
+            <div class="ico">🌐</div>
+            <h3>Browser-Automatisierung</h3>
+            <p>Ein echter, headless Browser in der Sandbox besucht Webseiten, liest Inhalte aus und erstellt Screenshots – die Basis für Recherche in RIS, Firmenbuch oder Grundbuch.</p>
+          </div>
+          <div class="tile">
+            <div class="ico">🤖</div>
+            <h3>KI-Agent</h3>
+            <p>Der Agent arbeitet Schritt für Schritt: Er sieht die Seite, entscheidet die nächste Aktion, klickt, füllt Formulare aus und meldet das Ergebnis – z. B. Login und Informationsabruf in einem Portal.</p>
+          </div>
+          <div class="tile">
+            <div class="ico">🔑</div>
+            <h3>Sichere Zugangsdaten</h3>
+            <p>Zugangsdaten werden getrennt gespeichert und nie an das KI-Modell gesendet. Der Agent nutzt sie nur als Platzhalter <code>{{PASSWORD}}</code> – wichtig für Vertraulichkeit & DSGVO.</p>
+          </div>
+        </div>
+
+        <div class="examples">
+          <span class="ex-label">Beispiele zum Ausprobieren:</span>
+          <button class="ex" onclick="fillExample(this)" data-p="Berechne die Berufungsfrist: Das Urteil wurde am 12.03.2026 zugestellt, die Frist beträgt 4 Wochen. Gib das genaue Enddatum an und berücksichtige Wochenenden.">Fristberechnung: Berufungsfrist ab Zustellung</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Erstelle eine Word-Datei mit einem einfachen Geheimhaltungsvertrag (NDA) zwischen der Muster GmbH und Max Mustermann.">Word-NDA generieren</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Öffne aissociate.at und mache einen Screenshot der Startseite.">🌐 Screenshot von aissociate.at</button>
+        </div>
+
+        <p class="hero-note">Wähle unten einen Modus (🌐 Browser · 🤖 Agent) oder stelle direkt eine Aufgabe. Für Logins nutze 🔑 Secrets – deine Zugangsdaten bleiben vor dem KI-Modell verborgen.</p>
       </div>
     </main>
 
     <footer>
       <div id="secretsPanel" hidden>
         <div class="secrets-head">
-          <span>🔑 Secrets — sent to the sandbox for the agent, never shown to the AI model (use as <code>{{NAME}}</code>)</span>
+          🔑 Secrets — werden an die Sandbox übergeben, aber <strong>nie dem KI-Modell gezeigt</strong>. Verwende sie in der Aufgabe als <code>{{NAME}}</code> (z. B. <code>{{PASSWORD}}</code>).
         </div>
         <div id="secretsRows"></div>
-        <button id="addSecret" class="mini">+ Add secret</button>
+        <button id="addSecret" class="mini">+ Secret hinzufügen</button>
       </div>
       <div id="attachments"></div>
       <div class="composer">
         <input type="file" id="fileInput" multiple hidden />
-        <button id="attach" class="ghost" title="Attach files">📎</button>
-        <button id="browserToggle" class="ghost" title="Browser mode: one-shot headless browser script">🌐</button>
-        <button id="agentToggle" class="ghost" title="Agent mode: step-by-step browser agent (observe → decide → act)">🤖</button>
-        <button id="secretsToggle" class="ghost" title="Manage secrets (credentials) for the agent">🔑</button>
-        <textarea id="input" placeholder="e.g. Add a column to my CSV, or convert my image to grayscale" rows="1"></textarea>
-        <button id="send">Run</button>
+        <textarea id="input" placeholder="Beschreibe deine Aufgabe … z. B. „Werte diese Excel-Datei aus" oder „Logge dich ein und finde X"" rows="1"></textarea>
+        <div class="composer-bar">
+          <div class="tools">
+            <button id="attach" class="tool" title="Dateien anhängen">📎</button>
+            <button id="browserToggle" class="tool" title="Browser-Modus: einmaliges Skript im headless Browser">🌐<span class="tlabel">Browser</span></button>
+            <button id="agentToggle" class="tool" title="Agent-Modus: Schritt-für-Schritt Browser-Agent">🤖<span class="tlabel">Agent</span></button>
+            <button id="secretsToggle" class="tool" title="Zugangsdaten (Secrets) verwalten">🔑<span class="tlabel">Secrets</span></button>
+          </div>
+          <button id="send">Ausführen</button>
+        </div>
       </div>
-      <div class="hint" id="hint">Enter to send · Shift+Enter for a new line · 📎 files · 🌐 browser · 🤖 agent · 🔑 secrets</div>
+      <div class="hint" id="hint">Enter zum Senden · Shift+Enter für neue Zeile · 📎 Dateien · 🌐 Browser · 🤖 Agent · 🔑 Secrets</div>
     </footer>
 
     <script>
@@ -224,12 +345,19 @@
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
 
+      function fillExample(btn) {
+        input.value = btn.dataset.p || btn.textContent
+        input.dispatchEvent(new Event('input'))
+        input.focus()
+      }
+      window.fillExample = fillExample
+
       function updateHint() {
         hint.textContent = agentMode
-          ? '🤖 Agent mode ON — the browser agent works step by step (add 🔑 secrets for logins). Type the goal, e.g. "log in and find X".'
+          ? '🤖 Agent-Modus AN — der Browser-Agent arbeitet Schritt für Schritt (für Logins 🔑 Secrets hinzufügen). Beschreibe das Ziel, z. B. „einloggen und X finden".'
           : browserMode
-            ? '🌐 Browser mode ON — one-shot headless Chromium in the sandbox (first run installs it, ~1 min)'
-            : 'Enter to send · Shift+Enter for a new line · 📎 files · 🌐 browser · 🤖 agent · 🔑 secrets'
+            ? '🌐 Browser-Modus AN — einmaliges headless Chromium in der Sandbox (erster Lauf installiert es, ~1 Min)'
+            : 'Enter zum Senden · Shift+Enter für neue Zeile · 📎 Dateien · 🌐 Browser · 🤖 Agent · 🔑 Secrets'
       }
 
       function renderSecrets() {
@@ -237,13 +365,13 @@
         secretRows.forEach((row, i) => {
           const div = el('div', 'secret-row')
           const k = el('input', 'k')
-          k.placeholder = 'NAME (e.g. PASSWORD)'
+          k.placeholder = 'NAME (z. B. PASSWORD)'
           k.value = row.name
           k.addEventListener('input', () => (row.name = k.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_')))
           k.addEventListener('blur', () => { k.value = row.name })
           const v = el('input', 'v')
           v.type = 'password'
-          v.placeholder = 'value (kept on server, hidden from the AI)'
+          v.placeholder = 'Wert (bleibt am Server, für die KI verborgen)'
           v.value = row.value
           v.addEventListener('input', () => (row.value = v.value))
           const x = el('button', null, '×')
@@ -274,11 +402,11 @@
       async function addFiles(fileList) {
         for (const file of fileList) {
           if (pendingFiles.length >= MAX_UPLOADS) {
-            alert(`You can attach at most ${MAX_UPLOADS} files per message.`)
+            alert(`Du kannst höchstens ${MAX_UPLOADS} Dateien pro Nachricht anhängen.`)
             break
           }
           if (file.size > MAX_UPLOAD_BYTES) {
-            alert(`"${file.name}" is ${fmtSize(file.size)} — over the ${MAX_UPLOAD_BYTES / 1024 / 1024} MB limit.`)
+            alert(`„${file.name}" ist ${fmtSize(file.size)} — über dem Limit von ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`)
             continue
           }
           const base64 = await readAsBase64(file)
@@ -293,7 +421,7 @@
           const chip = el('span', 'chip', '')
           chip.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`))
           const x = el('button', null, '×')
-          x.title = 'Remove'
+          x.title = 'Entfernen'
           x.addEventListener('click', () => {
             pendingFiles.splice(i, 1)
             renderAttachments()
@@ -310,11 +438,11 @@
           const ready = h.openai && h.e2b
           e2bDot.className = 'dot ' + (ready ? 'ok' : 'bad')
           statusEl.textContent = ready
-            ? `model: ${h.model}`
-            : `missing keys: ${[!h.openai && 'OPENAI_API_KEY', !h.e2b && 'E2B_API_KEY'].filter(Boolean).join(', ')}`
+            ? `Modell: ${h.model}`
+            : `Fehlende Keys: ${[!h.openai && 'OPENAI_API_KEY', !h.e2b && 'E2B_API_KEY'].filter(Boolean).join(', ')}`
         } catch {
           e2bDot.className = 'dot bad'
-          statusEl.textContent = 'server unreachable'
+          statusEl.textContent = 'Server nicht erreichbar'
         }
       }
 
@@ -334,7 +462,7 @@
       function addMessage(role) {
         empty?.remove()
         const wrap = el('div', 'msg ' + role)
-        wrap.appendChild(el('div', 'role', role === 'user' ? 'You' : 'Assistant'))
+        wrap.appendChild(el('div', 'role', role === 'user' ? 'Du' : 'Assistent'))
         const bubble = el('div', 'bubble')
         wrap.appendChild(bubble)
         chat.appendChild(wrap)
@@ -345,13 +473,13 @@
       function renderResult(bubble, data) {
         bubble.innerHTML = ''
         if (data.error) {
-          bubble.appendChild(el('div', 'label err', 'Error'))
+          bubble.appendChild(el('div', 'label err', 'Fehler'))
           bubble.appendChild(el('pre', null, data.error))
           return
         }
         if (data.explanation) bubble.appendChild(el('div', null, data.explanation))
         if (data.code) {
-          bubble.appendChild(el('div', 'label', 'Generated code'))
+          bubble.appendChild(el('div', 'label', 'Generierter Code'))
           bubble.appendChild(el('pre', null, data.code))
         }
         const ex = data.execution
@@ -360,11 +488,11 @@
             bubble.appendChild(el('div', 'file-note', '⚠ ' + ex.note))
           }
           if (ex.stdout) {
-            bubble.appendChild(el('div', 'label', 'Output'))
+            bubble.appendChild(el('div', 'label', 'Ausgabe'))
             bubble.appendChild(el('pre', null, ex.stdout))
           }
           ex.text?.forEach((t) => {
-            bubble.appendChild(el('div', 'label', 'Result'))
+            bubble.appendChild(el('div', 'label', 'Ergebnis'))
             bubble.appendChild(el('pre', null, t))
           })
           ex.images?.forEach((src) => {
@@ -373,13 +501,13 @@
             bubble.appendChild(img)
           })
           if (ex.files?.length) {
-            bubble.appendChild(el('div', 'label', 'Files'))
+            bubble.appendChild(el('div', 'label', 'Dateien'))
             ex.files.forEach((f) => {
               if (f.tooLarge) {
-                bubble.appendChild(el('div', 'file-note', `${f.name} — ${fmtSize(f.size)}, too large to download`))
+                bubble.appendChild(el('div', 'file-note', `${f.name} — ${fmtSize(f.size)}, zu groß zum Download`))
                 return
               }
-              // Show images (e.g. browser screenshots) inline, then link them.
+              // Bilder (z. B. Browser-Screenshots) inline zeigen, dann verlinken.
               if (IMG_RE.test(f.name) && f.base64) {
                 const img = el('img', 'result')
                 img.src = `data:image/png;base64,${f.base64}`
@@ -392,7 +520,7 @@
             })
           }
           if (ex.error) {
-            bubble.appendChild(el('div', 'label err', 'Runtime error'))
+            bubble.appendChild(el('div', 'label err', 'Laufzeitfehler'))
             bubble.appendChild(el('pre', null, ex.error))
           }
           if (ex.stderr) {
@@ -409,14 +537,14 @@
         const trace = el('div', 'trace')
         bubble.appendChild(trace)
         const spin = el('div', 'trace-status')
-        spin.innerHTML = '<span class="spinner"></span> Starting agent…'
+        spin.innerHTML = '<span class="spinner"></span> Agent wird gestartet…'
         trace.appendChild(spin)
 
         const stepEls = {}
         function stepEl(n) {
           if (!stepEls[n]) {
             const s = el('div', 'trace-step')
-            s.appendChild(el('div', 'stephead', `Step ${n}`))
+            s.appendChild(el('div', 'stephead', `Schritt ${n}`))
             trace.appendChild(s)
             stepEls[n] = s
           }
@@ -428,7 +556,7 @@
             spin.innerHTML = '<span class="spinner"></span> ' + ev.message
           } else if (ev.event === 'observation') {
             const s = stepEl(ev.step)
-            s.querySelector('.stephead').textContent = `Step ${ev.step} — ${ev.url || ''}`
+            s.querySelector('.stephead').textContent = `Schritt ${ev.step} — ${ev.url || ''}`
             if (ev.screenshot) {
               const img = el('img', 'trace-shot')
               img.src = `data:image/png;base64,${ev.screenshot}`
@@ -441,8 +569,8 @@
           } else if (ev.event === 'final') {
             spin.remove()
             const f = el('div', 'trace-final')
-            f.appendChild(el('div', 'lbl', 'Result'))
-            f.appendChild(el('div', null, ev.answer || '(no answer)'))
+            f.appendChild(el('div', 'lbl', 'Ergebnis'))
+            f.appendChild(el('div', null, ev.answer || '(keine Antwort)'))
             if (ev.screenshot) {
               const img = el('img')
               img.src = `data:image/png;base64,${ev.screenshot}`
@@ -451,7 +579,7 @@
             trace.appendChild(f)
           } else if (ev.event === 'error') {
             spin.remove()
-            const e = el('div', 'label err', 'Agent error')
+            const e = el('div', 'label err', 'Agent-Fehler')
             trace.appendChild(e)
             trace.appendChild(el('pre', null, ev.message))
           }
@@ -465,7 +593,7 @@
             body: JSON.stringify({ task, secrets: collectSecrets() }),
           })
           if (!resp.ok || !resp.body) {
-            let msg = 'Request failed'
+            let msg = 'Anfrage fehlgeschlagen'
             try { msg = (await resp.json()).error || msg } catch {}
             throw new Error(msg)
           }
@@ -520,8 +648,8 @@
 
         const bubble = addMessage('assistant')
         bubble.innerHTML = browserMode
-          ? '<span class="spinner"></span> Generating & running in a browser sandbox (first run installs Chromium, ~1 min)…'
-          : '<span class="spinner"></span> Generating & running…'
+          ? '<span class="spinner"></span> Wird im Browser-Sandbox generiert & ausgeführt (erster Lauf installiert Chromium, ~1 Min)…'
+          : '<span class="spinner"></span> Wird generiert & ausgeführt…'
 
         try {
           const r = await fetch('/api/chat', {
@@ -535,7 +663,7 @@
             }),
           })
           const data = await r.json()
-          if (!r.ok) throw new Error(data.error || 'Request failed')
+          if (!r.ok) throw new Error(data.error || 'Anfrage fehlgeschlagen')
           renderResult(bubble, data)
           history.push({ role: 'user', content: prompt })
           if (data.code || data.explanation) {
@@ -573,7 +701,7 @@
       attach.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', async () => {
         await addFiles(fileInput.files)
-        fileInput.value = '' // allow re-selecting the same file
+        fileInput.value = '' // erlaubt erneutes Auswählen derselben Datei
       })
       send.addEventListener('click', submit)
       input.addEventListener('keydown', (e) => {
