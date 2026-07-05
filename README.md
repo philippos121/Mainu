@@ -7,6 +7,15 @@ the code runs in a disposable **[E2B](https://e2b.dev) sandbox**, and the output
 You can also **attach files** (📎): they are uploaded into the sandbox, the generated code
 reads/modifies them, and any resulting files come back as downloads.
 
+### Modes
+
+| Toggle | What it does |
+|--------|--------------|
+| 📎 | Attach files → uploaded into the sandbox for the code to read/modify |
+| 🌐 | **Browser (one-shot):** the model writes a single Playwright script run in headless Chromium |
+| 🤖 | **Agent:** a step-by-step browser agent — it observes the page's elements, decides one action, acts, and repeats (login flows, multi-step tasks). Progress streams live. |
+| 🔑 | **Secrets:** name/value credentials sent to the sandbox for the agent but **never shown to the AI model**. Reference them in the task as `{{NAME}}` (e.g. `{{PASSWORD}}`); the server substitutes the real value only at execution time. |
+
 ```
 You ──prompt──▶ Express server ──▶ OpenAI (writes Python)
                                  └▶ E2B sandbox (runs it) ──▶ results ──▶ You

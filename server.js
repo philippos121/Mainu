@@ -274,6 +274,330 @@ app.post('/api/chat', async (req, res) => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// Agentic browser mode: an observe -> decide -> act loop. The model sees the
+// page's interactive elements each step and picks ONE action. Secrets stay on
+// the server and are substituted into actions at execution time, so the model
+// only ever sees placeholder names like {{PASSWORD}}.
+// ---------------------------------------------------------------------------
+
+const AGENT_MAX_STEPS = 14
+const AGENT_SANDBOX_MS = 600_000
+
+// Installs Playwright + Chromium inside the run kernel (same cache the launch uses).
+const AGENT_INSTALL_CODE = [
+  'import subprocess, sys',
+  'subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "playwright"], check=True)',
+  'subprocess.run([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"], check=True)',
+  'print("BROWSER_SETUP_DONE")',
+].join('\n')
+
+// Starts a persistent browser kept alive across runCode calls (no context manager).
+const AGENT_START_CODE = [
+  'from playwright.async_api import async_playwright',
+  'pw = await async_playwright().start()',
+  'browser = await pw.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])',
+  'page = await browser.new_page(viewport={"width": 1280, "height": 900})',
+  'print("BROWSER_STARTED")',
+].join('\n')
+
+const AGENT_CLEANUP_CODE = [
+  'try:',
+  '    await browser.close()',
+  'except Exception:',
+  '    pass',
+  'try:',
+  '    await pw.stop()',
+  'except Exception:',
+  '    pass',
+  'print("CLEANED")',
+].join('\n')
+
+// Tags each visible interactive element with a data-agent-ref and returns a
+// compact descriptor list. No backslashes / ${} so it is safe in a template.
+const OBSERVE_JS = `() => {
+  const items = [];
+  const els = document.querySelectorAll('a,button,input,textarea,select,[role=button],[role=link],[role=textbox],[contenteditable=true]');
+  let i = 0;
+  for (const el of els) {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    if (r.width <= 0 || r.height <= 0 || cs.visibility === 'hidden' || cs.display === 'none') continue;
+    el.setAttribute('data-agent-ref', String(i));
+    const label = (el.innerText || el.value || el.getAttribute('placeholder') || el.getAttribute('aria-label') || el.getAttribute('name') || '');
+    items.push({ ref: i, tag: el.tagName.toLowerCase(), type: el.getAttribute('type') || '', name: el.getAttribute('name') || '', label: String(label).slice(0, 100) });
+    i++;
+  }
+  return items;
+}`
+
+function agentSystemPrompt(secretNames) {
+  const secrets = secretNames.length ? secretNames.join(', ') : '(none provided)'
+  return `You are a web-automation agent driving a headless Chromium browser ONE step at a time.
+Each turn you get the current page (URL, TITLE, a numbered list of visible INTERACTIVE ELEMENTS) and the recent actions.
+Choose EXACTLY ONE next action to progress on the TASK. Reply with ONLY a JSON object — no prose, no code fences.
+
+Action formats:
+{"thought":"...","action":"goto","url":"https://..."}
+{"thought":"...","action":"click","ref":<number>}
+{"thought":"...","action":"fill","ref":<number>,"text":"value"}
+{"thought":"...","action":"press","key":"Enter","ref":<optional number>}
+{"thought":"...","action":"scroll","amount":800}
+{"thought":"...","action":"wait","seconds":3}
+{"thought":"...","action":"extract"}
+{"thought":"...","action":"done","answer":"the result/answer for the user"}
+{"thought":"...","action":"fail","answer":"why it is impossible"}
+
+Rules:
+- Refer to elements ONLY by their ref number from the ELEMENTS list.
+- To log in: reach the login form (you may first need to click a "Login"/"Einloggen" link), fill email and password, then click submit.
+- SECRETS available: ${secrets}. NEVER guess them. Use them ONLY as placeholders in "text", written EXACTLY as {{NAME}} (e.g. {{PASSWORD}}). You will never see the real values; they are substituted at execution time.
+- After any action that changes the page, the next turn shows the new page — re-check before continuing.
+- Use "extract" when you need the page's text (e.g. to read an answer). When the TASK is achieved, use "done" with the answer. If truly stuck, use "fail".`
+}
+
+function parseJsonObject(s) {
+  if (typeof s !== 'string') return null
+  try {
+    return JSON.parse(s)
+  } catch {}
+  const a = s.indexOf('{')
+  const b = s.lastIndexOf('}')
+  if (a >= 0 && b > a) {
+    try {
+      return JSON.parse(s.slice(a, b + 1))
+    } catch {}
+  }
+  return null
+}
+
+function substituteSecrets(text, secrets) {
+  return String(text).replace(/\{\{(\w+)\}\}/g, (m, name) =>
+    Object.prototype.hasOwnProperty.call(secrets, name) ? secrets[name] : m,
+  )
+}
+
+function describeAction(d) {
+  switch (d.action) {
+    case 'goto': return `goto ${d.url || ''}`
+    case 'click': return `click [${d.ref}]`
+    case 'fill': return `fill [${d.ref}] ${d.text || ''}` // text keeps the {{placeholder}}
+    case 'press': return `press ${d.key || 'Enter'}${Number.isInteger(d.ref) ? ` [${d.ref}]` : ''}`
+    case 'scroll': return `scroll ${d.amount || 800}`
+    case 'wait': return `wait ${d.seconds || 2}s`
+    case 'extract': return 'extract page text'
+    case 'done': return `done: ${d.answer || ''}`
+    case 'fail': return `fail: ${d.answer || ''}`
+    default: return `unknown (${d.action})`
+  }
+}
+
+function buildActionPy(d, secrets) {
+  const J = JSON.stringify
+  const hasRef = Number.isInteger(d.ref)
+  const sel = hasRef ? `[data-agent-ref="${d.ref}"]` : null
+  const wrap = (body) =>
+    'try:\n' +
+    body.split('\n').map((l) => '    ' + l).join('\n') +
+    '\nexcept Exception as e:\n    print("<<<ERR>>>"+repr(e))'
+  const waitLoad =
+    'try:\n    await page.wait_for_load_state("networkidle", timeout=8000)\nexcept Exception:\n    pass'
+
+  switch (d.action) {
+    case 'goto':
+      return wrap(`await page.goto(${J(String(d.url || ''))}, wait_until="domcontentloaded", timeout=45000)\nprint("OK")`)
+    case 'click':
+      if (!sel) return null
+      return wrap(`await page.click(${J(sel)}, timeout=15000)\n${waitLoad}\nprint("OK")`)
+    case 'fill': {
+      if (!sel) return null
+      const val = substituteSecrets(d.text || '', secrets)
+      return wrap(`await page.fill(${J(sel)}, ${J(val)}, timeout=15000)\nprint("OK")`)
+    }
+    case 'press': {
+      const key = J(String(d.key || 'Enter'))
+      const press = sel
+        ? `await page.press(${J(sel)}, ${key}, timeout=15000)`
+        : `await page.keyboard.press(${key})`
+      return wrap(`${press}\n${waitLoad}\nprint("OK")`)
+    }
+    case 'scroll':
+      return wrap(`await page.mouse.wheel(0, ${Number(d.amount) || 800})\nprint("OK")`)
+    case 'wait':
+      return wrap(`await page.wait_for_timeout(${Math.min(Math.max(Number(d.seconds) || 2, 1), 10) * 1000})\nprint("OK")`)
+    case 'extract':
+      return wrap('_t = await page.inner_text("body")\nprint("<<<TEXT>>>"+_t[:4000])')
+    default:
+      return null
+  }
+}
+
+async function agentObserve(sandbox) {
+  const code =
+    'import json\n' +
+    `_els = await page.evaluate(${JSON.stringify(OBSERVE_JS)})\n` +
+    'await page.screenshot(path="__step.png")\n' +
+    'print("<<<OBS>>>"+json.dumps({"url": page.url, "title": (await page.title()), "elements": _els}))'
+  const ex = await sandbox.runCode(code, { timeoutMs: 30_000 })
+  const out = (ex.logs?.stdout ?? []).join('')
+  let info = { url: '', title: '', elements: [] }
+  const i = out.indexOf('<<<OBS>>>')
+  if (i >= 0) {
+    try {
+      info = JSON.parse(out.slice(i + 9))
+    } catch {}
+  }
+  info.elements = (info.elements || []).map((e) => ({
+    ...e,
+    label: String(e.label || '').replace(/\s+/g, ' ').trim(),
+  }))
+  let screenshot = null
+  try {
+    const b = await sandbox.files.read(`${WORKDIR}/__step.png`, { format: 'bytes' })
+    screenshot = Buffer.from(b).toString('base64')
+  } catch {}
+  return { ...info, screenshot }
+}
+
+async function agentExecute(sandbox, d, secrets) {
+  const code = buildActionPy(d, secrets)
+  if (!code) return { error: 'unknown or malformed action' }
+  const ex = await sandbox.runCode(code, { timeoutMs: 60_000 })
+  const out = (ex.logs?.stdout ?? []).join('')
+  if (ex.error) return { error: `${ex.error.name}: ${ex.error.value}` }
+  const ei = out.indexOf('<<<ERR>>>')
+  if (ei >= 0) return { error: out.slice(ei + 9).trim().slice(0, 300) }
+  const ti = out.indexOf('<<<TEXT>>>')
+  if (ti >= 0) return { text: out.slice(ti + 10) }
+  return { ok: true }
+}
+
+async function agentDecide({ task, obs, recent, secretNames }) {
+  const elems = obs.elements
+    .map(
+      (e) =>
+        `[${e.ref}] <${e.tag}${e.type ? ` type=${e.type}` : ''}${e.name ? ` name=${e.name}` : ''}> ${JSON.stringify(e.label)}`,
+    )
+    .join('\n')
+    .slice(0, 6000)
+  const recentStr = recent.slice(-8).map((a, i) => `${i + 1}. ${a}`).join('\n') || '(none yet)'
+  const user = `TASK: ${task}
+
+CURRENT PAGE
+URL: ${obs.url}
+TITLE: ${obs.title}
+
+INTERACTIVE ELEMENTS:
+${elems || '(none)'}
+
+RECENT ACTIONS:
+${recentStr}
+
+Respond with ONLY the next action as a JSON object.`
+  const completion = await getOpenAI().chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      { role: 'system', content: agentSystemPrompt(secretNames) },
+      { role: 'user', content: user },
+    ],
+  })
+  const raw = completion.choices[0]?.message?.content ?? ''
+  return parseJsonObject(raw) || { action: 'fail', answer: 'Could not parse the model output.', thought: '' }
+}
+
+app.post('/api/agent', async (req, res) => {
+  // Server-Sent-Events style stream so long runs keep the connection alive.
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders?.()
+  const send = (event, data) => res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`)
+
+  if (!OPENAI_API_KEY || !E2B_API_KEY) {
+    send('error', { message: 'Server is missing OPENAI_API_KEY or E2B_API_KEY.' })
+    return res.end()
+  }
+
+  const { task, secrets: rawSecrets = {}, maxSteps } = req.body ?? {}
+  if (!task || typeof task !== 'string') {
+    send('error', { message: 'Missing "task" in request body.' })
+    return res.end()
+  }
+  const secrets = {}
+  for (const [k, v] of Object.entries(rawSecrets || {})) {
+    if (/^\w+$/.test(k) && typeof v === 'string' && v.length) secrets[k] = v
+  }
+  const secretNames = Object.keys(secrets)
+  const steps = Math.min(Math.max(Number(maxSteps) || AGENT_MAX_STEPS, 1), AGENT_MAX_STEPS)
+
+  let sandbox
+  try {
+    send('status', { message: 'Starting sandbox…' })
+    sandbox = await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
+
+    send('status', { message: 'Installing Chromium (first run, ~1 min)…' })
+    const inst = await sandbox.runCode(AGENT_INSTALL_CODE, { timeoutMs: BROWSER_SETUP_TIMEOUT_MS })
+    if (inst.error) {
+      send('error', { message: `Browser install failed: ${inst.error.value}` })
+      return
+    }
+
+    send('status', { message: 'Launching browser…' })
+    const start = await sandbox.runCode(AGENT_START_CODE, { timeoutMs: 60_000 })
+    if (start.error) {
+      send('error', { message: `Browser launch failed: ${start.error.value}` })
+      return
+    }
+    if (secretNames.length) send('status', { message: `Secrets loaded: ${secretNames.join(', ')}` })
+
+    const recent = []
+    let answer = null
+    for (let step = 1; step <= steps; step++) {
+      const obs = await agentObserve(sandbox)
+      send('observation', { step, url: obs.url, title: obs.title, screenshot: obs.screenshot })
+
+      const d = await agentDecide({ task, obs, recent, secretNames })
+      const summary = describeAction(d)
+      send('action', { step, thought: d.thought || '', summary })
+
+      if (d.action === 'done') {
+        answer = d.answer || 'Task complete.'
+        break
+      }
+      if (d.action === 'fail') {
+        answer = '⚠ ' + (d.answer || 'Agent could not complete the task.')
+        break
+      }
+
+      const r = await agentExecute(sandbox, d, secrets)
+      recent.push(
+        summary +
+          (r.error ? ` -> ERROR ${r.error}` : '') +
+          (r.text ? ` -> ${r.text.replace(/\s+/g, ' ').slice(0, 400)}` : ''),
+      )
+      if (r.error) send('status', { message: `Step ${step}: ${summary} — ${r.error}` })
+    }
+
+    if (answer == null) answer = 'Reached the step limit before finishing the task.'
+    const finalObs = await agentObserve(sandbox)
+    send('final', { answer, url: finalObs.url, screenshot: finalObs.screenshot })
+  } catch (err) {
+    console.error('agent error:', err)
+    send('error', { message: err?.message ?? 'Unknown agent error.' })
+  } finally {
+    if (sandbox) {
+      try {
+        await sandbox.runCode(AGENT_CLEANUP_CODE, { timeoutMs: 20_000 })
+      } catch {}
+      try {
+        await sandbox.kill()
+      } catch {}
+    }
+    res.end()
+  }
+})
+
 app.listen(PORT, () => {
   console.log(`e2b-code-chat listening on http://localhost:${PORT}`)
 })

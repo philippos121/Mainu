@@ -80,6 +80,28 @@
       }
       a.file-link:hover { border-color: var(--accent); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+      /* secrets panel */
+      #secretsPanel { max-width: 860px; margin: 0 auto 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+      .secrets-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+      .secrets-head code { background: var(--bg); padding: 1px 5px; border-radius: 4px; color: var(--accent); }
+      .secret-row { display: flex; gap: 8px; margin-bottom: 6px; }
+      .secret-row input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+      .secret-row input.k { width: 160px; flex: 0 0 auto; }
+      .secret-row input.v { flex: 1; }
+      .secret-row button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; cursor: pointer; padding: 0 10px; }
+      .secret-row button:hover { color: var(--err); border-color: var(--err); }
+      button.mini { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; padding: 6px 10px; border-radius: 8px; }
+      button.mini:hover { border-color: var(--accent); color: var(--accent); }
+      /* agent trace */
+      .trace-step { border-left: 2px solid var(--border); padding: 4px 0 4px 12px; margin: 10px 0; }
+      .trace-step .stephead { font-size: 12px; color: var(--muted); }
+      .trace-thought { font-size: 13px; margin: 4px 0; }
+      .trace-act { font-family: var(--mono); font-size: 12px; background: #0b0f16; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-top: 4px; display: inline-block; }
+      .trace-shot { max-width: 320px; border: 1px solid var(--border); border-radius: 6px; margin-top: 6px; display: block; }
+      .trace-status { font-size: 12px; color: var(--muted); font-style: italic; margin: 4px 0; }
+      .trace-final { border: 1px solid var(--accent-2); border-radius: 8px; padding: 12px; margin-top: 12px; }
+      .trace-final .lbl { font-size: 11px; text-transform: uppercase; color: var(--accent-2); letter-spacing: .05em; }
+      .trace-final img { max-width: 100%; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
       footer {
         border-top: 1px solid var(--border);
         padding: 14px 20px;
@@ -156,15 +178,24 @@
     </main>
 
     <footer>
+      <div id="secretsPanel" hidden>
+        <div class="secrets-head">
+          <span>🔑 Secrets — sent to the sandbox for the agent, never shown to the AI model (use as <code>{{NAME}}</code>)</span>
+        </div>
+        <div id="secretsRows"></div>
+        <button id="addSecret" class="mini">+ Add secret</button>
+      </div>
       <div id="attachments"></div>
       <div class="composer">
         <input type="file" id="fileInput" multiple hidden />
         <button id="attach" class="ghost" title="Attach files">📎</button>
-        <button id="browserToggle" class="ghost" title="Browser mode: run a headless browser (Playwright + Chromium) in the sandbox">🌐</button>
+        <button id="browserToggle" class="ghost" title="Browser mode: one-shot headless browser script">🌐</button>
+        <button id="agentToggle" class="ghost" title="Agent mode: step-by-step browser agent (observe → decide → act)">🤖</button>
+        <button id="secretsToggle" class="ghost" title="Manage secrets (credentials) for the agent">🔑</button>
         <textarea id="input" placeholder="e.g. Add a column to my CSV, or convert my image to grayscale" rows="1"></textarea>
         <button id="send">Run</button>
       </div>
-      <div class="hint" id="hint">Enter to send · Shift+Enter for a new line · 📎 attach files · 🌐 browser mode</div>
+      <div class="hint" id="hint">Enter to send · Shift+Enter for a new line · 📎 files · 🌐 browser · 🤖 agent · 🔑 secrets</div>
     </footer>
 
     <script>
@@ -178,13 +209,55 @@
       const fileInput = document.getElementById('fileInput')
       const attachments = document.getElementById('attachments')
       const browserToggle = document.getElementById('browserToggle')
+      const agentToggle = document.getElementById('agentToggle')
+      const secretsToggle = document.getElementById('secretsToggle')
+      const secretsPanel = document.getElementById('secretsPanel')
+      const secretsRowsEl = document.getElementById('secretsRows')
+      const addSecret = document.getElementById('addSecret')
       const hint = document.getElementById('hint')
 
       const history = [] // {role, content} pairs sent back to the model for context
       let pendingFiles = [] // {name, base64, size} to upload with the next prompt
       let browserMode = false
+      let agentMode = false
+      const secretRows = [] // {name, value}
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
+
+      function updateHint() {
+        hint.textContent = agentMode
+          ? '🤖 Agent mode ON — the browser agent works step by step (add 🔑 secrets for logins). Type the goal, e.g. "log in and find X".'
+          : browserMode
+            ? '🌐 Browser mode ON — one-shot headless Chromium in the sandbox (first run installs it, ~1 min)'
+            : 'Enter to send · Shift+Enter for a new line · 📎 files · 🌐 browser · 🤖 agent · 🔑 secrets'
+      }
+
+      function renderSecrets() {
+        secretsRowsEl.innerHTML = ''
+        secretRows.forEach((row, i) => {
+          const div = el('div', 'secret-row')
+          const k = el('input', 'k')
+          k.placeholder = 'NAME (e.g. PASSWORD)'
+          k.value = row.name
+          k.addEventListener('input', () => (row.name = k.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_')))
+          k.addEventListener('blur', () => { k.value = row.name })
+          const v = el('input', 'v')
+          v.type = 'password'
+          v.placeholder = 'value (kept on server, hidden from the AI)'
+          v.value = row.value
+          v.addEventListener('input', () => (row.value = v.value))
+          const x = el('button', null, '×')
+          x.addEventListener('click', () => { secretRows.splice(i, 1); renderSecrets() })
+          div.append(k, v, x)
+          secretsRowsEl.appendChild(div)
+        })
+      }
+
+      function collectSecrets() {
+        const out = {}
+        secretRows.forEach((r) => { if (r.name && r.value) out[r.name] = r.value })
+        return out
+      }
 
       const MAX_UPLOADS = 5
       const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -330,6 +403,93 @@
         chat.scrollTop = chat.scrollHeight
       }
 
+      async function runAgent(task) {
+        const bubble = addMessage('assistant')
+        bubble.innerHTML = ''
+        const trace = el('div', 'trace')
+        bubble.appendChild(trace)
+        const spin = el('div', 'trace-status')
+        spin.innerHTML = '<span class="spinner"></span> Starting agent…'
+        trace.appendChild(spin)
+
+        const stepEls = {}
+        function stepEl(n) {
+          if (!stepEls[n]) {
+            const s = el('div', 'trace-step')
+            s.appendChild(el('div', 'stephead', `Step ${n}`))
+            trace.appendChild(s)
+            stepEls[n] = s
+          }
+          return stepEls[n]
+        }
+
+        function handle(ev) {
+          if (ev.event === 'status') {
+            spin.innerHTML = '<span class="spinner"></span> ' + ev.message
+          } else if (ev.event === 'observation') {
+            const s = stepEl(ev.step)
+            s.querySelector('.stephead').textContent = `Step ${ev.step} — ${ev.url || ''}`
+            if (ev.screenshot) {
+              const img = el('img', 'trace-shot')
+              img.src = `data:image/png;base64,${ev.screenshot}`
+              s.appendChild(img)
+            }
+          } else if (ev.event === 'action') {
+            const s = stepEl(ev.step)
+            if (ev.thought) s.appendChild(el('div', 'trace-thought', ev.thought))
+            s.appendChild(el('div', 'trace-act', '▶ ' + ev.summary))
+          } else if (ev.event === 'final') {
+            spin.remove()
+            const f = el('div', 'trace-final')
+            f.appendChild(el('div', 'lbl', 'Result'))
+            f.appendChild(el('div', null, ev.answer || '(no answer)'))
+            if (ev.screenshot) {
+              const img = el('img')
+              img.src = `data:image/png;base64,${ev.screenshot}`
+              f.appendChild(img)
+            }
+            trace.appendChild(f)
+          } else if (ev.event === 'error') {
+            spin.remove()
+            const e = el('div', 'label err', 'Agent error')
+            trace.appendChild(e)
+            trace.appendChild(el('pre', null, ev.message))
+          }
+          chat.scrollTop = chat.scrollHeight
+        }
+
+        try {
+          const resp = await fetch('/api/agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task, secrets: collectSecrets() }),
+          })
+          if (!resp.ok || !resp.body) {
+            let msg = 'Request failed'
+            try { msg = (await resp.json()).error || msg } catch {}
+            throw new Error(msg)
+          }
+          const reader = resp.body.getReader()
+          const decoder = new TextDecoder()
+          let buf = ''
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += decoder.decode(value, { stream: true })
+            let idx
+            while ((idx = buf.indexOf('\n\n')) >= 0) {
+              const chunk = buf.slice(0, idx)
+              buf = buf.slice(idx + 2)
+              if (chunk.startsWith('data: ')) {
+                try { handle(JSON.parse(chunk.slice(6))) } catch {}
+              }
+            }
+          }
+        } catch (err) {
+          handle({ event: 'error', message: err.message })
+        }
+      }
+
       async function submit() {
         const prompt = input.value.trim()
         if (!prompt) return
@@ -347,6 +507,17 @@
           const note = el('div', 'file-note', '📎 ' + uploads.map((f) => f.name).join(', '))
           userBubble.appendChild(note)
         }
+
+        if (agentMode) {
+          try {
+            await runAgent(prompt)
+          } finally {
+            send.disabled = false
+            input.focus()
+          }
+          return
+        }
+
         const bubble = addMessage('assistant')
         bubble.innerHTML = browserMode
           ? '<span class="spinner"></span> Generating & running in a browser sandbox (first run installs Chromium, ~1 min)…'
@@ -380,11 +551,25 @@
 
       browserToggle.addEventListener('click', () => {
         browserMode = !browserMode
+        if (browserMode) { agentMode = false; agentToggle.classList.remove('active') }
         browserToggle.classList.toggle('active', browserMode)
-        hint.textContent = browserMode
-          ? '🌐 Browser mode ON — a headless Chromium runs in the sandbox (first run installs it, ~1 min)'
-          : 'Enter to send · Shift+Enter for a new line · 📎 attach files · 🌐 browser mode'
+        updateHint()
       })
+      agentToggle.addEventListener('click', () => {
+        agentMode = !agentMode
+        if (agentMode) { browserMode = false; browserToggle.classList.remove('active') }
+        agentToggle.classList.toggle('active', agentMode)
+        updateHint()
+      })
+      secretsToggle.addEventListener('click', () => {
+        secretsPanel.hidden = !secretsPanel.hidden
+        secretsToggle.classList.toggle('active', !secretsPanel.hidden)
+        if (!secretsPanel.hidden && secretRows.length === 0) {
+          secretRows.push({ name: 'EMAIL', value: '' }, { name: 'PASSWORD', value: '' })
+          renderSecrets()
+        }
+      })
+      addSecret.addEventListener('click', () => { secretRows.push({ name: '', value: '' }); renderSecrets() })
       attach.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', async () => {
         await addFiles(fileInput.files)
