@@ -87,6 +87,7 @@
       a.file-link:hover { border-color: var(--border-strong); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
       .pdf-preview { width: 100%; height: 460px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; }
+      .html-preview { width: 100%; height: 460px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; background: #fff; }
 
       /* welcome */
       .empty { max-width: 740px; width: 100%; margin: 24px auto; }
@@ -239,9 +240,8 @@
 
         <div class="examples">
           <div class="ex-label">Beispiele für Juristen — Dateien anhängen (📎) und starten</div>
-          <button class="ex" onclick="fillExample(this)" data-p="Vergleiche die hochgeladenen Dokumente und zeige die Unterschiede (Delta) klar auf: geänderte, ergänzte und gelöschte Passagen, mit kurzer Zusammenfassung der wesentlichen Änderungen.">Mehrere Verträge vergleichen — Delta-Ansicht</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Vergleiche die zwei hochgeladenen Dokumente und erstelle eine visuelle Delta-Ansicht (rot/grün, wie Nachverfolgen von Änderungen) als HTML-Datei mit dem Namen delta.html. Fasse darunter die wesentlichen Änderungen kurz zusammen.">Dokumente vergleichen — Delta-Ansicht</button>
           <button class="ex" onclick="fillExample(this)" data-p="Lies alle hochgeladenen Dateien und extrahiere die wichtigsten Eckdaten (Parteien, Datum, Fristen, Beträge, Gerichtsstand, Kündigungsklauseln) als übersichtliche Tabelle und als Excel-Datei zum Download.">Aus mehreren Dateien Infos extrahieren</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Prüfe den hochgeladenen Vertrag auf riskante oder unübliche Klauseln, liste sie mit kurzer Begründung und einer Ampel-Risikobewertung auf.">Vertrag auf riskante Klauseln prüfen</button>
         </div>
       </div>
     </main>
@@ -494,6 +494,12 @@
                 emb.type = 'application/pdf'
                 emb.src = `data:application/pdf;base64,${f.base64}`
                 bubble.appendChild(emb)
+              } else if (/\.html?$/i.test(f.name) && f.base64) {
+                const frame = document.createElement('iframe')
+                frame.className = 'html-preview'
+                frame.setAttribute('sandbox', '')
+                frame.src = `data:text/html;base64,${f.base64}`
+                bubble.appendChild(frame)
               }
               const a = el('a', 'file-link', `${f.name} · ${fmtSize(f.size)}`)
               a.href = `data:application/octet-stream;base64,${f.base64}`
@@ -589,6 +595,8 @@
                   const img = el('img', 'result'); img.src = `data:image/png;base64,${file.base64}`; f.appendChild(img)
                 } else if (/\.pdf$/i.test(file.name)) {
                   const emb = document.createElement('embed'); emb.className = 'pdf-preview'; emb.type = 'application/pdf'; emb.src = `data:application/pdf;base64,${file.base64}`; f.appendChild(emb)
+                } else if (/\.html?$/i.test(file.name)) {
+                  const frame = document.createElement('iframe'); frame.className = 'html-preview'; frame.setAttribute('sandbox', ''); frame.src = `data:text/html;base64,${file.base64}`; f.appendChild(frame)
                 }
                 const a = el('a', 'file-link', `${file.name} · ${fmtSize(file.size)}`)
                 a.href = `data:application/octet-stream;base64,${file.base64}`

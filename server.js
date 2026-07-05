@@ -447,6 +447,8 @@ Rules:
 - SECRETS available: ${secrets}. NEVER guess them. Use them ONLY as placeholders like {{NAME}} inside text/headers/url. You never see the real values; they are substituted at execution time.
 - The working directory is /home/user. Files you create there are returned to the user at the end.
 - Prefer "python" for editing files or data (pandas, python-docx, openpyxl, PyPDF2, Pillow). The Python kernel is PERSISTENT — variables and imports carry over between python steps. Always print() what you want to see.
+- MAKE RESULTS VIEWABLE: the UI previews .html, .pdf and image files inline. When COMPARING documents, extract the text of each and produce a visual red/green diff as an .html file (e.g. difflib.HtmlDiff().make_file(...), or custom HTML with green for additions and red for deletions). For other document results, also save a viewable .html or .pdf version in addition to the .docx/.xlsx.
+- To read text from uploaded documents: .docx via python-docx (docx.Document), .pdf via PyPDF2/pdfplumber, .txt/.csv directly.
 - Use "extract" for page text; "shell"/"read_file" for local data; "http" for APIs. When the TASK is achieved use "done"; if truly stuck use "fail".`
 }
 
