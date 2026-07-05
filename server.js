@@ -60,14 +60,37 @@ Rules:
   is fine) so it can be returned to the user for download.`
 
 // Extra guidance appended when the user turns on Browser mode.
+// IMPORTANT: the sandbox runs inside a Jupyter kernel with a RUNNING asyncio
+// loop, so Playwright's sync API fails. The async API with top-level await works.
 const BROWSER_PROMPT = `
 BROWSER AUTOMATION IS ENABLED. Playwright and headless Chromium are already installed in the sandbox.
 Use them to drive a real browser (navigate, click, fill forms, scrape JavaScript-rendered pages).
-- Use Playwright's SYNCHRONOUS API: "from playwright.sync_api import sync_playwright".
-- Launch headless with no-sandbox flags: p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"]).
-- Always save at least one screenshot to "screenshot.png" so the user can see the page.
-- print() the key information you extracted, and save structured results to a file when useful.
-- Always close the browser at the end.`
+
+CRITICAL: the code runs inside a Jupyter kernel that already has a running asyncio event loop.
+- You MUST use Playwright's ASYNC API: "from playwright.async_api import async_playwright".
+- Do NOT use the sync API (sync_playwright) — it raises "using Sync API inside the asyncio loop".
+- Do NOT call asyncio.run() or asyncio.get_event_loop().run_until_complete() — a loop is already running.
+- Use top-level "await" directly (it is supported here), or define "async def main(): ..." and end the
+  code with "await main()".
+- Launch headless: browser = await p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"]).
+- Always save a screenshot: await page.screenshot(path="screenshot.png", full_page=True).
+- print() the key information you extracted, and await browser.close() at the end.
+
+Template to follow:
+\`\`\`python
+from playwright.async_api import async_playwright
+
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
+        page = await browser.new_page()
+        await page.goto("https://example.com", wait_until="load")
+        print("Title:", await page.title())
+        await page.screenshot(path="screenshot.png", full_page=True)
+        await browser.close()
+
+await main()
+\`\`\``
 
 /** Pull the first fenced python block out of the model's reply. */
 function extractCode(text) {
