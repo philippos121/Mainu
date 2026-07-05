@@ -9,12 +9,15 @@ reads/modifies them, and any resulting files come back as downloads.
 
 ### Modes
 
-| Toggle | What it does |
+| Mode | What it does |
 |--------|--------------|
-| 📎 | Attach files → uploaded into the sandbox for the code to read/modify |
-| 🌐 | **Browser (one-shot):** the model writes a single Playwright script run in headless Chromium |
-| 🤖 | **Agent:** a step-by-step browser agent — it observes the page's elements, decides one action, acts, and repeats (login flows, multi-step tasks). Progress streams live. |
-| 🔑 | **Secrets:** name/value credentials sent to the sandbox for the agent but **never shown to the AI model**. Reference them in the task as `{{NAME}}` (e.g. `{{PASSWORD}}`); the server substitutes the real value only at execution time. |
+| Attach | Upload files into the sandbox for the code to read/modify |
+| Browser (one-shot) | The model writes a single Playwright script run in headless Chromium |
+| **Agent** | Step-by-step computer agent with a toolbox: **shell, read/write files, HTTP (e.g. Microsoft Graph for SharePoint/OneDrive), and a browser**. It observes, decides one action, acts, and repeats. Browser starts lazily only when needed. |
+| **Desktop** | Vision-driven **GUI** agent on a real Linux desktop (E2B Desktop): it takes a screenshot, decides a click/type/keypress by pixel coordinate, and can launch GUI apps like LibreOffice. |
+| Secrets | Name/value credentials sent to the sandbox but **never shown to the AI model**. Reference them as `{{NAME}}` (e.g. `{{PASSWORD}}`); the server substitutes the real value only at execution time. |
+
+Every query shows an **estimated cost** (exact token counts × configurable rates + sandbox seconds), plus a running session total in the header.
 
 ```
 You ──prompt──▶ Express server ──▶ OpenAI (writes Python)

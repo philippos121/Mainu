@@ -55,6 +55,9 @@
       .brand-logo { height: 22px; width: auto; display: block; }
       .brand-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
       .status-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+      .cost-pill { margin-left: auto; font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+      .cost-pill + .status-pill { margin-left: 10px; }
+      .cost-line { font-size: 12px; color: var(--faint); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
       .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
       .dot.ok { background: var(--ok); }
       .dot.bad { background: var(--err); }
@@ -184,6 +187,7 @@
     <header>
       <img class="brand-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
       <span class="brand-title">Pippos Playground</span>
+      <span class="cost-pill" id="costPill" hidden></span>
       <span class="status-pill"><span class="dot" id="e2bDot"></span><span class="status" id="status">…</span></span>
     </header>
 
@@ -235,9 +239,13 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
               <span class="tlabel">Browser</span>
             </button>
-            <button id="agentToggle" class="tool" title="Agent-Modus" aria-label="Agent-Modus">
+            <button id="agentToggle" class="tool" title="Agent-Modus (Web, Shell, Dateien, APIs)" aria-label="Agent-Modus">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5 13.7 9 19 10.5 13.7 12 12 17.5 10.3 12 5 10.5 10.3 9 12 3.5Z"/><path d="M18.5 16.5 19 18.5 21 19 19 19.5 18.5 21.5 18 19.5 16 19 18 18.5 18.5 16.5Z"/></svg>
               <span class="tlabel">Agent</span>
+            </button>
+            <button id="desktopToggle" class="tool" title="Desktop-Modus (GUI-Steuerung, z. B. LibreOffice)" aria-label="Desktop-Modus">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>
+              <span class="tlabel">Desktop</span>
             </button>
             <button id="secretsToggle" class="tool" title="Zugangsdaten" aria-label="Zugangsdaten">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16.5 16.5 18.5 14.5M13.5 18.5 15.5 16.5"/></svg>
@@ -264,19 +272,36 @@
       const attachments = document.getElementById('attachments')
       const browserToggle = document.getElementById('browserToggle')
       const agentToggle = document.getElementById('agentToggle')
+      const desktopToggle = document.getElementById('desktopToggle')
       const secretsToggle = document.getElementById('secretsToggle')
       const secretsPanel = document.getElementById('secretsPanel')
       const secretsRowsEl = document.getElementById('secretsRows')
       const addSecret = document.getElementById('addSecret')
       const hint = document.getElementById('hint')
+      const costPill = document.getElementById('costPill')
 
       const history = []
       let pendingFiles = []
       let browserMode = false
       let agentMode = false
+      let desktopMode = false
       const secretRows = []
+      let sessionCostUsd = 0
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
+
+      function fmtUsd(n) { return '$' + (n < 0.01 ? n.toFixed(4) : n.toFixed(3)) }
+      function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(1) + 'k' : String(t) }
+      function costLineText(c) {
+        return `≈ ${fmtUsd(c.totalUsd)}  ·  ${fmtTok(c.inTok)} in / ${fmtTok(c.outTok)} out  ·  ${c.seconds}s Sandbox` +
+          `  (KI ${fmtUsd(c.openaiUsd)} + Sandbox ${fmtUsd(c.e2bUsd)})`
+      }
+      function addCost(c) {
+        if (!c) return
+        sessionCostUsd += c.totalUsd || 0
+        costPill.hidden = false
+        costPill.textContent = 'Σ ' + fmtUsd(sessionCostUsd)
+      }
 
       function fillExample(btn) {
         input.value = btn.dataset.p || btn.textContent
@@ -286,11 +311,13 @@
       window.fillExample = fillExample
 
       function updateHint() {
-        hint.textContent = agentMode
-          ? 'Agent-Modus aktiv — arbeitet schrittweise. Für Logins Secrets hinzufügen.'
-          : browserMode
-            ? 'Browser-Modus aktiv — headless Chromium (erster Lauf ~1 Min).'
-            : 'Enter senden · Shift+Enter neue Zeile'
+        hint.textContent = desktopMode
+          ? 'Desktop-Modus aktiv — steuert eine grafische Linux-Oberfläche (z. B. LibreOffice) per Screenshot.'
+          : agentMode
+            ? 'Agent-Modus aktiv — Shell, Dateien, APIs und Browser, schrittweise. Für Logins Secrets hinzufügen.'
+            : browserMode
+              ? 'Browser-Modus aktiv — headless Chromium (erster Lauf ~1 Min).'
+              : 'Enter senden · Shift+Enter neue Zeile'
       }
 
       function renderSecrets() {
@@ -455,10 +482,14 @@
             bubble.appendChild(el('pre', null, ex.stderr))
           }
         }
+        if (data.cost) {
+          bubble.appendChild(el('div', 'cost-line', costLineText(data.cost)))
+          addCost(data.cost)
+        }
         chat.scrollTop = chat.scrollHeight
       }
 
-      async function runAgent(task) {
+      async function runAgent(task, mode) {
         const bubble = addMessage('assistant')
         bubble.innerHTML = ''
         const trace = el('div', 'trace')
@@ -503,6 +534,26 @@
               img.src = `data:image/png;base64,${ev.screenshot}`
               f.appendChild(img)
             }
+            if (ev.files?.length) {
+              f.appendChild(el('div', 'label', 'Dateien'))
+              ev.files.forEach((file) => {
+                if (file.tooLarge || !file.base64) {
+                  f.appendChild(el('div', 'file-note', `${file.name} — zu groß`))
+                  return
+                }
+                if (IMG_RE.test(file.name)) {
+                  const img = el('img', 'result'); img.src = `data:image/png;base64,${file.base64}`; f.appendChild(img)
+                }
+                const a = el('a', 'file-link', `${file.name} · ${fmtSize(file.size)}`)
+                a.href = `data:application/octet-stream;base64,${file.base64}`
+                a.download = file.name
+                f.appendChild(a)
+              })
+            }
+            if (ev.cost) {
+              f.appendChild(el('div', 'cost-line', costLineText(ev.cost)))
+              addCost(ev.cost)
+            }
             trace.appendChild(f)
           } else if (ev.event === 'error') {
             spin.remove()
@@ -516,7 +567,7 @@
           const resp = await fetch('/api/agent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task, secrets: collectSecrets() }),
+            body: JSON.stringify({ task, secrets: collectSecrets(), mode }),
           })
           if (!resp.ok || !resp.body) {
             let msg = 'Anfrage fehlgeschlagen'
@@ -562,9 +613,9 @@
           userBubble.appendChild(note)
         }
 
-        if (agentMode) {
+        if (agentMode || desktopMode) {
           try {
-            await runAgent(prompt)
+            await runAgent(prompt, desktopMode ? 'desktop' : 'web')
           } finally {
             send.disabled = false
             input.focus()
@@ -603,18 +654,18 @@
         }
       }
 
-      browserToggle.addEventListener('click', () => {
-        browserMode = !browserMode
-        if (browserMode) { agentMode = false; agentToggle.classList.remove('active') }
+      function setMode(which) {
+        browserMode = which === 'browser'
+        agentMode = which === 'agent'
+        desktopMode = which === 'desktop'
         browserToggle.classList.toggle('active', browserMode)
-        updateHint()
-      })
-      agentToggle.addEventListener('click', () => {
-        agentMode = !agentMode
-        if (agentMode) { browserMode = false; browserToggle.classList.remove('active') }
         agentToggle.classList.toggle('active', agentMode)
+        desktopToggle.classList.toggle('active', desktopMode)
         updateHint()
-      })
+      }
+      browserToggle.addEventListener('click', () => setMode(browserMode ? null : 'browser'))
+      agentToggle.addEventListener('click', () => setMode(agentMode ? null : 'agent'))
+      desktopToggle.addEventListener('click', () => setMode(desktopMode ? null : 'desktop'))
       secretsToggle.addEventListener('click', () => {
         secretsPanel.hidden = !secretsPanel.hidden
         secretsToggle.classList.toggle('active', !secretsPanel.hidden)

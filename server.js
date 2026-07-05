@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import OpenAI from 'openai'
 import { Sandbox } from '@e2b/code-interpreter'
+import { Sandbox as DesktopSandbox } from '@e2b/desktop'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -33,6 +34,32 @@ const RUN_TIMEOUT_MS = 60_000
 const BROWSER_RUN_TIMEOUT_MS = 180_000
 const BROWSER_SETUP_TIMEOUT_MS = 260_000
 const SANDBOX_LIFETIME_MS = 300_000
+
+// Cost estimation. Prices are configurable via env (USD). Token counts are
+// exact (from the OpenAI usage field); the $ figures are estimates.
+const PRICE_IN = Number(process.env.OPENAI_PRICE_IN || 1.25) // USD / 1M input tokens
+const PRICE_OUT = Number(process.env.OPENAI_PRICE_OUT || 10) // USD / 1M output tokens
+const E2B_PRICE_PER_SEC = Number(process.env.E2B_PRICE_PER_SEC || 0.00014) // USD / sandbox-second
+
+function computeCost(inTok, outTok, seconds) {
+  const openaiUsd = (inTok / 1e6) * PRICE_IN + (outTok / 1e6) * PRICE_OUT
+  const e2bUsd = (seconds || 0) * E2B_PRICE_PER_SEC
+  return {
+    inTok,
+    outTok,
+    seconds: Math.round(seconds || 0),
+    openaiUsd: +openaiUsd.toFixed(4),
+    e2bUsd: +e2bUsd.toFixed(4),
+    totalUsd: +(openaiUsd + e2bUsd).toFixed(4),
+  }
+}
+
+function addUsage(acc, usage) {
+  if (usage) {
+    acc.inTok += usage.prompt_tokens || 0
+    acc.outTok += usage.completion_tokens || 0
+  }
+}
 
 // Created lazily so the server still boots (and /api/health can report the
 // problem) when a key is missing, instead of crashing at startup.
@@ -159,20 +186,23 @@ app.post('/api/chat', async (req, res) => {
     ]
     // Note: no custom `temperature` — several newer models only accept the
     // default, and code generation is fine at the default sampling.
+    const usage = { inTok: 0, outTok: 0 }
     const completion = await getOpenAI().chat.completions.create({
       model: OPENAI_MODEL,
       messages,
     })
+    addUsage(usage, completion.usage)
     const reply = completion.choices[0]?.message?.content ?? ''
     const code = extractCode(reply)
     const explanation = reply.replace(/```[\s\S]*?```/g, '').trim()
 
     // Nothing to run — return the assistant's text as-is.
     if (!code) {
-      return res.json({ explanation: reply, code: null, execution: null })
+      return res.json({ explanation: reply, code: null, execution: null, cost: computeCost(usage.inTok, usage.outTok, 0) })
     }
 
     // 2) Run the generated code in a fresh, disposable E2B sandbox.
+    const sandboxStart = Date.now()
     const sandbox = await Sandbox.create({
       apiKey: E2B_API_KEY,
       timeoutMs: SANDBOX_LIFETIME_MS,
@@ -267,6 +297,7 @@ app.post('/api/chat', async (req, res) => {
         files,
         note: setupNote,
       },
+      cost: computeCost(usage.inTok, usage.outTok, (Date.now() - sandboxStart) / 1000),
     })
   } catch (err) {
     console.error(err)
@@ -331,29 +362,69 @@ const OBSERVE_JS = `() => {
   return items;
 }`
 
+const BROWSER_ACTIONS = new Set(['goto', 'click', 'fill', 'press', 'scroll', 'extract'])
+
 function agentSystemPrompt(secretNames) {
-  const secrets = secretNames.length ? secretNames.join(', ') : '(none provided)'
-  return `You are a web-automation agent driving a headless Chromium browser ONE step at a time.
-Each turn you get the current page (URL, TITLE, a numbered list of visible INTERACTIVE ELEMENTS) and the recent actions.
+  const secrets = secretNames.length ? secretNames.join(', ') : '(keine)'
+  return `You are a general computer-use agent working inside a Linux sandbox, ONE step at a time.
+You have a shell, a filesystem, Python, an HTTP client, and a headless Chromium browser.
+Each turn you get the current state (browser page if active, plus the output of your last tool) and the recent actions.
 Choose EXACTLY ONE next action to progress on the TASK. Reply with ONLY a JSON object — no prose, no code fences.
 
-Action formats:
+Browser actions (a browser is launched automatically the first time you use one):
 {"thought":"...","action":"goto","url":"https://..."}
 {"thought":"...","action":"click","ref":<number>}
 {"thought":"...","action":"fill","ref":<number>,"text":"value"}
 {"thought":"...","action":"press","key":"Enter","ref":<optional number>}
 {"thought":"...","action":"scroll","amount":800}
-{"thought":"...","action":"wait","seconds":3}
 {"thought":"...","action":"extract"}
+
+Computer actions (no browser needed):
+{"thought":"...","action":"shell","command":"ls -la"}
+{"thought":"...","action":"read_file","path":"/home/user/x.csv"}
+{"thought":"...","action":"write_file","path":"/home/user/out.txt","text":"content"}
+{"thought":"...","action":"http","method":"GET","url":"https://graph.microsoft.com/v1.0/me/drive/root/children","headers":{"Authorization":"Bearer {{TOKEN}}"}}
+
+Control:
+{"thought":"...","action":"wait","seconds":3}
 {"thought":"...","action":"done","answer":"the result/answer for the user"}
 {"thought":"...","action":"fail","answer":"why it is impossible"}
 
 Rules:
-- Refer to elements ONLY by their ref number from the ELEMENTS list.
-- To log in: reach the login form (you may first need to click a "Login"/"Einloggen" link), fill email and password, then click submit.
-- SECRETS available: ${secrets}. NEVER guess them. Use them ONLY as placeholders in "text", written EXACTLY as {{NAME}} (e.g. {{PASSWORD}}). You will never see the real values; they are substituted at execution time.
-- After any action that changes the page, the next turn shows the new page — re-check before continuing.
-- Use "extract" when you need the page's text (e.g. to read an answer). When the TASK is achieved, use "done" with the answer. If truly stuck, use "fail".`
+- For browser clicks/fills refer to elements ONLY by their ref number from the ELEMENTS list.
+- Prefer APIs over browser clicking when available (e.g. Microsoft Graph for SharePoint/OneDrive).
+- SECRETS available: ${secrets}. NEVER guess them. Use them ONLY as placeholders like {{NAME}} inside text/headers/url. You never see the real values; they are substituted at execution time.
+- The working directory is /home/user. Files you create there are returned to the user at the end.
+- Use "extract" for page text; "shell"/"read_file" for local data; "http" for APIs. When the TASK is achieved use "done"; if truly stuck use "fail".`
+}
+
+function desktopSystemPrompt(secretNames, size) {
+  const secrets = secretNames.length ? secretNames.join(', ') : '(keine)'
+  return `You are a computer-use agent controlling a real Linux DESKTOP (graphical) ONE step at a time.
+Each turn you receive a SCREENSHOT of the current ${size.width}x${size.height} screen. Coordinates are in pixels, origin top-left.
+Choose EXACTLY ONE next action to progress on the TASK. Reply with ONLY a JSON object — no prose, no code fences.
+
+Actions:
+{"thought":"...","action":"click","x":<int>,"y":<int>}
+{"thought":"...","action":"double_click","x":<int>,"y":<int>}
+{"thought":"...","action":"right_click","x":<int>,"y":<int>}
+{"thought":"...","action":"move","x":<int>,"y":<int>}
+{"thought":"...","action":"type","text":"text to type"}
+{"thought":"...","action":"key","keys":"ctrl+s"}
+{"thought":"...","action":"scroll","direction":"down","amount":3}
+{"thought":"...","action":"launch","app":"libreoffice --writer"}
+{"thought":"...","action":"open","target":"/home/user/file.docx"}
+{"thought":"...","action":"shell","command":"ls ~"}
+{"thought":"...","action":"wait","seconds":2}
+{"thought":"...","action":"done","answer":"result"}
+{"thought":"...","action":"fail","answer":"why"}
+
+Rules:
+- Look at the screenshot carefully and click precise pixel coordinates of the target.
+- Applications such as LibreOffice (writer/calc/impress), a file manager and a terminal are available; start them with "launch".
+- After opening or clicking, the next screenshot shows the result — verify before continuing; use "wait" if an app is still loading.
+- SECRETS available: ${secrets}. Use ONLY as placeholders {{NAME}} in "type"; they are substituted at execution time and never shown to you.
+- When the TASK is achieved use "done"; if stuck use "fail".`
 }
 
 function parseJsonObject(s) {
@@ -380,10 +451,21 @@ function substituteSecrets(text, secrets) {
 function describeAction(d) {
   switch (d.action) {
     case 'goto': return `goto ${d.url || ''}`
-    case 'click': return `click [${d.ref}]`
+    case 'click': return Number.isInteger(d.ref) ? `click [${d.ref}]` : `click ${d.x},${d.y}`
+    case 'double_click': return `double_click ${d.x},${d.y}`
+    case 'right_click': return `right_click ${d.x},${d.y}`
+    case 'move': return `move ${d.x},${d.y}`
     case 'fill': return `fill [${d.ref}] ${d.text || ''}` // text keeps the {{placeholder}}
+    case 'type': return `type "${d.text || ''}"`
+    case 'key': return `key ${Array.isArray(d.keys) ? d.keys.join('+') : d.keys || d.key || ''}`
     case 'press': return `press ${d.key || 'Enter'}${Number.isInteger(d.ref) ? ` [${d.ref}]` : ''}`
-    case 'scroll': return `scroll ${d.amount || 800}`
+    case 'scroll': return `scroll ${d.direction || ''} ${d.amount || 800}`.trim()
+    case 'shell': return `shell: ${d.command || ''}`
+    case 'read_file': return `read_file ${d.path || ''}`
+    case 'write_file': return `write_file ${d.path || ''}`
+    case 'http': return `http ${(d.method || 'GET').toUpperCase()} ${d.url || ''}`
+    case 'launch': return `launch ${d.app || d.application || ''}`
+    case 'open': return `open ${d.target || d.url || ''}`
     case 'wait': return `wait ${d.seconds || 2}s`
     case 'extract': return 'extract page text'
     case 'done': return `done: ${d.answer || ''}`
@@ -427,6 +509,39 @@ function buildActionPy(d, secrets) {
       return wrap(`await page.wait_for_timeout(${Math.min(Math.max(Number(d.seconds) || 2, 1), 10) * 1000})\nprint("OK")`)
     case 'extract':
       return wrap('_t = await page.inner_text("body")\nprint("<<<TEXT>>>"+_t[:4000])')
+    case 'shell': {
+      const cmd = substituteSecrets(String(d.command || ''), secrets)
+      return wrap(
+        'import subprocess\n' +
+        `_r = subprocess.run(${J(cmd)}, shell=True, capture_output=True, text=True, timeout=120)\n` +
+        'print("<<<TEXT>>>"+((_r.stdout or "")+(_r.stderr or ""))[:4000])',
+      )
+    }
+    case 'read_file': {
+      const p = String(d.path || '')
+      return wrap(`with open(${J(p)}, "r", errors="replace") as _f:\n    print("<<<TEXT>>>"+_f.read()[:4000])`)
+    }
+    case 'write_file': {
+      const p = String(d.path || '')
+      const content = substituteSecrets(String(d.text ?? d.content ?? ''), secrets)
+      return wrap(`with open(${J(p)}, "w") as _f:\n    _f.write(${J(content)})\nprint("OK")`)
+    }
+    case 'http': {
+      const url = substituteSecrets(String(d.url || ''), secrets)
+      const method = String(d.method || 'GET').toUpperCase()
+      const headersJson = substituteSecrets(JSON.stringify(d.headers || {}), secrets)
+      const hasBody = d.body != null
+      const body = hasBody
+        ? substituteSecrets(typeof d.body === 'string' ? d.body : JSON.stringify(d.body), secrets)
+        : null
+      return wrap(
+        'import requests, json\n' +
+        `_h = json.loads(${J(headersJson)})\n` +
+        `_data = ${hasBody ? J(body) : 'None'}\n` +
+        `_r = requests.request(${J(method)}, ${J(url)}, headers=_h, data=_data, timeout=60)\n` +
+        'print("<<<TEXT>>>"+"HTTP "+str(_r.status_code)+"\\n"+_r.text[:4000])',
+      )
+    }
     default:
       return null
   }
@@ -472,23 +587,30 @@ async function agentExecute(sandbox, d, secrets) {
   return { ok: true }
 }
 
-async function agentDecide({ task, obs, recent, secretNames }) {
-  const elems = obs.elements
+async function agentDecide({ task, obs, recent, secretNames, lastTool, browserReady, cost }) {
+  const pageBlock = browserReady
+    ? `CURRENT PAGE
+URL: ${obs.url}
+TITLE: ${obs.title}
+
+INTERACTIVE ELEMENTS:
+${
+  obs.elements
     .map(
       (e) =>
         `[${e.ref}] <${e.tag}${e.type ? ` type=${e.type}` : ''}${e.name ? ` name=${e.name}` : ''}> ${JSON.stringify(e.label)}`,
     )
     .join('\n')
-    .slice(0, 6000)
+    .slice(0, 6000) || '(none)'
+}`
+    : 'BROWSER: not started yet (a browser action will start it automatically).'
   const recentStr = recent.slice(-8).map((a, i) => `${i + 1}. ${a}`).join('\n') || '(none yet)'
   const user = `TASK: ${task}
 
-CURRENT PAGE
-URL: ${obs.url}
-TITLE: ${obs.title}
+${pageBlock}
 
-INTERACTIVE ELEMENTS:
-${elems || '(none)'}
+LAST TOOL OUTPUT:
+${lastTool ? String(lastTool).slice(0, 3000) : '(none)'}
 
 RECENT ACTIONS:
 ${recentStr}
@@ -501,8 +623,187 @@ Respond with ONLY the next action as a JSON object.`
       { role: 'user', content: user },
     ],
   })
+  addUsage(cost, completion.usage)
   const raw = completion.choices[0]?.message?.content ?? ''
-  return parseJsonObject(raw) || { action: 'fail', answer: 'Could not parse the model output.', thought: '' }
+  return parseJsonObject(raw) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
+}
+
+async function snapshotFiles(sandbox) {
+  const m = new Map()
+  try {
+    for (const e of await sandbox.files.list(WORKDIR)) {
+      if (e.type === 'file') m.set(e.path, e.size)
+    }
+  } catch {}
+  return m
+}
+
+async function captureNewFiles(sandbox, before) {
+  const files = []
+  try {
+    const after = await sandbox.files.list(WORKDIR)
+    const changed = after.filter(
+      (e) => e.type === 'file' && !e.name.startsWith('__') && before.get(e.path) !== e.size,
+    )
+    for (const e of changed.slice(0, MAX_FILES)) {
+      if (e.size > MAX_FILE_BYTES) {
+        files.push({ name: e.name, size: e.size, tooLarge: true })
+        continue
+      }
+      const b = await sandbox.files.read(e.path, { format: 'bytes' })
+      files.push({ name: e.name, size: e.size, base64: Buffer.from(b).toString('base64') })
+    }
+  } catch {}
+  return files
+}
+
+// ---- Web / computer agent (code-interpreter sandbox) ----
+async function runWebAgent(sandbox, { task, secrets, secretNames, steps, send, cost, startedAt }) {
+  const before = await snapshotFiles(sandbox)
+  let browserReady = false
+  let lastTool = null
+  const recent = []
+  let answer = null
+
+  for (let step = 1; step <= steps; step++) {
+    let obs = { url: '', title: '', elements: [] }
+    if (browserReady) {
+      obs = await agentObserve(sandbox)
+      send('observation', { step, url: obs.url, title: obs.title, screenshot: obs.screenshot })
+    } else {
+      send('observation', { step, url: '', title: '(kein Browser aktiv)' })
+    }
+
+    const d = await agentDecide({ task, obs, recent, secretNames, lastTool, browserReady, cost })
+    const summary = describeAction(d)
+    send('action', { step, thought: d.thought || '', summary })
+
+    if (d.action === 'done') { answer = d.answer || 'Fertig.'; break }
+    if (d.action === 'fail') { answer = '⚠ ' + (d.answer || 'Nicht möglich.'); break }
+
+    // Lazily start the browser the first time a browser action is used.
+    if (BROWSER_ACTIONS.has(d.action) && !browserReady) {
+      send('status', { message: 'Chromium wird installiert & gestartet (~1 Min)…' })
+      const inst = await sandbox.runCode(AGENT_INSTALL_CODE, { timeoutMs: BROWSER_SETUP_TIMEOUT_MS })
+      if (inst.error) send('status', { message: 'Browser-Installation meldete einen Fehler.' })
+      const st = await sandbox.runCode(AGENT_START_CODE, { timeoutMs: 60_000 })
+      browserReady = !st.error
+      if (!browserReady) {
+        recent.push(`${summary} -> ERROR Browser konnte nicht starten`)
+        lastTool = 'Browser konnte nicht gestartet werden.'
+        continue
+      }
+    }
+
+    const r = await agentExecute(sandbox, d, secrets)
+    lastTool = r.text || (r.error ? 'ERROR ' + r.error : null)
+    recent.push(
+      summary +
+        (r.error ? ` -> ERROR ${r.error}` : '') +
+        (r.text ? ` -> ${r.text.replace(/\s+/g, ' ').slice(0, 400)}` : ''),
+    )
+    if (r.error) send('status', { message: `Schritt ${step}: ${summary} — ${r.error}` })
+  }
+
+  if (answer == null) answer = 'Schrittlimit erreicht.'
+  const files = await captureNewFiles(sandbox, before)
+  let screenshot = null
+  if (browserReady) {
+    try { screenshot = (await agentObserve(sandbox)).screenshot } catch {}
+  }
+  send('final', { answer, files, screenshot, cost: computeCost(cost.inTok, cost.outTok, (Date.now() - startedAt) / 1000) })
+}
+
+// ---- Desktop / GUI agent (E2B desktop sandbox, vision-driven) ----
+function normalizeKeys(d) {
+  const raw = Array.isArray(d.keys) ? d.keys : String(d.keys || d.key || '').split('+')
+  const map = { enter: 'Return', return: 'Return', esc: 'Escape', escape: 'Escape', tab: 'Tab', space: 'space', del: 'Delete', delete: 'Delete', backspace: 'BackSpace', up: 'Up', down: 'Down', left: 'Left', right: 'Right' }
+  const keys = raw.map((k) => String(k).trim()).filter(Boolean).map((k) => map[k.toLowerCase()] || k)
+  return keys.length > 1 ? keys : keys[0] || 'Return'
+}
+
+async function desktopDecide({ task, b64, size, recent, secretNames, cost }) {
+  const recentStr = recent.slice(-8).map((a, i) => `${i + 1}. ${a}`).join('\n') || '(none yet)'
+  const userText = `TASK: ${task}
+
+The screenshot shows the current ${size.width}x${size.height} desktop.
+
+RECENT ACTIONS:
+${recentStr}
+
+Respond with ONLY the next action as a JSON object.`
+  const completion = await getOpenAI().chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      { role: 'system', content: desktopSystemPrompt(secretNames, size) },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: userText },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${b64}` } },
+        ],
+      },
+    ],
+  })
+  addUsage(cost, completion.usage)
+  const raw = completion.choices[0]?.message?.content ?? ''
+  return parseJsonObject(raw) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
+}
+
+async function desktopExecute(desktop, d, secrets) {
+  switch (d.action) {
+    case 'click': await desktop.leftClick(d.x, d.y); break
+    case 'double_click': await desktop.doubleClick(d.x, d.y); break
+    case 'right_click': await desktop.rightClick(d.x, d.y); break
+    case 'move': await desktop.moveMouse(d.x, d.y); break
+    case 'type': await desktop.write(substituteSecrets(String(d.text || ''), secrets)); break
+    case 'key': await desktop.press(normalizeKeys(d)); break
+    case 'scroll': await desktop.scroll(d.direction === 'up' ? 'up' : 'down', Math.min(Number(d.amount) || 3, 10)); break
+    case 'launch': await desktop.launch(String(d.app || d.application || '')); break
+    case 'open': await desktop.open(String(d.target || d.url || '')); break
+    case 'wait': await desktop.wait(Math.min(Math.max(Number(d.seconds) || 1, 1), 10) * 1000); break
+    case 'shell': {
+      const out = await desktop.commands.run(substituteSecrets(String(d.command || ''), secrets), { timeoutMs: 120_000 })
+      return { text: ((out.stdout || '') + (out.stderr || '')).slice(0, 3000) }
+    }
+    default: throw new Error('unbekannte Aktion: ' + d.action)
+  }
+  return {}
+}
+
+async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt }) {
+  const size = await desktop.getScreenSize()
+  const recent = []
+  let lastTool = null
+  let answer = null
+
+  for (let step = 1; step <= steps; step++) {
+    const shot = Buffer.from(await desktop.screenshot()).toString('base64')
+    send('observation', { step, url: `Desktop ${size.width}×${size.height}`, screenshot: shot })
+
+    const d = await desktopDecide({ task, b64: shot, size, recent, secretNames, cost })
+    const summary = describeAction(d)
+    send('action', { step, thought: d.thought || '', summary })
+
+    if (d.action === 'done') { answer = d.answer || 'Fertig.'; break }
+    if (d.action === 'fail') { answer = '⚠ ' + (d.answer || 'Nicht möglich.'); break }
+
+    let err = null
+    try {
+      const r = await desktopExecute(desktop, d, secrets)
+      lastTool = r?.text || null
+    } catch (e) {
+      err = e?.message || String(e)
+    }
+    recent.push(summary + (err ? ` -> ERROR ${err}` : '') + (lastTool ? ` -> ${lastTool.replace(/\s+/g, ' ').slice(0, 200)}` : ''))
+    if (err) send('status', { message: `Schritt ${step}: ${summary} — ${err}` })
+    await desktop.wait(600)
+  }
+
+  if (answer == null) answer = 'Schrittlimit erreicht.'
+  let screenshot = null
+  try { screenshot = Buffer.from(await desktop.screenshot()).toString('base64') } catch {}
+  send('final', { answer, screenshot, files: [], cost: computeCost(cost.inTok, cost.outTok, (Date.now() - startedAt) / 1000) })
 }
 
 app.post('/api/agent', async (req, res) => {
@@ -515,13 +816,13 @@ app.post('/api/agent', async (req, res) => {
   const send = (event, data) => res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`)
 
   if (!OPENAI_API_KEY || !E2B_API_KEY) {
-    send('error', { message: 'Server is missing OPENAI_API_KEY or E2B_API_KEY.' })
+    send('error', { message: 'Server: OPENAI_API_KEY oder E2B_API_KEY fehlt.' })
     return res.end()
   }
 
-  const { task, secrets: rawSecrets = {}, maxSteps } = req.body ?? {}
+  const { task, secrets: rawSecrets = {}, maxSteps, mode = 'web' } = req.body ?? {}
   if (!task || typeof task !== 'string') {
-    send('error', { message: 'Missing "task" in request body.' })
+    send('error', { message: 'Feld "task" fehlt.' })
     return res.end()
   }
   const secrets = {}
@@ -531,68 +832,39 @@ app.post('/api/agent', async (req, res) => {
   const secretNames = Object.keys(secrets)
   const steps = Math.min(Math.max(Number(maxSteps) || AGENT_MAX_STEPS, 1), AGENT_MAX_STEPS)
 
+  const cost = { inTok: 0, outTok: 0 }
+  const startedAt = Date.now()
+
+  if (mode === 'desktop') {
+    let desktop
+    try {
+      send('status', { message: 'Desktop wird gestartet…' })
+      desktop = await DesktopSandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
+      if (secretNames.length) send('status', { message: `Secrets geladen: ${secretNames.join(', ')}` })
+      await runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt })
+    } catch (err) {
+      console.error('desktop agent error:', err)
+      send('error', { message: err?.message ?? 'Unbekannter Desktop-Fehler.' })
+    } finally {
+      if (desktop) { try { await desktop.kill() } catch {} }
+      res.end()
+    }
+    return
+  }
+
   let sandbox
   try {
-    send('status', { message: 'Starting sandbox…' })
+    send('status', { message: 'Sandbox wird gestartet…' })
     sandbox = await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
-
-    send('status', { message: 'Installing Chromium (first run, ~1 min)…' })
-    const inst = await sandbox.runCode(AGENT_INSTALL_CODE, { timeoutMs: BROWSER_SETUP_TIMEOUT_MS })
-    if (inst.error) {
-      send('error', { message: `Browser install failed: ${inst.error.value}` })
-      return
-    }
-
-    send('status', { message: 'Launching browser…' })
-    const start = await sandbox.runCode(AGENT_START_CODE, { timeoutMs: 60_000 })
-    if (start.error) {
-      send('error', { message: `Browser launch failed: ${start.error.value}` })
-      return
-    }
-    if (secretNames.length) send('status', { message: `Secrets loaded: ${secretNames.join(', ')}` })
-
-    const recent = []
-    let answer = null
-    for (let step = 1; step <= steps; step++) {
-      const obs = await agentObserve(sandbox)
-      send('observation', { step, url: obs.url, title: obs.title, screenshot: obs.screenshot })
-
-      const d = await agentDecide({ task, obs, recent, secretNames })
-      const summary = describeAction(d)
-      send('action', { step, thought: d.thought || '', summary })
-
-      if (d.action === 'done') {
-        answer = d.answer || 'Task complete.'
-        break
-      }
-      if (d.action === 'fail') {
-        answer = '⚠ ' + (d.answer || 'Agent could not complete the task.')
-        break
-      }
-
-      const r = await agentExecute(sandbox, d, secrets)
-      recent.push(
-        summary +
-          (r.error ? ` -> ERROR ${r.error}` : '') +
-          (r.text ? ` -> ${r.text.replace(/\s+/g, ' ').slice(0, 400)}` : ''),
-      )
-      if (r.error) send('status', { message: `Step ${step}: ${summary} — ${r.error}` })
-    }
-
-    if (answer == null) answer = 'Reached the step limit before finishing the task.'
-    const finalObs = await agentObserve(sandbox)
-    send('final', { answer, url: finalObs.url, screenshot: finalObs.screenshot })
+    if (secretNames.length) send('status', { message: `Secrets geladen: ${secretNames.join(', ')}` })
+    await runWebAgent(sandbox, { task, secrets, secretNames, steps, send, cost, startedAt })
   } catch (err) {
     console.error('agent error:', err)
-    send('error', { message: err?.message ?? 'Unknown agent error.' })
+    send('error', { message: err?.message ?? 'Unbekannter Agent-Fehler.' })
   } finally {
     if (sandbox) {
-      try {
-        await sandbox.runCode(AGENT_CLEANUP_CODE, { timeoutMs: 20_000 })
-      } catch {}
-      try {
-        await sandbox.kill()
-      } catch {}
+      try { await sandbox.runCode(AGENT_CLEANUP_CODE, { timeoutMs: 20_000 }) } catch {}
+      try { await sandbox.kill() } catch {}
     }
     res.end()
   }
