@@ -183,6 +183,9 @@ Guidelines:
 - Read documents: .docx via python-docx, .pdf via PyPDF2/pdfplumber, .csv/.txt directly.
 - Always print() the key facts you need to see.
 
+You MUST actually execute code with run_python to complete the task and CREATE any requested output file — never just describe what you would do. Produce EXACTLY the requested format:
+- Excel → save a real .xlsx (import pandas; df.to_excel("out.xlsx", index=False); pip install openpyxl if the import fails). Do NOT fall back to .txt/.csv when Excel is asked for.
+- PDF text: try pdfplumber first, else PyPDF2 (pip install if needed). If the PDF has no extractable text (scanned), say so explicitly.
 Work step by step: run code, inspect the output, run more code if needed. When the whole task is done, STOP calling tools and reply with a concise natural-language summary for the user (what you changed, key findings). Reply in the user's language.`
 
 const CHAT_TOOL = {
@@ -301,7 +304,9 @@ app.post('/api/chat', async (req, res) => {
           model: OPENAI_MODEL,
           messages,
           tools: [CHAT_TOOL],
-          tool_choice: 'auto',
+          // Force code execution on the first step so the task is actually
+          // performed (a file is produced); afterwards let it finish with text.
+          tool_choice: step === 1 ? { type: 'function', function: { name: 'run_python' } } : 'auto',
         })
         addUsage(usage, completion.usage)
         const msg = completion.choices[0]?.message
