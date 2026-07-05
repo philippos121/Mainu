@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Pippos Playground</title>
+    <title>Playground</title>
     <link rel="icon" href="/aissociate-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -92,20 +92,19 @@
       .hero-logo { height: 34px; width: auto; margin-bottom: 22px; }
       .hero-title { font-size: clamp(30px, 6vw, 44px); margin: 0 0 14px; font-weight: 700; letter-spacing: -0.03em; }
       .hero-tag { color: var(--muted); font-size: 16px; margin: 0 auto; max-width: 480px; }
-      .tiles-head { font-size: 12px; color: var(--faint); margin: 40px 0 12px; letter-spacing: 0.02em; }
-      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-      .tile { background: var(--bg); padding: 18px; }
-      .tile h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
-      .tile p { margin: 0; font-size: 13px; color: var(--muted); }
-      .examples { margin-top: 26px; }
-      .ex-label { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
-      button.ex {
-        display: block; width: 100%; text-align: left; background: var(--surface);
-        border: 1px solid var(--border); color: var(--text); border-radius: 10px;
-        padding: 12px 15px; font-size: 13.5px; cursor: pointer; margin-bottom: 8px;
-        transition: border-color .15s; font-family: inherit;
+      .caps { margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+      .cap {
+        background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 24px 18px; text-align: center; display: flex; flex-direction: column;
+        align-items: center; gap: 14px; transition: border-color .18s, transform .18s;
       }
-      button.ex:hover { border-color: var(--border-strong); }
+      .cap:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+      .cap-ico {
+        width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center;
+        justify-content: center; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      }
+      .cap-ico svg { width: 23px; height: 23px; }
+      .cap-txt { font-size: 14.5px; font-weight: 500; line-height: 1.4; }
 
       /* secrets */
       #secretsPanel { max-width: 740px; margin: 0 auto 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; }
@@ -176,7 +175,8 @@
         .status-pill .status { display: none; }
         #chat { padding: 18px 14px 6px; gap: 18px; }
         footer { padding: 12px 14px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-        .tiles { grid-template-columns: 1fr; }
+        .caps { grid-template-columns: 1fr; gap: 10px; margin-top: 28px; }
+        .cap { flex-direction: row; text-align: left; padding: 16px; gap: 14px; }
         button.tool .tlabel { display: none; }
         button.tool { padding: 0 11px; height: 38px; }
         #send { width: 38px; height: 38px; }
@@ -186,7 +186,7 @@
   <body>
     <header>
       <img class="brand-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-      <span class="brand-title">Pippos Playground</span>
+      <span class="brand-title">Playground</span>
       <span class="cost-pill" id="costPill" hidden></span>
       <span class="status-pill"><span class="dot" id="e2bDot"></span><span class="status" id="status">…</span></span>
     </header>
@@ -195,25 +195,29 @@
       <div class="empty" id="empty">
         <div class="hero">
           <img class="hero-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-          <h1 class="hero-title">Pippos Playground</h1>
-          <p class="hero-tag">Eine Sandbox für KI-Funktionen — mögliche Erweiterungen für AI:ssociate.</p>
+          <h1 class="hero-title">Playground</h1>
+          <p class="hero-tag">Virtuelle Maschinen für AI:ssociate User</p>
         </div>
 
-        <div class="tiles-head">Funktionen</div>
-        <div class="tiles">
-          <div class="tile"><h3>Code &amp; Analyse</h3><p>Rechnen, Daten auswerten, Diagramme.</p></div>
-          <div class="tile"><h3>Dokumente</h3><p>Word- und PDF-Dateien erzeugen.</p></div>
-          <div class="tile"><h3>Dateien</h3><p>Hochladen, bearbeiten, zurückgeben.</p></div>
-          <div class="tile"><h3>Browser</h3><p>Webseiten automatisiert auslesen.</p></div>
-          <div class="tile"><h3>Agent</h3><p>Mehrstufige Aufgaben und Logins.</p></div>
-          <div class="tile"><h3>Zugangsdaten</h3><p>Sicher, verborgen vor dem Modell.</p></div>
-        </div>
-
-        <div class="examples">
-          <div class="ex-label">Beispiele</div>
-          <button class="ex" onclick="fillExample(this)" data-p="Berechne die Berufungsfrist: Urteil zugestellt am 12.03.2026, Frist 4 Wochen. Gib das Enddatum an und berücksichtige Wochenenden.">Berufungsfrist berechnen</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Erstelle eine Word-Datei mit einem einfachen Geheimhaltungsvertrag (NDA) zwischen der Muster GmbH und Max Mustermann.">Word-NDA erstellen</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Öffne aissociate.at und mache einen Screenshot der Startseite.">Screenshot von aissociate.at (Browser-Modus)</button>
+        <div class="caps">
+          <div class="cap">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+            </div>
+            <div class="cap-txt">Ad-hoc Code<br />generieren &amp; ausführen</div>
+          </div>
+          <div class="cap">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>
+            </div>
+            <div class="cap-txt">Dateien<br />beliebig bearbeiten</div>
+          </div>
+          <div class="cap">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>
+            </div>
+            <div class="cap-txt">Computer<br />steuern</div>
+          </div>
         </div>
       </div>
     </main>
