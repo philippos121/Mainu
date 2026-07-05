@@ -8,10 +8,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const {
   OPENAI_API_KEY,
-  E2B_API_KEY,
   OPENAI_MODEL = 'gpt-4o-mini',
   PORT = 3000,
 } = process.env
+
+// TEST ONLY: hardcoded E2B key so the app runs without configuring env vars.
+// The E2B_API_KEY env var overrides this. Delete the fallback and rotate the
+// key before any real or public deployment.
+const E2B_API_KEY =
+  process.env.E2B_API_KEY || 'e2b_bd1a9240aeb8ea21578a5fc7ab87befd408f074e'
 
 // Created lazily so the server still boots (and /api/health can report the
 // problem) when a key is missing, instead of crashing at startup.
