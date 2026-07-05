@@ -8,7 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const {
   OPENAI_API_KEY,
-  OPENAI_MODEL = 'gpt-4o-mini',
+  // Override via the OPENAI_MODEL env var if your account exposes the model
+  // under a different id (e.g. a dated variant).
+  OPENAI_MODEL = 'gpt-5.5',
   PORT = 3000,
 } = process.env
 
@@ -115,10 +117,11 @@ app.post('/api/chat', async (req, res) => {
         .slice(-10),
       { role: 'user', content: prompt },
     ]
+    // Note: no custom `temperature` — several newer models only accept the
+    // default, and code generation is fine at the default sampling.
     const completion = await getOpenAI().chat.completions.create({
       model: OPENAI_MODEL,
       messages,
-      temperature: 0.2,
     })
     const reply = completion.choices[0]?.message?.content ?? ''
     const code = extractCode(reply)

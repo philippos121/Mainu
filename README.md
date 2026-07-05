@@ -34,7 +34,7 @@ You need two keys in `.env`:
 |------------------|------------------------------------------------------------|
 | `OPENAI_API_KEY` | The same key you use in your other repos.                   |
 | `E2B_API_KEY`    | https://e2b.dev/dashboard                                   |
-| `OPENAI_MODEL`   | Optional, defaults to `gpt-4o-mini`.                        |
+| `OPENAI_MODEL`   | Optional, defaults to `gpt-5.5`.                            |
 
 ## Deploy on Render (connected to GitHub)
 

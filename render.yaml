@@ -15,4 +15,4 @@ services:
       - key: E2B_API_KEY
         sync: false   # set the value in the Render dashboard
       - key: OPENAI_MODEL
-        value: gpt-4o-mini
+        value: gpt-5.5
