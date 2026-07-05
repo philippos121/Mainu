@@ -429,6 +429,66 @@ Rules:
 - When the TASK is achieved use "done"; if stuck use "fail".`
 }
 
+// A forced function/tool so the model MUST return a schema-valid action
+// (far more reliable than hoping for clean JSON in the text).
+function makeActionTool(actionEnum) {
+  return {
+    type: 'function',
+    function: {
+      name: 'perform_action',
+      description: 'Perform exactly one next action to progress on the task.',
+      parameters: {
+        type: 'object',
+        properties: {
+          thought: { type: 'string', description: 'Brief reasoning.' },
+          action: { type: 'string', enum: actionEnum },
+          url: { type: 'string' },
+          ref: { type: 'integer' },
+          x: { type: 'integer' },
+          y: { type: 'integer' },
+          text: { type: 'string' },
+          key: { type: 'string' },
+          keys: { type: 'string', description: 'Key or combo, e.g. ctrl+s' },
+          amount: { type: 'integer' },
+          direction: { type: 'string', enum: ['up', 'down'] },
+          code: { type: 'string', description: 'Python source for the python action.' },
+          command: { type: 'string' },
+          path: { type: 'string' },
+          method: { type: 'string' },
+          headers: { type: 'object', additionalProperties: { type: 'string' } },
+          body: { type: 'string' },
+          seconds: { type: 'integer' },
+          app: { type: 'string' },
+          target: { type: 'string' },
+          answer: { type: 'string' },
+        },
+        required: ['action'],
+      },
+    },
+  }
+}
+const WEB_ACTION_TOOL = makeActionTool([
+  'goto', 'click', 'fill', 'press', 'scroll', 'extract',
+  'python', 'shell', 'read_file', 'write_file', 'http', 'wait', 'done', 'fail',
+])
+const DESKTOP_ACTION_TOOL = makeActionTool([
+  'click', 'double_click', 'right_click', 'move', 'type', 'key', 'scroll',
+  'launch', 'open', 'shell', 'wait', 'done', 'fail',
+])
+
+// Pulls the action object out of a completion: prefer the forced tool call,
+// fall back to parsing the message text.
+function extractDecision(completion) {
+  const msg = completion.choices?.[0]?.message
+  const tc = msg?.tool_calls?.[0]
+  if (tc?.function?.arguments) {
+    try {
+      return JSON.parse(tc.function.arguments)
+    } catch {}
+  }
+  return parseJsonObject(msg?.content ?? '')
+}
+
 function parseJsonObject(s) {
   if (typeof s !== 'string') return null
   try {
@@ -638,11 +698,11 @@ Respond with ONLY the next action as a JSON object.`
       { role: 'system', content: agentSystemPrompt(secretNames) },
       { role: 'user', content: user },
     ],
-    response_format: { type: 'json_object' },
+    tools: [WEB_ACTION_TOOL],
+    tool_choice: { type: 'function', function: { name: 'perform_action' } },
   })
   addUsage(cost, completion.usage)
-  const raw = completion.choices[0]?.message?.content ?? ''
-  return parseJsonObject(raw) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
+  return extractDecision(completion) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
 }
 
 async function writeUploads(sandbox, uploads, send) {
@@ -774,11 +834,11 @@ Respond with ONLY the next action as a JSON object.`
         ],
       },
     ],
-    response_format: { type: 'json_object' },
+    tools: [DESKTOP_ACTION_TOOL],
+    tool_choice: { type: 'function', function: { name: 'perform_action' } },
   })
   addUsage(cost, completion.usage)
-  const raw = completion.choices[0]?.message?.content ?? ''
-  return parseJsonObject(raw) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
+  return extractDecision(completion) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
 }
 
 async function desktopExecute(desktop, d, secrets) {
