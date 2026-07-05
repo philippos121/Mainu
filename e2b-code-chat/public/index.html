@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>E2B Code Chat</title>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --panel-2: #1c2230;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #4f8cff;
+        --accent-2: #2ea043;
+        --err: #f85149;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--panel);
+      }
+      header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+      header .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+      header .dot.ok { background: var(--accent-2); }
+      header .dot.bad { background: var(--err); }
+      header .status { color: var(--muted); font-size: 12px; margin-left: auto; }
+      #chat {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .msg { max-width: 860px; width: 100%; margin: 0 auto; }
+      .role { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      .bubble {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .msg.user .bubble { background: var(--panel-2); }
+      pre {
+        background: #0b0f16;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        overflow-x: auto;
+        font-family: var(--mono);
+        font-size: 13px;
+        margin: 10px 0 0;
+      }
+      .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 4px; }
+      .label.err { color: var(--err); }
+      img.result { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border); }
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 14px 20px;
+        background: var(--panel);
+      }
+      .composer { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; }
+      textarea {
+        flex: 1;
+        resize: none;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-family: inherit;
+        font-size: 14px;
+        min-height: 48px;
+        max-height: 180px;
+      }
+      button {
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0 20px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      .hint { max-width: 860px; margin: 8px auto 0; color: var(--muted); font-size: 11px; }
+      .empty { text-align: center; color: var(--muted); margin: auto; max-width: 480px; }
+      .empty h2 { color: var(--text); font-weight: 600; }
+      .spinner {
+        display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted);
+        border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite;
+        vertical-align: middle;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="dot" id="e2bDot" title="E2B"></span>
+      <h1>E2B Code Chat</h1>
+      <span class="status" id="status">checking…</span>
+    </header>
+
+    <main id="chat">
+      <div class="empty" id="empty">
+        <h2>Describe what you want to build or compute</h2>
+        <p>Your prompt is turned into Python by OpenAI, executed in a fresh E2B sandbox,
+        and the output (text, tables, charts) is shown back here.</p>
+      </div>
+    </main>
+
+    <footer>
+      <div class="composer">
+        <textarea id="input" placeholder="e.g. Plot a sine wave, or scrape the title of example.com" rows="1"></textarea>
+        <button id="send">Run</button>
+      </div>
+      <div class="hint">Enter to send · Shift+Enter for a new line</div>
+    </footer>
+
+    <script>
+      const chat = document.getElementById('chat')
+      const empty = document.getElementById('empty')
+      const input = document.getElementById('input')
+      const send = document.getElementById('send')
+      const statusEl = document.getElementById('status')
+      const e2bDot = document.getElementById('e2bDot')
+
+      const history = [] // {role, content} pairs sent back to the model for context
+
+      async function checkHealth() {
+        try {
+          const r = await fetch('/api/health')
+          const h = await r.json()
+          const ready = h.openai && h.e2b
+          e2bDot.className = 'dot ' + (ready ? 'ok' : 'bad')
+          statusEl.textContent = ready
+            ? `model: ${h.model}`
+            : `missing keys: ${[!h.openai && 'OPENAI_API_KEY', !h.e2b && 'E2B_API_KEY'].filter(Boolean).join(', ')}`
+        } catch {
+          e2bDot.className = 'dot bad'
+          statusEl.textContent = 'server unreachable'
+        }
+      }
+
+      function el(tag, cls, text) {
+        const e = document.createElement(tag)
+        if (cls) e.className = cls
+        if (text != null) e.textContent = text
+        return e
+      }
+
+      function addMessage(role) {
+        empty?.remove()
+        const wrap = el('div', 'msg ' + role)
+        wrap.appendChild(el('div', 'role', role === 'user' ? 'You' : 'Assistant'))
+        const bubble = el('div', 'bubble')
+        wrap.appendChild(bubble)
+        chat.appendChild(wrap)
+        chat.scrollTop = chat.scrollHeight
+        return bubble
+      }
+
+      function renderResult(bubble, data) {
+        bubble.innerHTML = ''
+        if (data.error) {
+          bubble.appendChild(el('div', 'label err', 'Error'))
+          bubble.appendChild(el('pre', null, data.error))
+          return
+        }
+        if (data.explanation) bubble.appendChild(el('div', null, data.explanation))
+        if (data.code) {
+          bubble.appendChild(el('div', 'label', 'Generated code'))
+          bubble.appendChild(el('pre', null, data.code))
+        }
+        const ex = data.execution
+        if (ex) {
+          if (ex.stdout) {
+            bubble.appendChild(el('div', 'label', 'Output'))
+            bubble.appendChild(el('pre', null, ex.stdout))
+          }
+          ex.text?.forEach((t) => {
+            bubble.appendChild(el('div', 'label', 'Result'))
+            bubble.appendChild(el('pre', null, t))
+          })
+          ex.images?.forEach((src) => {
+            const img = el('img', 'result')
+            img.src = src
+            bubble.appendChild(img)
+          })
+          if (ex.error) {
+            bubble.appendChild(el('div', 'label err', 'Runtime error'))
+            bubble.appendChild(el('pre', null, ex.error))
+          }
+          if (ex.stderr) {
+            bubble.appendChild(el('div', 'label err', 'stderr'))
+            bubble.appendChild(el('pre', null, ex.stderr))
+          }
+        }
+        chat.scrollTop = chat.scrollHeight
+      }
+
+      async function submit() {
+        const prompt = input.value.trim()
+        if (!prompt) return
+        input.value = ''
+        input.style.height = 'auto'
+        send.disabled = true
+
+        addMessage('user').textContent = prompt
+        const bubble = addMessage('assistant')
+        bubble.innerHTML = '<span class="spinner"></span> Generating & running…'
+
+        try {
+          const r = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, history }),
+          })
+          const data = await r.json()
+          if (!r.ok) throw new Error(data.error || 'Request failed')
+          renderResult(bubble, data)
+          history.push({ role: 'user', content: prompt })
+          if (data.code || data.explanation) {
+            history.push({ role: 'assistant', content: (data.explanation || '') + (data.code ? '\n\n```python\n' + data.code + '\n```' : '') })
+          }
+        } catch (err) {
+          renderResult(bubble, { error: err.message })
+        } finally {
+          send.disabled = false
+          input.focus()
+        }
+      }
+
+      send.addEventListener('click', submit)
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          submit()
+        }
+      })
+      input.addEventListener('input', () => {
+        input.style.height = 'auto'
+        input.style.height = Math.min(input.scrollHeight, 180) + 'px'
+      })
+
+      checkHealth()
+    </script>
+  </body>
+</html>
