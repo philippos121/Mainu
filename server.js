@@ -587,7 +587,7 @@ async function agentExecute(sandbox, d, secrets) {
   return { ok: true }
 }
 
-async function agentDecide({ task, obs, recent, secretNames, lastTool, browserReady, cost }) {
+async function agentDecide({ task, obs, recent, secretNames, lastTool, browserReady, cost, uploadNames }) {
   const pageBlock = browserReady
     ? `CURRENT PAGE
 URL: ${obs.url}
@@ -605,8 +605,11 @@ ${
 }`
     : 'BROWSER: not started yet (a browser action will start it automatically).'
   const recentStr = recent.slice(-8).map((a, i) => `${i + 1}. ${a}`).join('\n') || '(none yet)'
+  const uploadsLine = uploadNames?.length
+    ? `\nUPLOADED FILES (already in /home/user): ${uploadNames.join(', ')}\n`
+    : ''
   const user = `TASK: ${task}
-
+${uploadsLine}
 ${pageBlock}
 
 LAST TOOL OUTPUT:
@@ -626,6 +629,18 @@ Respond with ONLY the next action as a JSON object.`
   addUsage(cost, completion.usage)
   const raw = completion.choices[0]?.message?.content ?? ''
   return parseJsonObject(raw) || { action: 'fail', answer: 'Modellantwort nicht lesbar.', thought: '' }
+}
+
+async function writeUploads(sandbox, uploads, send) {
+  for (const u of uploads) {
+    const ab = u.buf.buffer.slice(u.buf.byteOffset, u.buf.byteOffset + u.buf.byteLength)
+    try {
+      await sandbox.files.write(`${WORKDIR}/${u.name}`, ab)
+    } catch (e) {
+      send?.('status', { message: `Upload „${u.name}" fehlgeschlagen: ${e?.message}` })
+    }
+  }
+  if (uploads.length) send?.('status', { message: `${uploads.length} Datei(en) nach ${WORKDIR} hochgeladen: ${uploads.map((u) => u.name).join(', ')}` })
 }
 
 async function snapshotFiles(sandbox) {
@@ -658,7 +673,7 @@ async function captureNewFiles(sandbox, before) {
 }
 
 // ---- Web / computer agent (code-interpreter sandbox) ----
-async function runWebAgent(sandbox, { task, secrets, secretNames, steps, send, cost, startedAt }) {
+async function runWebAgent(sandbox, { task, secrets, secretNames, steps, send, cost, startedAt, uploadNames }) {
   const before = await snapshotFiles(sandbox)
   let browserReady = false
   let lastTool = null
@@ -674,7 +689,7 @@ async function runWebAgent(sandbox, { task, secrets, secretNames, steps, send, c
       send('observation', { step, url: '', title: '(kein Browser aktiv)' })
     }
 
-    const d = await agentDecide({ task, obs, recent, secretNames, lastTool, browserReady, cost })
+    const d = await agentDecide({ task, obs, recent, secretNames, lastTool, browserReady, cost, uploadNames })
     const summary = describeAction(d)
     send('action', { step, thought: d.thought || '', summary })
 
@@ -722,10 +737,11 @@ function normalizeKeys(d) {
   return keys.length > 1 ? keys : keys[0] || 'Return'
 }
 
-async function desktopDecide({ task, b64, size, recent, secretNames, cost }) {
+async function desktopDecide({ task, b64, size, recent, secretNames, cost, uploadNames }) {
   const recentStr = recent.slice(-8).map((a, i) => `${i + 1}. ${a}`).join('\n') || '(none yet)'
+  const uploadsLine = uploadNames?.length ? `\nUPLOADED FILES (in /home/user): ${uploadNames.join(', ')}\n` : ''
   const userText = `TASK: ${task}
-
+${uploadsLine}
 The screenshot shows the current ${size.width}x${size.height} desktop.
 
 RECENT ACTIONS:
@@ -771,7 +787,7 @@ async function desktopExecute(desktop, d, secrets) {
   return {}
 }
 
-async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt }) {
+async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt, uploadNames }) {
   const size = await desktop.getScreenSize()
   const recent = []
   let lastTool = null
@@ -781,7 +797,7 @@ async function runDesktopAgent(desktop, { task, secrets, secretNames, steps, sen
     const shot = Buffer.from(await desktop.screenshot()).toString('base64')
     send('observation', { step, url: `Desktop ${size.width}×${size.height}`, screenshot: shot })
 
-    const d = await desktopDecide({ task, b64: shot, size, recent, secretNames, cost })
+    const d = await desktopDecide({ task, b64: shot, size, recent, secretNames, cost, uploadNames })
     const summary = describeAction(d)
     send('action', { step, thought: d.thought || '', summary })
 
@@ -820,7 +836,7 @@ app.post('/api/agent', async (req, res) => {
     return res.end()
   }
 
-  const { task, secrets: rawSecrets = {}, maxSteps, mode = 'web' } = req.body ?? {}
+  const { task, secrets: rawSecrets = {}, files: rawUploads = [], maxSteps, mode = 'web' } = req.body ?? {}
   if (!task || typeof task !== 'string') {
     send('error', { message: 'Feld "task" fehlt.' })
     return res.end()
@@ -832,6 +848,18 @@ app.post('/api/agent', async (req, res) => {
   const secretNames = Object.keys(secrets)
   const steps = Math.min(Math.max(Number(maxSteps) || AGENT_MAX_STEPS, 1), AGENT_MAX_STEPS)
 
+  // Uploaded files -> written into the sandbox working dir before the run.
+  const uploads = []
+  for (const u of Array.isArray(rawUploads) ? rawUploads : []) {
+    if (!u || typeof u.name !== 'string' || typeof u.base64 !== 'string') continue
+    const name = path.basename(u.name).replace(/[^\w.\- ]/g, '_')
+    const buf = Buffer.from(u.base64, 'base64')
+    if (!name || buf.length === 0 || buf.length > MAX_UPLOAD_BYTES) continue
+    uploads.push({ name, buf })
+    if (uploads.length >= MAX_UPLOADS) break
+  }
+  const uploadNames = uploads.map((u) => u.name)
+
   const cost = { inTok: 0, outTok: 0 }
   const startedAt = Date.now()
 
@@ -841,7 +869,8 @@ app.post('/api/agent', async (req, res) => {
       send('status', { message: 'Desktop wird gestartet…' })
       desktop = await DesktopSandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
       if (secretNames.length) send('status', { message: `Secrets geladen: ${secretNames.join(', ')}` })
-      await runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt })
+      await writeUploads(desktop, uploads, send)
+      await runDesktopAgent(desktop, { task, secrets, secretNames, steps, send, cost, startedAt, uploadNames })
     } catch (err) {
       console.error('desktop agent error:', err)
       send('error', { message: err?.message ?? 'Unbekannter Desktop-Fehler.' })
@@ -857,7 +886,8 @@ app.post('/api/agent', async (req, res) => {
     send('status', { message: 'Sandbox wird gestartet…' })
     sandbox = await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: AGENT_SANDBOX_MS })
     if (secretNames.length) send('status', { message: `Secrets geladen: ${secretNames.join(', ')}` })
-    await runWebAgent(sandbox, { task, secrets, secretNames, steps, send, cost, startedAt })
+    await writeUploads(sandbox, uploads, send)
+    await runWebAgent(sandbox, { task, secrets, secretNames, steps, send, cost, startedAt, uploadNames })
   } catch (err) {
     console.error('agent error:', err)
     send('error', { message: err?.message ?? 'Unbekannter Agent-Fehler.' })

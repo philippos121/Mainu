@@ -489,7 +489,7 @@
         chat.scrollTop = chat.scrollHeight
       }
 
-      async function runAgent(task, mode) {
+      async function runAgent(task, mode, uploads = []) {
         const bubble = addMessage('assistant')
         bubble.innerHTML = ''
         const trace = el('div', 'trace')
@@ -567,7 +567,12 @@
           const resp = await fetch('/api/agent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task, secrets: collectSecrets(), mode }),
+            body: JSON.stringify({
+              task,
+              secrets: collectSecrets(),
+              mode,
+              files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
+            }),
           })
           if (!resp.ok || !resp.body) {
             let msg = 'Anfrage fehlgeschlagen'
@@ -615,7 +620,7 @@
 
         if (agentMode || desktopMode) {
           try {
-            await runAgent(prompt, desktopMode ? 'desktop' : 'web')
+            await runAgent(prompt, desktopMode ? 'desktop' : 'web', uploads)
           } finally {
             send.disabled = false
             input.focus()
