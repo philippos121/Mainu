@@ -3,320 +3,248 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Pippos Playground · AI:ssociate</title>
+    <title>Pippos Playground</title>
     <link rel="icon" href="/aissociate-logo.png" />
     <style>
       :root {
-        --bg: #070b12;
-        --bg-glow-1: rgba(14, 124, 138, 0.22);
-        --bg-glow-2: rgba(31, 182, 205, 0.10);
-        --panel: rgba(20, 27, 38, 0.72);
-        --panel-2: rgba(30, 40, 54, 0.7);
-        --panel-solid: #111925;
-        --border: rgba(255, 255, 255, 0.09);
-        --border-strong: rgba(255, 255, 255, 0.16);
-        --text: #e9eff5;
-        --muted: #8b9aad;
-        --brand: #0e7c8a;
-        --brand-2: #1fb6cd;
-        --accent: #1fb6cd;
-        --accent-soft: rgba(31, 182, 205, 0.16);
-        --accent-2: #3fb950;
-        --err: #f85149;
+        --bg: #0d0d0d;
+        --surface: #1a1a1a;
+        --surface-2: #202020;
+        --border: rgba(255, 255, 255, 0.10);
+        --border-strong: rgba(255, 255, 255, 0.22);
+        --text: #ececec;
+        --muted: #9a9a9a;
+        --faint: #6e6e6e;
+        --err: #ff6b6b;
+        --ok: #3fb950;
         --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-        --radius: 16px;
-        --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+        --radius: 14px;
       }
       * { box-sizing: border-box; }
       html, body { height: 100%; }
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
         color: var(--text);
         height: 100dvh;
         display: flex;
         flex-direction: column;
-        background:
-          radial-gradient(1100px 600px at 8% -8%, var(--bg-glow-1), transparent 55%),
-          radial-gradient(900px 500px at 100% 0%, var(--bg-glow-2), transparent 50%),
-          var(--bg);
         -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
       }
 
-      /* ---------- header ---------- */
+      /* header */
       header {
         display: flex;
         align-items: center;
-        gap: 14px;
-        padding: 12px 20px;
-        padding-top: max(12px, env(safe-area-inset-top));
-        background: var(--panel);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
+        gap: 12px;
+        padding: 14px 22px;
+        padding-top: max(14px, env(safe-area-inset-top));
         border-bottom: 1px solid var(--border);
         position: sticky;
         top: 0;
+        background: var(--bg);
         z-index: 10;
       }
-      .brand-logo { height: 26px; width: auto; display: block; }
-      .brand-text { display: flex; flex-direction: column; line-height: 1.1; border-left: 1px solid var(--border-strong); padding-left: 14px; }
-      .brand-title {
-        font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
-        background: linear-gradient(90deg, #fff, #b9e6ee);
-        -webkit-background-clip: text; background-clip: text; color: transparent;
-      }
-      .brand-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
-      .status-pill {
-        margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
-        background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border);
-        border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted);
-      }
-      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 3px rgba(255,255,255,0.03); }
-      .dot.ok { background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2); }
-      .dot.bad { background: var(--err); box-shadow: 0 0 8px var(--err); }
+      .brand-logo { height: 22px; width: auto; display: block; }
+      .brand-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+      .status-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+      .dot.ok { background: var(--ok); }
+      .dot.bad { background: var(--err); }
 
-      /* ---------- chat ---------- */
-      #chat { flex: 1; overflow-y: auto; padding: 24px 20px 8px; display: flex; flex-direction: column; gap: 18px; }
-      .msg { max-width: 880px; width: 100%; margin: 0 auto; }
-      .role { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
-      .bubble {
-        background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-        padding: 16px 18px; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word;
-        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow);
-      }
+      /* chat */
+      #chat { flex: 1; overflow-y: auto; padding: 28px 22px 8px; display: flex; flex-direction: column; gap: 22px; }
+      .msg { max-width: 740px; width: 100%; margin: 0 auto; }
+      .role { font-size: 12px; color: var(--faint); margin-bottom: 7px; }
+      .bubble { line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
       .msg.user .bubble {
-        background: linear-gradient(135deg, rgba(31,182,205,0.14), rgba(14,124,138,0.10));
-        border-color: rgba(31,182,205,0.28);
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 13px 16px;
       }
       pre {
-        background: rgba(3, 6, 11, 0.72); border: 1px solid var(--border); border-radius: 10px;
-        padding: 12px 14px; overflow-x: auto; font-family: var(--mono); font-size: 13px; margin: 10px 0 0;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        padding: 13px 15px; overflow-x: auto; font-family: var(--mono); font-size: 13px; margin: 12px 0 0;
       }
-      .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 4px; }
+      .label { font-size: 12px; color: var(--faint); margin: 16px 0 5px; }
       .label.err { color: var(--err); }
-      img.result { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 1px solid var(--border); }
+      img.result { max-width: 100%; border-radius: 10px; margin-top: 12px; border: 1px solid var(--border); }
       a.file-link {
-        display: inline-flex; align-items: center; gap: 6px; margin: 8px 8px 0 0; padding: 9px 13px;
-        background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
-        color: var(--brand-2); text-decoration: none; font-size: 13px; transition: border-color .15s, transform .15s;
+        display: inline-flex; align-items: center; gap: 7px; margin: 8px 8px 0 0; padding: 9px 14px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        color: var(--text); text-decoration: none; font-size: 13px; transition: border-color .15s;
       }
-      a.file-link:hover { border-color: var(--brand-2); transform: translateY(-1px); }
+      a.file-link:hover { border-color: var(--border-strong); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
 
-      /* ---------- welcome / hero ---------- */
-      .empty { max-width: 880px; width: 100%; margin: 8px auto; }
-      .hero { text-align: center; padding: 18px 6px 6px; }
-      .hero-logo { height: 46px; width: auto; margin-bottom: 18px; filter: drop-shadow(0 4px 20px rgba(31,182,205,0.35)); }
-      .hero-title {
-        font-size: clamp(30px, 7vw, 46px); margin: 0 0 10px; font-weight: 800; letter-spacing: -0.02em;
-        background: linear-gradient(100deg, #ffffff 10%, var(--brand-2) 60%, var(--brand) 100%);
-        -webkit-background-clip: text; background-clip: text; color: transparent;
-      }
-      .hero-tag { color: var(--text); font-size: 16px; margin: 0 auto 14px; max-width: 620px; }
-      .hero-tag strong { color: var(--brand-2); }
-      .hero-lead { color: var(--muted); font-size: 14.5px; line-height: 1.6; max-width: 660px; margin: 0 auto; }
-      .tiles-head { text-align: center; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 34px 0 14px; }
-      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-      .tile {
-        background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-        padding: 18px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        transition: border-color .18s, transform .18s; position: relative; overflow: hidden;
-      }
-      .tile::before { content: ""; position: absolute; inset: 0; background: radial-gradient(120px 80px at 90% -10%, var(--accent-soft), transparent 70%); opacity: 0; transition: opacity .18s; }
-      .tile:hover { border-color: var(--border-strong); transform: translateY(-2px); }
-      .tile:hover::before { opacity: 1; }
-      .tile .ico { font-size: 22px; margin-bottom: 10px; }
-      .tile h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
-      .tile p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
-      .examples { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
-      .ex-label { font-size: 12px; color: var(--muted); width: 100%; text-align: center; margin-bottom: 2px; }
+      /* welcome */
+      .empty { max-width: 740px; width: 100%; margin: 24px auto; }
+      .hero { text-align: center; padding: 24px 4px 8px; }
+      .hero-logo { height: 34px; width: auto; margin-bottom: 22px; }
+      .hero-title { font-size: clamp(26px, 5vw, 34px); margin: 0 0 12px; font-weight: 600; letter-spacing: -0.02em; }
+      .hero-tag { color: var(--muted); font-size: 15px; margin: 0 auto; max-width: 460px; }
+      .tiles-head { font-size: 12px; color: var(--faint); margin: 40px 0 12px; letter-spacing: 0.02em; }
+      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+      .tile { background: var(--bg); padding: 18px; }
+      .tile h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+      .tile p { margin: 0; font-size: 13px; color: var(--muted); }
+      .examples { margin-top: 26px; }
+      .ex-label { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
       button.ex {
-        background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-        border-radius: 999px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; text-align: left;
-        max-width: 420px; transition: border-color .15s, transform .15s; font-weight: 400;
+        display: block; width: 100%; text-align: left; background: var(--surface);
+        border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+        padding: 12px 15px; font-size: 13.5px; cursor: pointer; margin-bottom: 8px;
+        transition: border-color .15s; font-family: inherit;
       }
-      button.ex:hover { border-color: var(--brand-2); transform: translateY(-1px); }
-      .hero-note { text-align: center; color: var(--muted); font-size: 12.5px; margin: 26px auto 6px; max-width: 620px; line-height: 1.5; }
+      button.ex:hover { border-color: var(--border-strong); }
 
-      /* ---------- secrets panel ---------- */
-      #secretsPanel { max-width: 880px; margin: 0 auto 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; backdrop-filter: blur(12px); }
-      .secrets-head { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
-      .secrets-head code { background: rgba(0,0,0,0.35); padding: 1px 6px; border-radius: 5px; color: var(--brand-2); }
+      /* secrets */
+      #secretsPanel { max-width: 740px; margin: 0 auto 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; }
+      .secrets-head { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+      .secrets-head code { font-family: var(--mono); font-size: 12px; color: var(--text); }
       .secret-row { display: flex; gap: 8px; margin-bottom: 8px; }
-      .secret-row input { background: rgba(3,6,11,0.6); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; font-size: 13px; }
+      .secret-row input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; font-size: 13px; font-family: inherit; }
       .secret-row input.k { width: 170px; flex: 0 0 auto; }
       .secret-row input.v { flex: 1; min-width: 0; }
-      .secret-row input:focus { outline: none; border-color: var(--brand-2); }
-      .secret-row button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 10px; cursor: pointer; padding: 0 12px; }
+      .secret-row input:focus { outline: none; border-color: var(--border-strong); }
+      .secret-row button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 9px; cursor: pointer; padding: 0 13px; font-size: 16px; }
       .secret-row button:hover { color: var(--err); border-color: var(--err); }
-      button.mini { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; padding: 7px 12px; border-radius: 10px; cursor: pointer; }
-      button.mini:hover { border-color: var(--brand-2); color: var(--brand-2); }
+      button.mini { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 12.5px; padding: 8px 13px; border-radius: 9px; cursor: pointer; font-family: inherit; }
+      button.mini:hover { border-color: var(--border-strong); color: var(--text); }
 
-      /* ---------- agent trace ---------- */
-      .trace-step { border-left: 2px solid var(--border-strong); padding: 4px 0 6px 14px; margin: 12px 0; }
-      .trace-step .stephead { font-size: 12px; color: var(--muted); word-break: break-all; }
-      .trace-thought { font-size: 13.5px; margin: 6px 0; line-height: 1.5; }
-      .trace-act { font-family: var(--mono); font-size: 12px; background: rgba(3,6,11,0.7); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; margin-top: 4px; display: inline-block; color: var(--brand-2); }
-      .trace-shot { max-width: 340px; width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; display: block; }
-      .trace-status { font-size: 12.5px; color: var(--muted); font-style: italic; margin: 6px 0; }
-      .trace-final { border: 1px solid rgba(63,185,80,0.5); background: rgba(63,185,80,0.06); border-radius: 12px; padding: 14px; margin-top: 14px; }
-      .trace-final .lbl { font-size: 11px; text-transform: uppercase; color: var(--accent-2); letter-spacing: 0.06em; margin-bottom: 4px; }
-      .trace-final img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; }
+      /* agent trace */
+      .trace-step { border-left: 1px solid var(--border); padding: 2px 0 8px 16px; margin: 14px 0; }
+      .trace-step .stephead { font-size: 12px; color: var(--faint); word-break: break-all; }
+      .trace-thought { font-size: 14px; margin: 7px 0; }
+      .trace-act { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
+      .trace-shot { max-width: 360px; width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; display: block; }
+      .trace-status { font-size: 13px; color: var(--muted); margin: 7px 0; }
+      .trace-final { border: 1px solid var(--border-strong); border-radius: 12px; padding: 15px; margin-top: 16px; }
+      .trace-final .lbl { font-size: 12px; color: var(--faint); margin-bottom: 5px; }
+      .trace-final img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 12px; }
 
-      /* ---------- footer / composer ---------- */
+      /* footer / composer */
       footer {
-        border-top: 1px solid var(--border); padding: 14px 20px;
-        padding-bottom: max(14px, env(safe-area-inset-bottom));
-        background: var(--panel); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+        border-top: 1px solid var(--border); padding: 16px 22px;
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        background: var(--bg);
       }
-      #attachments { max-width: 880px; margin: 0 auto 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+      #attachments { max-width: 740px; margin: 0 auto 10px; display: flex; flex-wrap: wrap; gap: 8px; }
       #attachments:empty { display: none; }
-      .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; color: var(--text); }
+      .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; color: var(--text); }
       .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
-      .composer {
-        max-width: 880px; margin: 0 auto; background: rgba(3,6,11,0.5); border: 1px solid var(--border);
-        border-radius: var(--radius); padding: 10px; transition: border-color .15s;
-      }
-      .composer:focus-within { border-color: rgba(31,182,205,0.45); box-shadow: 0 0 0 3px rgba(31,182,205,0.10); }
-      textarea {
-        width: 100%; resize: none; background: transparent; color: var(--text); border: none;
-        padding: 8px 8px 4px; font-family: inherit; font-size: 15px; line-height: 1.45;
-        min-height: 26px; max-height: 180px;
-      }
+      .composer { max-width: 740px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s; }
+      .composer:focus-within { border-color: var(--border-strong); }
+      textarea { width: 100%; resize: none; background: transparent; color: var(--text); border: none; padding: 6px 2px 2px; font-family: inherit; font-size: 15px; line-height: 1.5; min-height: 24px; max-height: 200px; }
       textarea:focus { outline: none; }
-      textarea::placeholder { color: var(--muted); }
+      textarea::placeholder { color: var(--faint); }
       .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-      .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+      .tools { display: flex; gap: 6px; flex-wrap: wrap; }
       button.tool {
-        display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,0.03);
-        border: 1px solid var(--border); color: var(--text); height: 40px; padding: 0 13px;
-        font-size: 16px; border-radius: 12px; cursor: pointer; transition: all .15s;
+        display: inline-flex; align-items: center; gap: 7px; background: transparent;
+        border: 1px solid var(--border); color: var(--muted); height: 36px; padding: 0 12px;
+        font-size: 13px; border-radius: 10px; cursor: pointer; transition: all .15s; font-family: inherit;
       }
-      button.tool .tlabel { font-size: 12.5px; font-weight: 500; }
-      button.tool:hover { border-color: var(--border-strong); background: rgba(255,255,255,0.06); }
-      button.tool.active { border-color: var(--brand-2); background: var(--accent-soft); color: var(--brand-2); box-shadow: 0 0 0 1px rgba(31,182,205,0.25); }
+      button.tool svg { width: 17px; height: 17px; }
+      button.tool:hover { border-color: var(--border-strong); color: var(--text); }
+      button.tool.active { background: rgba(255,255,255,0.10); border-color: var(--border-strong); color: var(--text); }
       #send {
-        margin-left: auto; background: linear-gradient(135deg, var(--brand-2), var(--brand));
-        color: #04121a; border: none; border-radius: 12px; padding: 0 22px; height: 40px;
-        font-size: 14px; font-weight: 700; cursor: pointer; transition: transform .12s, opacity .15s; flex: 0 0 auto;
+        margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+        background: var(--text); color: var(--bg); border: none; border-radius: 999px;
+        width: 36px; height: 36px; cursor: pointer; transition: opacity .15s; flex: 0 0 auto;
       }
-      #send:hover { transform: translateY(-1px); }
-      #send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-      .hint { max-width: 880px; margin: 9px auto 0; color: var(--muted); font-size: 11.5px; text-align: center; }
+      #send svg { width: 18px; height: 18px; }
+      #send:hover { opacity: 0.85; }
+      #send:disabled { opacity: 0.35; cursor: not-allowed; }
+      .hint { max-width: 740px; margin: 10px auto 0; color: var(--faint); font-size: 12px; text-align: center; }
 
-      .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 4px; }
+      .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--faint); border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 5px; }
       @keyframes spin { to { transform: rotate(360deg); } }
 
-      /* ---------- mobile ---------- */
       @media (max-width: 640px) {
-        header { padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); gap: 10px; }
-        .brand-logo { height: 22px; }
-        .brand-sub { display: none; }
-        .brand-title { font-size: 15px; }
+        header { padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); }
         .status-pill .status { display: none; }
-        #chat { padding: 16px 12px 6px; gap: 14px; }
-        .bubble { padding: 14px 15px; border-radius: 14px; }
-        footer { padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-        button.tool { height: 42px; padding: 0 12px; }
-        button.tool .tlabel { display: none; }
-        #send { padding: 0 18px; height: 42px; }
+        #chat { padding: 18px 14px 6px; gap: 18px; }
+        footer { padding: 12px 14px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
         .tiles { grid-template-columns: 1fr; }
-        .hero-logo { height: 38px; }
-        button.ex { max-width: 100%; }
+        button.tool .tlabel { display: none; }
+        button.tool { padding: 0 11px; height: 38px; }
+        #send { width: 38px; height: 38px; }
       }
     </style>
   </head>
   <body>
     <header>
       <img class="brand-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-      <div class="brand-text">
-        <span class="brand-title">Pippos Playground</span>
-        <span class="brand-sub">AI Sandbox</span>
-      </div>
-      <div class="status-pill">
-        <span class="dot" id="e2bDot"></span>
-        <span class="status" id="status">…</span>
-      </div>
+      <span class="brand-title">Pippos Playground</span>
+      <span class="status-pill"><span class="dot" id="e2bDot"></span><span class="status" id="status">…</span></span>
     </header>
 
     <main id="chat">
       <div class="empty" id="empty">
         <div class="hero">
           <img class="hero-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-          <h1 class="hero-title">Pippos&nbsp;Playground</h1>
-          <p class="hero-tag">Ein Experimentierfeld für KI-Funktionen — mögliche Erweiterungen für <strong>AI:ssociate</strong>.</p>
-          <p class="hero-lead">Hier kannst du in Echtzeit ausprobieren, was eine KI leisten kann, wenn sie nicht nur Text schreibt, sondern echten Code in einer sicheren, isolierten Sandbox ausführt – und sogar einen echten Browser steuert. Jede Funktion unten ist ein Baustein für zukünftige AI:ssociate-Features.</p>
+          <h1 class="hero-title">Pippos Playground</h1>
+          <p class="hero-tag">Eine Sandbox für KI-Funktionen — mögliche Erweiterungen für AI:ssociate.</p>
         </div>
 
-        <h2 class="tiles-head">Was du hier testen kannst</h2>
+        <div class="tiles-head">Funktionen</div>
         <div class="tiles">
-          <div class="tile">
-            <div class="ico">💻</div>
-            <h3>Code & Datenanalyse</h3>
-            <p>Stelle eine Aufgabe in natürlicher Sprache – die KI schreibt Python, führt es in der Sandbox aus und zeigt Ergebnisse, Tabellen und Diagramme. Ideal für exakte juristische Berechnungen: Fristen, Gebühren (RATG/GGG), Zinsen, Unterhalt.</p>
-          </div>
-          <div class="tile">
-            <div class="ico">📄</div>
-            <h3>Dokumente erstellen</h3>
-            <p>Lass Verträge, Schriftsätze oder Berichte als echte Word-/PDF-Dateien generieren – aus Vorlagen und Falldaten, direkt zum Download.</p>
-          </div>
-          <div class="tile">
-            <div class="ico">📎</div>
-            <h3>Dateien bearbeiten</h3>
-            <p>Lade eigene Dateien hoch (CSV, Excel, Verträge). Die KI liest, verändert und gibt sie bearbeitet zurück – z. B. Klauseln extrahieren, Tabellen auswerten oder Dokumente anonymisieren (DSGVO).</p>
-          </div>
-          <div class="tile">
-            <div class="ico">🌐</div>
-            <h3>Browser-Automatisierung</h3>
-            <p>Ein echter, headless Browser in der Sandbox besucht Webseiten, liest Inhalte aus und erstellt Screenshots – die Basis für Recherche in RIS, Firmenbuch oder Grundbuch.</p>
-          </div>
-          <div class="tile">
-            <div class="ico">🤖</div>
-            <h3>KI-Agent</h3>
-            <p>Der Agent arbeitet Schritt für Schritt: Er sieht die Seite, entscheidet die nächste Aktion, klickt, füllt Formulare aus und meldet das Ergebnis – z. B. Login und Informationsabruf in einem Portal.</p>
-          </div>
-          <div class="tile">
-            <div class="ico">🔑</div>
-            <h3>Sichere Zugangsdaten</h3>
-            <p>Zugangsdaten werden getrennt gespeichert und nie an das KI-Modell gesendet. Der Agent nutzt sie nur als Platzhalter <code>{{PASSWORD}}</code> – wichtig für Vertraulichkeit & DSGVO.</p>
-          </div>
+          <div class="tile"><h3>Code &amp; Analyse</h3><p>Rechnen, Daten auswerten, Diagramme.</p></div>
+          <div class="tile"><h3>Dokumente</h3><p>Word- und PDF-Dateien erzeugen.</p></div>
+          <div class="tile"><h3>Dateien</h3><p>Hochladen, bearbeiten, zurückgeben.</p></div>
+          <div class="tile"><h3>Browser</h3><p>Webseiten automatisiert auslesen.</p></div>
+          <div class="tile"><h3>Agent</h3><p>Mehrstufige Aufgaben und Logins.</p></div>
+          <div class="tile"><h3>Zugangsdaten</h3><p>Sicher, verborgen vor dem Modell.</p></div>
         </div>
 
         <div class="examples">
-          <span class="ex-label">Beispiele zum Ausprobieren:</span>
-          <button class="ex" onclick="fillExample(this)" data-p="Berechne die Berufungsfrist: Das Urteil wurde am 12.03.2026 zugestellt, die Frist beträgt 4 Wochen. Gib das genaue Enddatum an und berücksichtige Wochenenden.">Fristberechnung: Berufungsfrist ab Zustellung</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Erstelle eine Word-Datei mit einem einfachen Geheimhaltungsvertrag (NDA) zwischen der Muster GmbH und Max Mustermann.">Word-NDA generieren</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Öffne aissociate.at und mache einen Screenshot der Startseite.">🌐 Screenshot von aissociate.at</button>
+          <div class="ex-label">Beispiele</div>
+          <button class="ex" onclick="fillExample(this)" data-p="Berechne die Berufungsfrist: Urteil zugestellt am 12.03.2026, Frist 4 Wochen. Gib das Enddatum an und berücksichtige Wochenenden.">Berufungsfrist berechnen</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Erstelle eine Word-Datei mit einem einfachen Geheimhaltungsvertrag (NDA) zwischen der Muster GmbH und Max Mustermann.">Word-NDA erstellen</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Öffne aissociate.at und mache einen Screenshot der Startseite.">Screenshot von aissociate.at (Browser-Modus)</button>
         </div>
-
-        <p class="hero-note">Wähle unten einen Modus (🌐 Browser · 🤖 Agent) oder stelle direkt eine Aufgabe. Für Logins nutze 🔑 Secrets – deine Zugangsdaten bleiben vor dem KI-Modell verborgen.</p>
       </div>
     </main>
 
     <footer>
       <div id="secretsPanel" hidden>
         <div class="secrets-head">
-          🔑 Secrets — werden an die Sandbox übergeben, aber <strong>nie dem KI-Modell gezeigt</strong>. Verwende sie in der Aufgabe als <code>{{NAME}}</code> (z. B. <code>{{PASSWORD}}</code>).
+          Zugangsdaten werden an die Sandbox übergeben, aber nie dem KI-Modell gezeigt. In der Aufgabe als <code>{{NAME}}</code> verwenden, z. B. <code>{{PASSWORD}}</code>.
         </div>
         <div id="secretsRows"></div>
-        <button id="addSecret" class="mini">+ Secret hinzufügen</button>
+        <button id="addSecret" class="mini">Secret hinzufügen</button>
       </div>
       <div id="attachments"></div>
       <div class="composer">
         <input type="file" id="fileInput" multiple hidden />
-        <textarea id="input" placeholder="Beschreibe deine Aufgabe … z. B. „Werte diese Excel-Datei aus" oder „Logge dich ein und finde X"" rows="1"></textarea>
+        <textarea id="input" placeholder="Aufgabe beschreiben…" rows="1"></textarea>
         <div class="composer-bar">
           <div class="tools">
-            <button id="attach" class="tool" title="Dateien anhängen">📎</button>
-            <button id="browserToggle" class="tool" title="Browser-Modus: einmaliges Skript im headless Browser">🌐<span class="tlabel">Browser</span></button>
-            <button id="agentToggle" class="tool" title="Agent-Modus: Schritt-für-Schritt Browser-Agent">🤖<span class="tlabel">Agent</span></button>
-            <button id="secretsToggle" class="tool" title="Zugangsdaten (Secrets) verwalten">🔑<span class="tlabel">Secrets</span></button>
+            <button id="attach" class="tool" title="Dateien anhängen" aria-label="Dateien anhängen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
+            </button>
+            <button id="browserToggle" class="tool" title="Browser-Modus" aria-label="Browser-Modus">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
+              <span class="tlabel">Browser</span>
+            </button>
+            <button id="agentToggle" class="tool" title="Agent-Modus" aria-label="Agent-Modus">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5 13.7 9 19 10.5 13.7 12 12 17.5 10.3 12 5 10.5 10.3 9 12 3.5Z"/><path d="M18.5 16.5 19 18.5 21 19 19 19.5 18.5 21.5 18 19.5 16 19 18 18.5 18.5 16.5Z"/></svg>
+              <span class="tlabel">Agent</span>
+            </button>
+            <button id="secretsToggle" class="tool" title="Zugangsdaten" aria-label="Zugangsdaten">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16.5 16.5 18.5 14.5M13.5 18.5 15.5 16.5"/></svg>
+              <span class="tlabel">Secrets</span>
+            </button>
           </div>
-          <button id="send">Ausführen</button>
+          <button id="send" aria-label="Senden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+          </button>
         </div>
       </div>
-      <div class="hint" id="hint">Enter zum Senden · Shift+Enter für neue Zeile · 📎 Dateien · 🌐 Browser · 🤖 Agent · 🔑 Secrets</div>
+      <div class="hint" id="hint">Enter senden · Shift+Enter neue Zeile</div>
     </footer>
 
     <script>
@@ -337,11 +265,11 @@
       const addSecret = document.getElementById('addSecret')
       const hint = document.getElementById('hint')
 
-      const history = [] // {role, content} pairs sent back to the model for context
-      let pendingFiles = [] // {name, base64, size} to upload with the next prompt
+      const history = []
+      let pendingFiles = []
       let browserMode = false
       let agentMode = false
-      const secretRows = [] // {name, value}
+      const secretRows = []
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
 
@@ -354,10 +282,10 @@
 
       function updateHint() {
         hint.textContent = agentMode
-          ? '🤖 Agent-Modus AN — der Browser-Agent arbeitet Schritt für Schritt (für Logins 🔑 Secrets hinzufügen). Beschreibe das Ziel, z. B. „einloggen und X finden".'
+          ? 'Agent-Modus aktiv — arbeitet schrittweise. Für Logins Secrets hinzufügen.'
           : browserMode
-            ? '🌐 Browser-Modus AN — einmaliges headless Chromium in der Sandbox (erster Lauf installiert es, ~1 Min)'
-            : 'Enter zum Senden · Shift+Enter für neue Zeile · 📎 Dateien · 🌐 Browser · 🤖 Agent · 🔑 Secrets'
+            ? 'Browser-Modus aktiv — headless Chromium (erster Lauf ~1 Min).'
+            : 'Enter senden · Shift+Enter neue Zeile'
       }
 
       function renderSecrets() {
@@ -402,7 +330,7 @@
       async function addFiles(fileList) {
         for (const file of fileList) {
           if (pendingFiles.length >= MAX_UPLOADS) {
-            alert(`Du kannst höchstens ${MAX_UPLOADS} Dateien pro Nachricht anhängen.`)
+            alert(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht.`)
             break
           }
           if (file.size > MAX_UPLOAD_BYTES) {
@@ -422,10 +350,7 @@
           chip.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`))
           const x = el('button', null, '×')
           x.title = 'Entfernen'
-          x.addEventListener('click', () => {
-            pendingFiles.splice(i, 1)
-            renderAttachments()
-          })
+          x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() })
           chip.appendChild(x)
           attachments.appendChild(chip)
         })
@@ -484,9 +409,7 @@
         }
         const ex = data.execution
         if (ex) {
-          if (ex.note) {
-            bubble.appendChild(el('div', 'file-note', '⚠ ' + ex.note))
-          }
+          if (ex.note) bubble.appendChild(el('div', 'file-note', ex.note))
           if (ex.stdout) {
             bubble.appendChild(el('div', 'label', 'Ausgabe'))
             bubble.appendChild(el('pre', null, ex.stdout))
@@ -507,13 +430,12 @@
                 bubble.appendChild(el('div', 'file-note', `${f.name} — ${fmtSize(f.size)}, zu groß zum Download`))
                 return
               }
-              // Bilder (z. B. Browser-Screenshots) inline zeigen, dann verlinken.
               if (IMG_RE.test(f.name) && f.base64) {
                 const img = el('img', 'result')
                 img.src = `data:image/png;base64,${f.base64}`
                 bubble.appendChild(img)
               }
-              const a = el('a', 'file-link', `⬇ ${f.name}  ·  ${fmtSize(f.size)}`)
+              const a = el('a', 'file-link', `${f.name} · ${fmtSize(f.size)}`)
               a.href = `data:application/octet-stream;base64,${f.base64}`
               a.download = f.name
               bubble.appendChild(a)
@@ -565,7 +487,7 @@
           } else if (ev.event === 'action') {
             const s = stepEl(ev.step)
             if (ev.thought) s.appendChild(el('div', 'trace-thought', ev.thought))
-            s.appendChild(el('div', 'trace-act', '▶ ' + ev.summary))
+            s.appendChild(el('div', 'trace-act', ev.summary))
           } else if (ev.event === 'final') {
             spin.remove()
             const f = el('div', 'trace-final')
@@ -579,8 +501,7 @@
             trace.appendChild(f)
           } else if (ev.event === 'error') {
             spin.remove()
-            const e = el('div', 'label err', 'Agent-Fehler')
-            trace.appendChild(e)
+            trace.appendChild(el('div', 'label err', 'Agent-Fehler'))
             trace.appendChild(el('pre', null, ev.message))
           }
           chat.scrollTop = chat.scrollHeight
@@ -632,7 +553,7 @@
         const userBubble = addMessage('user')
         userBubble.textContent = prompt
         if (uploads.length) {
-          const note = el('div', 'file-note', '📎 ' + uploads.map((f) => f.name).join(', '))
+          const note = el('div', 'file-note', 'Dateien: ' + uploads.map((f) => f.name).join(', '))
           userBubble.appendChild(note)
         }
 
@@ -648,8 +569,8 @@
 
         const bubble = addMessage('assistant')
         bubble.innerHTML = browserMode
-          ? '<span class="spinner"></span> Wird im Browser-Sandbox generiert & ausgeführt (erster Lauf installiert Chromium, ~1 Min)…'
-          : '<span class="spinner"></span> Wird generiert & ausgeführt…'
+          ? '<span class="spinner"></span> Wird im Browser-Sandbox ausgeführt (erster Lauf ~1 Min)…'
+          : '<span class="spinner"></span> Wird ausgeführt…'
 
         try {
           const r = await fetch('/api/chat', {
@@ -701,7 +622,7 @@
       attach.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', async () => {
         await addFiles(fileInput.files)
-        fileInput.value = '' // erlaubt erneutes Auswählen derselben Datei
+        fileInput.value = ''
       })
       send.addEventListener('click', submit)
       input.addEventListener('keydown', (e) => {
@@ -712,7 +633,7 @@
       })
       input.addEventListener('input', () => {
         input.style.height = 'auto'
-        input.style.height = Math.min(input.scrollHeight, 180) + 'px'
+        input.style.height = Math.min(input.scrollHeight, 200) + 'px'
       })
 
       checkHealth()
