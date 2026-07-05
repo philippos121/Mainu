@@ -362,7 +362,7 @@ app.post('/api/chat', async (req, res) => {
 // only ever sees placeholder names like {{PASSWORD}}.
 // ---------------------------------------------------------------------------
 
-const AGENT_MAX_STEPS = 14
+const AGENT_MAX_STEPS = 30
 const AGENT_SANDBOX_MS = 600_000
 
 // Installs Playwright + Chromium inside the run kernel (same cache the launch uses).
