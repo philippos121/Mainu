@@ -18,6 +18,12 @@ const {
 const E2B_API_KEY =
   process.env.E2B_API_KEY || 'e2b_bd1a9240aeb8ea21578a5fc7ab87befd408f074e'
 
+// Where the sandbox's Python kernel writes files by default, and limits on
+// how many/how large the files we return to the browser can be.
+const WORKDIR = '/home/user'
+const MAX_FILES = 10
+const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB per file
+
 // Created lazily so the server still boots (and /api/health can report the
 // problem) when a key is missing, instead of crashing at startup.
 let _openai
@@ -98,8 +104,42 @@ app.post('/api/chat', async (req, res) => {
     // 2) Run the generated code in a fresh, disposable E2B sandbox.
     const sandbox = await Sandbox.create({ apiKey: E2B_API_KEY })
     let execution
+    let files = []
     try {
+      // Snapshot the working dir so we can detect files the code creates.
+      const before = new Map()
+      try {
+        for (const e of await sandbox.files.list(WORKDIR)) {
+          if (e.type === 'file') before.set(e.path, e.size)
+        }
+      } catch {
+        /* dir may not be listable; ignore */
+      }
+
       execution = await sandbox.runCode(code, { timeoutMs: 60_000 })
+
+      // Capture new or changed files (e.g. .docx, .csv, .xlsx, .zip) and
+      // hand them back to the browser as downloads.
+      try {
+        const after = await sandbox.files.list(WORKDIR)
+        const changed = after.filter(
+          (e) => e.type === 'file' && before.get(e.path) !== e.size,
+        )
+        for (const e of changed.slice(0, MAX_FILES)) {
+          if (e.size > MAX_FILE_BYTES) {
+            files.push({ name: e.name, size: e.size, tooLarge: true })
+            continue
+          }
+          const bytes = await sandbox.files.read(e.path, { format: 'bytes' })
+          files.push({
+            name: e.name,
+            size: e.size,
+            base64: Buffer.from(bytes).toString('base64'),
+          })
+        }
+      } catch (e) {
+        console.error('file capture failed:', e?.message)
+      }
     } finally {
       await sandbox.kill()
     }
@@ -121,6 +161,7 @@ app.post('/api/chat', async (req, res) => {
           : null,
         text: textResults,
         images,
+        files,
       },
     })
   } catch (err) {

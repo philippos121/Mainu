@@ -73,6 +73,13 @@
       .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 4px; }
       .label.err { color: var(--err); }
       img.result { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border); }
+      a.file-link {
+        display: inline-flex; align-items: center; gap: 6px; margin: 8px 8px 0 0;
+        padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: 8px; color: var(--accent); text-decoration: none; font-size: 13px;
+      }
+      a.file-link:hover { border-color: var(--accent); }
+      .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
       footer {
         border-top: 1px solid var(--border);
         padding: 14px 20px;
@@ -169,6 +176,12 @@
         return e
       }
 
+      function fmtSize(bytes) {
+        if (bytes < 1024) return bytes + ' B'
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+        return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+      }
+
       function addMessage(role) {
         empty?.remove()
         const wrap = el('div', 'msg ' + role)
@@ -207,6 +220,19 @@
             img.src = src
             bubble.appendChild(img)
           })
+          if (ex.files?.length) {
+            bubble.appendChild(el('div', 'label', 'Files'))
+            ex.files.forEach((f) => {
+              if (f.tooLarge) {
+                bubble.appendChild(el('div', 'file-note', `${f.name} — ${fmtSize(f.size)}, too large to download`))
+                return
+              }
+              const a = el('a', 'file-link', `⬇ ${f.name}  ·  ${fmtSize(f.size)}`)
+              a.href = `data:application/octet-stream;base64,${f.base64}`
+              a.download = f.name
+              bubble.appendChild(a)
+            })
+          }
           if (ex.error) {
             bubble.appendChild(el('div', 'label err', 'Runtime error'))
             bubble.appendChild(el('pre', null, ex.error))
