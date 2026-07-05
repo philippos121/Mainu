@@ -86,6 +86,7 @@
       }
       a.file-link:hover { border-color: var(--border-strong); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+      .pdf-preview { width: 100%; height: 460px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; }
 
       /* welcome */
       .empty { max-width: 740px; width: 100%; margin: 24px auto; }
@@ -106,6 +107,15 @@
       }
       .cap-ico svg { width: 23px; height: 23px; }
       .cap-txt { font-size: 14.5px; font-weight: 500; line-height: 1.4; }
+      .examples { margin-top: 30px; }
+      .ex-label { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
+      button.ex {
+        display: block; width: 100%; text-align: left; background: var(--surface);
+        border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+        padding: 13px 15px; font-size: 13.5px; cursor: pointer; margin-bottom: 8px;
+        transition: border-color .15s; font-family: inherit;
+      }
+      button.ex:hover { border-color: var(--border-strong); }
 
       /* secrets */
       #secretsPanel { max-width: 740px; margin: 0 auto 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; }
@@ -225,6 +235,13 @@
             </div>
             <div class="cap-txt">Computer<br />steuern</div>
           </div>
+        </div>
+
+        <div class="examples">
+          <div class="ex-label">Beispiele für Juristen — Dateien anhängen (📎) und starten</div>
+          <button class="ex" onclick="fillExample(this)" data-p="Vergleiche die hochgeladenen Dokumente und zeige die Unterschiede (Delta) klar auf: geänderte, ergänzte und gelöschte Passagen, mit kurzer Zusammenfassung der wesentlichen Änderungen.">Mehrere Verträge vergleichen — Delta-Ansicht</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Lies alle hochgeladenen Dateien und extrahiere die wichtigsten Eckdaten (Parteien, Datum, Fristen, Beträge, Gerichtsstand, Kündigungsklauseln) als übersichtliche Tabelle und als Excel-Datei zum Download.">Aus mehreren Dateien Infos extrahieren</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Prüfe den hochgeladenen Vertrag auf riskante oder unübliche Klauseln, liste sie mit kurzer Begründung und einer Ampel-Risikobewertung auf.">Vertrag auf riskante Klauseln prüfen</button>
         </div>
       </div>
     </main>
@@ -471,6 +488,12 @@
                 const img = el('img', 'result')
                 img.src = `data:image/png;base64,${f.base64}`
                 bubble.appendChild(img)
+              } else if (/\.pdf$/i.test(f.name) && f.base64) {
+                const emb = document.createElement('embed')
+                emb.className = 'pdf-preview'
+                emb.type = 'application/pdf'
+                emb.src = `data:application/pdf;base64,${f.base64}`
+                bubble.appendChild(emb)
               }
               const a = el('a', 'file-link', `${f.name} · ${fmtSize(f.size)}`)
               a.href = `data:application/octet-stream;base64,${f.base64}`
@@ -564,6 +587,8 @@
                 }
                 if (IMG_RE.test(file.name)) {
                   const img = el('img', 'result'); img.src = `data:image/png;base64,${file.base64}`; f.appendChild(img)
+                } else if (/\.pdf$/i.test(file.name)) {
+                  const emb = document.createElement('embed'); emb.className = 'pdf-preview'; emb.type = 'application/pdf'; emb.src = `data:application/pdf;base64,${file.base64}`; f.appendChild(emb)
                 }
                 const a = el('a', 'file-link', `${file.name} · ${fmtSize(file.size)}`)
                 a.href = `data:application/octet-stream;base64,${file.base64}`
@@ -713,6 +738,7 @@
         input.style.height = Math.min(input.scrollHeight, 200) + 'px'
       })
 
+      setMode('agent') // Agent mode preselected by default
       checkHealth()
     </script>
   </body>
