@@ -442,6 +442,8 @@ Control:
 {"thought":"...","action":"fail","answer":"why it is impossible"}
 
 Rules:
+- BE EFFICIENT — use as FEW steps as possible. If the task can be solved by a single program (e.g. transform/translate/edit a file and return it), write ONE complete "python" action that does EVERYTHING at once, then immediately "done". Do NOT split a deterministic file transformation into many steps and do NOT re-inspect or re-verify once the output file exists.
+- Only use many steps when the task genuinely requires reacting to what you observe (browsing, logins, portals, GUIs, multiple sources).
 - For browser clicks/fills refer to elements ONLY by their ref number from the ELEMENTS list.
 - Prefer APIs over browser clicking when available (e.g. Microsoft Graph for SharePoint/OneDrive).
 - SECRETS available: ${secrets}. NEVER guess them. Use them ONLY as placeholders like {{NAME}} inside text/headers/url. You never see the real values; they are substituted at execution time.
