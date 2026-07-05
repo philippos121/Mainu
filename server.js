@@ -28,6 +28,12 @@ const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB per file (download)
 const MAX_UPLOADS = 5
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024 // 15 MB per uploaded file
 
+// Execution timeouts. Browser tasks need longer (install + navigation).
+const RUN_TIMEOUT_MS = 60_000
+const BROWSER_RUN_TIMEOUT_MS = 180_000
+const BROWSER_SETUP_TIMEOUT_MS = 260_000
+const SANDBOX_LIFETIME_MS = 300_000
+
 // Created lazily so the server still boots (and /api/health can report the
 // problem) when a key is missing, instead of crashing at startup.
 let _openai
@@ -52,6 +58,16 @@ Rules:
 - If the user uploaded files, they are already saved in the current working directory. Read them by
   their exact filename. Save any modified or generated file to the working directory (a new filename
   is fine) so it can be returned to the user for download.`
+
+// Extra guidance appended when the user turns on Browser mode.
+const BROWSER_PROMPT = `
+BROWSER AUTOMATION IS ENABLED. Playwright and headless Chromium are already installed in the sandbox.
+Use them to drive a real browser (navigate, click, fill forms, scrape JavaScript-rendered pages).
+- Use Playwright's SYNCHRONOUS API: "from playwright.sync_api import sync_playwright".
+- Launch headless with no-sandbox flags: p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"]).
+- Always save at least one screenshot to "screenshot.png" so the user can see the page.
+- print() the key information you extracted, and save structured results to a file when useful.
+- Always close the browser at the end.`
 
 /** Pull the first fenced python block out of the model's reply. */
 function extractCode(text) {
@@ -81,10 +97,11 @@ app.post('/api/chat', async (req, res) => {
       return res.status(500).json({ error: 'E2B_API_KEY is not set on the server.' })
     }
 
-    const { prompt, history = [], files: rawUploads = [] } = req.body ?? {}
+    const { prompt, history = [], files: rawUploads = [], browser = false } = req.body ?? {}
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'Missing "prompt" string in request body.' })
     }
+    const browserMode = browser === true
 
     // Validate & normalize uploaded files: strip any path, cap count/size.
     const uploads = []
@@ -110,7 +127,7 @@ app.post('/api/chat', async (req, res) => {
         }
       : null
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: SYSTEM_PROMPT + (browserMode ? '\n' + BROWSER_PROMPT : '') },
       ...(uploadNote ? [uploadNote] : []),
       ...history
         .filter((m) => m && m.role && typeof m.content === 'string')
@@ -133,14 +150,31 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // 2) Run the generated code in a fresh, disposable E2B sandbox.
-    const sandbox = await Sandbox.create({ apiKey: E2B_API_KEY })
+    const sandbox = await Sandbox.create({
+      apiKey: E2B_API_KEY,
+      timeoutMs: SANDBOX_LIFETIME_MS,
+    })
     let execution
     let files = []
+    let setupNote = null
     try {
       // Push any uploaded files into the sandbox so the code can use them.
       for (const u of uploads) {
         const ab = u.buf.buffer.slice(u.buf.byteOffset, u.buf.byteOffset + u.buf.byteLength)
         await sandbox.files.write(`${WORKDIR}/${u.name}`, ab)
+      }
+
+      // Browser mode: install Playwright + headless Chromium up front so the
+      // generated code can assume they're ready.
+      if (browserMode) {
+        const setup = await sandbox.commands.run(
+          'pip install --quiet playwright && playwright install --with-deps chromium',
+          { timeoutMs: BROWSER_SETUP_TIMEOUT_MS },
+        )
+        if (setup.exitCode !== 0) {
+          setupNote = 'Browser setup reported a non-zero exit code; the run may fail.'
+          console.error('browser setup failed:', (setup.stderr || '').slice(-500))
+        }
       }
 
       // Snapshot the working dir (uploads included) so we can detect files the
@@ -154,7 +188,9 @@ app.post('/api/chat', async (req, res) => {
         /* dir may not be listable; ignore */
       }
 
-      execution = await sandbox.runCode(code, { timeoutMs: 60_000 })
+      execution = await sandbox.runCode(code, {
+        timeoutMs: browserMode ? BROWSER_RUN_TIMEOUT_MS : RUN_TIMEOUT_MS,
+      })
 
       // Capture new or changed files (e.g. .docx, .csv, .xlsx, .zip) and
       // hand them back to the browser as downloads.
@@ -200,6 +236,7 @@ app.post('/api/chat', async (req, res) => {
         text: textResults,
         images,
         files,
+        note: setupNote,
       },
     })
   } catch (err) {

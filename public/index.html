@@ -91,6 +91,7 @@
         padding: 0 14px; font-size: 18px; height: 48px; flex: 0 0 auto;
       }
       button.ghost:hover { border-color: var(--accent); }
+      button.ghost.active { border-color: var(--accent); background: rgba(79,140,255,.15); }
       #attachments { max-width: 860px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 8px; }
       #attachments:empty { display: none; }
       .chip {
@@ -159,10 +160,11 @@
       <div class="composer">
         <input type="file" id="fileInput" multiple hidden />
         <button id="attach" class="ghost" title="Attach files">📎</button>
+        <button id="browserToggle" class="ghost" title="Browser mode: run a headless browser (Playwright + Chromium) in the sandbox">🌐</button>
         <textarea id="input" placeholder="e.g. Add a column to my CSV, or convert my image to grayscale" rows="1"></textarea>
         <button id="send">Run</button>
       </div>
-      <div class="hint">Enter to send · Shift+Enter for a new line · attach files to have the code modify them</div>
+      <div class="hint" id="hint">Enter to send · Shift+Enter for a new line · 📎 attach files · 🌐 browser mode</div>
     </footer>
 
     <script>
@@ -175,9 +177,14 @@
       const attach = document.getElementById('attach')
       const fileInput = document.getElementById('fileInput')
       const attachments = document.getElementById('attachments')
+      const browserToggle = document.getElementById('browserToggle')
+      const hint = document.getElementById('hint')
 
       const history = [] // {role, content} pairs sent back to the model for context
       let pendingFiles = [] // {name, base64, size} to upload with the next prompt
+      let browserMode = false
+
+      const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
 
       const MAX_UPLOADS = 5
       const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -276,6 +283,9 @@
         }
         const ex = data.execution
         if (ex) {
+          if (ex.note) {
+            bubble.appendChild(el('div', 'file-note', '⚠ ' + ex.note))
+          }
           if (ex.stdout) {
             bubble.appendChild(el('div', 'label', 'Output'))
             bubble.appendChild(el('pre', null, ex.stdout))
@@ -295,6 +305,12 @@
               if (f.tooLarge) {
                 bubble.appendChild(el('div', 'file-note', `${f.name} — ${fmtSize(f.size)}, too large to download`))
                 return
+              }
+              // Show images (e.g. browser screenshots) inline, then link them.
+              if (IMG_RE.test(f.name) && f.base64) {
+                const img = el('img', 'result')
+                img.src = `data:image/png;base64,${f.base64}`
+                bubble.appendChild(img)
               }
               const a = el('a', 'file-link', `⬇ ${f.name}  ·  ${fmtSize(f.size)}`)
               a.href = `data:application/octet-stream;base64,${f.base64}`
@@ -332,7 +348,9 @@
           userBubble.appendChild(note)
         }
         const bubble = addMessage('assistant')
-        bubble.innerHTML = '<span class="spinner"></span> Generating & running…'
+        bubble.innerHTML = browserMode
+          ? '<span class="spinner"></span> Generating & running in a browser sandbox (first run installs Chromium, ~1 min)…'
+          : '<span class="spinner"></span> Generating & running…'
 
         try {
           const r = await fetch('/api/chat', {
@@ -341,6 +359,7 @@
             body: JSON.stringify({
               prompt,
               history,
+              browser: browserMode,
               files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
             }),
           })
@@ -359,6 +378,13 @@
         }
       }
 
+      browserToggle.addEventListener('click', () => {
+        browserMode = !browserMode
+        browserToggle.classList.toggle('active', browserMode)
+        hint.textContent = browserMode
+          ? '🌐 Browser mode ON — a headless Chromium runs in the sandbox (first run installs it, ~1 min)'
+          : 'Enter to send · Shift+Enter for a new line · 📎 attach files · 🌐 browser mode'
+      })
       attach.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', async () => {
         await addFiles(fileInput.files)
