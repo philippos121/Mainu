@@ -172,7 +172,7 @@ function extractCode(text) {
 // Chat = a code-interpreter loop: the model may run Python several times
 // (persistent kernel) and then answer in natural language. This supports
 // multi-step tasks (e.g. transform a document, then summarise the changes).
-const CHAT_MAX_STEPS = 6
+const CHAT_MAX_STEPS = 12
 const CHAT_SYSTEM = `You are a data & document analyst with a PERSISTENT Python sandbox (working dir /home/user, internet enabled).
 Use the run_python tool to execute Python. You may call it MULTIPLE times; variables, imports and files persist between calls.
 Uploaded files are already in /home/user. Save any output files there — they are returned to the user as downloads.
@@ -186,7 +186,9 @@ Guidelines:
 You MUST actually execute code with run_python to complete the task and CREATE any requested output file — never just describe what you would do. Produce EXACTLY the requested format:
 - Excel → save a real .xlsx (import pandas; df.to_excel("out.xlsx", index=False); pip install openpyxl if the import fails). Do NOT fall back to .txt/.csv when Excel is asked for.
 - PDF text: try pdfplumber first, else PyPDF2 (pip install if needed). If the PDF has no extractable text (scanned), say so explicitly.
-Work step by step: run code, inspect the output, run more code if needed. When the whole task is done, STOP calling tools and reply with a concise natural-language summary for the user (what you changed, key findings). Reply in the user's language.`
+BE EFFICIENT — do not waste steps: do NOT dump the whole document to stdout to "inspect" it. Extract the needed data programmatically and WRITE the requested output file as early as possible (ideally in the first one or two steps). Print only a short confirmation (e.g. row count, saved filename), not the entire content. Make sure the requested output file actually exists before you finish.
+
+Work step by step only when necessary. When the task is done, STOP calling tools and reply with a concise natural-language summary for the user (what you did, key findings). Reply in the user's language.`
 
 const CHAT_TOOL = {
   type: 'function',
@@ -289,6 +291,22 @@ app.post('/api/chat', async (req, res) => {
       }
       if (uploads.length) send('status', { message: `${uploads.length} Datei(en) hochgeladen.` })
 
+      // Make common libraries available so e.g. df.to_excel(.xlsx) can't fail
+      // silently on a missing package. Fast when already installed (reused
+      // session sandbox just imports).
+      send('status', { message: 'Bibliotheken werden vorbereitet…' })
+      try {
+        await sandbox.runCode(
+          'import importlib, subprocess, sys\n' +
+          'for _p,_m in [("openpyxl","openpyxl"),("pdfplumber","pdfplumber"),("python-docx","docx"),("deep-translator","deep_translator"),("pandas","pandas")]:\n' +
+          '    try:\n        importlib.import_module(_m)\n    except Exception:\n        subprocess.run([sys.executable,"-m","pip","install","-q",_p])\n' +
+          'print("DEPS_READY")',
+          { timeoutMs: 180_000 },
+        )
+      } catch (e) {
+        console.error('dep prep failed:', e?.message)
+      }
+
       const before = new Map()
       try {
         for (const e of await sandbox.files.list(WORKDIR)) {
@@ -325,7 +343,7 @@ app.post('/api/chat', async (req, res) => {
           let ex
           try {
             ex = await sandbox.runCode(codeStr, {
-              timeoutMs: RUN_TIMEOUT_MS,
+              timeoutMs: 120_000,
               onStdout: (m) => send('stdout', { step, chunk: m.line ?? String(m) }),
               onStderr: (m) => send('stderr', { step, chunk: m.line ?? String(m) }),
             })
@@ -341,7 +359,19 @@ app.post('/api/chat', async (req, res) => {
           messages.push({ role: 'tool', tool_call_id: tc.id, content: toolContent })
         }
       }
-      if (!answer) answer = 'Fertig.'
+      // Hit the step cap without a text answer — ask for a final summary
+      // (no tools) so the user gets a real message.
+      if (!answer) {
+        try {
+          send('status', { message: 'Zusammenfassung wird erstellt…' })
+          messages.push({ role: 'user', content: 'Fasse jetzt kurz zusammen, was du getan hast und welche Datei erzeugt wurde. Führe keinen weiteren Code aus.' })
+          const fin = await getOpenAI().chat.completions.create({ model: OPENAI_MODEL, messages })
+          addUsage(usage, fin.usage)
+          answer = fin.choices[0]?.message?.content || 'Fertig.'
+        } catch {
+          answer = 'Fertig.'
+        }
+      }
 
       // Capture new/changed files as downloads.
       try {
