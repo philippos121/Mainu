@@ -186,9 +186,9 @@ Guidelines:
 You MUST actually execute code with run_python to complete the task and CREATE any requested output file — never just describe what you would do. Produce EXACTLY the requested format:
 - Excel → save a real .xlsx (import pandas; df.to_excel("out.xlsx", index=False); pip install openpyxl if the import fails). Do NOT fall back to .txt/.csv when Excel is asked for.
 - PDF text: try pdfplumber first, else PyPDF2 (pip install if needed). If the PDF has no extractable text (scanned), say so explicitly.
-BE EFFICIENT — do not waste steps: do NOT dump the whole document to stdout to "inspect" it. Extract the needed data programmatically and WRITE the requested output file as early as possible (ideally in the first one or two steps). Print only a short confirmation (e.g. row count, saved filename), not the entire content. Make sure the requested output file actually exists before you finish.
+BE DECISIVE — in your FIRST run_python call, do the FULL job end to end: read the input(s), extract/transform, and SAVE the requested output file to /home/user (e.g. report.docx, out.xlsx). Do NOT print document contents to "inspect" them, and do NOT split the work across many exploratory steps. Use further steps ONLY to fix an error, never to explore. Print only a short confirmation (saved filename, row/section count). The requested output file MUST exist before you finish.
 
-Work step by step only when necessary. When the task is done, STOP calling tools and reply with a concise natural-language summary for the user (what you did, key findings). Reply in the user's language.`
+When the requested file is saved, STOP calling tools and reply with a concise natural-language summary for the user (what you produced, key findings). Reply in the user's language.`
 
 const CHAT_TOOL = {
   type: 'function',
@@ -359,17 +359,43 @@ app.post('/api/chat', async (req, res) => {
           messages.push({ role: 'tool', tool_call_id: tc.id, content: toolContent })
         }
       }
-      // Hit the step cap without a text answer — ask for a final summary
-      // (no tools) so the user gets a real message.
+      // Hit the step cap while still working — force ONE final code step to
+      // finish and SAVE the requested file (do NOT forbid running code).
       if (!answer) {
         try {
-          send('status', { message: 'Zusammenfassung wird erstellt…' })
-          messages.push({ role: 'user', content: 'Fasse jetzt kurz zusammen, was du getan hast und welche Datei erzeugt wurde. Führe keinen weiteren Code aus.' })
-          const fin = await getOpenAI().chat.completions.create({ model: OPENAI_MODEL, messages })
-          addUsage(usage, fin.usage)
-          answer = fin.choices[0]?.message?.content || 'Fertig.'
+          send('status', { message: 'Abschluss – Datei wird finalisiert…' })
+          messages.push({
+            role: 'user',
+            content: 'Du hast das Schrittlimit fast erreicht. Erledige die Aufgabe JETZT in EINEM einzigen run_python-Aufruf vollständig und speichere die angeforderte Ausgabedatei (z. B. .docx/.xlsx) in /home/user.',
+          })
+          const fc = await getOpenAI().chat.completions.create({
+            model: OPENAI_MODEL,
+            messages,
+            tools: [CHAT_TOOL],
+            tool_choice: { type: 'function', function: { name: 'run_python' } },
+          })
+          addUsage(usage, fc.usage)
+          const tc = fc.choices[0]?.message?.tool_calls?.[0]
+          if (tc) {
+            let codeStr = ''
+            try { codeStr = JSON.parse(tc.function.arguments || '{}').code || '' } catch {}
+            send('code', { step: 'final', code: codeStr })
+            send('status', { message: 'Code wird ausgeführt…' })
+            let ex
+            try {
+              ex = await sandbox.runCode(codeStr, {
+                timeoutMs: 120_000,
+                onStdout: (m) => send('stdout', { step: 'final', chunk: m.line ?? String(m) }),
+                onStderr: (m) => send('stderr', { step: 'final', chunk: m.line ?? String(m) }),
+              })
+            } catch (e) {
+              ex = { results: [], error: { name: 'Error', value: String(e?.message || e) } }
+            }
+            ;(ex.results || []).forEach((r) => { if (r.png) allImages.push(`data:image/png;base64,${r.png}`) })
+          }
+          answer = 'Aufgabe abgeschlossen (Schrittlimit erreicht) — bitte die erzeugte Datei unten prüfen.'
         } catch {
-          answer = 'Fertig.'
+          answer = 'Schrittlimit erreicht.'
         }
       }
 
