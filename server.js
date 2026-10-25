@@ -11,7 +11,7 @@ const {
   OPENAI_API_KEY,
   // Override via the OPENAI_MODEL env var if your account exposes the model
   // under a different id (e.g. a dated variant).
-  OPENAI_MODEL = 'gpt-5.5',
+  OPENAI_MODEL = 'gpt-6-sol',
   PORT = 3000,
 } = process.env
 
@@ -38,12 +38,12 @@ const SANDBOX_LIFETIME_MS = 300_000
 // Optional custom E2B desktop template (e.g. one with LibreOffice pre-baked).
 const DESKTOP_TEMPLATE = process.env.E2B_DESKTOP_TEMPLATE || ''
 
-// Cost estimation. Defaults are the real OpenAI GPT-5.5 API rates (USD per 1M
-// tokens): $5 input, $0.50 cached input, $30 output. Override via env. Token
-// counts are exact (from the OpenAI usage field), including cached tokens.
-const PRICE_IN = Number(process.env.OPENAI_PRICE_IN || 5) // USD / 1M input tokens
-const PRICE_CACHED = Number(process.env.OPENAI_PRICE_CACHED || 0.5) // USD / 1M cached input tokens
-const PRICE_OUT = Number(process.env.OPENAI_PRICE_OUT || 30) // USD / 1M output tokens
+// Cost estimation. Defaults are the real OpenAI GPT-6 Sol API rates (USD per
+// 1M tokens): $2 input, $0.20 cached input, $10 output. Override via env.
+// Token counts are exact (from the OpenAI usage field), including cached.
+const PRICE_IN = Number(process.env.OPENAI_PRICE_IN || 2) // USD / 1M input tokens
+const PRICE_CACHED = Number(process.env.OPENAI_PRICE_CACHED || 0.2) // USD / 1M cached input tokens
+const PRICE_OUT = Number(process.env.OPENAI_PRICE_OUT || 10) // USD / 1M output tokens
 const E2B_PRICE_PER_SEC = Number(process.env.E2B_PRICE_PER_SEC || 0.00014) // USD / sandbox-second
 
 function computeCost(inTok, outTok, seconds, cachedTok = 0) {
@@ -225,6 +225,7 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive')
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders?.()
+  res.write(':' + ' '.repeat(2048) + '\n\n') // initial padding: flush bytes now so the client connects immediately (avoids "Load failed")
   const send = (event, data) => res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`)
   const heartbeat = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 15_000)
   heartbeat.unref?.()
@@ -1072,6 +1073,7 @@ app.post('/api/agent', async (req, res) => {
   res.setHeader('Connection', 'keep-alive')
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders?.()
+  res.write(':' + ' '.repeat(2048) + '\n\n') // initial padding: flush bytes now so the client connects immediately (avoids "Load failed")
   const send = (event, data) => res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`)
   // Keep the connection alive during long steps (e.g. LibreOffice install).
   const heartbeat = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 15_000)
