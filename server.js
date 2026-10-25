@@ -296,26 +296,27 @@ app.post('/api/chat', async (req, res) => {
     ]
     let prevId
 
-    send('status', { message: persistent ? 'Sandbox (Session) wird vorbereitet…' : 'Sandbox wird gestartet…' })
-    const sandboxStart = Date.now()
-    sandbox = persistent
-      ? await getChatSandbox(sessionId)
-      : await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
-
     const allImages = []
     const files = []
     let answer = ''
+    let before = new Map()
+    let sandboxStart = null
+    let sandboxReady = false
 
-    try {
+    // Lazily start the sandbox only when Python is actually needed, so pure
+    // web-search / Q&A tasks don't spin one up.
+    async function ensureSandbox() {
+      if (sandboxReady) return
+      send('status', { message: persistent ? 'Sandbox (Session) wird vorbereitet…' : 'Sandbox wird gestartet…' })
+      sandboxStart = Date.now()
+      sandbox = persistent
+        ? await getChatSandbox(sessionId)
+        : await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
       for (const u of uploads) {
         const ab = u.buf.buffer.slice(u.buf.byteOffset, u.buf.byteOffset + u.buf.byteLength)
         await sandbox.files.write(`${WORKDIR}/${u.name}`, ab)
       }
       if (uploads.length) send('status', { message: `${uploads.length} Datei(en) hochgeladen.` })
-
-      // Make common libraries available so e.g. df.to_excel(.xlsx) can't fail
-      // silently on a missing package. Fast when already installed (reused
-      // session sandbox just imports).
       send('status', { message: 'Bibliotheken werden vorbereitet…' })
       try {
         await sandbox.runCode(
@@ -328,18 +329,23 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) {
         console.error('dep prep failed:', e?.message)
       }
-
-      const before = new Map()
       try {
         for (const e of await sandbox.files.list(WORKDIR)) {
           if (e.type === 'file') before.set(e.path, e.size)
         }
       } catch {}
+      sandboxReady = true
+    }
+
+    try {
+      // Uploaded files will be needed in the sandbox — prepare it up front.
+      if (uploads.length) await ensureSandbox()
 
       // Agentic code-interpreter loop via the Responses API: the model reasons
       // (reasoning_effort high) AND calls the run_python tool, iterating across
       // steps until it answers in natural language (or we hit the step cap).
       const runTool = async (codeStr, step) => {
+        await ensureSandbox()
         send('code', { step, code: codeStr })
         send('status', { message: 'Code wird ausgeführt…' })
         let ex
@@ -367,7 +373,7 @@ app.post('/api/chat', async (req, res) => {
           instructions: CHAT_SYSTEM,
           input,
           tools: CHAT_TOOLS,
-          tool_choice: step === 1 ? { type: 'function', name: 'run_python' } : 'auto',
+          tool_choice: 'auto',
           reasoning: { effort: REASONING_EFFORT },
           ...(prevId ? { previous_response_id: prevId } : {}),
         })
@@ -417,20 +423,22 @@ app.post('/api/chat', async (req, res) => {
         }
       }
 
-      // Capture new/changed files as downloads.
-      try {
-        const after = await sandbox.files.list(WORKDIR)
-        const changed = after.filter((e) => e.type === 'file' && before.get(e.path) !== e.size)
-        for (const e of changed.slice(0, MAX_FILES)) {
-          if (e.size > MAX_FILE_BYTES) {
-            files.push({ name: e.name, size: e.size, tooLarge: true })
-            continue
+      // Capture new/changed files as downloads (only if the sandbox was used).
+      if (sandboxReady) {
+        try {
+          const after = await sandbox.files.list(WORKDIR)
+          const changed = after.filter((e) => e.type === 'file' && before.get(e.path) !== e.size)
+          for (const e of changed.slice(0, MAX_FILES)) {
+            if (e.size > MAX_FILE_BYTES) {
+              files.push({ name: e.name, size: e.size, tooLarge: true })
+              continue
+            }
+            const bytes = await sandbox.files.read(e.path, { format: 'bytes' })
+            files.push({ name: e.name, size: e.size, base64: Buffer.from(bytes).toString('base64') })
           }
-          const bytes = await sandbox.files.read(e.path, { format: 'bytes' })
-          files.push({ name: e.name, size: e.size, base64: Buffer.from(bytes).toString('base64') })
+        } catch (e) {
+          console.error('file capture failed:', e?.message)
         }
-      } catch (e) {
-        console.error('file capture failed:', e?.message)
       }
     } finally {
       if (!persistent && sandbox) {
@@ -441,7 +449,7 @@ app.post('/api/chat', async (req, res) => {
     send('final', {
       answer,
       execution: { images: allImages, files },
-      cost: computeCost(usage.inTok, usage.outTok, (Date.now() - sandboxStart) / 1000, usage.cachedTok),
+      cost: computeCost(usage.inTok, usage.outTok, sandboxStart ? (Date.now() - sandboxStart) / 1000 : 0, usage.cachedTok),
     })
   } catch (err) {
     console.error('chat error:', err)
