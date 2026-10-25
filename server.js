@@ -159,6 +159,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     resp = await getOpenAI().responses.create(p2)
   }
   addUsage(ctx.usage, model, resp)
+  if (resp?.status === 'incomplete') console.warn(`responses: incomplete (${resp.incomplete_details?.reason || '?'}) model=${model} max_output_tokens=${params.max_output_tokens}`)
   return resp
 }
 
@@ -649,13 +650,15 @@ Vorgehen: Dokument lesen (read_document) → klauselweise prüfen; strittige Rec
 }
 
 // Tools for document mode (Responses API flat function tools).
+// strict: false — the schemas have optional parameters (strict mode would require
+// additionalProperties:false and every key in `required`).
 const TOOL_READ_DOCUMENT = {
-  type: 'function', name: 'read_document',
+  type: 'function', name: 'read_document', strict: false,
   description: 'Liest den Text einer hochgeladenen Datei (Teil für Teil, je ca. 24.000 Zeichen).',
   parameters: { type: 'object', properties: { name: { type: 'string', description: 'Dateiname exakt wie hochgeladen.' }, part: { type: 'integer', description: 'Teil-Nummer ab 1 (Standard 1).' } }, required: ['name'] },
 }
 const TOOL_ASK_AISSOCIATE = {
-  type: 'function', name: 'ask_aissociate',
+  type: 'function', name: 'ask_aissociate', strict: false,
   description: 'Stellt EINE vollständige Rechtsfrage an die juristische Wissensdatenbank AI:ssociate (österreichisches Recht, recherchiert selbst agentisch in Normen und Judikatur). Nur ein Aufruf pro Aufgabe – alle Rechtsfragen bündeln und die relevanten Fakten mitgeben.',
   parameters: {
     type: 'object',
@@ -668,7 +671,7 @@ const TOOL_ASK_AISSOCIATE = {
   },
 }
 const TOOL_FILE = {
-  type: 'function', name: 'create_or_edit_file',
+  type: 'function', name: 'create_or_edit_file', strict: false,
   description: 'Erzeugt oder bearbeitet Dateien (Word .docx, Excel .xlsx, PDF, HTML) in einer Sandbox. Ein Codemodell schreibt und führt das Programm aus; du siehst nur das Ergebnis. Gib ALLE Inhalte wörtlich in task an (z. B. jede Kommentarstelle mit Kommentartext, neue Klauselformulierungen, Tabellenzeilen). Ein Aufruf pro Deliverable.',
   parameters: {
     type: 'object',
@@ -974,16 +977,17 @@ app.post('/api/chat', async (req, res) => {
       let resp
       try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DOC_INSTRUCTIONS, input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
       prevId = resp.id
+      input = [] // everything sent so far is now part of the chain (previous_response_id)
       collectWebCitations(resp)
       emitWebSteps(resp)
       const calls = (resp.output || []).filter((o) => o.type === 'function_call')
       stepDone(sid, { detail: calls.length ? `${calls.length} Werkzeug${calls.length > 1 ? 'e' : ''} angefordert` : 'Antwort formuliert' })
       if (!calls.length) { text = resp.output_text || ''; break }
-      input = []
       for (const c of calls) input.push({ type: 'function_call_output', call_id: c.call_id, output: await runToolCall(c) })
       if (clientGone) throw new Error('Verbindung geschlossen.')
     }
     if (!text && prevId) {
+      // Only unsent tool outputs (if any) plus the wrap-up request go into the chain.
       const sid = step('think', 'Sol fasst zusammen (Schrittlimit)', { model: MODEL_MAIN })
       const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DOC_INSTRUCTIONS, input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
       collectWebCitations(resp)
@@ -1021,13 +1025,17 @@ app.post('/api/chat', async (req, res) => {
     const pid = step('triage', 'Sol analysiert die Anfrage', { model: MODEL_MAIN })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', question: prompt, title: prompt.slice(0, 60) }
     try {
-      const pr = await callModel(ctx, {
-        model: MODEL_MAIN, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 2500,
-        input: [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${privacyMode !== 'off' ? 'Datenschutz: personenbezogene Daten in "question" pseudonymisieren.\n' : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }],
-        text: { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } },
-      })
-      const parsed = parseJsonLoose(pr.output_text || '')
+      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${privacyMode !== 'off' ? 'Datenschutz: personenbezogene Daten in "question" pseudonymisieren.\n' : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
+      const planFormat = { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } }
+      // max_output_tokens includes reasoning tokens: retry once with more room if truncated.
+      let pr = await callModel(ctx, { model: MODEL_MAIN, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 6000, input: planInput, text: planFormat })
+      let parsed = parseJsonLoose(pr.output_text || '')
+      if (!parsed?.mode && pr.status === 'incomplete') {
+        pr = await callModel(ctx, { model: MODEL_MAIN, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 16_000, input: planInput, text: planFormat })
+        parsed = parseJsonLoose(pr.output_text || '')
+      }
       if (parsed?.mode) plan = { ...plan, ...parsed }
+      else console.error('plan: no usable JSON, using defaults')
     } catch (e) { console.error('plan failed:', e?.message) }
     if (uploads.length) plan.mode = 'document'
     if (forceMode) plan.mode = forceMode
@@ -1048,23 +1056,32 @@ app.post('/api/chat', async (req, res) => {
           kb = await runAissociate({ question: plan.question, legalArea: plan.legal_area, scope: plan.scope, stream: true })
         } catch (e) { console.error('aissociate failed:', e?.message) }
         if (kb && kb.answer.trim()) {
-          const sid = step('think', 'Sol prüft die Antwort', { model: MODEL_MAIN })
-          const resp = await callModel(ctx, {
-            model: MODEL_MAIN, instructions: REVIEW_INSTRUCTIONS, effort: EFFORT_MAIN, maxOut: 8000,
-            input: [...histInput, { role: 'user', content: `${privacyLine}NUTZERFRAGE:\n${prompt}\n\nFRAGE AN DIE WISSENSDATENBANK (${areaLabel}):\n${plan.question}\n\nANTWORT DER WISSENSDATENBANK:\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}` }],
-            tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined,
-          })
-          collectWebCitations(resp)
-          emitWebSteps(resp)
-          const txt = (resp.output_text || '').trim()
-          // Tolerate Markdown decoration around the verdict line (**VERDICT: …**, # VERDICT: …).
-          const vm = txt.match(/^[\s*#_>`]*VERDICT:?\s*(AUSREICHEND|ERG(?:AE|Ä)NZT)[\s*_`:.-]*/i)
-          verdict = vm ? (/AUSREICHEND/i.test(vm[1]) ? 'sufficient' : 'supplemented') : (txt ? 'supplemented' : 'sufficient')
-          const supplement = (vm ? txt.slice(vm[0].length) : txt).trim()
-          const webN = ctx.usage.webSearchCalls
-          stepDone(sid, { detail: verdict === 'sufficient' ? 'ausreichend' : `ergänzt${webN ? ` (${webN} Websuche${webN > 1 ? 'n' : ''})` : ''}` })
+          // The knowledge-base answer is the deliverable; the review only adds to it,
+          // so a failing review (API error, budget) must never discard it.
           answer = kb.answer.trim()
-          if (supplement.length > 15) answer += verdict === 'sufficient' ? `\n\n**Hinweis (Sol)**\n\n${supplement}` : `\n\n---\n\n**Ergänzung (Sol, Websuche)**\n\n${supplement}`
+          const sid = step('think', 'Sol prüft die Antwort', { model: MODEL_MAIN })
+          try {
+            const resp = await callModel(ctx, {
+              model: MODEL_MAIN, instructions: REVIEW_INSTRUCTIONS, effort: EFFORT_MAIN, maxOut: 8000,
+              input: [...histInput, { role: 'user', content: `${privacyLine}NUTZERFRAGE:\n${prompt}\n\nFRAGE AN DIE WISSENSDATENBANK (${areaLabel}):\n${plan.question}\n\nANTWORT DER WISSENSDATENBANK:\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}` }],
+              tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined,
+            })
+            collectWebCitations(resp)
+            emitWebSteps(resp)
+            const txt = (resp.output_text || '').trim()
+            // Tolerate Markdown decoration around the verdict line (**VERDICT: …**, # VERDICT: …).
+            const vm = txt.match(/^[\s*#_>`]*VERDICT:?\s*(AUSREICHEND|ERG(?:AE|Ä)NZT)[\s*_`:.-]*/i)
+            verdict = vm ? (/AUSREICHEND/i.test(vm[1]) ? 'sufficient' : 'supplemented') : (txt ? 'supplemented' : 'sufficient')
+            const supplement = (vm ? txt.slice(vm[0].length) : txt).trim()
+            const webN = ctx.usage.webSearchCalls
+            stepDone(sid, { detail: verdict === 'sufficient' ? 'ausreichend' : `ergänzt${webN ? ` (${webN} Websuche${webN > 1 ? 'n' : ''})` : ''}${resp.status === 'incomplete' ? ' · abgeschnitten' : ''}` })
+            if (supplement.length > 15) answer += verdict === 'sufficient' ? `\n\n**Hinweis (Sol)**\n\n${supplement}` : `\n\n---\n\n**Ergänzung (Sol, Websuche)**\n\n${supplement}`
+          } catch (e) {
+            console.error('review failed:', e?.message)
+            verdict = 'unreviewed'
+            stepFail(sid, { detail: `Prüfung übersprungen: ${String(e?.message || e).slice(0, 140)}` })
+            answer += '\n\n> Hinweis: Die Nachprüfung durch Sol konnte nicht durchgeführt werden; dies ist die ungeprüfte Antwort der Wissensdatenbank.'
+          }
         } else {
           // Knowledge base unavailable → Sol answers directly with ≤3 web searches.
           const sid = step('think', 'Sol beantwortet die Frage (Wissensdatenbank nicht verfügbar)', { model: MODEL_MAIN })
@@ -1104,7 +1121,7 @@ app.post('/api/chat', async (req, res) => {
     // ---- 4. follow-ups (Luna, tiny) ----
     let followups = []
     try {
-      const fr = await callModel(ctx, { model: MODEL_FAST, instructions: FOLLOWUP_INSTRUCTIONS, effort: 'low', maxOut: 400, input: [{ role: 'user', content: `FRAGE: ${prompt.slice(0, 2000)}\n\nANTWORT (Auszug): ${answer.slice(0, 6000)}` }], text: { format: { type: 'json_schema', name: 'followups', schema: { type: 'object', additionalProperties: false, properties: { followups: { type: 'array', items: { type: 'string' } } }, required: ['followups'] }, strict: true } } })
+      const fr = await callModel(ctx, { model: MODEL_FAST, instructions: FOLLOWUP_INSTRUCTIONS, effort: 'low', maxOut: 2000, input: [{ role: 'user', content: `FRAGE: ${prompt.slice(0, 2000)}\n\nANTWORT (Auszug): ${answer.slice(0, 6000)}` }], text: { format: { type: 'json_schema', name: 'followups', schema: { type: 'object', additionalProperties: false, properties: { followups: { type: 'array', items: { type: 'string' } } }, required: ['followups'] }, strict: true } } })
       followups = (parseJsonLoose(fr.output_text || '')?.followups || []).filter((s) => typeof s === 'string').slice(0, 3)
     } catch {}
 
