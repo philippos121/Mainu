@@ -17,15 +17,19 @@ question ──▶ Sol: mode + legal area (1 call) ──▶ legal    → AI:sso
                                                │              ask_aissociate ×1, web_search ≤ 3)
                                                └▶ general  → Sol answers directly
                                                      │
-                              RIS verification of §§ / GZ (deterministic) + 3 follow-ups (Luna)
+                   RIS verification of §§ / GZ (deterministic) → citations in the answer linked to RIS
 ```
 
 * **Knowledge base:** `POST /api/public/v1/chat/ask` on app.aissociate.at
   (header `x-api-key`, SSE stream; legal areas civil / criminal / tax / public,
-  optional Bundesland scope; `thread_id` keeps follow-ups in one thread).
+  optional Bundesland scope; `thread_id` keeps follow-ups in one thread). The
+  documents it consults are shown live as research steps.
 * **Models:** `gpt-6-sol` for the legal-area decision, review, document tasks
-  and final answers; `gpt-6-luna` only for follow-up suggestions; the code model
-  defaults to Sol (set `OPENAI_MODEL_CODE` if you have another id).
+  and final answers; the code model defaults to Sol (set `OPENAI_MODEL_CODE` if
+  you have another id).
+* **Verification:** each cited § / Art is looked up in RIS BrKons via
+  `Abschnitt.Typ/Von/Bis` + `Fassung.FassungVom=today`, each Geschäftszahl via
+  the Judikatur endpoint; confirmed citations become links in the answer.
 * **Budgets:** hard caps per question — 1,000,000 input and 100,000 output
   tokens summed over all model calls (`MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`);
   `MAX_WEB_SEARCHES` (3) and `DOC_MAX_STEPS` (8) bound the step count.

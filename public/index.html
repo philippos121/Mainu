@@ -121,6 +121,8 @@
       .step.error .sico { color: var(--err); border-color: rgba(217,45,32,0.35); }
       .step .stxt { flex: 1; min-width: 0; }
       .step .st { font-weight: 600; color: var(--text); word-break: break-word; }
+      .step .st a { color: var(--accent); text-decoration: none; }
+      .step .st a:hover { text-decoration: underline; }
       .step .sd { color: var(--faint); font-size: 12px; margin-top: 1px; word-break: break-word; }
       .step.error .sd { color: var(--err); }
       .step .smodel { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; flex: 0 0 auto; margin-top: 3px; }
@@ -374,7 +376,6 @@
         <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
         <div class="kv"><span>Websuche (Fallback)</span><b id="kvWeb">–</b></div>
         <div class="kv"><span>Dateien (Code)</span><b id="kvCode">–</b></div>
-        <div class="kv"><span>Folgefragen</span><b id="kvFast">–</b></div>
         <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
         <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
         <div class="menu-sec">Daten</div>
@@ -739,7 +740,9 @@
       function addStep(ui, ev) {
         const s = el('div', 'step running'); s.dataset.id = ev.id
         const ico = el('div', 'sico'); ico.appendChild(svg(ev.kind)); s.appendChild(ico)
-        const txt = el('div', 'stxt'); txt.appendChild(el('div', 'st', ev.title)); const d = el('div', 'sd', ev.detail || ''); txt.appendChild(d); s.appendChild(txt)
+        const txt = el('div', 'stxt'); const st = el('div', 'st')
+        if (ev.url) { const a = el('a', null, ev.title); a.href = ev.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; st.appendChild(a) } else st.textContent = ev.title
+        txt.appendChild(st); const d = el('div', 'sd', ev.detail || ''); txt.appendChild(d); s.appendChild(txt)
         if (ev.model) s.appendChild(el('div', 'smodel', modelLabel(ev.model)))
         ui.sb.appendChild(s); ui.stepEls.set(ev.id, s); ui.stepCount++; ui.kinds[ev.kind] = (ui.kinds[ev.kind] || 0) + 1
         ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.title)}</span>`
@@ -834,10 +837,14 @@
         const cited = sources.filter((s) => s.cited), others = sources.filter((s) => !s.cited)
         if (sources.length) {
           const p = el('div', 'panel'); const t = el('div', 'panel-title', 'Quellen'); const nKb = sources.filter((s) => s.type === 'aissociate').length; t.appendChild(el('span', 'vsum', nKb ? `${nKb} aus der Wissensdatenbank${sources.length > nKb ? ` · ${sources.length - nKb} Web` : ''}` : `${sources.length} Web`)); p.appendChild(t)
-          cited.forEach((s) => p.appendChild(sourceRow(s)))
-          if (others.length) {
-            const box = el('div'); box.hidden = true; others.forEach((s) => box.appendChild(sourceRow(s)))
-            const tg = el('button', 'more-toggle', `${cited.length ? 'Weitere' : 'Alle'} herangezogene Dokumente (${others.length}) anzeigen`); tg.addEventListener('click', () => { box.hidden = !box.hidden; tg.textContent = box.hidden ? `${cited.length ? 'Weitere' : 'Alle'} herangezogene Dokumente (${others.length}) anzeigen` : 'Weniger anzeigen' })
+          // Keep the list short: five documents visible, the rest behind a toggle.
+          const MAX_SHOWN = 5
+          const shown = cited.slice(0, MAX_SHOWN), hidden = [...cited.slice(MAX_SHOWN), ...others]
+          shown.forEach((s) => p.appendChild(sourceRow(s)))
+          if (hidden.length) {
+            const box = el('div'); box.hidden = true; hidden.forEach((s) => box.appendChild(sourceRow(s)))
+            const lbl = () => `${shown.length ? 'Weitere' : 'Alle'} Dokumente (${hidden.length}) anzeigen`
+            const tg = el('button', 'more-toggle', lbl()); tg.addEventListener('click', () => { box.hidden = !box.hidden; tg.textContent = box.hidden ? lbl() : 'Weniger anzeigen' })
             p.appendChild(tg); p.appendChild(box)
           }
           body.appendChild(p)
@@ -849,8 +856,6 @@
         const ex = data.execution || {}
         ;(ex.images || []).forEach((src) => { const img = el('img', 'result'); img.src = src; body.appendChild(img) })
         if (ex.files?.length) { const p = el('div', 'panel'); p.appendChild(el('div', 'panel-title', 'Dateien')); ex.files.forEach((f) => renderFileInto(p, f)); body.appendChild(p) }
-
-        if (data.followups?.length && !opts.restored) { const fu = el('div', 'followups'); data.followups.forEach((q) => { const b = el('button', 'fu', q); b.addEventListener('click', () => { if (!busy) sendMessage({ text: q }) }); fu.appendChild(b) }); body.appendChild(fu) }
 
         if (data.answer) {
           const acts = el('div', 'actions')
@@ -976,7 +981,7 @@
       async function checkHealth() {
         try {
           health = await (await fetch('/api/health')).json()
-          $('kvFast').textContent = health.models?.fast || '–'; $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'
+          $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'
           $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
           if (!health.aissociate) toast('Server: AISSOCIATE_API_KEY fehlt.')
           $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`

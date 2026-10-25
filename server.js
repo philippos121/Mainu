@@ -23,10 +23,9 @@ const AISSOCIATE_BASE_URL = (process.env.AISSOCIATE_BASE_URL || 'https://app.ais
 const AISSOCIATE_TIMEOUT_MS = Number(process.env.AISSOCIATE_TIMEOUT_MS || 240_000)
 
 // Models: Sol decides the legal area, reviews the knowledge-base answer, writes
-// the final answer and runs document tasks; Luna only generates follow-up
-// suggestions. The code model writes the Python for file generation.
+// the final answer and runs document tasks. The code model writes the Python
+// for file generation.
 const MODEL_MAIN = process.env.OPENAI_MODEL_MAIN || process.env.OPENAI_MODEL || 'gpt-6-sol'
-const MODEL_FAST = process.env.OPENAI_MODEL_FAST || 'gpt-6-luna'
 const MODEL_CODE = process.env.OPENAI_MODEL_CODE || MODEL_MAIN
 const EFFORT_MAIN = process.env.OPENAI_EFFORT_MAIN || 'medium'
 const EFFORT_PLAN = process.env.OPENAI_EFFORT_PLAN || 'low'
@@ -253,7 +252,7 @@ function sourceFromDocumentEvent(text, meta) {
  * httpx read timeout), not a total deadline: agentic answers may stream for
  * minutes. A stream that breaks after the answer arrived still returns it.
  */
-async function askAissociate({ question, legalArea, scope, threadId, onDelta, signal }) {
+async function askAissociate({ question, legalArea, scope, threadId, onDelta, onDocument, onEvent, signal }) {
   if (!AISSOCIATE_API_KEY) throw new Error('AISSOCIATE_API_KEY fehlt.')
   const payload = {
     question,
@@ -296,9 +295,9 @@ async function askAissociate({ question, legalArea, scope, threadId, onDelta, si
       const type = j?.type || 'message'
       const text = typeof j?.text === 'string' ? j.text : ''
       if (type === 'message') { out.answer += text; if (text) onDelta?.(text) }
-      else if (type === 'document_number') out.sources.push(sourceFromDocumentEvent(text, j?.meta))
+      else if (type === 'document_number') { const src = sourceFromDocumentEvent(text, j?.meta); out.sources.push(src); onDocument?.(src) }
       else if (type === 'qa_metadata') { const tid = j?.meta?.qa_metadata?.thread_id || j?.meta?.thread_id; if (tid) out.threadId = tid; out.meta.qa = j?.meta || null }
-      else out.meta[type] = j?.meta ?? text
+      else { out.meta[type] = j?.meta ?? text; onEvent?.(type, text, j?.meta) }
     }
     const reader = r.body.getReader()
     const dec = new TextDecoder()
@@ -447,18 +446,37 @@ function extractNormCitations(text) {
     const law = m[3].replace(/\s+/g, '')
     if (LAW_STOP.has(law) || law.length < 2 || !/[A-ZÄÖÜ].*[A-ZÄÖÜ]/.test(law)) continue
     const key = `${kind} ${num} ${law}`
-    if (!out.has(key)) out.set(key, { kind, num, law, label: key })
+    if (!out.has(key)) out.set(key, { kind, num, law, label: key, raw: m[0].trim() })
   }
   return [...out.values()]
 }
 
+/** Turns verified citations in a Markdown answer into RIS links (outside existing links/code). */
+function linkCitations(markdown, verification) {
+  if (!verification) return markdown
+  const items = [...(verification.norms || []), ...(verification.decisions || [])]
+    .filter((x) => x.url && x.raw && ['ok', 'expired', 'unsure'].includes(x.status))
+    .sort((a, b) => b.raw.length - a.raw.length) // longest first, so "§ 9 Abs 1 BAO" wins over "§ 9 BAO"
+  if (!items.length) return markdown
+  const segs = String(markdown).split(/(\[[^\]\n]*\]\([^)\s]*\)|`[^`\n]*`|https?:\/\/\S+)/)
+  for (let i = 0; i < segs.length; i += 2) {
+    let s = segs[i]
+    for (const it of items) {
+      const re = new RegExp(`(^|[^\\w\\[§])(${it.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')})(?![\\w\\]])`, 'g')
+      s = s.replace(re, (all, pre, txt) => `${pre}[${txt}](${it.url})`)
+    }
+    segs[i] = s
+  }
+  return segs.join('')
+}
+
 const GZ_PATTERNS = [
-  { app: 'Justiz', re: /\b(\d{1,2})\s?(ObA|ObS|Ob|Os|Nc|Nd|Ns|Fsc|Fss|Bkd|Ds|Dg|Präs|R|Bs|Cga|Cgs|Cgb|Cg|Ra|Rs|Msch|Fam|Hv|U|St|HR|Kt|Okt)\s?(\d{1,4})\/(\d{2})([a-z])?(?![\d/])/g, fmt: (m) => `${m[1]}${m[2]}${m[3]}/${m[4]}${m[5] || ''}` },
-  { app: 'Vwgh', re: /\b(Ra|Ro|Fr|Fe|Fra|Ko)\s?(\d{4})\/(\d{2})\/(\d{4})(?![\d/])/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}/${m[4]}` },
+  { app: 'Justiz', re: /\b(\d{1,2})\s?(ObA|ObS|Ob|Os|Nc|Nd|Ns|Fsc|Fss|Bkd|Ds|Dg|Präs|R|Bs|Cga|Cgs|Cgb|Cg|Ra|Rs|Msch|Fam|Hv|U|St|HR|Kt|Okt)\s?(\d{1,4})\/(\d{2})([a-z])?(?![\d/])/g, fmt: (m) => `${m[1]}${m[2]}${m[3]}/${m[4]}${m[5] || ''}`, raw: (m) => m[0] },
+  { app: 'Vwgh', re: /\b(Ra|Ro|Fr|Fe|Fra|Ko)\s?(\d{4})\/(\d{2})\/(\d{4})(?![\d/])/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}/${m[4]}`, raw: (m) => m[0] },
   // Pre-2014 VwGH numbering (e.g. 2012/15/0123), only when VwGH is named nearby and
   // the number carries no letter prefix (those are matched above).
-  { app: 'Vwgh', re: /VwGH[^\n]{0,40}?(?<![A-Za-z]\s?)\b(\d{4})\/(\d{2})\/(\d{4})(?![\d/])/g, fmt: (m) => `${m[1]}/${m[2]}/${m[3]}` },
-  { app: 'Vfgh', re: /\b(G|B|E|V|SV|WI|KI|KR|KIV|A|UA)\s?(\d{1,4})\/(\d{4})(?:-\d+)?(?![\d/])/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}` },
+  { app: 'Vwgh', re: /VwGH[^\n]{0,40}?(?<![A-Za-z]\s?)\b(\d{4})\/(\d{2})\/(\d{4})(?![\d/])/g, fmt: (m) => `${m[1]}/${m[2]}/${m[3]}`, raw: (m) => `${m[1]}/${m[2]}/${m[3]}` },
+  { app: 'Vfgh', re: /\b(G|B|E|V|SV|WI|KI|KR|KIV|A|UA)\s?(\d{1,4})\/(\d{4})(?:-\d+)?(?![\d/])/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}`, raw: (m) => m[0] },
 ]
 function extractDecisionCitations(text) {
   const out = new Map()
@@ -468,7 +486,7 @@ function extractDecisionCitations(text) {
     while ((m = pat.re.exec(text)) && out.size < 20) {
       const gz = pat.fmt(m)
       const key = `${pat.app}:${gz}`
-      if (!out.has(key)) out.set(key, { app: pat.app, gz, label: gz })
+      if (!out.has(key)) out.set(key, { app: pat.app, gz, label: gz, raw: pat.raw(m).trim() })
     }
   }
   return [...out.values()]
@@ -483,20 +501,42 @@ function lawMatches(doc, law) {
   return (abbr && (abbr === l || abbr.startsWith(l + ' ') || abbr.startsWith(l))) || (title && title === l.replace(/[^a-zäöüß0-9]/g, ''))
 }
 
+/**
+ * RIS OGD v2.6 (BrKons) request for one section of one law, valid today:
+ * Abschnitt.Typ/Von/Bis selects the § or Art, Fassung.FassungVom the version in force.
+ */
+function normQueryParams(n, today, viaFulltext = false) {
+  return {
+    Applikation: 'BrKons',
+    [viaFulltext ? 'Suchworte' : 'Titel']: n.law,
+    'Abschnitt.Typ': n.kind === 'Art' ? 'Artikel' : 'Paragraph',
+    'Abschnitt.Von': n.num,
+    'Abschnitt.Bis': n.num,
+    'Fassung.FassungVom': today,
+    DokumenteProSeite: RIS_PAGE_SIZE,
+    Seitennummer: 1,
+  }
+}
+const sectionMatches = (doc, n) => {
+  const s = (doc.section || '').replace(/\s+/g, '').toLowerCase()
+  const want = `${n.kind === 'Art' ? 'art' : '§'}${n.num}`.toLowerCase()
+  return s === want || s === want.replace('art', 'art.') || s.startsWith(want + ' ') || s === want.replace('art', 'artikel')
+}
+
 async function verifyNorm(n) {
   if (FOREIGN_LAWS.has(n.law)) return { ...n, status: 'skipped', note: 'EU-Recht/ausländisches Recht – nicht im RIS (Bundesrecht) enthalten, nicht geprüft.' }
-  const attempts = n.kind === 'Art'
-    ? [{ Titel: n.law, Artikel: n.num }, { Suchworte: n.law, Artikel: n.num }]
-    : [{ Titel: n.law, Paragraf: n.num }, { Suchworte: n.law, Paragraf: n.num }]
+  const today = new Date().toISOString().slice(0, 10)
   let lastErr = null
   let otherHit = null
-  for (const extra of attempts) {
+  for (const viaFulltext of [false, true]) {
     try {
-      const r = await risRequest('Bundesrecht', { Applikation: 'BrKons', DokumenteProSeite: RIS_PAGE_SIZE, Seitennummer: 1, ...extra })
+      const r = await risRequest('Bundesrecht', normQueryParams(n, today, viaFulltext))
       if (r.hits > 0 && r.docs.length) {
-        const best = r.docs.find((d) => lawMatches(d, n.law))
-        if (!best) { otherHit = otherHit || r.docs[0]; continue }
-        const today = new Date().toISOString().slice(0, 10)
+        // Only a document of the cited law AND the cited section counts; a hit in the
+        // law's title document ("§ 0") or another section must never be reported as
+        // confirmed or as "außer Kraft".
+        const best = r.docs.find((d) => lawMatches(d, n.law) && sectionMatches(d, n))
+        if (!best) { otherHit = otherHit || r.docs.find((d) => lawMatches(d, n.law)) || r.docs[0]; continue }
         const expired = best.inForceTo && best.inForceTo <= today
         return {
           ...n,
@@ -508,8 +548,8 @@ async function verifyNorm(n) {
     } catch (e) { lastErr = e; break } // transport/validation errors would repeat identically
   }
   if (lastErr) return { ...n, status: 'error', note: `RIS nicht erreichbar (${lastErr.message})` }
-  if (otherHit) return { ...n, status: 'unsure', title: otherHit.title, url: otherHit.url, note: `Nur Treffer in einem anderen Gesetz (${otherHit.title}) – Zitat prüfen` }
-  return { ...n, status: 'not_found', note: 'Im RIS (Bundesrecht konsolidiert) nicht gefunden – Landesrecht/EU-Recht oder Zitierfehler?' }
+  if (otherHit) return { ...n, status: 'unsure', title: otherHit.title, url: otherHit.url, note: lawMatches(otherHit, n.law) ? `Gesetz im RIS gefunden, ${n.kind === 'Art' ? 'Artikel' : 'Paragraph'} ${n.num} aber nicht eindeutig – Zitat prüfen` : `Nur Treffer in einem anderen Gesetz (${otherHit.title}) – Zitat prüfen` }
+  return { ...n, status: 'not_found', note: 'Im RIS (Bundesrecht, geltende Fassung) nicht gefunden – Landesrecht/EU-Recht, aufgehoben oder Zitierfehler?' }
 }
 
 async function verifyDecision(d) {
@@ -520,7 +560,10 @@ async function verifyDecision(d) {
       const r = await risRequest('Judikatur', { Applikation: d.app, Geschaeftszahl: gz, DokumenteProSeite: RIS_PAGE_SIZE, Seitennummer: 1 })
       if (r.hits > 0 && r.docs.length) {
         const best = r.docs.find((x) => x.docType === 'Entscheidungstext') || r.docs[0]
-        return { ...d, status: 'ok', title: best.title, url: best.url, htmlUrl: best.htmlUrl, date: best.date, court: best.court, id: best.id, hits: r.hits, note: `Im RIS gefunden (${r.hits} Dokument${r.hits === 1 ? '' : 'e'})` }
+        // A Rechtssatz lists every decision it applies to; show only the cited number.
+        const isText = best.docType === 'Entscheidungstext'
+        const title = `${best.court || d.app} ${d.gz}${isText && best.date ? ' vom ' + best.date : ''}${best.docType ? ' · ' + best.docType : ''}`
+        return { ...d, status: 'ok', title, url: best.url, htmlUrl: best.htmlUrl, date: best.date, court: best.court, id: best.id, hits: r.hits, note: isText ? 'Entscheidungstext im RIS' : `Rechtssatz im RIS (${r.hits} Dokument${r.hits === 1 ? '' : 'e'})` }
       }
     } catch (e) { lastErr = e; break }
   }
@@ -627,11 +670,16 @@ const webClause = (web) => web
   ? `nutze die Websuche, höchstens ${MAX_WEB_SEARCHES} Suchen (${WEB_SOURCES})`
   : 'eine Websuche ist NICHT verfügbar – ergänze nur aus gesichertem Wissen und kennzeichne Unsicheres ausdrücklich als nicht verifiziert'
 
-const reviewInstructions = (web) => `Du bist AI:ssociate (Modell Sol) und prüfst die Antwort der juristischen Wissensdatenbank (AI:ssociate, österreichisches Recht; sie recherchiert selbst agentisch in Normen und Judikatur). Du bekommst die Nutzerfrage und diese Antwort.
+const reviewInstructions = (web) => `Du bist AI:ssociate (Modell Sol) und prüfst die Antwort der juristischen Wissensdatenbank (AI:ssociate, österreichisches Recht; sie recherchiert selbst agentisch in Normen und Judikatur und ist die maßgebliche Quelle). Du bekommst die Nutzerfrage und diese Antwort.
 
-Prüfe: Ist die Frage damit vollständig, aktuell und belegt beantwortet?
-- JA → erste Zeile exakt "VERDICT: AUSREICHEND". Danach entweder nichts oder höchstens 1–3 Sätze mit einem wichtigen Hinweis (z. B. Frist, Risiko, Praxis-Tipp). Keine Wiederholung der Antwort.
-- NEIN (wesentliche Lücke, Unsicherheit, veraltete Rechtslage, fehlendes EU-/ausländisches Recht, aktuelle Entwicklung, Widerspruch) → ${webClause(web)}. Dann erste Zeile exakt "VERDICT: ERGAENZT", danach eine kompakte Ergänzung in Markdown: nur was fehlt oder zu korrigieren ist, mit Fundstellen (§, Gesetz; Gericht, Datum, Geschäftszahl)${web ? ' und Links' : ''}. Keine Wiederholung der Wissensdatenbank-Antwort.
+REGELFALL: Die Antwort ist ausreichend → erste Zeile exakt "VERDICT: AUSREICHEND", danach nichts (oder höchstens ein Satz mit einem wirklich wichtigen Hinweis). Keine Wiederholung, keine Abrundung, keine Bestätigungssuche.
+
+AUSNAHMEFALL – nur wenn mindestens eines zutrifft:
+(a) ein wesentlicher Teil der Nutzerfrage wird gar nicht behandelt,
+(b) die Nutzerin fragt ausdrücklich nach EU-Recht oder ausländischem Recht und das fehlt,
+(c) die Frage betrifft eine tagesaktuelle Entwicklung (neue Novelle, gerade ergangene Entscheidung), die die Antwort nicht kennt,
+(d) die Antwort enthält einen offensichtlichen Widerspruch.
+Dann ${webClause(web)}, und antworte mit erster Zeile exakt "VERDICT: ERGAENZT", danach eine knappe Ergänzung in Markdown: nur das Fehlende, mit Fundstellen (§, Gesetz; Gericht, Datum, Geschäftszahl)${web ? ' und Links' : ''}.
 Nie Normen, Entscheidungen oder Fundstellen erfinden. Sprache: wie die Nutzerfrage.`
 
 const directInstructions = (web) => `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Die juristische Wissensdatenbank ist gerade nicht verfügbar. Beantworte die Rechtsfrage selbst: ${webClause(web)}. Antworte strukturiert in Markdown: **Kurzantwort**, **Rechtliche Grundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Beurteilung**, **Ergebnis / Empfehlung**. ${web ? 'Belege mit Links. ' : ''}Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
@@ -647,8 +695,6 @@ ${web ? `- web_search: nur falls die Wissensdatenbank nicht ausreicht (höchsten
 - create_or_edit_file: erzeugt/bearbeitet Dateien (Word/Excel/PDF/HTML). Ein Aufruf je Deliverable. Die gesamte juristische Arbeit (welche Klausel, welcher Kommentar, welche Formulierung) machst DU vorher und gibst sie wörtlich in task mit. Niemals generische oder identische Kommentare für mehrere Absätze; jeder Kommentar nennt das konkrete Problem der konkreten Klausel.
 
 ABLAUF: lesen → (eine) Rechtsfrage an die Wissensdatenbank → Deliverable erzeugen → kurze Antwort. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
-
-const FOLLOWUP_INSTRUCTIONS = 'Formuliere 3 kurze, konkrete Folgefragen oder nächste Schritte (je max. 12 Wörter), die eine Anwältin nach dieser Antwort sinnvoll stellen würde. Antworte als JSON {"followups": ["…","…","…"]}.'
 
 // Task presets: real workflows with structured inputs.
 const TASK_PRESETS = {
@@ -772,7 +818,7 @@ app.use(express.json({ limit: '40mb' }))
 app.use(express.static(path.join(__dirname, 'public')))
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE }, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS } })
+  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), models: { main: MODEL_MAIN, code: MODEL_CODE }, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -945,7 +991,18 @@ app.post('/api/chat', async (req, res) => {
     // Real progress events while the knowledge base works (can take minutes).
     const ticker = setInterval(() => send('step_update', { id: sid, status: 'running', detail: `recherchiert seit ${Math.round((Date.now() - t0) / 1000)} s…` }), 15_000)
     ticker.unref?.()
-    const attempt = (tid) => { ctx.usage.aissociateCalls++; return askAissociate({ question, legalArea, scope, threadId: tid, onDelta: stream ? (t) => send('delta', { text: t }) : null }) }
+    // The knowledge base reports the documents it consults while it works: show
+    // each one as a research step (that is the visible part of its agentic run).
+    const found = []
+    const onDocument = (src) => {
+      const ev = addEvidence({ type: 'aissociate', url: src.url, title: src.title, raw: src.raw, read: true })
+      if (found.includes(ev)) return
+      found.push(ev)
+      const ds = step('search', `AI:ssociate zieht heran: ${ev.title}`, { url: ev.url || undefined })
+      stepDone(ds)
+    }
+    const onEvent = (type, text) => { if (text && typeof text === 'string' && text.trim() && !/^\s*[{[]/.test(text)) send('step_update', { id: sid, status: 'running', detail: text.trim().slice(0, 160) }) }
+    const attempt = (tid) => { ctx.usage.aissociateCalls++; return askAissociate({ question, legalArea, scope, threadId: tid, onDelta: stream ? (t) => send('delta', { text: t }) : null, onDocument, onEvent }) }
     try {
       let r
       try {
@@ -962,7 +1019,7 @@ app.post('/api/chat', async (req, res) => {
       aissThreadOut = r.threadId || null
       aissOk = true
       const srcs = r.sources.map((s) => addEvidence({ type: 'aissociate', url: s.url, title: s.title, raw: s.raw, read: true }))
-      stepDone(sid, { detail: `Antwort erhalten${srcs.length ? ` · ${srcs.length} Dokument${srcs.length > 1 ? 'e' : ''}` : ''}${r.errors.length ? ' · Hinweis: ' + r.errors[0].slice(0, 80) : ''}` })
+      stepDone(sid, { detail: `Antwort erhalten${srcs.length ? ` · ${srcs.length} Dokument${srcs.length > 1 ? 'e' : ''} herangezogen` : ''}${r.errors.length ? ' · Hinweis: ' + r.errors[0].slice(0, 80) : ''}` })
       return { ...r, evidence: srcs }
     } catch (e) {
       stepFail(sid, { detail: String(e?.message || e).slice(0, 200) })
@@ -1217,13 +1274,8 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) { stepFail(vid, { detail: e.message }) }
     }
 
-    // ---- 4. follow-ups (Luna, tiny) ----
-    let followups = []
-    assertAlive()
-    try {
-      const fr = await callModel(ctx, { model: MODEL_FAST, instructions: FOLLOWUP_INSTRUCTIONS, effort: 'low', maxOut: 2000, input: [{ role: 'user', content: `FRAGE: ${prompt.slice(0, 2000)}\n\nANTWORT (Auszug): ${answer.slice(0, 6000)}` }], text: { format: { type: 'json_schema', name: 'followups', schema: { type: 'object', additionalProperties: false, properties: { followups: { type: 'array', items: { type: 'string' } } }, required: ['followups'] }, strict: true } } })
-      followups = (parseJsonLoose(fr.output_text || '')?.followups || []).filter((s) => typeof s === 'string').slice(0, 3)
-    } catch {}
+    // ---- 4. link verified citations in the answer text to the RIS ----
+    if (verification) answer = linkCitations(answer, verification)
 
     // ---- 5. files from the sandbox ----
     if (sandboxReady) {
@@ -1242,7 +1294,7 @@ app.post('/api/chat', async (req, res) => {
     const sources = evidence.map((e) => ({ marker: e.marker, type: e.type, title: e.title, url: e.url, read: Boolean(e.read), cited: cited.has(e.marker) || e.type === 'aissociate' || (e.type === 'web' && verdict !== 'sufficient'), raw: e.raw || null }))
 
     send('final', {
-      answer, sources, verification, followups, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
+      answer, sources, verification, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
       models: { main: MODEL_MAIN, code: MODEL_CODE, knowledgeBase: aissOk ? 'AI:ssociate' : null },
       aissThreadId: aissThreadOut,
       execution: { images, files: filesOut },
@@ -1265,4 +1317,4 @@ if (process.env.NO_LISTEN !== '1') {
 }
 
 // Exported for tests (NO_LISTEN=1).
-export { extractNormCitations, extractDecisionCitations, normalizeRisDoc, htmlToText, markdownToDocx, askAissociate, parseSseBlock, sourceFromDocumentEvent, risLinkForDocNumber, app }
+export { extractNormCitations, extractDecisionCitations, normalizeRisDoc, htmlToText, markdownToDocx, askAissociate, parseSseBlock, sourceFromDocumentEvent, risLinkForDocNumber, linkCitations, normQueryParams, app }
