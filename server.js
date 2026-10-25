@@ -322,6 +322,7 @@ app.post('/api/chat', async (req, res) => {
         send('status', { message: step === 1 ? 'Modell schreibt Code…' : 'Modell denkt weiter…' })
         const completion = await getOpenAI().chat.completions.create({
           model: OPENAI_MODEL,
+          reasoning_effort: 'none',
           messages,
           tools: [CHAT_TOOL],
           // Force code execution on the first step so the task is actually
@@ -372,6 +373,7 @@ app.post('/api/chat', async (req, res) => {
           })
           const fc = await getOpenAI().chat.completions.create({
             model: OPENAI_MODEL,
+            reasoning_effort: 'none',
             messages,
             tools: [CHAT_TOOL],
             tool_choice: { type: 'function', function: { name: 'run_python' } },
@@ -829,6 +831,7 @@ ${recentStr}
 Respond with ONLY the next action as a JSON object.`
   const completion = await getOpenAI().chat.completions.create({
     model: OPENAI_MODEL,
+    reasoning_effort: 'none',
     messages: [
       { role: 'system', content: agentSystemPrompt(secretNames) },
       { role: 'user', content: user },
@@ -959,6 +962,7 @@ ${recentStr}
 Respond with ONLY the next action as a JSON object.`
   const completion = await getOpenAI().chat.completions.create({
     model: OPENAI_MODEL,
+    reasoning_effort: 'none',
     messages: [
       { role: 'system', content: desktopSystemPrompt(secretNames, size) },
       {

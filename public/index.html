@@ -20,6 +20,8 @@
         --faint: #8e8e98;
         --err: #d92d20;
         --ok: #12b76a;
+        --accent: #0e7c8a;
+        --accent-hover: #0a6a76;
         --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
         --sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         --radius: 16px;
@@ -82,7 +84,7 @@
       a.file-link {
         display: inline-flex; align-items: center; gap: 7px; margin: 8px 8px 0 0; padding: 9px 14px;
         background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-        color: var(--text); text-decoration: none; font-size: 13px; transition: border-color .15s;
+        color: var(--accent); text-decoration: none; font-size: 13px; transition: border-color .15s;
       }
       a.file-link:hover { border-color: var(--border-strong); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
@@ -161,7 +163,7 @@
       .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
       .composer { max-width: 740px; margin: 0 auto; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s, box-shadow .15s; box-shadow: 0 2px 12px rgba(13,13,13,0.05); }
-      .composer:focus-within { border-color: var(--border-strong); box-shadow: 0 4px 18px rgba(13,13,13,0.08); }
+      .composer:focus-within { border-color: var(--accent); box-shadow: 0 4px 18px rgba(14,124,138,0.12); }
       textarea { width: 100%; resize: none; background: transparent; color: var(--text); border: none; padding: 6px 2px 2px; font-family: inherit; font-size: 15px; line-height: 1.5; min-height: 24px; max-height: 200px; }
       textarea:focus { outline: none; }
       textarea::placeholder { color: var(--faint); }
@@ -177,11 +179,11 @@
       button.tool.active { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
       #send {
         margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
-        background: var(--text); color: var(--bg); border: none; border-radius: 999px;
-        width: 36px; height: 36px; cursor: pointer; transition: opacity .15s; flex: 0 0 auto;
+        background: var(--accent); color: #fff; border: none; border-radius: 999px;
+        width: 36px; height: 36px; cursor: pointer; transition: background .15s, opacity .15s; flex: 0 0 auto;
       }
       #send svg { width: 18px; height: 18px; }
-      #send:hover { opacity: 0.85; }
+      #send:hover { background: var(--accent-hover); }
       #send:disabled { opacity: 0.35; cursor: not-allowed; }
       .hint { max-width: 740px; margin: 10px auto 0; color: var(--faint); font-size: 12px; text-align: center; }
 
@@ -220,21 +222,21 @@
         <div class="caps">
           <div class="cap">
             <div class="cap-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             </div>
-            <div class="cap-txt">Ad-hoc Code<br />generieren &amp; ausführen</div>
+            <div class="cap-txt">Dokumente<br />analysieren</div>
           </div>
           <div class="cap">
             <div class="cap-ico">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>
             </div>
-            <div class="cap-txt">Dateien<br />beliebig bearbeiten</div>
+            <div class="cap-txt">Dokumente<br />schreiben &amp; erstellen</div>
           </div>
           <div class="cap">
             <div class="cap-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>
             </div>
-            <div class="cap-txt">Computer<br />steuern</div>
+            <div class="cap-txt">Dokumente<br />bearbeiten &amp; umwandeln</div>
           </div>
         </div>
 
@@ -242,33 +244,15 @@
     </main>
 
     <footer>
-      <div id="secretsPanel" hidden>
-        <div class="secrets-head">
-          Zugangsdaten werden an die Sandbox übergeben, aber nie dem KI-Modell gezeigt. In der Aufgabe als <code>{{NAME}}</code> verwenden, z. B. <code>{{PASSWORD}}</code>.
-        </div>
-        <div id="secretsRows"></div>
-        <button id="addSecret" class="mini">Secret hinzufügen</button>
-      </div>
       <div id="attachments"></div>
       <div class="composer">
         <input type="file" id="fileInput" multiple hidden />
-        <textarea id="input" placeholder="Aufgabe beschreiben…" rows="1"></textarea>
+        <textarea id="input" placeholder="Dokument hochladen (📎) und beschreiben, was damit geschehen soll…" rows="1"></textarea>
         <div class="composer-bar">
           <div class="tools">
             <button id="attach" class="tool" title="Dateien anhängen" aria-label="Dateien anhängen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
-            </button>
-            <button id="agentToggle" class="tool" title="Agent-Modus (Code, Shell, Dateien, APIs, Browser)" aria-label="Agent-Modus">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5 13.7 9 19 10.5 13.7 12 12 17.5 10.3 12 5 10.5 10.3 9 12 3.5Z"/><path d="M18.5 16.5 19 18.5 21 19 19 19.5 18.5 21.5 18 19.5 16 19 18 18.5 18.5 16.5Z"/></svg>
-              <span class="tlabel">Agent</span>
-            </button>
-            <button id="desktopToggle" class="tool" title="Desktop-Modus (GUI-Steuerung, z. B. LibreOffice)" aria-label="Desktop-Modus">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>
-              <span class="tlabel">Desktop</span>
-            </button>
-            <button id="secretsToggle" class="tool" title="Zugangsdaten" aria-label="Zugangsdaten">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16.5 16.5 18.5 14.5M13.5 18.5 15.5 16.5"/></svg>
-              <span class="tlabel">Secrets</span>
+              <span class="tlabel">Dateien</span>
             </button>
           </div>
           <button id="send" aria-label="Senden">
@@ -276,7 +260,7 @@
           </button>
         </div>
       </div>
-      <div class="hint" id="hint">Enter senden · Shift+Enter neue Zeile</div>
+      <div class="hint" id="hint">Enter senden · Shift+Enter neue Zeile · 📎 Dokumente analysieren, schreiben, bearbeiten</div>
     </footer>
 
     <script>
@@ -289,20 +273,11 @@
       const attach = document.getElementById('attach')
       const fileInput = document.getElementById('fileInput')
       const attachments = document.getElementById('attachments')
-      const agentToggle = document.getElementById('agentToggle')
-      const desktopToggle = document.getElementById('desktopToggle')
-      const secretsToggle = document.getElementById('secretsToggle')
-      const secretsPanel = document.getElementById('secretsPanel')
-      const secretsRowsEl = document.getElementById('secretsRows')
-      const addSecret = document.getElementById('addSecret')
       const hint = document.getElementById('hint')
       const costPill = document.getElementById('costPill')
 
       const history = []
       let pendingFiles = []
-      let agentMode = false
-      let desktopMode = false
-      const secretRows = []
       let sessionCostUsd = 0
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
@@ -328,41 +303,6 @@
         input.focus()
       }
       window.fillExample = fillExample
-
-      function updateHint() {
-        hint.textContent = desktopMode
-          ? 'Desktop-Modus aktiv — steuert eine grafische Linux-Oberfläche (z. B. LibreOffice) per Screenshot.'
-          : agentMode
-            ? 'Agent-Modus aktiv — Code, Shell, Dateien, APIs und Browser, schrittweise. Für Logins Secrets hinzufügen.'
-            : 'Enter senden · Shift+Enter neue Zeile'
-      }
-
-      function renderSecrets() {
-        secretsRowsEl.innerHTML = ''
-        secretRows.forEach((row, i) => {
-          const div = el('div', 'secret-row')
-          const k = el('input', 'k')
-          k.placeholder = 'NAME (z. B. PASSWORD)'
-          k.value = row.name
-          k.addEventListener('input', () => (row.name = k.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_')))
-          k.addEventListener('blur', () => { k.value = row.name })
-          const v = el('input', 'v')
-          v.type = 'password'
-          v.placeholder = 'Wert (bleibt am Server, für die KI verborgen)'
-          v.value = row.value
-          v.addEventListener('input', () => (row.value = v.value))
-          const x = el('button', null, '×')
-          x.addEventListener('click', () => { secretRows.splice(i, 1); renderSecrets() })
-          div.append(k, v, x)
-          secretsRowsEl.appendChild(div)
-        })
-      }
-
-      function collectSecrets() {
-        const out = {}
-        secretRows.forEach((r) => { if (r.name && r.value) out[r.name] = r.value })
-        return out
-      }
 
       const MAX_UPLOADS = 5
       const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -618,137 +558,6 @@
         }
       }
 
-      async function runAgent(task, mode, uploads = []) {
-        const bubble = addMessage('assistant')
-        bubble.innerHTML = ''
-        const trace = el('div', 'trace')
-        bubble.appendChild(trace)
-        const spin = el('div', 'trace-status')
-        spin.innerHTML = '<span class="spinner"></span> Agent wird gestartet…'
-        trace.appendChild(spin)
-
-        const stepEls = {}
-        function stepEl(n) {
-          if (!stepEls[n]) {
-            const s = el('div', 'trace-step')
-            s.appendChild(el('div', 'stephead', `Schritt ${n}`))
-            trace.appendChild(s)
-            stepEls[n] = s
-          }
-          return stepEls[n]
-        }
-
-        function handle(ev) {
-          if (ev.event === 'status') {
-            spin.innerHTML = '<span class="spinner"></span> ' + ev.message
-          } else if (ev.event === 'stream') {
-            const wrap = el('div', 'desk-live')
-            wrap.appendChild(el('div', 'desk-live-lbl', 'Live-Ansicht'))
-            const frame = document.createElement('iframe')
-            frame.src = ev.url
-            frame.className = 'desk-frame'
-            frame.allow = 'clipboard-read; clipboard-write'
-            wrap.appendChild(frame)
-            trace.insertBefore(wrap, trace.firstChild)
-          } else if (ev.event === 'observation') {
-            const s = stepEl(ev.step)
-            s.querySelector('.stephead').textContent = `Schritt ${ev.step} — ${ev.url || ''}`
-            if (ev.screenshot) {
-              const img = el('img', 'trace-shot')
-              img.src = `data:image/png;base64,${ev.screenshot}`
-              s.appendChild(img)
-            }
-          } else if (ev.event === 'action') {
-            const s = stepEl(ev.step)
-            if (ev.thought) s.appendChild(el('div', 'trace-thought', ev.thought))
-            s.appendChild(el('div', 'trace-act', ev.summary))
-          } else if (ev.event === 'result') {
-            const s = stepEl(ev.step)
-            if (ev.error) {
-              s.appendChild(el('div', 'trace-err', 'Fehler: ' + ev.error))
-            } else if (ev.text) {
-              s.appendChild(el('pre', 'trace-out', ev.text))
-            }
-          } else if (ev.event === 'final') {
-            spin.remove()
-            const f = el('div', 'trace-final')
-            f.appendChild(el('div', 'lbl', 'Ergebnis'))
-            f.appendChild(el('div', null, ev.answer || '(keine Antwort)'))
-            if (ev.screenshot) {
-              const img = el('img')
-              img.src = `data:image/png;base64,${ev.screenshot}`
-              f.appendChild(img)
-            }
-            if (ev.files?.length) {
-              f.appendChild(el('div', 'label', 'Dateien'))
-              ev.files.forEach((file) => {
-                if (file.tooLarge || !file.base64) {
-                  f.appendChild(el('div', 'file-note', `${file.name} — zu groß`))
-                  return
-                }
-                if (IMG_RE.test(file.name)) {
-                  const img = el('img', 'result'); img.src = `data:image/png;base64,${file.base64}`; f.appendChild(img)
-                } else if (/\.pdf$/i.test(file.name)) {
-                  const emb = document.createElement('embed'); emb.className = 'pdf-preview'; emb.type = 'application/pdf'; emb.src = `data:application/pdf;base64,${file.base64}`; f.appendChild(emb)
-                } else if (/\.html?$/i.test(file.name)) {
-                  const frame = document.createElement('iframe'); frame.className = 'html-preview'; frame.setAttribute('sandbox', ''); frame.src = `data:text/html;base64,${file.base64}`; f.appendChild(frame)
-                }
-                const a = el('a', 'file-link', `${file.name} · ${fmtSize(file.size)}`)
-                a.href = `data:application/octet-stream;base64,${file.base64}`
-                a.download = file.name
-                f.appendChild(a)
-              })
-            }
-            if (ev.cost) {
-              f.appendChild(el('div', 'cost-line', costLineText(ev.cost)))
-              addCost(ev.cost)
-            }
-            trace.appendChild(f)
-          } else if (ev.event === 'error') {
-            spin.remove()
-            trace.appendChild(el('div', 'label err', 'Agent-Fehler'))
-            trace.appendChild(el('pre', null, ev.message))
-          }
-          chat.scrollTop = chat.scrollHeight
-        }
-
-        try {
-          const resp = await fetch('/api/agent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              task,
-              secrets: collectSecrets(),
-              mode,
-              files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
-            }),
-          })
-          if (!resp.ok || !resp.body) {
-            let msg = 'Anfrage fehlgeschlagen'
-            try { msg = (await resp.json()).error || msg } catch {}
-            throw new Error(msg)
-          }
-          const reader = resp.body.getReader()
-          const decoder = new TextDecoder()
-          let buf = ''
-          for (;;) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buf += decoder.decode(value, { stream: true })
-            let idx
-            while ((idx = buf.indexOf('\n\n')) >= 0) {
-              const chunk = buf.slice(0, idx)
-              buf = buf.slice(idx + 2)
-              if (chunk.startsWith('data: ')) {
-                try { handle(JSON.parse(chunk.slice(6))) } catch {}
-              }
-            }
-          }
-        } catch (err) {
-          handle({ event: 'error', message: err.message })
-        }
-      }
-
       async function submit() {
         const prompt = input.value.trim()
         if (!prompt) return
@@ -768,35 +577,13 @@
         }
 
         try {
-          if (agentMode || desktopMode) {
-            await runAgent(prompt, desktopMode ? 'desktop' : 'web', uploads)
-          } else {
-            await runChat(prompt, uploads)
-          }
+          await runChat(prompt, uploads)
         } finally {
           send.disabled = false
           input.focus()
         }
       }
 
-      function setMode(which) {
-        agentMode = which === 'agent'
-        desktopMode = which === 'desktop'
-        agentToggle.classList.toggle('active', agentMode)
-        desktopToggle.classList.toggle('active', desktopMode)
-        updateHint()
-      }
-      agentToggle.addEventListener('click', () => setMode(agentMode ? null : 'agent'))
-      desktopToggle.addEventListener('click', () => setMode(desktopMode ? null : 'desktop'))
-      secretsToggle.addEventListener('click', () => {
-        secretsPanel.hidden = !secretsPanel.hidden
-        secretsToggle.classList.toggle('active', !secretsPanel.hidden)
-        if (!secretsPanel.hidden && secretRows.length === 0) {
-          secretRows.push({ name: 'EMAIL', value: '' }, { name: 'PASSWORD', value: '' })
-          renderSecrets()
-        }
-      })
-      addSecret.addEventListener('click', () => { secretRows.push({ name: '', value: '' }); renderSecrets() })
       attach.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', async () => {
         await addFiles(fileInput.files)
@@ -814,7 +601,6 @@
         input.style.height = Math.min(input.scrollHeight, 200) + 'px'
       })
 
-      setMode('agent') // Agent mode preselected by default
       checkHealth()
     </script>
   </body>
