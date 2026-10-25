@@ -481,7 +481,8 @@
         s = s.replace(/`([^`]+)`/g, '<code>$1</code>')
         s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>')
-        s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+        // Link text may not contain brackets, so plain "[…]" groups around linked citations stay intact.
+        s = s.replace(/\[([^\[\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
         s = s.replace(/\[Q(\d+)\]/g, '<a class="cite" data-q="Q$1" href="#q$1">Q$1</a>')
         s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
         return s

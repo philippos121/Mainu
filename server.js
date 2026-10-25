@@ -5,7 +5,7 @@ import OpenAI from 'openai'
 import { Sandbox } from '@e2b/code-interpreter'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -451,21 +451,34 @@ function extractNormCitations(text) {
   return [...out.values()]
 }
 
-/** Turns verified citations in a Markdown answer into RIS links (outside existing links/code). */
-function linkCitations(markdown, verification) {
+const reEsc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** Regex source matching every written variant of one citation (§ 10 Abs 4 VGG, § 10 VGG, 4 Ob 150/10b, 4Ob150/10b …). */
+function citationPattern(it) {
+  if (it.kind) {
+    const kind = it.kind === 'Art' ? '(?:Art\\.?|Artikel)' : '§§?'
+    return `${kind}\\s*${reEsc(it.num)}(?:\\s*(?:Abs\\.?|Absatz)\\s*\\d+[a-z]?)?(?:\\s*(?:Z|Ziffer|Zif\\.?)\\s*\\d+[a-z]?)?(?:\\s*lit\\.?\\s*[a-z]{1,2})?(?:\\s*sublit\\.?\\s*[a-z]{1,2})?(?:\\s*(?:erster|zweiter|dritter|vierter|fünfter|letzter|vorletzter)\\s+Satz)?(?:\\s*(?:Satz|S\\.?)\\s*\\d+)?(?:\\s*ff?\\.?)?\\s+${reEsc(it.law)}(?![\\wäöüß])`
+  }
+  const parts = String(it.gz).replace(/\s+/g, '').replace(/([A-Za-zÄÖÜäöü])(\d)/g, '$1\u0000$2').replace(/(\d)([A-Za-zÄÖÜäöü])/g, '$1\u0000$2').split('\u0000')
+  return parts.map(reEsc).join('\\s?') + '(?![\\w/])'
+}
+
+/**
+ * Turns verified citations in a Markdown answer into RIS links: every written
+ * variant of a confirmed § / Art / Geschäftszahl, outside existing links and
+ * code, in one pass (so nothing is linked twice). extraUrls maps citation
+ * labels (e.g. "§ 924 ABGB") to fallback URLs such as knowledge-base documents.
+ */
+function linkCitations(markdown, verification, extraUrls = new Map()) {
   if (!verification) return markdown
   const items = [...(verification.norms || []), ...(verification.decisions || [])]
-    .filter((x) => x.url && x.raw && ['ok', 'expired', 'unsure'].includes(x.status))
-    .sort((a, b) => b.raw.length - a.raw.length) // longest first, so "§ 9 Abs 1 BAO" wins over "§ 9 BAO"
+    .map((x) => ({ ...x, url: ['ok', 'expired', 'unsure'].includes(x.status) && x.url ? x.url : (extraUrls.get(x.label) || null) }))
+    .filter((x) => x.url)
   if (!items.length) return markdown
+  const matchers = items.map((it) => ({ it, re: new RegExp('^(?:' + citationPattern(it) + ')$') }))
+  const big = new RegExp(`(^|[^\\w§])(${items.map(citationPattern).join('|')})`, 'g')
   const segs = String(markdown).split(/(\[[^\]\n]*\]\([^)\s]*\)|`[^`\n]*`|https?:\/\/\S+)/)
   for (let i = 0; i < segs.length; i += 2) {
-    let s = segs[i]
-    for (const it of items) {
-      const re = new RegExp(`(^|[^\\w\\[§])(${it.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')})(?![\\w\\]])`, 'g')
-      s = s.replace(re, (all, pre, txt) => `${pre}[${txt}](${it.url})`)
-    }
-    segs[i] = s
+    segs[i] = segs[i].replace(big, (all, pre, txt) => { const m = matchers.find((x) => x.re.test(txt)); return m ? `${pre}[${txt}](${m.it.url})` : all })
   }
   return segs.join('')
 }
@@ -771,12 +784,14 @@ function markdownToDocx(title, md) {
   if (title) children.push(new Paragraph({ text: title, heading: HeadingLevel.TITLE }))
   const inline = (s) => {
     const runs = []
-    const re = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[Q\d+\])/g
+    const re = /(\[[^\[\]]+\]\(https?:[^)\s]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[Q\d+\])/g
     let last = 0, m
     while ((m = re.exec(s))) {
       if (m.index > last) runs.push(new TextRun(s.slice(last, m.index)))
       const t = m[0]
-      if (t.startsWith('**')) runs.push(new TextRun({ text: t.slice(2, -2), bold: true }))
+      const link = t.match(/^\[([^\[\]]+)\]\((https?:[^)\s]+)\)$/)
+      if (link) runs.push(new ExternalHyperlink({ children: [new TextRun({ text: link[1], style: 'Hyperlink', color: '0E7C8A', underline: {} })], link: link[2] }))
+      else if (t.startsWith('**')) runs.push(new TextRun({ text: t.slice(2, -2), bold: true }))
       else if (t.startsWith('`')) runs.push(new TextRun({ text: t.slice(1, -1), font: 'Consolas' }))
       else if (t.startsWith('[Q')) runs.push(new TextRun({ text: ' ' + t, superScript: true, color: '0E7C8A' }))
       else runs.push(new TextRun({ text: t.slice(1, -1), italics: true }))
@@ -1274,8 +1289,13 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) { stepFail(vid, { detail: e.message }) }
     }
 
-    // ---- 4. link verified citations in the answer text to the RIS ----
-    if (verification) answer = linkCitations(answer, verification)
+    // ---- 4. link citations in the answer text to the RIS (verified ones, else
+    //         to the matching knowledge-base document) ----
+    if (verification) {
+      const extraUrls = new Map()
+      for (const e of evidence) if (e.type === 'aissociate' && e.url) { const c = extractNormCitations(e.title || '')[0]; if (c && !extraUrls.has(c.label)) extraUrls.set(c.label, e.url) }
+      answer = linkCitations(answer, verification, extraUrls)
+    }
 
     // ---- 5. files from the sandbox ----
     if (sandboxReady) {
