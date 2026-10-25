@@ -422,6 +422,8 @@
       try { convos = JSON.parse(localStorage.getItem(LS_CONVOS) || '[]') } catch {}
       let current = null // { id, sessionId, title, messages, history }
       let health = null
+      let activeAbort = null // AbortController of the running request (test hook below)
+      window.__aissAbortActive = () => { try { activeAbort?.abort() } catch {} }
 
       const uid = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2)
       const saveSettings = () => { try { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)) } catch {} }
@@ -888,23 +890,49 @@
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
         let ended = false, lastError = null
+        // Resumable job: the server keeps every event, so after a dropped connection
+        // (Safari "Load failed", proxy timeout, app in background) we reconnect and
+        // fetch only the events we have not seen yet.
+        const jobId = uid()
+        let lastSeq = 0
         const handle = (ev) => {
+          if (ev.seq) { if (ev.seq <= lastSeq) return; lastSeq = ev.seq }
+          if (ev.event === 'job') return
           if (ev.event === 'step') addStep(ui, ev)
           else if (ev.event === 'step_update') updateStep(ui, ev)
           else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } renderModelTags(ui.models, ev.models) }
           else if (ev.event === 'delta') { if (ui.live.hidden) { ui.live.hidden = false } ui.liveText = (ui.liveText || '') + (ev.text || ''); ui.live.innerHTML = renderMarkdown(ui.liveText); scrollBottom() }
           else if (ev.event === 'status') { ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.message)}</span>` }
           else if (ev.event === 'final') { finalData = ev; ended = true; if (ev.title && !current.titleLocked && !taskTitle) { current.title = ev.title; topTitle.textContent = ev.title } current.titleLocked = true; if ('aissThreadId' in ev) current.aissThreadId = ev.aissThreadId || null; renderAssistantFinal(ui, ev); addCost(ev.cost) }
-          else if (ev.event === 'error') { ended = true; lastError = ev.message; ui.running.remove(); ui.live?.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
+          else if (ev.event === 'error') { ended = true; lastError = ev.message; ui.running.remove(); if (ui.live) { if (ui.liveText) ui.live.classList.remove('live'); else ui.live.remove() } ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
         }
-        try {
-          const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
-          if (!resp.ok || !resp.body) { let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
+        const readStream = async (resp) => {
           const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
           for (;;) { const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith('data: ')) { try { handle(JSON.parse(chunk.slice(6))) } catch {} } } }
-          if (!ended) handle({ event: 'error', message: 'Verbindung beendet, bevor eine Antwort vorlag.' })
-        } catch (err) { handle({ event: 'error', message: err.message }) }
-        finally {
+        }
+        let firstError = null
+        let hardFail = false // the server rejected the request itself (4xx/5xx) → no job to resume
+        try {
+          activeAbort = new AbortController()
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
+          if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
+          await readStream(resp)
+        } catch (err) { firstError = err }
+        // Reconnect and replay missing events until the job reports final/error.
+        for (let attempt = 1; !ended && !hardFail && attempt <= 8; attempt++) {
+          ui.running.innerHTML = `<span class="spinner"></span><span>Verbindung unterbrochen – wird wiederhergestellt (${attempt})…</span>`
+          await new Promise((r) => setTimeout(r, Math.min(8000, 700 * 2 ** (attempt - 1))))
+          try {
+            activeAbort = new AbortController()
+            const r = await fetch(`/api/chat/stream/${jobId}?after=${lastSeq}`, { signal: activeAbort.signal, cache: 'no-store' })
+            if (r.status === 404) { hardFail = true; break }
+            if (!r.ok || !r.body) continue
+            await readStream(r)
+          } catch {}
+        }
+        if (!ended) handle({ event: 'error', message: (firstError?.message ? firstError.message + ' – ' : '') + 'Verbindung konnte nicht wiederhergestellt werden. Bitte erneut senden.' })
+        activeAbort = null
+        {
           busy = false; updateSend(); input.focus()
           current.history.push({ role: 'user', content: text })
           if (finalData?.answer) { current.history.push({ role: 'assistant', content: finalData.answer }); current.history = current.history.slice(-16) }

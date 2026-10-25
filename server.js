@@ -789,23 +789,69 @@ app.post('/api/verify', async (req, res) => {
   try { res.json(await verifyAnswer(String(req.body?.text || '').slice(0, 100_000))) } catch (e) { res.status(500).json({ error: e?.message }) }
 })
 
-app.post('/api/chat', async (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream')
-  res.setHeader('Cache-Control', 'no-cache')
+// ---------------------------------------------------------------------------
+// Jobs: every chat request runs as a server-side job whose events are kept in
+// memory, so a dropped connection (mobile Safari "Load failed", proxy timeouts,
+// app switched to background) can be resumed with GET /api/chat/stream/:id?after=seq.
+// ---------------------------------------------------------------------------
+const jobs = new Map() // id -> { seq, events: [{seq,line}], done, listeners:Set<res>, createdAt }
+const JOB_TTL_MS = Number(process.env.JOB_TTL_MS || 30 * 60 * 1000)
+const HEARTBEAT_MS = 10_000
+setInterval(() => { const now = Date.now(); for (const [id, j] of jobs) if (now - j.createdAt > JOB_TTL_MS) jobs.delete(id) }, 60_000).unref?.()
+
+function sseStart(res) {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
   res.setHeader('Connection', 'keep-alive')
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders?.()
-  res.write(':' + ' '.repeat(2048) + '\n\n')
-  const send = (event, data) => { try { res.write(`data: ${JSON.stringify({ event, ...data })}\n\n`) } catch {} }
-  const heartbeat = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 15_000)
-  heartbeat.unref?.()
-  let clientGone = false
-  const abortCtrl = new AbortController()
-  res.on('close', () => { clientGone = true; clearInterval(heartbeat); abortCtrl.abort() })
+  res.write(':' + ' '.repeat(2048) + '\n\n') // initial padding: defeats proxy buffering, client connects immediately
+}
+function attachListener(job, res, after) {
+  sseStart(res)
+  for (const e of job.events) if (e.seq > after) { try { res.write(e.line) } catch {} }
+  if (job.done) { res.end(); return }
+  job.listeners.add(res)
+  // Padded heartbeats: a bare ": ping" can sit in an intermediate proxy buffer.
+  const hb = setInterval(() => { try { res.write(':' + ' '.repeat(512) + '\n\n') } catch {} }, HEARTBEAT_MS)
+  hb.unref?.()
+  res.on('close', () => { job.listeners.delete(res); clearInterval(hb) })
+}
+function newJob(id) {
+  const job = { id, seq: 0, events: [], done: false, listeners: new Set(), createdAt: Date.now() }
+  jobs.set(id, job)
+  job.send = (event, data) => {
+    const seq = ++job.seq
+    const line = `data: ${JSON.stringify({ event, seq, ...data })}\n\n`
+    job.events.push({ seq, line })
+    for (const l of job.listeners) { try { l.write(line) } catch {} }
+  }
+  job.finish = () => {
+    job.done = true
+    for (const l of job.listeners) { try { l.end() } catch {} }
+    job.listeners.clear()
+  }
+  return job
+}
 
-  if (!OPENAI_API_KEY) { send('error', { message: 'Server: OPENAI_API_KEY fehlt.' }); return res.end() }
+app.get('/api/chat/stream/:id', (req, res) => {
+  const job = jobs.get(String(req.params.id || ''))
+  if (!job) return res.status(404).json({ error: 'Auftrag unbekannt oder abgelaufen.' })
+  attachListener(job, res, Number(req.query.after) || 0)
+})
 
+app.post('/api/chat', async (req, res) => {
   const body = req.body ?? {}
+  // The client may supply the job id so it can resume even if this response never arrives.
+  const jobId = typeof body.jobId === 'string' && /^[\w-]{8,64}$/.test(body.jobId) && !jobs.has(body.jobId) ? body.jobId : `j_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  const job = newJob(jobId)
+  const send = job.send
+  attachListener(job, res, 0)
+  send('job', { id: jobId })
+  const finish = () => job.finish()
+
+  if (!OPENAI_API_KEY) { send('error', { message: 'Server: OPENAI_API_KEY fehlt.' }); return finish() }
+
   const { history = [], files: rawUploads = [], sessionId, privacy = 'off', webSearch = true, task = null, aissThreadId = null } = body
   let prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   let taskExtra = ''
@@ -816,7 +862,7 @@ app.post('/api/chat', async (req, res) => {
     taskExtra = t.extra
     forceMode = t.forceMode
   }
-  if (!prompt) { send('error', { message: 'Bitte eine Frage oder Aufgabe eingeben.' }); return res.end() }
+  if (!prompt) { send('error', { message: 'Bitte eine Frage oder Aufgabe eingeben.' }); return finish() }
 
   const persistent = typeof sessionId === 'string' && sessionId.length > 0
   const privacyMode = privacy === 'pseudonymize' || privacy === 'anonymize' ? privacy : 'off'
@@ -830,7 +876,7 @@ app.post('/api/chat', async (req, res) => {
     const name = path.basename(u.name).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_')
     const buf = Buffer.from(u.base64, 'base64')
     if (!name || buf.length === 0) continue
-    if (buf.length > MAX_UPLOAD_BYTES) { send('error', { message: `Datei „${name}“ überschreitet ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.` }); return res.end() }
+    if (buf.length > MAX_UPLOAD_BYTES) { send('error', { message: `Datei „${name}“ überschreitet ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.` }); return finish() }
     uploads.push({ name, buf })
     if (uploads.length >= MAX_UPLOADS) break
   }
@@ -873,7 +919,9 @@ app.post('/api/chat', async (req, res) => {
   let aissThreadOut = threadIn
   let aissCalls = 0 // attempts (enforces the one-call limit)
   let aissOk = false // at least one successful knowledge-base answer
-  const assertAlive = () => { if (clientGone) throw new Error('Verbindung geschlossen.') }
+  // The job keeps running when the browser drops the connection (it can resume),
+  // so there is nothing to abort here.
+  const assertAlive = () => {}
 
   async function ensureSandbox() {
     if (sandboxReady) return
@@ -893,7 +941,11 @@ app.post('/api/chat', async (req, res) => {
     aissCalls++
     const label = LEGAL_AREA_LABEL[legalArea] || 'allgemein'
     const sid = step('aissociate', `AI:ssociate recherchiert (${label}${scope ? ', ' + scope : ''})`, { model: 'aissociate' })
-    const attempt = (tid) => { ctx.usage.aissociateCalls++; return askAissociate({ question, legalArea, scope, threadId: tid, onDelta: stream ? (t) => send('delta', { text: t }) : null, signal: abortCtrl.signal }) }
+    const t0 = Date.now()
+    // Real progress events while the knowledge base works (can take minutes).
+    const ticker = setInterval(() => send('step_update', { id: sid, status: 'running', detail: `recherchiert seit ${Math.round((Date.now() - t0) / 1000)} s…` }), 15_000)
+    ticker.unref?.()
+    const attempt = (tid) => { ctx.usage.aissociateCalls++; return askAissociate({ question, legalArea, scope, threadId: tid, onDelta: stream ? (t) => send('delta', { text: t }) : null }) }
     try {
       let r
       try {
@@ -901,7 +953,7 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) {
         // A stale/invalid thread must not break the knowledge base for the rest
         // of the conversation: retry once without the thread, then drop it.
-        if (!aissThreadOut || clientGone) throw e
+        if (!aissThreadOut) throw e
         console.error('aissociate (thread) failed, retrying without thread:', e?.message)
         send('step_update', { id: sid, status: 'running', detail: 'Gesprächsfaden ungültig – neuer Versuch ohne Verlauf…' })
         aissThreadOut = null
@@ -915,7 +967,7 @@ app.post('/api/chat', async (req, res) => {
     } catch (e) {
       stepFail(sid, { detail: String(e?.message || e).slice(0, 200) })
       throw e
-    }
+    } finally { clearInterval(ticker) }
   }
 
   // ---- document-mode tool implementations ----
@@ -1023,7 +1075,6 @@ app.post('/api/chat', async (req, res) => {
       stepDone(sid, { detail: calls.length ? `${calls.length} Werkzeug${calls.length > 1 ? 'e' : ''} angefordert` : 'Antwort formuliert' })
       if (!calls.length) { text = resp.output_text || ''; break }
       for (const c of calls) input.push({ type: 'function_call_output', call_id: c.call_id, output: await runToolCall(c) })
-      if (clientGone) throw new Error('Verbindung geschlossen.')
     }
     if (!text && prevId) {
       // Only unsent tool outputs (if any) plus the wrap-up request go into the chain.
@@ -1203,8 +1254,7 @@ app.post('/api/chat', async (req, res) => {
     send('error', { message: err?.message ?? 'Unbekannter Fehler.', cost: computeCost(ctx.usage, sandboxStart ? (Date.now() - sandboxStart) / 1000 : 0) })
   } finally {
     if (!persistent && sandbox) { try { await sandbox.kill() } catch {} }
-    clearInterval(heartbeat)
-    res.end()
+    finish()
   }
 })
 

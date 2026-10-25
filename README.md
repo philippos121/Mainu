@@ -54,7 +54,8 @@ has defaults (see `.env.example`). `GET /api/health` reports the configuration.
 
 | Route | Purpose |
 |---|---|
-| `POST /api/chat` | SSE stream: `step`, `step_update`, `route`, `delta`, `final`, `error` |
+| `POST /api/chat` | SSE stream: `job`, `step`, `step_update`, `route`, `delta`, `final`, `error` (every event carries a `seq`) |
+| `GET /api/chat/stream/:jobId?after=seq` | Resume a running or finished job after a dropped connection (replays events with `seq` > `after`) |
 | `POST /api/verify` | Re-run the RIS verification for a text |
 | `POST /api/export/docx` | Markdown → Word export of an answer |
 
