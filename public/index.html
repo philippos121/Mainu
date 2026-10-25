@@ -3,708 +3,933 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Playground</title>
+    <meta name="theme-color" content="#0e5c69" />
+    <title>AI:ssociate</title>
     <link rel="icon" href="/aissociate-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..700;1,400&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,400&display=swap" rel="stylesheet" />
     <style>
       :root {
-        --bg: #f3f5f6;
-        --surface: #ffffff;
-        --surface-2: #eef1f2;
-        --border: rgba(14, 60, 70, 0.13);
-        --border-strong: rgba(14, 60, 70, 0.30);
-        --text: #16252e;
-        --muted: #566a73;
-        --faint: #8a98a0;
-        --err: #d92d20;
-        --ok: #12b76a;
-        --accent: #0e7c8a;
-        --accent-hover: #0a6a76;
-        --header: #0e5c69;
-        --orange: #f39200;
-        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        --bg: #f3f5f6; --surface: #fff; --surface-2: #eef1f2; --surface-3: #e4e9eb;
+        --border: rgba(14, 60, 70, 0.12); --border-strong: rgba(14, 60, 70, 0.28);
+        --text: #16252e; --muted: #566a73; --faint: #8a98a0;
+        --accent: #0e7c8a; --accent-hover: #0a6a76; --accent-soft: rgba(14, 124, 138, 0.10);
+        --header: #0e5c69; --orange: #f39200; --ok: #1a9c5b; --warn: #e08a00; --err: #d92d20;
         --sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        --radius: 14px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --radius: 16px; --topbar: 56px; --maxw: 760px;
       }
       * { box-sizing: border-box; }
       html, body { height: 100%; }
-      body {
-        margin: 0;
-        font-family: var(--sans);
-        background: var(--bg);
-        color: var(--text);
-        height: 100dvh;
-        display: flex;
-        flex-direction: column;
-        -webkit-font-smoothing: antialiased;
-        text-rendering: optimizeLegibility;
-        line-height: 1.55;
-      }
+      body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; line-height: 1.55; min-height: 100dvh; display: flex; flex-direction: column; }
+      button { font-family: inherit; }
+      a { color: var(--accent); }
+      [hidden] { display: none !important; }
 
-      /* header */
-      header {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 13px 20px;
-        padding-top: max(13px, env(safe-area-inset-top));
-        background: var(--header);
-        color: #fff;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-      }
-      .brand-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: #fff; }
-      .brand-badge { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; background: var(--orange); border-radius: 999px; padding: 3px 9px; }
-      .status-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgba(255,255,255,0.85); }
-      .cost-pill { margin-left: auto; font-size: 12px; color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
-      .cost-pill + .status-pill { margin-left: 10px; }
-      .cost-line { font-size: 12px; color: var(--faint); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
-      .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.5); }
-      .dot.ok { background: #5ce09a; }
-      .dot.bad { background: #ff8a7a; }
+      /* ---------- top bar ---------- */
+      .topbar { position: sticky; top: 0; z-index: 30; height: calc(var(--topbar) + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: var(--header); color: #fff; display: flex; align-items: center; justify-content: space-between; padding-left: 10px; padding-right: 10px; }
+      .iconbtn { width: 40px; height: 40px; border: none; background: transparent; color: #fff; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; opacity: .95; }
+      .iconbtn:hover { background: rgba(255,255,255,0.12); }
+      .iconbtn svg { width: 24px; height: 24px; }
+      .topbar-title { flex: 1; text-align: center; font-size: 14px; font-weight: 600; letter-spacing: .01em; color: rgba(255,255,255,0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; }
+      .topbar-right { display: flex; align-items: center; gap: 4px; }
+      .cost-pill { font-size: 12px; font-weight: 600; color: #fff; background: rgba(255,255,255,0.14); border-radius: 999px; padding: 4px 10px; white-space: nowrap; cursor: pointer; }
+      .cost-pill:empty { display: none; }
 
-      /* chat */
-      #chat { flex: 1; overflow-y: auto; padding: 28px 22px 8px; display: flex; flex-direction: column; gap: 22px; }
-      .msg { max-width: 740px; width: 100%; margin: 0 auto; }
-      .role { font-size: 12px; color: var(--faint); margin-bottom: 7px; }
-      .bubble { line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
-      .msg.user .bubble {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: var(--radius); padding: 13px 16px; box-shadow: 0 1px 3px rgba(14,60,70,0.06);
-      }
-      pre {
-        background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
-        padding: 13px 15px; overflow-x: auto; font-family: var(--mono); font-size: 13px; margin: 12px 0 0;
-      }
-      .label { font-size: 12px; color: var(--faint); margin: 16px 0 5px; }
-      .label.err { color: var(--err); }
-      img.result { max-width: 100%; border-radius: 10px; margin-top: 12px; border: 1px solid var(--border); }
-      a.file-link {
-        display: inline-flex; align-items: center; gap: 7px; margin: 8px 8px 0 0; padding: 9px 14px;
-        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-        color: var(--accent); text-decoration: none; font-size: 13px; transition: border-color .15s;
-      }
-      a.file-link:hover { border-color: var(--border-strong); }
-      .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
-      .pdf-preview { width: 100%; height: 460px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; }
-      .html-preview { width: 100%; height: 460px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; background: #fff; }
+      /* ---------- home ---------- */
+      main { flex: 1; display: flex; flex-direction: column; }
+      #home { align-items: center; padding: 0 16px 40px; }
+      .home-inner { width: 100%; max-width: var(--maxw); margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+      .home-logo { height: 46px; width: auto; margin: 56px 0 36px; }
+      .home-inner .composer { width: 100%; }
+      .disclaimer { color: var(--faint); font-size: 11.5px; text-align: center; line-height: 1.45; margin: 14px auto 0; max-width: 560px; }
+      .section { width: 100%; margin-top: 40px; }
+      .section-title { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 0 0 12px; }
+      .recent-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .recent-item { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: border-color .15s, transform .15s; min-width: 0; }
+      .recent-item:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+      .recent-item .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .recent-item .d { font-size: 12px; color: var(--faint); margin-top: 3px; }
+      .recent-empty { font-size: 13px; color: var(--faint); }
+      .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .action { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s, transform .15s; }
+      .action:hover { border-color: var(--accent); transform: translateY(-1px); }
+      .action .ico { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+      .action .ico svg { width: 20px; height: 20px; }
+      .action .t { font-size: 14px; font-weight: 700; }
+      .action .d { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
 
-      /* welcome */
-      .empty { max-width: 740px; width: 100%; margin: 24px auto; }
-      .hero { text-align: center; padding: 24px 4px 8px; }
-      .hero-logo { height: 34px; width: auto; margin-bottom: 22px; }
-      .hero-title { font-size: clamp(30px, 6vw, 44px); margin: 0 0 14px; font-weight: 700; letter-spacing: -0.03em; }
-      .hero-tag { color: var(--muted); font-size: 16px; margin: 0 auto; max-width: 480px; }
-      .caps { margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-      .cap {
-        background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-        padding: 24px 18px; text-align: center; display: flex; flex-direction: column;
-        align-items: center; gap: 14px; transition: border-color .18s, transform .18s;
-      }
-      .cap:hover { border-color: var(--border-strong); transform: translateY(-2px); }
-      .cap-ico {
-        width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center;
-        justify-content: center; background: var(--bg); border: 1px solid var(--border); color: var(--text);
-      }
-      .cap-ico svg { width: 23px; height: 23px; }
-      .cap-txt { font-size: 14.5px; font-weight: 500; line-height: 1.4; }
-      .examples { margin-top: 30px; }
-      .ex-label { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
-      button.ex {
-        display: block; width: 100%; text-align: left; background: var(--surface);
-        border: 1px solid var(--border); color: var(--text); border-radius: 10px;
-        padding: 13px 15px; font-size: 13.5px; cursor: pointer; margin-bottom: 8px;
-        transition: border-color .15s; font-family: inherit;
-      }
-      button.ex:hover { border-color: var(--border-strong); }
-
-      /* secrets */
-      #secretsPanel { max-width: 740px; margin: 0 auto 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; }
-      .secrets-head { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
-      .secrets-head code { font-family: var(--mono); font-size: 12px; color: var(--text); }
-      .secret-row { display: flex; gap: 8px; margin-bottom: 8px; }
-      .secret-row input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; font-size: 13px; font-family: inherit; }
-      .secret-row input.k { width: 170px; flex: 0 0 auto; }
-      .secret-row input.v { flex: 1; min-width: 0; }
-      .secret-row input:focus { outline: none; border-color: var(--border-strong); }
-      .secret-row button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 9px; cursor: pointer; padding: 0 13px; font-size: 16px; }
-      .secret-row button:hover { color: var(--err); border-color: var(--err); }
-      button.mini { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 12.5px; padding: 8px 13px; border-radius: 9px; cursor: pointer; font-family: inherit; }
-      button.mini:hover { border-color: var(--border-strong); color: var(--text); }
-
-      /* agent trace */
-      .trace-step { border-left: 1px solid var(--border); padding: 2px 0 8px 16px; margin: 14px 0; }
-      .trace-step .stephead { font-size: 12px; color: var(--faint); word-break: break-all; }
-      .trace-thought { font-size: 14px; margin: 7px 0; }
-      .trace-act { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
-      .trace-out { margin-top: 8px; max-height: 220px; overflow: auto; font-size: 12px; }
-      .chat-answer { margin: 6px 0 4px; line-height: 1.6; white-space: pre-wrap; }
-      details.trace-details { margin: 0 0 10px; }
-      details.trace-details > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); list-style: none; user-select: none; }
-      details.trace-details > summary::-webkit-details-marker { display: none; }
-      details.trace-details > summary::before { content: '▸ '; color: var(--faint); }
-      details.trace-details[open] > summary::before { content: '▾ '; }
-      .sources { display: flex; flex-wrap: wrap; gap: 8px; }
-      .answer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-      .answer-note { font-size: 11px; color: var(--faint); margin-top: 10px; }
-      .trace-err { margin-top: 8px; font-size: 12.5px; color: var(--err); }
-      .desk-live { margin: 0 0 14px; }
-      .desk-live-lbl { font-size: 12px; color: var(--faint); margin-bottom: 6px; }
-      .desk-frame { width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--border); border-radius: 10px; background: #000; }
-      .trace-shot { max-width: 360px; width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; display: block; }
-      .trace-status { font-size: 13px; color: var(--muted); margin: 7px 0; }
-      .trace-final { border: 1px solid var(--border-strong); border-radius: 12px; padding: 15px; margin-top: 16px; }
-      .trace-final .lbl { font-size: 12px; color: var(--faint); margin-bottom: 5px; }
-      .trace-final img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 12px; }
-
-      /* footer / composer */
-      footer {
-        border-top: 1px solid var(--border); padding: 16px 22px;
-        padding-bottom: max(16px, env(safe-area-inset-bottom));
-        background: var(--bg);
-      }
-      #attachments { max-width: 740px; margin: 0 auto 10px; display: flex; flex-wrap: wrap; gap: 8px; }
-      #attachments:empty { display: none; }
-      .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; color: var(--text); }
+      /* ---------- composer ---------- */
+      .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 12px 12px 10px; box-shadow: 0 4px 22px rgba(14,60,70,0.08); transition: border-color .15s, box-shadow .15s; }
+      .composer:focus-within { border-color: var(--accent); box-shadow: 0 6px 26px rgba(14,124,138,0.14); }
+      .composer textarea { width: 100%; resize: none; background: transparent; border: none; color: var(--text); font-family: inherit; font-size: 16px; line-height: 1.5; padding: 6px 6px 4px; min-height: 30px; max-height: 220px; }
+      .composer textarea:focus { outline: none; }
+      .composer textarea::placeholder { color: var(--faint); }
+      .composer-bar { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+      .ctool { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px; border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+      .ctool svg { width: 19px; height: 19px; flex: 0 0 auto; }
+      .ctool:hover { background: var(--surface-2); color: var(--text); }
+      .ctool.on { background: var(--accent-soft); color: var(--accent); border-color: rgba(14,124,138,0.25); }
+      .ctool.warnon { background: rgba(243,146,0,0.12); color: #b36a00; border-color: rgba(243,146,0,0.35); }
+      .sendbtn { margin-left: auto; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface-3); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; flex: 0 0 auto; }
+      .sendbtn svg { width: 20px; height: 20px; }
+      .sendbtn.ready { background: var(--accent); }
+      .sendbtn.ready:hover { background: var(--accent-hover); }
+      .sendbtn:disabled { cursor: not-allowed; }
+      .sendbtn.busy { background: var(--surface-3); }
+      .attach-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 6px; }
+      .attach-list:empty { display: none; }
+      .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; color: var(--text); max-width: 100%; }
+      .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
-      .composer { max-width: 740px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s, box-shadow .15s; box-shadow: 0 2px 10px rgba(14,60,70,0.07); }
-      .composer:focus-within { border-color: var(--accent); box-shadow: 0 4px 18px rgba(14,124,138,0.12); }
-      textarea { width: 100%; resize: none; background: transparent; color: var(--text); border: none; padding: 6px 2px 2px; font-family: inherit; font-size: 15px; line-height: 1.5; min-height: 24px; max-height: 200px; }
-      textarea:focus { outline: none; }
-      textarea::placeholder { color: var(--faint); }
-      .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-      .tools { display: flex; gap: 6px; flex-wrap: wrap; }
-      button.tool {
-        display: inline-flex; align-items: center; gap: 7px; background: transparent;
-        border: 1px solid var(--border); color: var(--muted); height: 36px; padding: 0 12px;
-        font-size: 13px; border-radius: 10px; cursor: pointer; transition: all .15s; font-family: inherit;
-      }
-      button.tool svg { width: 17px; height: 17px; }
-      button.tool:hover { border-color: var(--border-strong); color: var(--text); }
-      button.tool.active { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
-      #send {
-        margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
-        background: var(--accent); color: #fff; border: none; border-radius: 10px;
-        width: 40px; height: 36px; cursor: pointer; transition: background .15s, opacity .15s; flex: 0 0 auto;
-      }
-      #send svg { width: 18px; height: 18px; }
-      #send:hover { background: var(--accent-hover); }
-      #send:disabled { opacity: 0.35; cursor: not-allowed; }
-      .hint { max-width: 740px; margin: 10px auto 0; color: var(--faint); font-size: 12px; text-align: center; }
-      .disclaimer { max-width: 740px; margin: 6px auto 0; color: var(--faint); font-size: 11px; text-align: center; line-height: 1.4; }
+      .privacy-note { font-size: 11.5px; color: #b36a00; text-align: center; margin-top: 8px; }
 
-      .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--faint); border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 5px; }
+      /* ---------- chat ---------- */
+      #chat { padding-bottom: 0; }
+      #messages { flex: 1; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 22px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
+      .msg-user { align-self: flex-end; max-width: 88%; background: var(--accent); color: #fff; border-radius: 18px 18px 4px 18px; padding: 11px 15px; white-space: pre-wrap; word-wrap: break-word; font-size: 15px; box-shadow: 0 2px 10px rgba(14,124,138,0.18); }
+      .msg-user .files { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+      .msg-user .files span { font-size: 12px; background: rgba(255,255,255,0.18); border-radius: 999px; padding: 3px 9px; }
+      .msg-user .tasklbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .85; margin-bottom: 4px; font-weight: 700; }
+      .msg-ai { align-self: stretch; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px 12px; box-shadow: 0 2px 12px rgba(14,60,70,0.05); min-width: 0; }
+      .ai-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+      .ai-head .brand { font-weight: 800; color: var(--header); letter-spacing: -.01em; }
+      .ai-head .models { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+      .model-tag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+      .model-tag.sol { background: rgba(14,124,138,0.12); color: var(--accent); }
+      .model-tag.luna { background: rgba(243,146,0,0.14); color: #b36a00; }
+
+      /* steps */
+      .steps { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); margin-bottom: 12px; overflow: hidden; }
+      .steps-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; font-size: 13px; color: var(--muted); }
+      .steps-head .sum { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .steps-head .chev { transition: transform .2s; }
+      .steps.open .steps-head .chev { transform: rotate(90deg); }
+      .steps-body { display: none; padding: 2px 12px 10px; }
+      .steps.open .steps-body { display: block; }
+      .step { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-size: 13px; border-top: 1px dashed var(--border); }
+      .step:first-child { border-top: none; }
+      .step .sico { width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+      .step .sico svg { width: 13px; height: 13px; }
+      .step.done .sico { color: var(--accent); border-color: rgba(14,124,138,0.3); }
+      .step.error .sico { color: var(--err); border-color: rgba(217,45,32,0.35); }
+      .step .stxt { flex: 1; min-width: 0; }
+      .step .st { font-weight: 600; color: var(--text); word-break: break-word; }
+      .step .sd { color: var(--faint); font-size: 12px; margin-top: 1px; word-break: break-word; }
+      .step.error .sd { color: var(--err); }
+      .step .smodel { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; flex: 0 0 auto; margin-top: 3px; }
+      .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--faint); border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
       @keyframes spin { to { transform: rotate(360deg); } }
+      .running-line { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; }
+
+      /* answer markdown */
+      .answer { font-size: 15px; line-height: 1.62; word-wrap: break-word; }
+      .answer > :first-child { margin-top: 0; }
+      .answer h1, .answer h2, .answer h3, .answer h4 { font-weight: 700; letter-spacing: -.01em; margin: 18px 0 6px; line-height: 1.3; }
+      .answer h1 { font-size: 19px; } .answer h2 { font-size: 17px; } .answer h3 { font-size: 15.5px; } .answer h4 { font-size: 14.5px; }
+      .answer p { margin: 8px 0; }
+      .answer ul, .answer ol { margin: 6px 0 10px; padding-left: 22px; }
+      .answer li { margin: 3px 0; }
+      .answer blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; color: var(--text); }
+      .answer code { font-family: var(--mono); font-size: 13px; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+      .answer pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; font-size: 13px; }
+      .answer pre code { background: none; padding: 0; }
+      .answer table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13.5px; display: block; overflow-x: auto; }
+      .answer th, .answer td { border: 1px solid var(--border); padding: 6px 9px; text-align: left; vertical-align: top; }
+      .answer th { background: var(--surface-2); font-weight: 700; }
+      .answer hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+      .cite { display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 0 5px; margin: 0 1px; text-decoration: none; vertical-align: 1px; line-height: 1.6; }
+      .cite:hover { background: rgba(14,124,138,0.2); }
+
+      /* sources / verification */
+      .panel { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+      .panel-title { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .vsum { font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; border-radius: 999px; padding: 2px 9px; background: var(--surface-2); color: var(--muted); }
+      .vsum.good { background: rgba(26,156,91,0.12); color: var(--ok); }
+      .vsum.warn { background: rgba(224,138,0,0.14); color: #a96500; }
+      .vsum.bad { background: rgba(217,45,32,0.1); color: var(--err); }
+      .src { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-top: 1px dashed var(--border); font-size: 13px; scroll-margin-top: 80px; }
+      .src:first-of-type { border-top: none; }
+      .src.hl { background: rgba(243,146,0,0.12); border-radius: 8px; }
+      .src .q { flex: 0 0 auto; font-size: 11px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 6px; margin-top: 2px; }
+      .src .body { flex: 1; min-width: 0; }
+      .src .t { font-weight: 600; word-break: break-word; }
+      .src .t a { color: inherit; text-decoration: none; }
+      .src .t a:hover { text-decoration: underline; }
+      .src .m { font-size: 12px; color: var(--faint); margin-top: 1px; word-break: break-word; }
+      .badge { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 7px; margin-right: 5px; vertical-align: 1px; letter-spacing: .02em; }
+      .badge.ris { background: rgba(14,92,105,0.12); color: var(--header); }
+      .badge.web { background: rgba(86,106,115,0.14); color: var(--muted); }
+      .badge.upload { background: rgba(243,146,0,0.14); color: #b36a00; }
+      .badge.read { background: rgba(26,156,91,0.12); color: var(--ok); }
+      .badge.found { background: var(--surface-2); color: var(--muted); }
+      .more-toggle { background: none; border: none; color: var(--accent); font-size: 12.5px; cursor: pointer; padding: 6px 0 0; font-weight: 600; }
+      .vrow { display: flex; align-items: flex-start; gap: 9px; padding: 5px 0; font-size: 13px; border-top: 1px dashed var(--border); }
+      .vrow:first-of-type { border-top: none; }
+      .vmark { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; margin-top: 1px; }
+      .vmark.ok { background: rgba(26,156,91,0.14); color: var(--ok); }
+      .vmark.expired { background: rgba(224,138,0,0.16); color: #a96500; }
+      .vmark.not_found { background: rgba(217,45,32,0.12); color: var(--err); }
+      .vmark.error, .vmark.skipped { background: var(--surface-2); color: var(--faint); }
+      .vrow .vt { font-weight: 600; }
+      .vrow .vn { font-size: 12px; color: var(--faint); }
+      .vrow .vn a { color: var(--accent); }
+
+      /* files, followups, actions */
+      img.result { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 1px solid var(--border); }
+      .pdf-preview, .html-preview { width: 100%; height: 440px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; background: #fff; }
+      a.file-link { display: inline-flex; align-items: center; gap: 7px; margin: 8px 8px 0 0; padding: 9px 13px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+      a.file-link:hover { border-color: var(--border-strong); }
+      .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+      .followups { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .fu { background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); border-radius: 999px; padding: 7px 13px; font-size: 13px; cursor: pointer; text-align: left; }
+      .fu:hover { border-color: var(--accent); color: var(--accent); }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .mini { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 12.5px; padding: 7px 12px; border-radius: 9px; cursor: pointer; font-weight: 600; }
+      .mini:hover { border-color: var(--border-strong); color: var(--text); }
+      .note { font-size: 11px; color: var(--faint); margin-top: 10px; }
+      .cost-line { font-size: 12px; color: var(--faint); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+      .err-box { background: rgba(217,45,32,0.08); border: 1px solid rgba(217,45,32,0.3); color: var(--err); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; white-space: pre-wrap; }
+
+      /* chat footer */
+      #chatFooter { position: sticky; bottom: 0; background: linear-gradient(to top, var(--bg) 70%, rgba(243,245,246,0)); padding: 10px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+      #chatFooter .inner { max-width: var(--maxw); margin: 0 auto; }
+
+      /* ---------- drawers / overlay ---------- */
+      .overlay { position: fixed; inset: 0; background: rgba(14,37,46,0.35); z-index: 40; opacity: 0; pointer-events: none; transition: opacity .2s; }
+      .overlay.show { opacity: 1; pointer-events: auto; }
+      .drawer { position: fixed; top: 0; bottom: 0; width: 320px; max-width: 88vw; background: var(--surface); z-index: 50; box-shadow: 0 0 40px rgba(14,37,46,0.18); transition: transform .22s ease; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
+      .drawer.left { left: 0; transform: translateX(-105%); }
+      .drawer.right { right: 0; transform: translateX(105%); }
+      .drawer.show { transform: translateX(0); }
+      .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+      .drawer-head h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+      .drawer-body { flex: 1; overflow-y: auto; padding: 10px 12px 20px; }
+      .menu-item { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none; text-align: left; padding: 11px 10px; border-radius: 10px; font-size: 14.5px; color: var(--text); cursor: pointer; font-weight: 600; }
+      .menu-item:hover { background: var(--surface-2); }
+      .menu-item svg { width: 20px; height: 20px; color: var(--accent); flex: 0 0 auto; }
+      .menu-sec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 16px 10px 6px; }
+      .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; font-size: 14px; }
+      .setting .sl { font-weight: 600; }
+      .setting .sd { font-size: 12px; color: var(--faint); font-weight: 400; }
+      .switch { position: relative; width: 42px; height: 24px; border-radius: 999px; background: var(--surface-3); border: none; cursor: pointer; flex: 0 0 auto; transition: background .15s; }
+      .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+      .switch.on { background: var(--accent); }
+      .switch.on::after { transform: translateX(18px); }
+      select.sel { font-family: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; background: var(--surface); color: var(--text); }
+      .kv { font-size: 12.5px; color: var(--muted); padding: 4px 10px; display: flex; justify-content: space-between; gap: 10px; }
+      .kv b { color: var(--text); font-weight: 600; text-align: right; }
+      .hist-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border-radius: 10px; cursor: pointer; border: none; background: none; text-align: left; }
+      .hist-item:hover { background: var(--surface-2); }
+      .hist-item.active { background: var(--accent-soft); }
+      .hist-item .ht { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .hist-item .hd { font-size: 11.5px; color: var(--faint); }
+      .hist-item .hx { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 6px; }
+      .hist-item .hx:hover { color: var(--err); background: var(--surface-2); }
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+      .btn:hover { background: var(--accent-hover); }
+      .btn:disabled { opacity: .5; cursor: not-allowed; }
+      .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-strong); }
+      .btn.ghost:hover { background: var(--accent-soft); }
+      .btn.full { width: 100%; }
+
+      /* ---------- modal ---------- */
+      .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 16px; }
+      .modal.show { display: flex; }
+      .modal-card { background: var(--surface); border-radius: 18px; width: 100%; max-width: 520px; max-height: calc(100dvh - 32px); overflow-y: auto; padding: 20px 20px 18px; box-shadow: 0 20px 60px rgba(14,37,46,0.3); }
+      .modal-card h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+      .modal-card .md { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+      .field { margin-bottom: 12px; }
+      .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+      .field input, .field select, .field textarea { width: 100%; font-family: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--text); }
+      .field textarea { min-height: 86px; resize: vertical; }
+      .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+      .filebox { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 12px; text-align: center; font-size: 13px; color: var(--muted); cursor: pointer; }
+      .filebox:hover { border-color: var(--accent); color: var(--accent); }
+      .filebox .attach-list { justify-content: center; padding-top: 8px; }
+      .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+      /* ---------- tour ---------- */
+      .tour-target { position: relative; z-index: 71 !important; box-shadow: 0 0 0 4px rgba(243,146,0,0.9), 0 0 0 9999px rgba(14,37,46,0.55) !important; border-radius: 14px; }
+      .tour-card { position: fixed; z-index: 72; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom)); width: min(420px, calc(100vw - 32px)); background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: 0 16px 50px rgba(14,37,46,0.35); }
+      .tour-card .tc-step { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--orange); font-weight: 800; }
+      .tour-card h3 { margin: 4px 0 6px; font-size: 16px; font-weight: 800; }
+      .tour-card p { margin: 0 0 12px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+      .tour-card .ta { display: flex; gap: 8px; justify-content: flex-end; }
+      .tour-banner { width: 100%; margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+      .tour-banner b { color: var(--text); }
+      .tour-banner .sp { flex: 1; }
+      .tour-banner button { white-space: nowrap; }
+
+      .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom)); background: var(--header); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; z-index: 80; opacity: 0; transition: opacity .2s; pointer-events: none; }
+      .toast.show { opacity: 1; }
 
       @media (max-width: 640px) {
-        header { padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); }
-        .status-pill .status { display: none; }
-        #chat { padding: 18px 14px 6px; gap: 18px; }
-        footer { padding: 12px 14px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-        .caps { grid-template-columns: 1fr; gap: 10px; margin-top: 28px; }
-        .cap { flex-direction: row; text-align: left; padding: 16px; gap: 14px; }
-        button.tool .tlabel { display: none; }
-        button.tool { padding: 0 11px; height: 38px; }
-        #send { width: 42px; height: 38px; }
+        .home-logo { height: 38px; margin: 36px 0 26px; }
+        .recent-list, .action-grid { grid-template-columns: 1fr; }
+        .ctool .lbl { display: none; }
+        .ctool { padding: 0 9px; }
+        .ctool.on .lbl, .ctool.warnon .lbl { display: inline; }
+        #messages { padding: 16px 12px 10px; gap: 14px; }
+        .msg-ai { padding: 12px 13px 10px; border-radius: 16px; }
+        .msg-user { max-width: 92%; }
+        .ai-head .models { display: none; }
+        .pdf-preview, .html-preview { height: 320px; }
+        .drawer { width: 86vw; }
       }
     </style>
   </head>
   <body>
-    <header>
-      <span class="brand-title">Playground</span>
-      <span class="brand-badge">Sandbox</span>
-      <span class="cost-pill" id="costPill" hidden></span>
-      <span class="status-pill"><span class="dot" id="e2bDot"></span><span class="status" id="status">…</span></span>
+    <header class="topbar">
+      <button class="iconbtn" id="menuBtn" aria-label="Menü" title="Menü">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="topbar-title" id="topTitle"></div>
+      <div class="topbar-right">
+        <span class="cost-pill" id="costPill" title="Kosten dieser Sitzung (Modelle + Websuche + Sandbox)"></span>
+        <button class="iconbtn" id="historyBtn" aria-label="Verlauf" title="Verlauf">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
+        </button>
+      </div>
     </header>
 
-    <main id="chat">
-      <div class="empty" id="empty">
-        <div class="hero">
-          <img class="hero-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-          <p class="hero-tag">Virtuelle Maschinen für AI:ssociate User</p>
+    <!-- ================= HOME ================= -->
+    <main id="home">
+      <div class="home-inner">
+        <img class="home-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
+        <div id="composerSlotHome" style="width:100%"></div>
+        <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können fehlerhaft sein und müssen vor Verwendung juristisch geprüft werden. Fundstellen werden automatisch gegen das RIS geprüft.</p>
+
+        <div class="tour-banner" id="tourBanner" hidden>
+          <span class="sp"><b>Neu hier?</b> In 60 Sekunden durch die Funktionen.</span>
+          <button class="btn ghost" id="tourStart">Tour starten</button>
+          <button class="mini" id="tourSkip">Später</button>
         </div>
 
-        <div class="caps">
-          <div class="cap">
-            <div class="cap-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            </div>
-            <div class="cap-txt">Dokumente<br />analysieren</div>
-          </div>
-          <div class="cap">
-            <div class="cap-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>
-            </div>
-            <div class="cap-txt">Dokumente<br />schreiben &amp; erstellen</div>
-          </div>
-          <div class="cap">
-            <div class="cap-ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>
-            </div>
-            <div class="cap-txt">Dokumente<br />bearbeiten &amp; umwandeln</div>
-          </div>
-        </div>
+        <section class="section" id="recentSec">
+          <h3 class="section-title">Zuletzt</h3>
+          <div class="recent-list" id="recentList"></div>
+        </section>
 
-        <div class="examples">
-          <div class="ex-label">Schnellaktionen — Dokument anhängen (📎) und starten</div>
-          <button class="ex" onclick="fillExample(this)" data-p="Prüfe den hochgeladenen Vertrag Klausel für Klausel rechtlich und füge zu jeder relevanten Stelle einen konkreten, spezifischen Word-Kommentar (Autor AI:ssociate) direkt ins Dokument ein. Gib die kommentierte .docx zurück.">Vertrag prüfen &amp; kommentieren</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Liste die rechtlichen Risiken, unüblichen und fehlenden Klauseln im hochgeladenen Vertrag auf — mit kurzer Begründung und Ampel-Risikobewertung.">Risiken &amp; fehlende Klauseln</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Vergleiche die zwei hochgeladenen Dokumente: visuelle Delta-Ansicht (rot/grün) als delta.html UND als delta.docx (Zusätze grün, Streichungen rot durchgestrichen) + kurze Zusammenfassung der wesentlichen Änderungen.">Zwei Versionen vergleichen (Delta)</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Fasse das hochgeladene Dokument strukturiert zusammen: Sachverhalt, rechtliche Würdigung, Fazit/Empfehlung.">Dokument zusammenfassen</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Erkenne im hochgeladenen Dokument alle Fristen und fristrelevanten Daten und liste sie mit Datum, Bezug und Rechtsfolge als Tabelle (und als Excel-Datei) auf.">Fristen erkennen</button>
-          <button class="ex" onclick="fillExample(this)" data-p="Recherchiere die folgende Rechtsfrage und belege jede Aussage mit konkreter Fundstelle und Link; nutze für österreichisches Recht vorrangig das RIS (ris.bka.gv.at) und für EU-Recht EUR-Lex: ">Rechtsfrage recherchieren (RIS/EUR-Lex)</button>
-        </div>
+        <section class="section" id="actionsSec">
+          <h3 class="section-title">Workflows</h3>
+          <div class="action-grid" id="actionGrid"></div>
+        </section>
       </div>
     </main>
 
-    <footer>
-      <div id="attachments"></div>
-      <div class="composer">
-        <input type="file" id="fileInput" multiple hidden />
-        <textarea id="input" placeholder="Dokument hochladen (📎) und beschreiben, was damit geschehen soll…" rows="1"></textarea>
-        <div class="composer-bar">
-          <div class="tools">
-            <button id="attach" class="tool" title="Dateien anhängen" aria-label="Dateien anhängen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
-              <span class="tlabel">Dateien</span>
-            </button>
-            <button id="privacyBtn" class="tool" title="Pseudonymisierung / Anonymisierung (DSGVO)" aria-label="Datenschutz">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>
-              <span class="tlabel">Datenschutz</span>
-            </button>
-            <button id="webBtn" class="tool active" title="Websuche für aktuelle Fakten/Rechtslage" aria-label="Websuche">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
-              <span class="tlabel">Websuche</span>
-            </button>
-          </div>
-          <button id="send" aria-label="Senden">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
-          </button>
+    <!-- ================= CHAT ================= -->
+    <main id="chat" hidden>
+      <div id="messages"></div>
+      <footer id="chatFooter">
+        <div class="inner">
+          <div id="composerSlotChat"></div>
+          <p class="disclaimer" style="margin-top:8px">KI-generiert – Inhalte und Fundstellen vor Verwendung juristisch prüfen.</p>
         </div>
+      </footer>
+    </main>
+
+    <!-- shared composer (moved between home and chat) -->
+    <div class="composer" id="composer">
+      <input type="file" id="fileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.xlsx,.rtf,.xml" />
+      <div class="attach-list" id="attachList"></div>
+      <textarea id="input" placeholder="Frage AI:ssociate." rows="1"></textarea>
+      <div class="composer-bar">
+        <button class="ctool" id="attachBtn" title="Dokumente anhängen (PDF, Word, Text)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
+          <span class="lbl">Dokumente</span>
+        </button>
+        <button class="ctool" id="privacyBtn" title="Pseudonymisierung / Anonymisierung (DSGVO)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>
+          <span class="lbl" id="privacyLbl">Pseudonymisierung</span>
+        </button>
+        <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
       </div>
-      <div class="hint" id="hint">Enter senden · Shift+Enter neue Zeile · 📎 Dokumente analysieren, schreiben, bearbeiten</div>
-      <div class="disclaimer" id="privacyNote" hidden></div>
-      <div class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können falsch sein und müssen vor Verwendung juristisch geprüft werden.</div>
-    </footer>
+      <div class="privacy-note" id="privacyNote" hidden></div>
+    </div>
+
+    <!-- ================= DRAWERS ================= -->
+    <div class="overlay" id="overlay"></div>
+    <aside class="drawer left" id="menuDrawer" aria-label="Menü">
+      <div class="drawer-head"><h2>AI:ssociate</h2><button class="iconbtn" style="color:var(--muted)" id="menuClose" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="drawer-body">
+        <button class="menu-item" id="miNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neues Gespräch</button>
+        <button class="menu-item" id="miHistory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>Verlauf</button>
+        <button class="menu-item" id="miTour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 6L9 15l1-5z"/></svg>Feature-Tour</button>
+        <div class="menu-sec">Einstellungen</div>
+        <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Zusätzlich zum RIS (EUR-Lex, Kommentare)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
+        <div class="setting"><div><div class="sl">Datenschutz-Modus</div><div class="sd">Standard für neue Fragen</div></div>
+          <select class="sel" id="selPrivacy"><option value="off">Aus</option><option value="pseudonymize">Pseudonymisierung</option><option value="anonymize">Anonymisierung</option></select></div>
+        <div class="menu-sec">Modelle &amp; Budget</div>
+        <div class="kv"><span>Einfach / Recherche</span><b id="kvFast">–</b></div>
+        <div class="kv"><span>Komplex / Endantwort</span><b id="kvMain">–</b></div>
+        <div class="kv"><span>Dateien (Code)</span><b id="kvCode">–</b></div>
+        <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
+        <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
+        <div class="menu-sec">Daten</div>
+        <button class="menu-item" id="miClear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Verlauf löschen</button>
+        <p class="disclaimer" style="text-align:left;margin-top:14px">Gespräche werden nur in diesem Browser gespeichert. Hochgeladene Dateien werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht.</p>
+      </div>
+    </aside>
+
+    <aside class="drawer right" id="historyDrawer" aria-label="Verlauf">
+      <div class="drawer-head"><h2>Verlauf</h2><button class="iconbtn" style="color:var(--muted)" id="historyClose" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="drawer-body">
+        <button class="btn full" id="histNew" style="margin-bottom:10px">Neues Gespräch</button>
+        <div id="histList"></div>
+      </div>
+    </aside>
+
+    <!-- ================= TASK MODAL ================= -->
+    <div class="modal" id="taskModal">
+      <div class="modal-card" id="taskCard"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
 
     <script>
-      const chat = document.getElementById('chat')
-      const empty = document.getElementById('empty')
-      const input = document.getElementById('input')
-      const send = document.getElementById('send')
-      const statusEl = document.getElementById('status')
-      const e2bDot = document.getElementById('e2bDot')
-      const attach = document.getElementById('attach')
-      const fileInput = document.getElementById('fileInput')
-      const attachments = document.getElementById('attachments')
-      const hint = document.getElementById('hint')
-      const costPill = document.getElementById('costPill')
-      const privacyBtn = document.getElementById('privacyBtn')
-      const webBtn = document.getElementById('webBtn')
-      const privacyNote = document.getElementById('privacyNote')
+      // ------------------------------------------------------------------
+      // State
+      // ------------------------------------------------------------------
+      const $ = (id) => document.getElementById(id)
+      const home = $('home'), chatView = $('chat'), messages = $('messages'), composer = $('composer')
+      const input = $('input'), sendBtn = $('sendBtn'), attachBtn = $('attachBtn'), fileInput = $('fileInput'), attachList = $('attachList')
+      const privacyBtn = $('privacyBtn'), privacyLbl = $('privacyLbl'), privacyNote = $('privacyNote')
+      const costPill = $('costPill'), topTitle = $('topTitle')
 
-      const history = []
-      let pendingFiles = []
-      let sessionCostUsd = 0
-      let privacyMode = 'off' // off | pseudonymize | anonymize
-      let webSearch = true
-
+      const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v2'
+      const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
-      // Stable per-tab id so chat follow-ups reuse the same sandbox (context).
-      const sessionId = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2)
 
+      let settings = { webSearch: true, privacy: 'off' }
+      try { settings = { ...settings, ...JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}') } } catch {}
+      let privacyMode = settings.privacy || 'off'
+      let pendingFiles = []
+      let busy = false
+      let sessionCostUsd = 0
+      let convos = []
+      try { convos = JSON.parse(localStorage.getItem(LS_CONVOS) || '[]') } catch {}
+      let current = null // { id, sessionId, title, messages, history }
+      let health = null
+
+      const uid = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2)
+      const saveSettings = () => { try { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)) } catch {} }
+      const saveConvos = () => { try { localStorage.setItem(LS_CONVOS, JSON.stringify(convos.slice(0, 40))) } catch (e) { try { convos = convos.slice(0, 10); localStorage.setItem(LS_CONVOS, JSON.stringify(convos)) } catch {} } }
+
+      // ------------------------------------------------------------------
+      // Helpers
+      // ------------------------------------------------------------------
+      function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e }
       function fmtUsd(n) { return '$' + (n < 0.01 ? n.toFixed(4) : n.toFixed(3)) }
-      function downloadText(text, filename) {
-        try {
-          const blob = new Blob([text], { type: 'text/markdown' })
-          const a = document.createElement('a')
-          a.href = URL.createObjectURL(blob)
-          a.download = filename
-          a.click()
-          setTimeout(() => URL.revokeObjectURL(a.href), 2000)
-        } catch {}
-      }
-      function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(1) + 'k' : String(t) }
-      function costLineText(c) {
-        return `≈ ${fmtUsd(c.totalUsd)}  ·  ${fmtTok(c.inTok)} in / ${fmtTok(c.outTok)} out  ·  ${c.seconds}s Sandbox` +
-          `  (KI ${fmtUsd(c.openaiUsd)} + Sandbox ${fmtUsd(c.e2bUsd)})`
-      }
-      function addCost(c) {
-        if (!c) return
-        sessionCostUsd += c.totalUsd || 0
-        costPill.hidden = false
-        costPill.textContent = 'Σ ' + fmtUsd(sessionCostUsd)
-      }
+      function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(t >= 100000 ? 0 : 1) + 'k' : String(t) }
+      function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB' }
+      function fmtDate(ts) { const d = new Date(ts); const today = new Date(); const same = d.toDateString() === today.toDateString(); return same ? d.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: '2-digit' }) }
+      function modelLabel(m) { if (!m) return ''; if (/luna/i.test(m)) return 'Luna'; if (/sol/i.test(m)) return 'Sol'; if (/terra/i.test(m)) return 'Terra'; return m }
+      function modelTag(m) { const s = el('span', 'model-tag ' + modelLabel(m).toLowerCase(), modelLabel(m)); return s }
+      let toastT
+      function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200) }
+      function downloadBlob(blob, filename) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000) }
+      function addCost(c) { if (!c) return; sessionCostUsd += c.totalUsd || 0; costPill.textContent = 'Σ ' + fmtUsd(sessionCostUsd); $('kvCost').textContent = fmtUsd(sessionCostUsd) }
 
-      function fillExample(btn) {
-        input.value = btn.dataset.p || btn.textContent
-        input.dispatchEvent(new Event('input'))
-        input.focus()
+      const ICONS = {
+        triage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 6L9 15l1-5z"/></svg>',
+        think: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>',
+        search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+        read: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2zM20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z"/></svg>',
+        web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>',
+        upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>',
+        file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M12 11v6M9 14h6"/></svg>',
+        verify: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>',
+        final: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>',
+        tool: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5 5L13 18l-3-3 6.7-6.7Z"/><path d="m3 21 7-7"/></svg>',
+        contract: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>',
+        compare: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/><path d="M10 12h4"/></svg>',
+        draft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>',
+        summary: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>',
+        deadline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m10 16 1.5 1.5L15 14"/></svg>',
+        chev: '<svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
       }
-      window.fillExample = fillExample
+      const svg = (name) => { const s = document.createElement('span'); s.innerHTML = ICONS[name] || ICONS.tool; return s.firstChild }
 
-      const MAX_UPLOADS = 5
-      const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
-
-      function readAsBase64(file) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(String(reader.result).split(',')[1] || '')
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
+      // ------------------------------------------------------------------
+      // Minimal Markdown renderer (safe: escapes HTML first)
+      // ------------------------------------------------------------------
+      function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
+      function inlineMd(s) {
+        s = esc(s)
+        s = s.replace(/`([^`]+)`/g, '<code>$1</code>')
+        s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>')
+        s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+        s = s.replace(/\[Q(\d+)\]/g, '<a class="cite" data-q="Q$1" href="#q$1">Q$1</a>')
+        s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
+        return s
       }
-
-      async function addFiles(fileList) {
-        for (const file of fileList) {
-          if (pendingFiles.length >= MAX_UPLOADS) {
-            alert(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht.`)
-            break
-          }
-          if (file.size > MAX_UPLOAD_BYTES) {
-            alert(`„${file.name}" ist ${fmtSize(file.size)} — über dem Limit von ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`)
+      function renderMarkdown(md) {
+        const codeBlocks = []
+        md = String(md || '').replace(/\r\n/g, '\n').replace(/```[\w-]*\n([\s\S]*?)```/g, (_, c) => { codeBlocks.push(c); return `\u0000${codeBlocks.length - 1}\u0000` })
+        const lines = md.split('\n')
+        let html = '', i = 0
+        const isTable = (l) => /^\s*\|.*\|\s*$/.test(l)
+        while (i < lines.length) {
+          const line = lines[i]
+          if (/^\s*$/.test(line)) { i++; continue }
+          const cb = line.match(/^\u0000(\d+)\u0000$/)
+          if (cb) { html += `<pre><code>${esc(codeBlocks[+cb[1]])}</code></pre>`; i++; continue }
+          const h = line.match(/^(#{1,6})\s+(.*)$/)
+          if (h) { html += `<h${h[1].length}>${inlineMd(h[2])}</h${h[1].length}>`; i++; continue }
+          if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { html += '<hr>'; i++; continue }
+          if (isTable(line)) {
+            const rows = []
+            while (i < lines.length && isTable(lines[i])) { const cells = lines[i].trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim()); if (!cells.every((c) => /^:?-{2,}:?$/.test(c))) rows.push(cells); i++ }
+            if (rows.length) html += '<table><thead><tr>' + rows[0].map((c) => `<th>${inlineMd(c)}</th>`).join('') + '</tr></thead><tbody>' + rows.slice(1).map((r) => '<tr>' + r.map((c) => `<td>${inlineMd(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>'
             continue
           }
-          const base64 = await readAsBase64(file)
-          pendingFiles.push({ name: file.name, base64, size: file.size })
+          if (/^\s*>\s?/.test(line)) { let q = []; while (i < lines.length && /^\s*>\s?/.test(lines[i])) { q.push(lines[i].replace(/^\s*>\s?/, '')); i++ } html += `<blockquote>${inlineMd(q.join(' '))}</blockquote>`; continue }
+          const li = line.match(/^(\s*)([-*•]|\d+[.)])\s+(.*)$/)
+          if (li) {
+            const ordered = /\d/.test(li[2])
+            html += ordered ? '<ol>' : '<ul>'
+            while (i < lines.length) {
+              const m = lines[i].match(/^(\s*)([-*•]|\d+[.)])\s+(.*)$/)
+              if (!m) { if (/^\s{2,}\S/.test(lines[i]) && !/^\s*$/.test(lines[i])) { html = html.replace(/<\/li>$/, ' ' + inlineMd(lines[i].trim()) + '</li>'); i++; continue } break }
+              html += `<li>${inlineMd(m[3])}</li>`; i++
+            }
+            html += ordered ? '</ol>' : '</ul>'
+            continue
+          }
+          let p = [line]; i++
+          while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,6}\s|\s*([-*•]|\d+[.)])\s|\s*\||\s*>|\u0000)/.test(lines[i])) { p.push(lines[i]); i++ }
+          html += `<p>${inlineMd(p.join(' '))}</p>`
+        }
+        return html
+      }
+
+      // ------------------------------------------------------------------
+      // Workflows (real, form-driven tasks — not prompt templates)
+      // ------------------------------------------------------------------
+      const WORKFLOWS = {
+        research: { title: 'Rechtsrecherche', desc: 'Normen und Judikatur direkt aus dem RIS, EU-Recht aus EUR-Lex – mit geprüften Fundstellen.', icon: 'search', fields: [
+          { k: 'question', label: 'Rechtsfrage', type: 'textarea', required: true, ph: 'z. B. Kann der Vermieter bei befristetem Mietvertrag nach MRG vorzeitig kündigen, wenn …?' },
+          { k: 'jurisdiction', label: 'Rechtsordnung', type: 'select', opts: ['Österreich', 'Österreich + EU-Recht', 'EU-Recht', 'Deutschland'] },
+          { k: 'depth', label: 'Tiefe', type: 'select', opts: ['ausführlich', 'kurz'] } ] },
+        contract_review: { title: 'Vertrag prüfen', desc: 'Klauselweise Prüfung mit Risiko-Ampel. Kommentare direkt im Word-Dokument, Memo oder Excel-Tabelle.', icon: 'contract', needsFiles: true, fields: [
+          { k: 'perspective', label: 'Perspektive', type: 'select', opts: ['neutral', 'Auftraggeber / Kunde', 'Auftragnehmer / Lieferant', 'Vermieter', 'Mieter', 'Arbeitgeber', 'Arbeitnehmer', 'Käufer', 'Verkäufer'] },
+          { k: 'focus', label: 'Fokus (optional)', type: 'text', ph: 'z. B. Haftung, Kündigung, Datenschutz' },
+          { k: 'output', label: 'Ergebnis', type: 'select', opts: ['Kommentare im Word-Dokument', 'Prüfmemo', 'Risikotabelle (Excel)'] },
+          { k: 'notes', label: 'Hinweise (optional)', type: 'textarea', ph: 'Besondere Umstände, Verhandlungsziel …' } ] },
+        compare: { title: 'Versionen vergleichen', desc: 'Zwei Fassungen hochladen: Delta-Ansicht (rot/grün) als HTML und Word plus juristische Bewertung der Änderungen.', icon: 'compare', needsFiles: true, minFiles: 2, fields: [ { k: 'notes', label: 'Hinweise (optional)', type: 'textarea', ph: 'Worauf soll besonders geachtet werden?' } ] },
+        draft: { title: 'Entwurf erstellen', desc: 'Schriftsatz, Vertrag, Mahnung oder Memo – rechtlich geprüft und als Word-Datei.', icon: 'draft', fields: [
+          { k: 'doc_type', label: 'Dokumenttyp', type: 'select', opts: ['Mahnschreiben', 'Klage', 'Klagebeantwortung', 'Vertrag', 'Kündigungsschreiben', 'Vollmacht', 'Memo / Gutachten', 'Sonstiges'], required: true },
+          { k: 'parties', label: 'Parteien', type: 'text', ph: 'z. B. Muster GmbH (Klägerin) / Max Beispiel (Beklagter)' },
+          { k: 'facts', label: 'Sachverhalt / Vorgaben', type: 'textarea', required: true, ph: 'Was ist passiert, was soll erreicht werden, Beträge, Daten …' },
+          { k: 'extra', label: 'Weitere Vorgaben (optional)', type: 'text', ph: 'Tonfall, Länge, Gericht, Frist …' } ] },
+        summary: { title: 'Zusammenfassen', desc: 'Memo, Kurzfassung oder mandantentaugliche Zusammenfassung hochgeladener Dokumente.', icon: 'summary', needsFiles: true, fields: [
+          { k: 'style', label: 'Stil', type: 'select', opts: ['Juristisches Memo', 'Kurzfassung (10 Sätze)', 'Für Mandanten verständlich'] },
+          { k: 'question', label: 'Schwerpunkt (optional)', type: 'text', ph: 'z. B. Haftungsfragen, Zahlungsmodalitäten' } ] },
+        deadlines: { title: 'Fristen erkennen', desc: 'Alle Fristen mit Auslöser, Berechnung und Rechtsfolge – als Tabelle und Excel-Datei.', icon: 'deadline', needsFiles: true, fields: [ { k: 'reference_date', label: 'Stichtag (optional)', type: 'date' } ] },
+      }
+
+      function renderActions() {
+        const g = $('actionGrid'); g.innerHTML = ''
+        for (const [key, w] of Object.entries(WORKFLOWS)) {
+          const b = el('button', 'action'); b.dataset.wf = key
+          const ico = el('div', 'ico'); ico.appendChild(svg(w.icon)); b.appendChild(ico)
+          b.appendChild(el('div', 't', w.title)); b.appendChild(el('div', 'd', w.desc))
+          b.addEventListener('click', () => openTask(key))
+          g.appendChild(b)
+        }
+      }
+
+      function openTask(key) {
+        const w = WORKFLOWS[key]
+        const card = $('taskCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, w.title)); card.appendChild(el('div', 'md', w.desc))
+        const form = el('form')
+        if (w.needsFiles) {
+          const fb = el('div', 'filebox')
+          fb.appendChild(el('div', null, w.minFiles === 2 ? 'Zwei Dokumentversionen anhängen (PDF, Word, Text)' : 'Dokument(e) anhängen (PDF, Word, Text) – tippen zum Auswählen'))
+          const list = el('div', 'attach-list'); fb.appendChild(list)
+          const refresh = () => { list.innerHTML = ''; pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingFiles.splice(i, 1); renderAttachments(); refresh() }); c.appendChild(x); list.appendChild(c) }) }
+          fb.addEventListener('click', () => { fileInput.onchange = async () => { await addFiles(fileInput.files); fileInput.value = ''; refresh(); fileInput.onchange = defaultFileChange }; fileInput.click() })
+          refresh(); form.appendChild(fb)
+        }
+        const inputs = {}
+        for (const f of w.fields) {
+          const fld = el('div', 'field'); fld.appendChild(el('label', null, f.label + (f.required ? ' *' : '')))
+          let c
+          if (f.type === 'select') { c = el('select'); for (const o of f.opts) { const op = el('option', null, o); op.value = o; c.appendChild(op) } }
+          else if (f.type === 'textarea') { c = el('textarea'); c.placeholder = f.ph || '' }
+          else { c = el('input'); c.type = f.type === 'date' ? 'date' : 'text'; c.placeholder = f.ph || '' }
+          c.name = f.k; inputs[f.k] = c; fld.appendChild(c); form.appendChild(fld)
+        }
+        const act = el('div', 'modal-actions')
+        const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.type = 'button'; cancel.addEventListener('click', closeTask)
+        const go = el('button', 'btn', 'Starten'); go.type = 'submit'
+        act.append(cancel, go); form.appendChild(act)
+        form.addEventListener('submit', (e) => {
+          e.preventDefault()
+          const params = {}
+          for (const f of w.fields) { const v = inputs[f.k].value.trim(); if (f.required && !v) { inputs[f.k].focus(); toast(`Bitte „${f.label}“ ausfüllen.`); return } if (v) params[f.k] = v }
+          if (w.needsFiles && pendingFiles.length < (w.minFiles || 1)) { toast(w.minFiles === 2 ? 'Bitte zwei Dokumente anhängen.' : 'Bitte mindestens ein Dokument anhängen.'); return }
+          closeTask()
+          const label = w.title + (params.question ? ': ' + params.question : params.doc_type ? ': ' + params.doc_type : '') + Object.entries(params).filter(([k]) => !['question', 'doc_type'].includes(k)).map(([k, v]) => `\n${(w.fields.find((x) => x.k === k) || {}).label || k}: ${v}`).join('')
+          sendMessage({ text: label, task: { type: key, params }, taskTitle: w.title })
+        })
+        card.appendChild(form)
+        $('taskModal').classList.add('show')
+        setTimeout(() => (inputs[w.fields[0]?.k] || {}).focus?.(), 50)
+      }
+      function closeTask() { $('taskModal').classList.remove('show') }
+      $('taskModal').addEventListener('click', (e) => { if (e.target === $('taskModal')) closeTask() })
+
+      // ------------------------------------------------------------------
+      // Uploads
+      // ------------------------------------------------------------------
+      function readAsBase64(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(file) }) }
+      async function addFiles(fileList) {
+        for (const file of fileList) {
+          if (pendingFiles.length >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht.`); break }
+          if (file.size > MAX_UPLOAD_BYTES) { toast(`„${file.name}“ ist zu groß (max. 15 MB).`); continue }
+          pendingFiles.push({ name: file.name, base64: await readAsBase64(file), size: file.size })
         }
         renderAttachments()
       }
-
       function renderAttachments() {
-        attachments.innerHTML = ''
-        pendingFiles.forEach((f, i) => {
-          const chip = el('span', 'chip', '')
-          chip.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`))
-          const x = el('button', null, '×')
-          x.title = 'Entfernen'
-          x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() })
-          chip.appendChild(x)
-          attachments.appendChild(chip)
-        })
+        attachList.innerHTML = ''
+        pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
+        attachBtn.classList.toggle('on', pendingFiles.length > 0)
+        updateSend()
+      }
+      const defaultFileChange = async () => { await addFiles(fileInput.files); fileInput.value = '' }
+      fileInput.onchange = defaultFileChange
+      attachBtn.addEventListener('click', () => fileInput.click())
+      // drag & drop anywhere
+      document.addEventListener('dragover', (e) => { e.preventDefault() })
+      document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
+
+      // ------------------------------------------------------------------
+      // Composer behaviour
+      // ------------------------------------------------------------------
+      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
+      input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
+      sendBtn.addEventListener('click', submit)
+      const PRIVACY_CYCLE = ['off', 'pseudonymize', 'anonymize']
+      function updatePrivacyUI() {
+        privacyBtn.classList.toggle('on', privacyMode === 'pseudonymize'); privacyBtn.classList.toggle('warnon', privacyMode === 'anonymize')
+        privacyLbl.textContent = privacyMode === 'anonymize' ? 'Anonymisierung' : 'Pseudonymisierung'
+        privacyNote.hidden = privacyMode === 'off'
+        privacyNote.textContent = privacyMode === 'pseudonymize' ? 'Pseudonymisierung aktiv: personenbezogene Daten werden durch Platzhalter ersetzt (Zuordnungstabelle bei Dateiausgaben).' : privacyMode === 'anonymize' ? 'Anonymisierung aktiv: personenbezogene Daten werden irreversibel entfernt.' : ''
+        $('selPrivacy').value = privacyMode
+      }
+      privacyBtn.addEventListener('click', () => { privacyMode = PRIVACY_CYCLE[(PRIVACY_CYCLE.indexOf(privacyMode) + 1) % 3]; settings.privacy = privacyMode; saveSettings(); updatePrivacyUI() })
+      $('selPrivacy').addEventListener('change', (e) => { privacyMode = e.target.value; settings.privacy = privacyMode; saveSettings(); updatePrivacyUI() })
+      $('swWeb').addEventListener('click', () => { settings.webSearch = !settings.webSearch; saveSettings(); $('swWeb').classList.toggle('on', settings.webSearch); $('swWeb').setAttribute('aria-checked', String(settings.webSearch)) })
+
+      function submit() {
+        const text = input.value.trim()
+        if ((!text && !pendingFiles.length) || busy) return
+        sendMessage({ text: text || 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.' })
       }
 
-      async function checkHealth() {
-        try {
-          const r = await fetch('/api/health')
-          const h = await r.json()
-          const ready = h.openai && h.e2b
-          e2bDot.className = 'dot ' + (ready ? 'ok' : 'bad')
-          statusEl.textContent = ready
-            ? `Modell: ${h.model}`
-            : `Fehlende Keys: ${[!h.openai && 'OPENAI_API_KEY', !h.e2b && 'E2B_API_KEY'].filter(Boolean).join(', ')}`
-        } catch {
-          e2bDot.className = 'dot bad'
-          statusEl.textContent = 'Server nicht erreichbar'
+      // ------------------------------------------------------------------
+      // Conversations / views
+      // ------------------------------------------------------------------
+      function showHome() {
+        $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; topTitle.textContent = ''
+        renderRecent(); input.focus()
+      }
+      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; topTitle.textContent = current?.title || 'Neues Gespräch' }
+      function newConversation() {
+        current = { id: uid(), sessionId: uid(), title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
+        messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; renderAttachments(); closeDrawers(); showHome()
+      }
+      function persistCurrent() {
+        if (!current || !current.messages.length) return
+        current.updatedAt = Date.now()
+        const idx = convos.findIndex((c) => c.id === current.id)
+        const stored = { ...current, messages: current.messages.map((m) => m.role === 'assistant' ? { ...m, data: { ...m.data, execution: { images: [], files: (m.data?.execution?.files || []).map((f) => ({ name: f.name, size: f.size, gone: true })) } } } : m) }
+        if (idx >= 0) convos[idx] = stored; else convos.unshift(stored)
+        convos.sort((a, b) => b.updatedAt - a.updatedAt)
+        saveConvos(); renderRecent(); renderHistory()
+      }
+      function openConversation(id) {
+        const c = convos.find((x) => x.id === id); if (!c) return
+        current = { ...c, sessionId: c.sessionId || uid(), messages: [...c.messages], history: [...(c.history || [])] }
+        messages.innerHTML = ''
+        for (const m of current.messages) { if (m.role === 'user') renderUser(m); else renderAssistantFinal(createAssistantCard(), m.data, { restored: true }) }
+        closeDrawers(); showChat(); messages.scrollTop = messages.scrollHeight; window.scrollTo(0, document.body.scrollHeight)
+      }
+      function deleteConversation(id) { convos = convos.filter((c) => c.id !== id); saveConvos(); renderRecent(); renderHistory(); if (current?.id === id) newConversation() }
+      function renderRecent() {
+        const list = $('recentList'); list.innerHTML = ''
+        const items = convos.slice(0, 6)
+        $('recentSec').hidden = !items.length
+        for (const c of items) { const b = el('button', 'recent-item'); b.appendChild(el('div', 't', c.title || 'Gespräch')); b.appendChild(el('div', 'd', `${fmtDate(c.updatedAt)} · ${c.messages.filter((m) => m.role === 'user').length} Frage${c.messages.filter((m) => m.role === 'user').length === 1 ? '' : 'n'}`)); b.addEventListener('click', () => openConversation(c.id)); list.appendChild(b) }
+      }
+      function renderHistory() {
+        const list = $('histList'); list.innerHTML = ''
+        if (!convos.length) { list.appendChild(el('div', 'recent-empty', 'Noch keine Gespräche.')); return }
+        for (const c of convos) {
+          const row = el('div', 'hist-item' + (current?.id === c.id ? ' active' : '')); row.role = 'button'
+          const t = el('div', 'ht', c.title || 'Gespräch'); const d = el('div', 'hd', fmtDate(c.updatedAt))
+          const x = el('button', 'hx', '×'); x.title = 'Löschen'; x.addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(c.id) })
+          row.append(t, d, x); row.addEventListener('click', () => openConversation(c.id)); list.appendChild(row)
         }
       }
 
-      function el(tag, cls, text) {
-        const e = document.createElement(tag)
-        if (cls) e.className = cls
-        if (text != null) e.textContent = text
-        return e
-      }
+      // drawers
+      const overlay = $('overlay')
+      function openDrawer(id) { closeDrawers(); $(id).classList.add('show'); overlay.classList.add('show'); if (id === 'historyDrawer') renderHistory() }
+      function closeDrawers() { $('menuDrawer').classList.remove('show'); $('historyDrawer').classList.remove('show'); overlay.classList.remove('show') }
+      $('menuBtn').addEventListener('click', () => openDrawer('menuDrawer'))
+      $('historyBtn').addEventListener('click', () => openDrawer('historyDrawer'))
+      $('menuClose').addEventListener('click', closeDrawers); $('historyClose').addEventListener('click', closeDrawers); overlay.addEventListener('click', closeDrawers)
+      $('miNew').addEventListener('click', newConversation); $('histNew').addEventListener('click', newConversation)
+      $('miHistory').addEventListener('click', () => openDrawer('historyDrawer'))
+      $('miTour').addEventListener('click', () => { closeDrawers(); startTour() })
+      $('miClear').addEventListener('click', () => { if (confirm('Gesamten Verlauf in diesem Browser löschen?')) { convos = []; saveConvos(); newConversation(); toast('Verlauf gelöscht.') } })
+      costPill.addEventListener('click', () => openDrawer('menuDrawer'))
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDrawers(); closeTask(); endTour() } })
 
-      function fmtSize(bytes) {
-        if (bytes < 1024) return bytes + ' B'
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-        return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+      // ------------------------------------------------------------------
+      // Message rendering
+      // ------------------------------------------------------------------
+      function renderUser(m) {
+        const b = el('div', 'msg-user')
+        if (m.taskTitle) b.appendChild(el('div', 'tasklbl', 'Workflow · ' + m.taskTitle))
+        b.appendChild(document.createTextNode(m.text))
+        if (m.files?.length) { const f = el('div', 'files'); m.files.forEach((n) => f.appendChild(el('span', null, n))); b.appendChild(f) }
+        messages.appendChild(b)
       }
+      function createAssistantCard() {
+        const card = el('div', 'msg-ai')
+        const head = el('div', 'ai-head'); head.appendChild(el('span', 'brand', 'AI:ssociate')); const models = el('span', 'models'); head.appendChild(models); card.appendChild(head)
+        const steps = el('div', 'steps open')
+        const sh = el('div', 'steps-head'); sh.appendChild(svg('chev')); const sum = el('span', 'sum', 'Arbeitsschritte'); sh.appendChild(sum); sh.addEventListener('click', () => steps.classList.toggle('open')); steps.appendChild(sh)
+        const sb = el('div', 'steps-body'); steps.appendChild(sb); card.appendChild(steps)
+        const running = el('div', 'running-line'); running.innerHTML = '<span class="spinner"></span><span>Startet…</span>'; card.appendChild(running)
+        const body = el('div'); card.appendChild(body)
+        messages.appendChild(card)
+        return { card, head, models, steps, sum, sb, running, body, stepEls: new Map(), stepCount: 0, kinds: {} }
+      }
+      function addStep(ui, ev) {
+        const s = el('div', 'step running'); s.dataset.id = ev.id
+        const ico = el('div', 'sico'); ico.appendChild(svg(ev.kind)); s.appendChild(ico)
+        const txt = el('div', 'stxt'); txt.appendChild(el('div', 'st', ev.title)); const d = el('div', 'sd', ev.detail || ''); txt.appendChild(d); s.appendChild(txt)
+        if (ev.model) s.appendChild(el('div', 'smodel', modelLabel(ev.model)))
+        ui.sb.appendChild(s); ui.stepEls.set(ev.id, s); ui.stepCount++; ui.kinds[ev.kind] = (ui.kinds[ev.kind] || 0) + 1
+        ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.title)}</span>`
+        ui.sum.textContent = `Arbeitsschritte · ${ui.stepCount}`
+        scrollBottom()
+      }
+      function updateStep(ui, ev) {
+        const s = ui.stepEls.get(ev.id); if (!s) return
+        s.classList.remove('running', 'done', 'error'); s.classList.add(ev.status === 'error' ? 'error' : 'done')
+        if (ev.detail != null) s.querySelector('.sd').textContent = ev.detail
+      }
+      function stepsSummary(ui, data) {
+        const k = ui.kinds; const parts = []
+        if (k.search) parts.push(`${k.search} RIS-Suche${k.search > 1 ? 'n' : ''}`)
+        if (k.read) parts.push(`${k.read} Dokument${k.read > 1 ? 'e' : ''} gelesen`)
+        if (k.web) parts.push(`${k.web} Web`)
+        if (k.file) parts.push(`${k.file} Datei${k.file > 1 ? 'en' : ''}`)
+        const m = data?.models ? [modelLabel(data.models.loop), data.models.final !== data.models.loop ? modelLabel(data.models.final) : null].filter(Boolean).join(' → ') : ''
+        return `${ui.stepCount} Schritte${parts.length ? ' · ' + parts.join(' · ') : ''}${m ? ' · ' + m : ''}`
+      }
+      function scrollBottom() { window.scrollTo({ top: document.body.scrollHeight }) }
 
       function renderFileInto(container, f) {
-        if (f.tooLarge || !f.base64) {
-          container.appendChild(el('div', 'file-note', `${f.name} — zu groß`))
-          return
-        }
-        if (IMG_RE.test(f.name)) {
-          const img = el('img', 'result'); img.src = `data:image/png;base64,${f.base64}`; container.appendChild(img)
-        } else if (/\.pdf$/i.test(f.name)) {
-          const e = document.createElement('embed'); e.className = 'pdf-preview'; e.type = 'application/pdf'; e.src = `data:application/pdf;base64,${f.base64}`; container.appendChild(e)
-        } else if (/\.html?$/i.test(f.name)) {
-          const fr = document.createElement('iframe'); fr.className = 'html-preview'; fr.setAttribute('sandbox', ''); fr.src = `data:text/html;base64,${f.base64}`; container.appendChild(fr)
-        }
-        const a = el('a', 'file-link', `${f.name} · ${fmtSize(f.size)}`)
-        a.href = `data:application/octet-stream;base64,${f.base64}`
-        a.download = f.name
-        container.appendChild(a)
+        if (f.gone) { container.appendChild(el('div', 'file-note', `${f.name} – Datei aus früherer Sitzung nicht mehr verfügbar.`)); return }
+        if (f.tooLarge || !f.base64) { container.appendChild(el('div', 'file-note', `${f.name} – zu groß für den Download.`)); return }
+        if (IMG_RE.test(f.name)) { const img = el('img', 'result'); img.src = `data:image/png;base64,${f.base64}`; container.appendChild(img) }
+        else if (/\.pdf$/i.test(f.name)) { const e = document.createElement('embed'); e.className = 'pdf-preview'; e.type = 'application/pdf'; e.src = `data:application/pdf;base64,${f.base64}`; container.appendChild(e) }
+        else if (/\.html?$/i.test(f.name)) { const fr = document.createElement('iframe'); fr.className = 'html-preview'; fr.setAttribute('sandbox', ''); fr.src = `data:text/html;base64,${f.base64}`; container.appendChild(fr) }
+        const a = el('a', 'file-link', `⬇ ${f.name} · ${fmtSize(f.size)}`); a.href = `data:application/octet-stream;base64,${f.base64}`; a.download = f.name; container.appendChild(a)
       }
 
-      function addMessage(role) {
-        empty?.remove()
-        const wrap = el('div', 'msg ' + role)
-        wrap.appendChild(el('div', 'role', role === 'user' ? 'Du' : 'Assistent'))
-        const bubble = el('div', 'bubble')
-        wrap.appendChild(bubble)
-        chat.appendChild(wrap)
-        chat.scrollTop = chat.scrollHeight
-        return bubble
+      function sourceRow(s) {
+        const row = el('div', 'src'); row.id = 'q' + s.marker.slice(1); row.dataset.q = s.marker
+        row.appendChild(el('span', 'q', s.marker))
+        const body = el('div', 'body')
+        const t = el('div', 't')
+        const badge = el('span', 'badge ' + (s.type === 'ris' ? 'ris' : s.type === 'web' ? 'web' : 'upload'), s.type === 'ris' ? 'RIS' : s.type === 'web' ? 'Web' : 'Upload'); t.appendChild(badge)
+        if (s.url) { const a = el('a', null, s.title || s.url); a.href = s.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; t.appendChild(a) } else t.appendChild(document.createTextNode(s.title || ''))
+        body.appendChild(t)
+        const metaParts = []
+        if (s.meta?.inForceFrom) metaParts.push(`gilt seit ${s.meta.inForceFrom}`)
+        if (s.meta?.inForceTo) metaParts.push(`außer Kraft ${s.meta.inForceTo}`)
+        if (s.meta?.docType) metaParts.push(s.meta.docType)
+        const m = el('div', 'm'); const st = el('span', 'badge ' + (s.read ? 'read' : 'found'), s.read ? 'Volltext geprüft' : s.type === 'web' ? 'Suchtreffer (nicht gelesen)' : 'Suchtreffer'); m.appendChild(st); m.appendChild(document.createTextNode(metaParts.join(' · ')))
+        body.appendChild(m); row.appendChild(body)
+        return row
       }
 
-      function renderResult(bubble, data) {
-        bubble.innerHTML = ''
-        if (data.error) {
-          bubble.appendChild(el('div', 'label err', 'Fehler'))
-          bubble.appendChild(el('pre', null, data.error))
-          return
+      function renderVerification(container, v, answerText) {
+        const p = el('div', 'panel'); const title = el('div', 'panel-title', 'Verifikation gegen das RIS')
+        const sum = v?.summary
+        if (sum && sum.checked) {
+          const cls = sum.notFound || sum.error ? (sum.ok ? 'warn' : 'bad') : sum.warn ? 'warn' : 'good'
+          title.appendChild(el('span', 'vsum ' + cls, `${sum.ok}/${sum.checked} Fundstellen bestätigt${sum.warn ? ` · ${sum.warn} außer Kraft` : ''}${sum.notFound ? ` · ${sum.notFound} nicht gefunden` : ''}${sum.error ? ` · ${sum.error} nicht prüfbar` : ''}`))
+        } else title.appendChild(el('span', 'vsum', 'keine Normzitate erkannt'))
+        p.appendChild(title)
+        const rows = el('div')
+        const MARK = { ok: '✓', expired: '!', not_found: '✗', error: '?', skipped: '–' }
+        for (const x of [...(v?.norms || []), ...(v?.decisions || [])]) {
+          const r = el('div', 'vrow'); r.appendChild(el('div', 'vmark ' + x.status, MARK[x.status] || '?'))
+          const b = el('div'); b.appendChild(el('div', 'vt', x.label))
+          const n = el('div', 'vn'); n.appendChild(document.createTextNode((x.note || '') + (x.title && x.status === 'ok' ? ' · ' : '')))
+          if (x.url && x.status !== 'not_found') { const a = el('a', null, x.title || 'RIS öffnen'); a.href = x.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; n.appendChild(a) }
+          b.appendChild(n); r.appendChild(b); rows.appendChild(r)
         }
-        if (data.explanation) bubble.appendChild(el('div', null, data.explanation))
-        if (data.code) {
-          bubble.appendChild(el('div', 'label', 'Generierter Code'))
-          bubble.appendChild(el('pre', null, data.code))
+        p.appendChild(rows)
+        const re = el('button', 'more-toggle', 'Erneut prüfen')
+        re.addEventListener('click', async () => { re.textContent = 'Prüft…'; re.disabled = true; try { const r = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: answerText }) }); const nv = await r.json(); const np = renderVerification(container, nv, answerText); p.replaceWith(np) } catch { re.textContent = 'Prüfung fehlgeschlagen'; } })
+        p.appendChild(re)
+        return p
+      }
+
+      function renderAssistantFinal(ui, data, opts = {}) {
+        ui.running.remove()
+        ui.steps.classList.remove('open')
+        if (opts.restored || !ui.stepCount) { ui.steps.remove() } else ui.sum.textContent = stepsSummary(ui, data)
+        ui.models.innerHTML = ''
+        if (data.models) { ui.models.appendChild(modelTag(data.models.loop)); if (data.models.final && data.models.final !== data.models.loop) { ui.models.appendChild(document.createTextNode(' → ')); ui.models.appendChild(modelTag(data.models.final)) } }
+        const body = ui.body; body.innerHTML = ''
+        const ans = el('div', 'answer'); ans.innerHTML = renderMarkdown(data.answer || '')
+        body.appendChild(ans)
+
+        const sources = (data.sources || []).filter((s) => s.type !== 'upload' || s.cited)
+        const cited = sources.filter((s) => s.cited), others = sources.filter((s) => !s.cited)
+        if (sources.length) {
+          const p = el('div', 'panel'); const t = el('div', 'panel-title', 'Quellen'); t.appendChild(el('span', 'vsum', `${sources.filter((s) => s.read).length} im Volltext geprüft`)); p.appendChild(t)
+          cited.forEach((s) => p.appendChild(sourceRow(s)))
+          if (others.length) {
+            const box = el('div'); box.hidden = true; others.forEach((s) => box.appendChild(sourceRow(s)))
+            const tg = el('button', 'more-toggle', `${cited.length ? 'Weitere' : 'Alle'} herangezogene Dokumente (${others.length}) anzeigen`); tg.addEventListener('click', () => { box.hidden = !box.hidden; tg.textContent = box.hidden ? `${cited.length ? 'Weitere' : 'Alle'} herangezogene Dokumente (${others.length}) anzeigen` : 'Weniger anzeigen' })
+            p.appendChild(tg); p.appendChild(box)
+          }
+          body.appendChild(p)
         }
-        const ex = data.execution
-        if (ex) {
-          if (ex.note) bubble.appendChild(el('div', 'file-note', ex.note))
-          if (ex.stdout) {
-            bubble.appendChild(el('div', 'label', 'Ausgabe'))
-            bubble.appendChild(el('pre', null, ex.stdout))
-          }
-          ex.text?.forEach((t) => {
-            bubble.appendChild(el('div', 'label', 'Ergebnis'))
-            bubble.appendChild(el('pre', null, t))
-          })
-          ex.images?.forEach((src) => {
-            const img = el('img', 'result')
-            img.src = src
-            bubble.appendChild(img)
-          })
-          if (ex.files?.length) {
-            bubble.appendChild(el('div', 'label', 'Dateien'))
-            ex.files.forEach((f) => {
-              if (f.tooLarge) {
-                bubble.appendChild(el('div', 'file-note', `${f.name} — ${fmtSize(f.size)}, zu groß zum Download`))
-                return
-              }
-              if (IMG_RE.test(f.name) && f.base64) {
-                const img = el('img', 'result')
-                img.src = `data:image/png;base64,${f.base64}`
-                bubble.appendChild(img)
-              } else if (/\.pdf$/i.test(f.name) && f.base64) {
-                const emb = document.createElement('embed')
-                emb.className = 'pdf-preview'
-                emb.type = 'application/pdf'
-                emb.src = `data:application/pdf;base64,${f.base64}`
-                bubble.appendChild(emb)
-              } else if (/\.html?$/i.test(f.name) && f.base64) {
-                const frame = document.createElement('iframe')
-                frame.className = 'html-preview'
-                frame.setAttribute('sandbox', '')
-                frame.src = `data:text/html;base64,${f.base64}`
-                bubble.appendChild(frame)
-              }
-              const a = el('a', 'file-link', `${f.name} · ${fmtSize(f.size)}`)
-              a.href = `data:application/octet-stream;base64,${f.base64}`
-              a.download = f.name
-              bubble.appendChild(a)
-            })
-          }
-          if (ex.error) {
-            bubble.appendChild(el('div', 'label err', 'Laufzeitfehler'))
-            bubble.appendChild(el('pre', null, ex.error))
-          }
-          if (ex.stderr) {
-            bubble.appendChild(el('div', 'label err', 'stderr'))
-            bubble.appendChild(el('pre', null, ex.stderr))
-          }
+        ans.querySelectorAll('a.cite').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); const row = body.querySelector(`.src[data-q="${a.dataset.q}"]`); if (row) { if (row.parentElement.hidden) { row.parentElement.hidden = false } row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.add('hl'); setTimeout(() => row.classList.remove('hl'), 1800) } else { const s = (data.sources || []).find((x) => x.marker === a.dataset.q); if (s?.url) window.open(s.url, '_blank') } }))
+
+        if (data.verification) body.appendChild(renderVerification(body, data.verification, data.answer || ''))
+
+        const ex = data.execution || {}
+        ;(ex.images || []).forEach((src) => { const img = el('img', 'result'); img.src = src; body.appendChild(img) })
+        if (ex.files?.length) { const p = el('div', 'panel'); p.appendChild(el('div', 'panel-title', 'Dateien')); ex.files.forEach((f) => renderFileInto(p, f)); body.appendChild(p) }
+
+        if (data.followups?.length && !opts.restored) { const fu = el('div', 'followups'); data.followups.forEach((q) => { const b = el('button', 'fu', q); b.addEventListener('click', () => { if (!busy) sendMessage({ text: q }) }); fu.appendChild(b) }); body.appendChild(fu) }
+
+        if (data.answer) {
+          const acts = el('div', 'actions')
+          const cp = el('button', 'mini', 'Kopieren'); cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(data.answer) ; toast('Kopiert.') } catch { toast('Kopieren nicht möglich.') } })
+          const wd = el('button', 'mini', 'Als Word (.docx)'); wd.addEventListener('click', async () => { wd.disabled = true; try { const r = await fetch('/api/export/docx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: data.title || current?.title || 'AI:ssociate Antwort', markdown: data.answer }) }); if (!r.ok) throw new Error(); downloadBlob(await r.blob(), (data.title || 'antwort').replace(/[^\w.-]+/g, '_') + '.docx') } catch { toast('Export fehlgeschlagen.') } finally { wd.disabled = false } })
+          const md = el('button', 'mini', 'Als Markdown'); md.addEventListener('click', () => downloadBlob(new Blob([data.answer], { type: 'text/markdown' }), 'antwort.md'))
+          acts.append(cp, wd, md); body.appendChild(acts)
         }
+        body.appendChild(el('div', 'note', 'KI-generiert – Inhalte und Fundstellen vor Verwendung juristisch prüfen. Verifikation prüft nur die Existenz/Geltung zitierter Normen und Entscheidungen im RIS, nicht die inhaltliche Richtigkeit.'))
         if (data.cost) {
-          bubble.appendChild(el('div', 'cost-line', costLineText(data.cost)))
-          addCost(data.cost)
+          const c = data.cost; const line = el('div', 'cost-line')
+          line.appendChild(el('span', null, `≈ ${fmtUsd(c.totalUsd)}`))
+          line.appendChild(el('span', null, `${fmtTok(c.inTok)} in / ${fmtTok(c.outTok)} out`))
+          const bm = Object.entries(c.byModel || {}).map(([m, v]) => `${modelLabel(m)} ${fmtUsd(v.usd)}`).join(' · '); if (bm) line.appendChild(el('span', null, bm))
+          if (c.webSearchCalls) line.appendChild(el('span', null, `Web ${c.webSearchCalls}× ${fmtUsd(c.webSearchUsd)}`))
+          if (c.seconds) line.appendChild(el('span', null, `Sandbox ${c.seconds}s ${fmtUsd(c.e2bUsd)}`))
+          if (data.durationMs) line.appendChild(el('span', null, `${Math.round(data.durationMs / 1000)}s`))
+          body.appendChild(line)
         }
-        chat.scrollTop = chat.scrollHeight
+        if (!opts.restored) scrollBottom()
       }
 
-      async function runChat(prompt, uploads = []) {
-        const bubble = addMessage('assistant')
-        bubble.innerHTML = ''
-        const details = el('details', 'trace-details')
-        details.open = true
-        details.appendChild(el('summary', null, 'Arbeitsschritte'))
-        bubble.appendChild(details)
-        const spin = el('div', 'trace-status')
-        spin.innerHTML = '<span class="spinner"></span> Startet…'
-        bubble.appendChild(spin)
-
-        let curOut = null // current step's live output <pre>
-
-        function handle(ev) {
-          if (ev.event === 'status') {
-            spin.innerHTML = '<span class="spinner"></span> ' + ev.message
-          } else if (ev.event === 'code') {
-            details.appendChild(el('div', 'label', 'Code'))
-            details.appendChild(el('pre', null, ev.code || ''))
-            curOut = el('pre', 'trace-out')
-            details.appendChild(curOut)
-          } else if (ev.event === 'stdout' || ev.event === 'stderr') {
-            if (!curOut) { curOut = el('pre', 'trace-out'); details.appendChild(curOut) }
-            curOut.textContent += ev.chunk
-          } else if (ev.event === 'final') {
-            spin.remove()
-            details.open = false
-            if (!details.querySelector('pre')) details.remove() // no code ran (e.g. web-only answer)
-            if (ev.answer) bubble.appendChild(el('div', 'chat-answer', ev.answer))
-
-            if (ev.citations?.length) {
-              bubble.appendChild(el('div', 'label', 'Quellen'))
-              const box = el('div', 'sources')
-              ev.citations.forEach((c) => {
-                const a = el('a', 'file-link', c.title || c.url)
-                a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer'
-                box.appendChild(a)
-              })
-              bubble.appendChild(box)
-            }
-
-            const ex = ev.execution || {}
-            ex.images?.forEach((src) => { const img = el('img', 'result'); img.src = src; bubble.appendChild(img) })
-            if (ex.files?.length) {
-              bubble.appendChild(el('div', 'label', 'Dateien'))
-              ex.files.forEach((f) => renderFileInto(bubble, f))
-            }
-
-            if (ev.answer) {
-              const actions = el('div', 'answer-actions')
-              const copyBtn = el('button', 'mini', 'Kopieren')
-              copyBtn.addEventListener('click', () => {
-                try { navigator.clipboard.writeText(ev.answer) } catch {}
-                copyBtn.textContent = 'Kopiert ✓'; setTimeout(() => (copyBtn.textContent = 'Kopieren'), 1500)
-              })
-              const mdBtn = el('button', 'mini', 'Als Markdown')
-              mdBtn.addEventListener('click', () => downloadText(ev.answer, 'antwort.md'))
-              const docxBtn = el('button', 'mini', 'Als Word (.docx)')
-              docxBtn.addEventListener('click', () => {
-                if (send.disabled) return
-                runChat('Erzeuge aus folgendem Text eine sauber formatierte Word-Datei (.docx) und gib sie zum Download zurück:\n\n' + ev.answer)
-              })
-              actions.append(copyBtn, mdBtn, docxBtn)
-              bubble.appendChild(actions)
-            }
-
-            bubble.appendChild(el('div', 'answer-note', 'KI-generiert — Inhalte und Fundstellen vor Verwendung juristisch prüfen.'))
-
-            if (ev.cost) { bubble.appendChild(el('div', 'cost-line', costLineText(ev.cost))); addCost(ev.cost) }
-            history.push({ role: 'user', content: prompt })
-            if (ev.answer) history.push({ role: 'assistant', content: ev.answer })
-          } else if (ev.event === 'error') {
-            spin.remove()
-            details.open = false
-            bubble.appendChild(el('div', 'label err', 'Fehler'))
-            bubble.appendChild(el('pre', null, ev.message))
-          }
-          chat.scrollTop = chat.scrollHeight
+      // ------------------------------------------------------------------
+      // Sending (SSE)
+      // ------------------------------------------------------------------
+      async function sendMessage({ text, task = null, taskTitle = null }) {
+        if (busy) return
+        if (!current) newConversation()
+        const uploads = pendingFiles.slice(); pendingFiles = []; renderAttachments()
+        input.value = ''; input.style.height = 'auto'
+        busy = true; updateSend()
+        if (!current.title) { current.title = taskTitle ? `${taskTitle}: ${text.split('\n')[0].replace(taskTitle + ': ', '').slice(0, 50)}` : text.slice(0, 60) }
+        showChat()
+        const um = { role: 'user', text, files: uploads.map((f) => f.name), taskTitle }
+        current.messages.push(um); renderUser(um)
+        const ui = createAssistantCard(); scrollBottom()
+        let finalData = null
+        const handle = (ev) => {
+          if (ev.event === 'step') addStep(ui, ev)
+          else if (ev.event === 'step_update') updateStep(ui, ev)
+          else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } ui.models.innerHTML = ''; if (ev.models) { ui.models.appendChild(modelTag(ev.models.loop)); if (ev.models.final !== ev.models.loop) { ui.models.appendChild(document.createTextNode(' → ')); ui.models.appendChild(modelTag(ev.models.final)) } } }
+          else if (ev.event === 'status') { ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.message)}</span>` }
+          else if (ev.event === 'final') { finalData = ev; if (ev.title && !current.titleLocked) { current.title = ev.title; topTitle.textContent = ev.title } renderAssistantFinal(ui, ev); addCost(ev.cost) }
+          else if (ev.event === 'error') { ui.running.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
         }
-
         try {
-          const resp = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt,
-              history,
-              sessionId,
-              privacy: privacyMode,
-              webSearch,
-              files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
-            }),
-          })
-          if (!resp.ok || !resp.body) {
-            let msg = 'Anfrage fehlgeschlagen'
-            try { msg = (await resp.json()).error || msg } catch {}
-            throw new Error(msg)
-          }
-          const reader = resp.body.getReader()
-          const decoder = new TextDecoder()
-          let buf = ''
-          for (;;) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buf += decoder.decode(value, { stream: true })
-            let idx
-            while ((idx = buf.indexOf('\n\n')) >= 0) {
-              const chunk = buf.slice(0, idx)
-              buf = buf.slice(idx + 2)
-              if (chunk.startsWith('data: ')) {
-                try { handle(JSON.parse(chunk.slice(6))) } catch {}
-              }
-            }
-          }
-        } catch (err) {
-          handle({ event: 'error', message: err.message })
+          const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
+          if (!resp.ok || !resp.body) { let msg = 'Anfrage fehlgeschlagen'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
+          const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
+          for (;;) { const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith('data: ')) { try { handle(JSON.parse(chunk.slice(6))) } catch {} } } }
+          if (!finalData) handle({ event: 'error', message: 'Verbindung beendet, bevor eine Antwort vorlag.' })
+        } catch (err) { handle({ event: 'error', message: err.message }) }
+        finally {
+          busy = false; updateSend(); input.focus()
+          current.history.push({ role: 'user', content: text })
+          if (finalData?.answer) { current.history.push({ role: 'assistant', content: finalData.answer }); current.history = current.history.slice(-16) }
+          current.messages.push({ role: 'assistant', data: finalData || { answer: '', error: true } })
+          persistCurrent()
         }
       }
 
-      async function submit() {
-        const prompt = input.value.trim()
-        if (!prompt) return
-        input.value = ''
-        input.style.height = 'auto'
-        send.disabled = true
+      // ------------------------------------------------------------------
+      // Feature tour
+      // ------------------------------------------------------------------
+      const TOUR = [
+        { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. AI:ssociate recherchiert iterativ im RIS (ris.bka.gv.at) und in EU-Quellen, liest die Dokumente und antwortet belegt.' },
+        { sel: '#privacyBtn', title: 'Datenschutz', text: 'Pseudonymisierung ersetzt personenbezogene Daten durch Platzhalter, Anonymisierung entfernt sie irreversibel – auch in erzeugten Dateien.' },
+        { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
+        { sel: '#actionsSec', title: 'Workflows', text: 'Geführte Aufgaben mit Formular statt Prompt-Vorlagen: Vertragsprüfung mit Kommentaren im Dokument, Versionsvergleich, Entwürfe, Fristen.' },
+        { sel: '#historyBtn', title: 'Verlauf', text: 'Alle Gespräche bleiben in diesem Browser gespeichert und können jederzeit fortgesetzt werden – mit Kontext.' },
+        { sel: '#menuBtn', title: 'Menü & Einstellungen', text: 'Websuche, Datenschutz-Standard, Modell-Routing (Luna für einfache, Sol für komplexe Aufgaben) und Sitzungskosten.' },
+        { sel: null, title: 'Schritte, Quellen, Verifikation', text: 'Jede Antwort zeigt die Arbeitsschritte (ohne Code), die Quellen mit Status „Volltext geprüft“ und eine automatische Prüfung aller zitierten §§ und Geschäftszahlen gegen das RIS.' },
+      ]
+      let tourIdx = -1, tourCard = null, tourTarget = null
+      function startTour() { closeDrawers(); if (home.hidden) showHome(); tourIdx = 0; showTourStep() }
+      function showTourStep() {
+        if (tourTarget) tourTarget.classList.remove('tour-target')
+        if (tourCard) tourCard.remove()
+        const s = TOUR[tourIdx]; if (!s) return endTour()
+        tourTarget = s.sel ? document.querySelector(s.sel) : null
+        if (tourTarget) { tourTarget.classList.add('tour-target'); tourTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }) }
+        tourCard = el('div', 'tour-card')
+        tourCard.appendChild(el('div', 'tc-step', `Schritt ${tourIdx + 1} von ${TOUR.length}`)); tourCard.appendChild(el('h3', null, s.title)); tourCard.appendChild(el('p', null, s.text))
+        const a = el('div', 'ta'); const skip = el('button', 'btn ghost', 'Beenden'); skip.addEventListener('click', endTour); const next = el('button', 'btn', tourIdx === TOUR.length - 1 ? 'Fertig' : 'Weiter'); next.addEventListener('click', () => { tourIdx++; showTourStep() }); a.append(skip, next); tourCard.appendChild(a)
+        document.body.appendChild(tourCard)
+      }
+      function endTour() { if (tourTarget) tourTarget.classList.remove('tour-target'); if (tourCard) tourCard.remove(); tourTarget = null; tourCard = null; tourIdx = -1; try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true }
+      $('tourStart').addEventListener('click', startTour)
+      $('tourSkip').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true })
 
-        const uploads = pendingFiles.slice()
-        pendingFiles = []
-        renderAttachments()
-
-        const userBubble = addMessage('user')
-        userBubble.textContent = prompt
-        if (uploads.length) {
-          const note = el('div', 'file-note', 'Dateien: ' + uploads.map((f) => f.name).join(', '))
-          userBubble.appendChild(note)
-        }
-
+      // ------------------------------------------------------------------
+      // Init
+      // ------------------------------------------------------------------
+      async function checkHealth() {
         try {
-          await runChat(prompt, uploads)
-        } finally {
-          send.disabled = false
-          input.focus()
-        }
+          health = await (await fetch('/api/health')).json()
+          $('kvFast').textContent = health.models?.fast || '–'; $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'
+          $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`
+          if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
+        } catch { toast('Server nicht erreichbar.') }
       }
-
-      const PRIVACY_CYCLE = ['off', 'pseudonymize', 'anonymize']
-      const PRIVACY_LABEL = { off: 'Datenschutz', pseudonymize: 'Pseudonym.', anonymize: 'Anonym.' }
-      function updatePrivacyUI() {
-        privacyBtn.classList.toggle('active', privacyMode !== 'off')
-        const lbl = privacyBtn.querySelector('.tlabel')
-        if (lbl) lbl.textContent = PRIVACY_LABEL[privacyMode]
-        if (privacyMode === 'pseudonymize') {
-          privacyNote.hidden = false
-          privacyNote.textContent = 'Pseudonymisierung aktiv — personenbezogene Daten werden durch Platzhalter ersetzt (bleiben DSGVO-relevant); Zuordnungstabelle als mapping.xlsx.'
-        } else if (privacyMode === 'anonymize') {
-          privacyNote.hidden = false
-          privacyNote.textContent = 'Anonymisierung aktiv — personenbezogene Daten werden irreversibel geschwärzt (keine Zuordnungstabelle).'
-        } else {
-          privacyNote.hidden = true
-        }
-      }
-      privacyBtn.addEventListener('click', () => {
-        privacyMode = PRIVACY_CYCLE[(PRIVACY_CYCLE.indexOf(privacyMode) + 1) % PRIVACY_CYCLE.length]
-        updatePrivacyUI()
-      })
-      webBtn.addEventListener('click', () => {
-        webSearch = !webSearch
-        webBtn.classList.toggle('active', webSearch)
-      })
-      attach.addEventListener('click', () => fileInput.click())
-      fileInput.addEventListener('change', async () => {
-        await addFiles(fileInput.files)
-        fileInput.value = ''
-      })
-      send.addEventListener('click', submit)
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault()
-          submit()
-        }
-      })
-      input.addEventListener('input', () => {
-        input.style.height = 'auto'
-        input.style.height = Math.min(input.scrollHeight, 200) + 'px'
-      })
-
+      renderActions(); renderRecent(); updatePrivacyUI()
+      $('swWeb').classList.toggle('on', settings.webSearch !== false); $('swWeb').setAttribute('aria-checked', String(settings.webSearch !== false))
+      newConversation()
+      try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
       checkHealth()
     </script>
   </body>

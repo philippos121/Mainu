@@ -1,7 +1,7 @@
 {
-  "name": "e2b-code-chat",
-  "version": "1.0.0",
-  "description": "Chat interface that turns coding prompts into code via OpenAI and runs it in an E2B sandbox.",
+  "name": "aissociate-playground",
+  "version": "2.0.0",
+  "description": "AI:ssociate Playground – legal research & document assistant (RIS-first, GPT-6 Luna/Sol routing, E2B file tool).",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@e2b/code-interpreter": "^1.2.0",
-    "@e2b/desktop": "^2.3.1",
+    "docx": "^9.5.1",
     "express": "^4.19.2",
-    "openai": "^4.67.3"
+    "mammoth": "^1.13.0",
+    "openai": "^4.67.3",
+    "pdf-parse": "^1.1.1"
   }
 }

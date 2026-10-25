@@ -1,71 +1,62 @@
-# E2B Code Chat
+# AI:ssociate Playground
 
-A minimal chat interface where you type a coding prompt, **OpenAI** turns it into Python,
-the code runs in a disposable **[E2B](https://e2b.dev) sandbox**, and the output
-(text, tables, charts, files) is streamed back into the chat. Built to deploy on **Render**.
+Legal AI assistant for Austrian law firms. Users ask questions or run guided
+workflows; an agent researches **iteratively in the RIS (ris.bka.gv.at)**,
+reads the actual documents, answers with `[Qn]` source markers, and every cited
+§ / Geschäftszahl is **verified against the RIS** afterwards. Documents can be
+uploaded, analysed and returned as Word/Excel/PDF — the code for that is a
+single tool call executed in an **E2B sandbox** (never shown to the user).
 
-You can also **attach files** (📎): they are uploaded into the sandbox, the generated code
-reads/modifies them, and any resulting files come back as downloads.
-
-### Modes
-
-| Mode | What it does |
-|--------|--------------|
-| Attach | Upload files into the sandbox for the code to read/modify |
-| Browser (one-shot) | The model writes a single Playwright script run in headless Chromium |
-| **Agent** | Step-by-step computer agent with a toolbox: **shell, read/write files, HTTP (e.g. Microsoft Graph for SharePoint/OneDrive), and a browser**. It observes, decides one action, acts, and repeats. Browser starts lazily only when needed. |
-| **Desktop** | Vision-driven **GUI** agent on a real Linux desktop (E2B Desktop): it takes a screenshot, decides a click/type/keypress by pixel coordinate, and can launch GUI apps like LibreOffice. |
-| Secrets | Name/value credentials sent to the sandbox but **never shown to the AI model**. Reference them as `{{NAME}}` (e.g. `{{PASSWORD}}`); the server substitutes the real value only at execution time. |
-
-Every query shows an **estimated cost** (exact token counts × configurable rates + sandbox seconds), plus a running session total in the header.
+## How a question is processed
 
 ```
-You ──prompt──▶ Express server ──▶ OpenAI (writes Python)
-                                 └▶ E2B sandbox (runs it) ──▶ results ──▶ You
+question ──▶ triage (Luna) ──▶ simple    → Luna answers (≤ 4 steps)
+                            ├▶ research  → Luna research loop (RIS/EU) → Sol writes the answer
+                            └▶ complex   → Sol agent loop (uploads, files, drafting)
+                                     │
+                     verification (deterministic RIS checks of §§ and GZ) + follow-ups (Luna)
 ```
 
-## Stack
-
-- **Backend:** Node.js + Express (`server.js`)
-- **Frontend:** single static page, no build step (`public/index.html`)
-- **AI:** OpenAI Chat Completions
-- **Execution:** `@e2b/code-interpreter` (secure, throwaway Python sandbox)
+* **Tools of the agent:** `ris_search` (Bundesrecht, Landesrecht, Judikatur,
+  BGBl via the OGD API v2.6), `ris_read` (full text), `fetch_page` (EUR-Lex etc.),
+  `read_document` (uploaded files, extracted server-side), `create_or_edit_file`
+  (code model writes Python, runs in E2B, retries on errors), hosted `web_search`.
+* **Model routing:** `gpt-6-luna` for triage, simple tasks, research loop and
+  follow-ups; `gpt-6-sol` for complex tasks and the final answer; the code model
+  defaults to Sol (set `OPENAI_MODEL_CODE` if you have another id).
+* **Budgets:** hard caps per question — 1,000,000 input and 100,000 output
+  tokens summed over all model calls (`MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`).
+* **UI:** app.aissociate.at look (teal bar, centred logo, "Frage AI:ssociate."
+  card with Pseudonymisierung toggle), no Rechtsgebiet selection. Workflows with
+  forms (Rechtsrecherche, Vertrag prüfen, Versionen vergleichen, Entwurf,
+  Zusammenfassen, Fristen), conversation history (browser-local), feature tour,
+  agent steps without code, sources with "Volltext geprüft" status, RIS
+  verification panel, Word/Markdown export, exact cost per answer.
 
 ## Run locally
 
 ```bash
-cd e2b-code-chat
-cp .env.example .env      # then fill in your keys
+cp .env.example .env   # fill in OPENAI_API_KEY (and E2B_API_KEY)
 npm install
-npm run dev               # http://localhost:3000
+npm run dev            # http://localhost:3000
 ```
 
-You need two keys in `.env`:
+## Deploy on Render
 
-| Variable         | Where to get it                                             |
-|------------------|------------------------------------------------------------|
-| `OPENAI_API_KEY` | The same key you use in your other repos.                   |
-| `E2B_API_KEY`    | https://e2b.dev/dashboard                                   |
-| `OPENAI_MODEL`   | Optional, defaults to `gpt-5.5`.                            |
+The service builds from the `Dockerfile`. Set `OPENAI_API_KEY` and
+`E2B_API_KEY` in the Render dashboard; everything else has defaults
+(see `.env.example`). `GET /api/health` reports the configured models.
 
-## Deploy on Render (connected to GitHub)
+## Endpoints
 
-1. Push this folder to a GitHub repo (see options below).
-2. In Render: **New → Web Service** and connect that repo.
-3. Settings:
-   - **Runtime:** Node
-   - **Build command:** `npm install`
-   - **Start command:** `node server.js`
-   - **Root directory:** `e2b-code-chat` *(only if it lives in a subfolder)*
-4. Add the environment variables `OPENAI_API_KEY` and `E2B_API_KEY`
-   (and optionally `OPENAI_MODEL`) under **Environment**.
-5. Deploy. Render auto-redeploys on every push to the connected branch.
+| Route | Purpose |
+|---|---|
+| `POST /api/chat` | SSE stream: `step`, `step_update`, `route`, `final`, `error` |
+| `POST /api/verify` | Re-run the RIS verification for a text |
+| `GET /api/ris/search` | Direct RIS search (same parameters as the tool) |
+| `POST /api/export/docx` | Markdown → Word export of an answer |
 
-A `render.yaml` Blueprint is included, so you can also do **New → Blueprint**
-and point it at the repo instead of configuring by hand.
+## Security note
 
-## Security
-
-- **Never commit real keys.** `.env` is git-ignored; only `.env.example` is tracked.
-- Rotate any key you have shared in plain text (chat, screenshots, tickets).
-- Each request spins up a fresh sandbox and kills it afterwards, so runs are isolated.
+The E2B key has a hardcoded **test-only** fallback in `server.js`; set
+`E2B_API_KEY` in production and rotate any key that was ever pasted into a chat.
