@@ -885,7 +885,7 @@
           else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } renderModelTags(ui.models, ev.models) }
           else if (ev.event === 'delta') { if (ui.live.hidden) { ui.live.hidden = false } ui.liveText = (ui.liveText || '') + (ev.text || ''); ui.live.innerHTML = renderMarkdown(ui.liveText); scrollBottom() }
           else if (ev.event === 'status') { ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.message)}</span>` }
-          else if (ev.event === 'final') { finalData = ev; if (ev.title && !current.titleLocked) { current.title = ev.title; topTitle.textContent = ev.title } if (ev.aissThreadId) current.aissThreadId = ev.aissThreadId; renderAssistantFinal(ui, ev); addCost(ev.cost) }
+          else if (ev.event === 'final') { finalData = ev; if (ev.title && !current.titleLocked) { current.title = ev.title; topTitle.textContent = ev.title } if ('aissThreadId' in ev) current.aissThreadId = ev.aissThreadId || null; renderAssistantFinal(ui, ev); addCost(ev.cost) }
           else if (ev.event === 'error') { ui.running.remove(); ui.live?.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
         }
         try {

@@ -246,8 +246,13 @@ function sourceFromDocumentEvent(text, meta) {
   return { title: title || url || 'Dokument', url, raw: String(text || '').trim(), meta: Object.keys(m).length ? m : null }
 }
 
-/** Ask the AI:ssociate knowledge base; streams text via onDelta. */
-async function askAissociate({ question, legalArea, scope, threadId, onDelta }) {
+/**
+ * Ask the AI:ssociate knowledge base; streams text via onDelta.
+ * The timeout is an idle timeout between chunks (like the reference client's
+ * httpx read timeout), not a total deadline: agentic answers may stream for
+ * minutes. A stream that breaks after the answer arrived still returns it.
+ */
+async function askAissociate({ question, legalArea, scope, threadId, onDelta, signal }) {
   if (!AISSOCIATE_API_KEY) throw new Error('AISSOCIATE_API_KEY fehlt.')
   const payload = {
     question,
@@ -258,9 +263,15 @@ async function askAissociate({ question, legalArea, scope, threadId, onDelta }) 
     ...(threadId ? { thread_id: threadId } : {}),
   }
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), AISSOCIATE_TIMEOUT_MS)
+  let timer = null
+  const arm = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(), AISSOCIATE_TIMEOUT_MS) }
+  const onOuterAbort = () => ctrl.abort()
+  signal?.addEventListener('abort', onOuterAbort, { once: true })
   const out = { answer: '', sources: [], threadId: threadId || null, events: 0, errors: [], meta: {} }
+  let rawHead = ''
+  let contentType = ''
   try {
+    arm()
     const r = await fetch(`${AISSOCIATE_BASE_URL}/api/public/v1/chat/ask`, {
       method: 'POST',
       headers: { 'x-api-key': AISSOCIATE_API_KEY, 'Content-Type': 'application/json', Accept: 'text/event-stream', 'User-Agent': UA },
@@ -271,6 +282,7 @@ async function askAissociate({ question, legalArea, scope, threadId, onDelta }) 
       const body = await r.text().catch(() => '')
       throw new Error(`AI:ssociate API ${r.status}${r.status === 401 ? ' (API-Key ungültig)' : ''}: ${body.slice(0, 300)}`)
     }
+    contentType = r.headers.get('content-type') || ''
     const handle = (block) => {
       if (!block.trim()) return
       const ev = parseSseBlock(block)
@@ -290,17 +302,30 @@ async function askAissociate({ question, legalArea, scope, threadId, onDelta }) 
     const reader = r.body.getReader()
     const dec = new TextDecoder()
     let buf = ''
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buf += dec.decode(value, { stream: true })
-      let m
-      while ((m = buf.match(/\r?\n\r?\n/))) { handle(buf.slice(0, m.index)); buf = buf.slice(m.index + m[0].length) }
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        arm()
+        const chunk = dec.decode(value, { stream: true })
+        if (rawHead.length < 300) rawHead += chunk.slice(0, 300 - rawHead.length)
+        buf += chunk
+        let m
+        while ((m = buf.match(/\r?\n\r?\n/))) { handle(buf.slice(0, m.index)); buf = buf.slice(m.index + m[0].length) }
+      }
+      buf += dec.decode()
+      if (buf.trim()) handle(buf)
+    } catch (e) {
+      // Stream interrupted (idle timeout, reset, client gone): keep a received answer.
+      if (!out.answer.trim()) throw e
+      out.errors.push(`Stream unterbrochen: ${e?.name === 'AbortError' ? 'Zeitüberschreitung/Abbruch' : String(e?.message || e)}`)
     }
-    buf += dec.decode()
-    if (buf.trim()) handle(buf)
-  } finally { clearTimeout(timer) }
-  if (!out.answer.trim() && out.errors.length) throw new Error('AI:ssociate: ' + out.errors[0])
+    if (out.events === 0) throw new Error(`AI:ssociate: unerwartete Antwort (${contentType || 'ohne Content-Type'}): ${rawHead.trim().slice(0, 300) || '(leer)'}`)
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onOuterAbort)
+  }
+  if (!out.answer.trim()) throw new Error('AI:ssociate: ' + (out.errors[0] || 'leere Antwort'))
   return out
 }
 
@@ -736,7 +761,8 @@ app.post('/api/chat', async (req, res) => {
   const heartbeat = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 15_000)
   heartbeat.unref?.()
   let clientGone = false
-  res.on('close', () => { clientGone = true; clearInterval(heartbeat) })
+  const abortCtrl = new AbortController()
+  res.on('close', () => { clientGone = true; clearInterval(heartbeat); abortCtrl.abort() })
 
   if (!OPENAI_API_KEY) { send('error', { message: 'Server: OPENAI_API_KEY fehlt.' }); return res.end() }
 
@@ -824,12 +850,23 @@ app.post('/api/chat', async (req, res) => {
   /** Knowledge-base call with step display, streaming deltas and evidence registration. */
   async function runAissociate({ question, legalArea, scope, stream }) {
     aissCalls++
-    ctx.usage.aissociateCalls++
     const label = LEGAL_AREA_LABEL[legalArea] || 'allgemein'
     const sid = step('aissociate', `AI:ssociate recherchiert (${label}${scope ? ', ' + scope : ''})`, { model: 'aissociate' })
+    const attempt = (tid) => { ctx.usage.aissociateCalls++; return askAissociate({ question, legalArea, scope, threadId: tid, onDelta: stream ? (t) => send('delta', { text: t }) : null, signal: abortCtrl.signal }) }
     try {
-      const r = await askAissociate({ question, legalArea, scope, threadId: aissThreadOut, onDelta: stream ? (t) => send('delta', { text: t }) : null })
-      if (r.threadId) aissThreadOut = r.threadId
+      let r
+      try {
+        r = await attempt(aissThreadOut)
+      } catch (e) {
+        // A stale/invalid thread must not break the knowledge base for the rest
+        // of the conversation: retry once without the thread, then drop it.
+        if (!aissThreadOut || clientGone) throw e
+        console.error('aissociate (thread) failed, retrying without thread:', e?.message)
+        send('step_update', { id: sid, status: 'running', detail: 'Gesprächsfaden ungültig – neuer Versuch ohne Verlauf…' })
+        aissThreadOut = null
+        r = await attempt(null)
+      }
+      aissThreadOut = r.threadId || null
       const srcs = r.sources.map((s) => addEvidence({ type: 'aissociate', url: s.url, title: s.title, raw: s.raw, read: true }))
       stepDone(sid, { detail: `Antwort erhalten${srcs.length ? ` · ${srcs.length} Dokument${srcs.length > 1 ? 'e' : ''}` : ''}${r.errors.length ? ' · Hinweis: ' + r.errors[0].slice(0, 80) : ''}` })
       return { ...r, evidence: srcs }
@@ -927,15 +964,18 @@ app.post('/api/chat', async (req, res) => {
   async function documentLoop({ input }) {
     let prevId
     let text = ''
-    let tools = [TOOL_FILE, TOOL_ASK_AISSOCIATE, ...(uploads.length ? [TOOL_READ_DOCUMENT] : []), ...(useWeb ? [WEB_SEARCH_TOOL] : [])]
+    const baseTools = [TOOL_FILE, TOOL_ASK_AISSOCIATE, ...(uploads.length ? [TOOL_READ_DOCUMENT] : [])]
     for (let i = 1; i <= DOC_MAX_STEPS; i++) {
+      // max_tool_calls caps built-in tool calls per response, so hand the model
+      // only the web budget that is still left over the whole task.
+      const remainingWeb = useWeb ? Math.max(0, MAX_WEB_SEARCHES - ctx.usage.webSearchCalls) : 0
+      const tools = remainingWeb > 0 ? [...baseTools, WEB_SEARCH_TOOL] : baseTools
       const sid = step('think', i === 1 ? 'Sol plant die Bearbeitung' : 'Sol wertet Ergebnisse aus', { model: MODEL_MAIN })
       let resp
-      try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DOC_INSTRUCTIONS, input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
+      try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DOC_INSTRUCTIONS, input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
       prevId = resp.id
       collectWebCitations(resp)
       emitWebSteps(resp)
-      if (ctx.usage.webSearchCalls >= MAX_WEB_SEARCHES) tools = tools.filter((t) => !String(t.type).startsWith('web_search'))
       const calls = (resp.output || []).filter((o) => o.type === 'function_call')
       stepDone(sid, { detail: calls.length ? `${calls.length} Werkzeug${calls.length > 1 ? 'e' : ''} angefordert` : 'Antwort formuliert' })
       if (!calls.length) { text = resp.output_text || ''; break }
@@ -1017,7 +1057,8 @@ app.post('/api/chat', async (req, res) => {
           collectWebCitations(resp)
           emitWebSteps(resp)
           const txt = (resp.output_text || '').trim()
-          const vm = txt.match(/^\s*VERDICT:\s*(AUSREICHEND|ERGAENZT|ERGÄNZT)\s*/i)
+          // Tolerate Markdown decoration around the verdict line (**VERDICT: …**, # VERDICT: …).
+          const vm = txt.match(/^[\s*#_>`]*VERDICT:?\s*(AUSREICHEND|ERG(?:AE|Ä)NZT)[\s*_`:.-]*/i)
           verdict = vm ? (/AUSREICHEND/i.test(vm[1]) ? 'sufficient' : 'supplemented') : (txt ? 'supplemented' : 'sufficient')
           const supplement = (vm ? txt.slice(vm[0].length) : txt).trim()
           const webN = ctx.usage.webSearchCalls
