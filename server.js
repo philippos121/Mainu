@@ -66,9 +66,11 @@ function computeCost(inTok, outTok, seconds, cachedTok = 0) {
 
 function addUsage(acc, usage) {
   if (usage) {
-    acc.inTok += usage.prompt_tokens || 0
-    acc.outTok += usage.completion_tokens || 0
-    acc.cachedTok += usage.prompt_tokens_details?.cached_tokens || 0
+    // Handles both Chat Completions (prompt/completion_tokens) and Responses
+    // API (input/output_tokens) usage shapes.
+    acc.inTok += usage.prompt_tokens ?? usage.input_tokens ?? 0
+    acc.outTok += usage.completion_tokens ?? usage.output_tokens ?? 0
+    acc.cachedTok += usage.prompt_tokens_details?.cached_tokens ?? usage.input_tokens_details?.cached_tokens ?? 0
   }
 }
 
@@ -181,15 +183,13 @@ Guidelines:
 - Install packages when needed (e.g. deep-translator for translation, python-docx for Word, openpyxl, PyPDF2/pdfplumber, Pillow). Use: import subprocess,sys; subprocess.run([sys.executable,"-m","pip","install","-q","<pkg>"]).
 - MAKE RESULTS VIEWABLE (the UI previews .html/.pdf/images inline): for document edits also save a viewable .html or .pdf. For comparisons/redlines/track-changes produce a red/green diff as .html AND a Word file (.docx) with additions in green and deletions in red strikethrough (RGBColor). Note: true Word revision marks are limited via python-docx; a colored redline is the practical representation.
 - Read documents: .docx via python-docx, .pdf via PyPDF2/pdfplumber, .csv/.txt directly.
-- COMMENTS / LEGAL REVIEW: when asked to review a document and add comments, first read ALL paragraphs, then write DISTINCT, paragraph-SPECIFIC comments ONLY on the paragraphs that genuinely warrant a remark — NEVER add the same generic comment to every paragraph. Build an explicit mapping {paragraph index -> specific comment text based on that paragraph's actual content} in the code, and add each where relevant. Use real Word comments: pip install -U python-docx (>=1.2) then paragraph.add_comment(text, author="AI:ssociate", initials="AI"). If add_comment is unavailable, fall back to inserting the remark inline in red brackets. Keep paragraphs without issues uncommented.
+- COMMENTS / LEGAL REVIEW: this is the core use case — work like a diligent lawyer, not a template. First read the FULL document text (one step). Then THINK through it clause by clause and decide where a real remark is warranted. Write DISTINCT, clause-SPECIFIC comments that quote or reference the concrete wording and name the concrete legal issue/risk (e.g. missing liability cap, unclear jurisdiction, one-sided termination, data-protection gap) — NEVER the same generic comment on multiple paragraphs, and do not comment paragraphs that are fine. It is good to use several steps: (1) extract text, (2) reason and build an explicit mapping {paragraph index -> specific comment}, (3) insert and save. Use real Word comments: pip install -U python-docx (>=1.2) then paragraph.add_comment(text, author="AI:ssociate", initials="AI"); if unavailable, insert the remark inline in red brackets.
 - Always print() the key facts you need to see.
 
 You MUST actually execute code with run_python to complete the task and CREATE any requested output file — never just describe what you would do. Produce EXACTLY the requested format:
 - Excel → save a real .xlsx (import pandas; df.to_excel("out.xlsx", index=False); pip install openpyxl if the import fails). Do NOT fall back to .txt/.csv when Excel is asked for.
 - PDF text: try pdfplumber first, else PyPDF2 (pip install if needed). If the PDF has no extractable text (scanned), say so explicitly.
-BE DECISIVE — in your FIRST run_python call, do the FULL job end to end: read the input(s), extract/transform, and SAVE the requested output file to /home/user (e.g. report.docx, out.xlsx). Do NOT print document contents to "inspect" them, and do NOT split the work across many exploratory steps. Use further steps ONLY to fix an error, never to explore. Print only a short confirmation (saved filename, row/section count). The requested output file MUST exist before you finish.
-
-When the requested file is saved, STOP calling tools and reply with a concise natural-language summary for the user (what you produced, key findings). Reply in the user's language.`
+WORK ITERATIVELY AND THOUGHTFULLY: it is fine and encouraged to take several steps — read, reason, act, verify. Do NOT dump the whole document to stdout just to "inspect" it; extract what you need and reason over it. The requested output file MUST exist in /home/user before you finish. When done, STOP calling tools and reply with a concise summary of the concrete findings (not generic boilerplate).`
 
 const CHAT_TOOL = {
   type: 'function',
@@ -203,6 +203,19 @@ const CHAT_TOOL = {
     },
   },
 }
+// Flat function-tool shape for the Responses API (tools + reasoning together).
+const CHAT_TOOL_RESP = {
+  type: 'function',
+  name: 'run_python',
+  description: 'Execute Python in the persistent sandbox and return its stdout/results.',
+  parameters: {
+    type: 'object',
+    properties: { code: { type: 'string', description: 'Python source to run.' } },
+    required: ['code'],
+  },
+}
+// Reasoning effort for gpt-6-sol via the Responses API (tools + reasoning).
+const REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || 'high'
 
 const app = express()
 app.use(express.json({ limit: '30mb' })) // room for base64-encoded uploads
@@ -261,20 +274,20 @@ app.post('/api/chat', async (req, res) => {
   const usage = { inTok: 0, outTok: 0, cachedTok: 0 }
   let sandbox
   try {
-    const uploadNote = uploads.length
-      ? {
-          role: 'system',
-          content: `The user uploaded these files, already saved in the working directory: ${uploads
-            .map((u) => u.name)
-            .join(', ')}. Read them by these exact filenames.`,
-        }
-      : null
-    const messages = [
-      { role: 'system', content: CHAT_SYSTEM },
-      ...(uploadNote ? [uploadNote] : []),
-      ...history.filter((m) => m && m.role && typeof m.content === 'string').slice(-10),
-      { role: 'user', content: prompt },
+    const uploadLine = uploads.length
+      ? `Hochgeladene Dateien liegen im Arbeitsverzeichnis /home/user: ${uploads
+          .map((u) => u.name)
+          .join(', ')}. Lies sie unter genau diesen Namen.\n\n`
+      : ''
+    // Responses-API conversation input (the system prompt goes in `instructions`).
+    let input = [
+      ...history
+        .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .slice(-8)
+        .map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: uploadLine + prompt },
     ]
+    let prevId
 
     send('status', { message: persistent ? 'Sandbox (Session) wird vorbereitet…' : 'Sandbox wird gestartet…' })
     const sandboxStart = Date.now()
@@ -316,88 +329,82 @@ app.post('/api/chat', async (req, res) => {
         }
       } catch {}
 
-      // Code-interpreter loop: run code, feed results back, until the model
-      // answers in natural language (or we hit the step cap).
+      // Agentic code-interpreter loop via the Responses API: the model reasons
+      // (reasoning_effort high) AND calls the run_python tool, iterating across
+      // steps until it answers in natural language (or we hit the step cap).
+      const runTool = async (codeStr, step) => {
+        send('code', { step, code: codeStr })
+        send('status', { message: 'Code wird ausgeführt…' })
+        let ex
+        try {
+          ex = await sandbox.runCode(codeStr, {
+            timeoutMs: 120_000,
+            onStdout: (m) => send('stdout', { step, chunk: m.line ?? String(m) }),
+            onStderr: (m) => send('stderr', { step, chunk: m.line ?? String(m) }),
+          })
+        } catch (e) {
+          ex = { logs: { stdout: [], stderr: [String(e?.message || e)] }, results: [], error: { name: 'Error', value: String(e?.message || e) } }
+        }
+        ;(ex.results || []).forEach((r) => { if (r.png) allImages.push(`data:image/png;base64,${r.png}`) })
+        const out = (ex.logs?.stdout ?? []).join('')
+        const errOut = (ex.logs?.stderr ?? []).join('')
+        const textRes = (ex.results || []).map((r) => r.text).filter(Boolean).join('\n')
+        const errObj = ex.error ? `ERROR ${ex.error.name}: ${ex.error.value}` : ''
+        return [out, textRes, errOut, errObj].filter(Boolean).join('\n').slice(0, 6000) || '(kein Output)'
+      }
+
       for (let step = 1; step <= CHAT_MAX_STEPS; step++) {
-        send('status', { message: step === 1 ? 'Modell schreibt Code…' : 'Modell denkt weiter…' })
-        const completion = await getOpenAI().chat.completions.create({
+        send('status', { message: step === 1 ? 'Modell analysiert…' : 'Modell denkt weiter…' })
+        const resp = await getOpenAI().responses.create({
           model: OPENAI_MODEL,
-          reasoning_effort: 'none',
-          messages,
-          tools: [CHAT_TOOL],
-          // Force code execution on the first step so the task is actually
-          // performed (a file is produced); afterwards let it finish with text.
-          tool_choice: step === 1 ? { type: 'function', function: { name: 'run_python' } } : 'auto',
+          instructions: CHAT_SYSTEM,
+          input,
+          tools: [CHAT_TOOL_RESP],
+          tool_choice: step === 1 ? { type: 'function', name: 'run_python' } : 'auto',
+          reasoning: { effort: REASONING_EFFORT },
+          ...(prevId ? { previous_response_id: prevId } : {}),
         })
-        addUsage(usage, completion.usage)
-        const msg = completion.choices[0]?.message
-        if (!msg) break
-        const calls = msg.tool_calls || []
+        addUsage(usage, resp.usage)
+        prevId = resp.id
+        const calls = (resp.output || []).filter((o) => o.type === 'function_call')
         if (!calls.length) {
-          answer = msg.content || ''
+          answer = resp.output_text || ''
           break
         }
-        messages.push(msg)
-        for (const tc of calls) {
+        input = []
+        for (const c of calls) {
           let codeStr = ''
-          try { codeStr = JSON.parse(tc.function.arguments || '{}').code || '' } catch {}
-          send('code', { step, code: codeStr })
-          send('status', { message: 'Code wird ausgeführt…' })
-          let ex
-          try {
-            ex = await sandbox.runCode(codeStr, {
-              timeoutMs: 120_000,
-              onStdout: (m) => send('stdout', { step, chunk: m.line ?? String(m) }),
-              onStderr: (m) => send('stderr', { step, chunk: m.line ?? String(m) }),
-            })
-          } catch (e) {
-            ex = { logs: { stdout: [], stderr: [String(e?.message || e)] }, results: [], error: { name: 'Error', value: String(e?.message || e) } }
-          }
-          ;(ex.results || []).forEach((r) => { if (r.png) allImages.push(`data:image/png;base64,${r.png}`) })
-          const out = (ex.logs?.stdout ?? []).join('')
-          const errOut = (ex.logs?.stderr ?? []).join('')
-          const textRes = (ex.results || []).map((r) => r.text).filter(Boolean).join('\n')
-          const errObj = ex.error ? `ERROR ${ex.error.name}: ${ex.error.value}` : ''
-          const toolContent = [out, textRes, errOut, errObj].filter(Boolean).join('\n').slice(0, 4000) || '(kein Output)'
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: toolContent })
+          try { codeStr = JSON.parse(c.arguments || '{}').code || '' } catch {}
+          const toolContent = await runTool(codeStr, step)
+          input.push({ type: 'function_call_output', call_id: c.call_id, output: toolContent })
         }
       }
+
       // Hit the step cap while still working — force ONE final code step to
       // finish and SAVE the requested file (do NOT forbid running code).
       if (!answer) {
         try {
-          send('status', { message: 'Abschluss – Datei wird finalisiert…' })
-          messages.push({
-            role: 'user',
-            content: 'Du hast das Schrittlimit fast erreicht. Erledige die Aufgabe JETZT in EINEM einzigen run_python-Aufruf vollständig und speichere die angeforderte Ausgabedatei (z. B. .docx/.xlsx) in /home/user.',
-          })
-          const fc = await getOpenAI().chat.completions.create({
+          send('status', { message: 'Abschluss – Ergebnis wird finalisiert…' })
+          const fc = await getOpenAI().responses.create({
             model: OPENAI_MODEL,
-            reasoning_effort: 'none',
-            messages,
-            tools: [CHAT_TOOL],
-            tool_choice: { type: 'function', function: { name: 'run_python' } },
+            instructions: CHAT_SYSTEM,
+            input: [
+              ...input,
+              { role: 'user', content: 'Du hast das Schrittlimit fast erreicht. Erledige die Aufgabe JETZT in EINEM einzigen run_python-Aufruf vollständig und speichere die angeforderte Ausgabedatei (z. B. .docx/.xlsx) in /home/user.' },
+            ],
+            tools: [CHAT_TOOL_RESP],
+            tool_choice: { type: 'function', name: 'run_python' },
+            reasoning: { effort: REASONING_EFFORT },
+            ...(prevId ? { previous_response_id: prevId } : {}),
           })
           addUsage(usage, fc.usage)
-          const tc = fc.choices[0]?.message?.tool_calls?.[0]
-          if (tc) {
+          const c = (fc.output || []).find((o) => o.type === 'function_call')
+          if (c) {
             let codeStr = ''
-            try { codeStr = JSON.parse(tc.function.arguments || '{}').code || '' } catch {}
-            send('code', { step: 'final', code: codeStr })
-            send('status', { message: 'Code wird ausgeführt…' })
-            let ex
-            try {
-              ex = await sandbox.runCode(codeStr, {
-                timeoutMs: 120_000,
-                onStdout: (m) => send('stdout', { step: 'final', chunk: m.line ?? String(m) }),
-                onStderr: (m) => send('stderr', { step: 'final', chunk: m.line ?? String(m) }),
-              })
-            } catch (e) {
-              ex = { results: [], error: { name: 'Error', value: String(e?.message || e) } }
-            }
-            ;(ex.results || []).forEach((r) => { if (r.png) allImages.push(`data:image/png;base64,${r.png}`) })
+            try { codeStr = JSON.parse(c.arguments || '{}').code || '' } catch {}
+            await runTool(codeStr, 'final')
           }
-          answer = 'Aufgabe abgeschlossen (Schrittlimit erreicht) — bitte die erzeugte Datei unten prüfen.'
+          answer = 'Aufgabe abgeschlossen (Schrittlimit erreicht) — bitte das Ergebnis unten prüfen.'
         } catch {
           answer = 'Schrittlimit erreicht.'
         }
