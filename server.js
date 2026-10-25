@@ -178,6 +178,7 @@ const CHAT_MAX_STEPS = 12
 const CHAT_SYSTEM = `You are a data & document analyst with a PERSISTENT Python sandbox (working dir /home/user, internet enabled).
 Use the run_python tool to execute Python. You may call it MULTIPLE times; variables, imports and files persist between calls.
 Uploaded files are already in /home/user. Save any output files there — they are returned to the user as downloads.
+You also have a web_search tool — use it when the task needs current or external facts (e.g. current statutes/case law, company data, verifying a citation, recent events). Don't invent facts you could verify.
 
 Guidelines:
 - Install packages when needed (e.g. deep-translator for translation, python-docx for Word, openpyxl, PyPDF2/pdfplumber, Pillow). Use: import subprocess,sys; subprocess.run([sys.executable,"-m","pip","install","-q","<pkg>"]).
@@ -216,6 +217,12 @@ const CHAT_TOOL_RESP = {
 }
 // Reasoning effort for gpt-6-sol via the Responses API (tools + reasoning).
 const REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || 'high'
+
+// OpenAI's hosted web-search tool (set OPENAI_WEB_SEARCH=off to disable, or
+// OPENAI_WEB_SEARCH_TOOL=web_search_preview if your model needs the preview id).
+const WEB_SEARCH_ENABLED = process.env.OPENAI_WEB_SEARCH !== 'off'
+const WEB_SEARCH_TOOL = { type: process.env.OPENAI_WEB_SEARCH_TOOL || 'web_search' }
+const CHAT_TOOLS = WEB_SEARCH_ENABLED ? [CHAT_TOOL_RESP, WEB_SEARCH_TOOL] : [CHAT_TOOL_RESP]
 
 const app = express()
 app.use(express.json({ limit: '30mb' })) // room for base64-encoded uploads
@@ -359,7 +366,7 @@ app.post('/api/chat', async (req, res) => {
           model: OPENAI_MODEL,
           instructions: CHAT_SYSTEM,
           input,
-          tools: [CHAT_TOOL_RESP],
+          tools: CHAT_TOOLS,
           tool_choice: step === 1 ? { type: 'function', name: 'run_python' } : 'auto',
           reasoning: { effort: REASONING_EFFORT },
           ...(prevId ? { previous_response_id: prevId } : {}),
@@ -392,7 +399,7 @@ app.post('/api/chat', async (req, res) => {
               ...input,
               { role: 'user', content: 'Du hast das Schrittlimit fast erreicht. Erledige die Aufgabe JETZT in EINEM einzigen run_python-Aufruf vollständig und speichere die angeforderte Ausgabedatei (z. B. .docx/.xlsx) in /home/user.' },
             ],
-            tools: [CHAT_TOOL_RESP],
+            tools: CHAT_TOOLS,
             tool_choice: { type: 'function', name: 'run_python' },
             reasoning: { effort: REASONING_EFFORT },
             ...(prevId ? { previous_response_id: prevId } : {}),
