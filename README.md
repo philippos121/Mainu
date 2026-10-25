@@ -34,11 +34,28 @@ question ──▶ Sol: mode + legal area (1 call) ──▶ legal    → AI:sso
   tokens summed over all model calls (`MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`);
   `MAX_WEB_SEARCHES` (3) and `DOC_MAX_STEPS` (8) bound the step count.
 * **UI:** app.aissociate.at look (teal bar, centred logo, "Frage AI:ssociate."
-  card with Pseudonymisierung toggle), no Rechtsgebiet selection. Workflows with
+  card), no Rechtsgebiet selection. Workflows with
   forms (Rechtsrecherche, Vertrag prüfen, Versionen vergleichen, Entwurf,
   Zusammenfassen, Fristen), conversation history (browser-local), feature tour,
   agent steps without code, sources with "Volltext geprüft" status, RIS
   verification panel, Word/Markdown export, exact cost per answer.
+
+## Microsoft 365 (OneDrive / SharePoint)
+
+Users sign in with their Microsoft account (OAuth 2.0 + PKCE against Entra ID,
+delegated permissions). The composer's "Microsoft 365" button opens a picker for
+OneDrive and SharePoint document libraries; picked files are downloaded
+server-side via Microsoft Graph and processed like uploads. After a task, the
+generated files and (optionally) the answer as a Word memo are written back to
+the folder of the source file or to a chosen target folder; existing files are
+never overwritten (Graph `conflictBehavior=rename`). The refresh token lives in
+an encrypted, HttpOnly cookie; the server keeps no account data.
+
+Configure `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and optionally `MS_TENANT` /
+`MS_REDIRECT_URI` (see `.env.example`). Routes: `GET /api/ms/login`,
+`GET /api/ms/callback`, `GET /api/ms/me`, `POST /api/ms/logout`,
+`GET /api/ms/browse`, `GET /api/ms/sites`, `GET /api/ms/site-drives`; the chat
+request takes `msFiles` and `msSync`.
 
 ## Run locally
 

@@ -1,5 +1,6 @@
 import express from 'express'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import OpenAI from 'openai'
 import { Sandbox } from '@e2b/code-interpreter'
@@ -66,6 +67,21 @@ const E2B_PRICE_PER_SEC = Number(process.env.E2B_PRICE_PER_SEC || 0.00014)
 
 const UA = 'AIssociate-Playground/2.1 (+https://aissociate.at)'
 const RIS_BASE = 'https://data.bka.gv.at/ris/api/v2.6'
+
+// Microsoft 365 (OneDrive / SharePoint via Microsoft Graph). Register an app in
+// Entra ID (platform "Web", redirect URI https://<host>/api/ms/callback, delegated
+// permissions User.Read, Files.ReadWrite.All, Sites.ReadWrite.All, offline_access).
+const MS = {
+  clientId: process.env.MS_CLIENT_ID || '',
+  clientSecret: process.env.MS_CLIENT_SECRET || '',
+  tenant: process.env.MS_TENANT || 'common',
+  redirectUri: process.env.MS_REDIRECT_URI || '',
+  scopes: process.env.MS_SCOPES || 'openid profile offline_access User.Read Files.ReadWrite.All Sites.ReadWrite.All',
+  loginBase: (process.env.MS_LOGIN_BASE_URL || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
+  graphBase: (process.env.MS_GRAPH_BASE_URL || 'https://graph.microsoft.com/v1.0').replace(/\/+$/, ''),
+}
+const MS_COOKIE_KEY = crypto.createHash('sha256').update(process.env.MS_COOKIE_SECRET || process.env.MS_CLIENT_SECRET || 'dev-insecure-' + MS.clientId).digest()
+const MS_UPLOAD_SIMPLE_MAX = 4 * 1024 * 1024 // Graph: simple PUT up to 4 MB, else upload session
 
 function priceFor(model) {
   return PRICES[model] || PRICES[String(model).replace(/-\d{4}-\d{2}-\d{2}$/, '')] || { in: 2, cached: 0.2, out: 10 }
@@ -826,14 +842,215 @@ function markdownToDocx(title, md) {
 }
 
 // ---------------------------------------------------------------------------
+// Microsoft Graph: cookie-based login (encrypted refresh token), browsing,
+// download and write-back to OneDrive / SharePoint document libraries.
+// ---------------------------------------------------------------------------
+function seal(obj) {
+  const iv = crypto.randomBytes(12)
+  const c = crypto.createCipheriv('aes-256-gcm', MS_COOKIE_KEY, iv)
+  const enc = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()])
+  return Buffer.concat([iv, c.getAuthTag(), enc]).toString('base64url')
+}
+function unseal(s) {
+  try {
+    const b = Buffer.from(String(s || ''), 'base64url')
+    const d = crypto.createDecipheriv('aes-256-gcm', MS_COOKIE_KEY, b.subarray(0, 12))
+    d.setAuthTag(b.subarray(12, 28))
+    return JSON.parse(Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8'))
+  } catch { return null }
+}
+function parseCookies(req) {
+  const out = {}
+  for (const part of String(req.headers.cookie || '').split(';')) { const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim()) }
+  return out
+}
+const isHttps = (req) => req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0] === 'https'
+function setCookie(req, res, name, value, maxAge) {
+  const parts = [`${name}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAge}`]
+  if (isHttps(req)) parts.push('Secure')
+  const prev = res.getHeader('Set-Cookie')
+  res.setHeader('Set-Cookie', [...(Array.isArray(prev) ? prev : prev ? [prev] : []), parts.join('; ')])
+}
+const clearCookie = (req, res, name) => setCookie(req, res, name, '', 0)
+const msRedirectUri = (req) => MS.redirectUri || `${isHttps(req) ? 'https' : 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}/api/ms/callback`
+
+// Big refresh tokens that do not fit a cookie live in memory under a session id.
+const msSessions = new Map() // sid -> { rt, account, at }
+const msTokenCache = new Map() // hash(rt) -> { accessToken, expiresAt }
+
+async function msTokenRequest(req, form) {
+  const body = new URLSearchParams({ client_id: MS.clientId, redirect_uri: msRedirectUri(req), scope: MS.scopes, ...form })
+  if (MS.clientSecret) body.set('client_secret', MS.clientSecret)
+  const r = await fetchWithTimeout(`${MS.loginBase}/${MS.tenant}/oauth2/v2.0/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, 20_000)
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok || !j.access_token) throw new Error(j.error_description || j.error || `Token-Anfrage fehlgeschlagen (${r.status})`)
+  return j
+}
+
+function msReadSession(req) {
+  const c = parseCookies(req)
+  if (c.ms_auth) return unseal(c.ms_auth)
+  if (c.ms_sid && msSessions.has(c.ms_sid)) return msSessions.get(c.ms_sid)
+  return null
+}
+function msWriteSession(req, res, sess) {
+  const sealed = seal(sess)
+  if (sealed.length <= 3900) { setCookie(req, res, 'ms_auth', sealed, 90 * 86400); clearCookie(req, res, 'ms_sid'); return }
+  const sid = crypto.randomBytes(24).toString('base64url')
+  msSessions.set(sid, sess)
+  clearCookie(req, res, 'ms_auth')
+  setCookie(req, res, 'ms_sid', sid, 90 * 86400)
+}
+function msClearSession(req, res) {
+  const c = parseCookies(req)
+  if (c.ms_sid) msSessions.delete(c.ms_sid)
+  clearCookie(req, res, 'ms_auth'); clearCookie(req, res, 'ms_sid')
+}
+
+/** Access token for Graph (refreshes with the stored refresh token). */
+async function msAccessToken(req, res) {
+  const sess = msReadSession(req)
+  if (!sess?.rt) return null
+  const key = crypto.createHash('sha256').update(sess.rt).digest('hex')
+  const cached = msTokenCache.get(key)
+  if (cached && cached.expiresAt > Date.now() + 60_000) return { token: cached.accessToken, account: sess.account }
+  try {
+    const j = await msTokenRequest(req, { grant_type: 'refresh_token', refresh_token: sess.rt })
+    const token = j.access_token
+    msTokenCache.set(key, { accessToken: token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 })
+    if (j.refresh_token && j.refresh_token !== sess.rt) { const next = { ...sess, rt: j.refresh_token }; msWriteSession(req, res, next); msTokenCache.set(crypto.createHash('sha256').update(next.rt).digest('hex'), msTokenCache.get(key)) }
+    return { token, account: sess.account }
+  } catch (e) {
+    console.error('ms refresh failed:', e?.message)
+    msClearSession(req, res)
+    return null
+  }
+}
+
+async function graph(token, pathOrUrl, { method = 'GET', body, headers = {}, raw = false, timeout = 30_000 } = {}) {
+  const url = /^https?:/.test(pathOrUrl) ? pathOrUrl : `${MS.graphBase}${pathOrUrl}`
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await fetchWithTimeout(url, { method, headers: { Authorization: `Bearer ${token}`, ...(body && !(body instanceof Buffer) ? { 'Content-Type': 'application/json' } : {}), ...headers }, body: body instanceof Buffer ? body : body ? JSON.stringify(body) : undefined, redirect: raw ? 'manual' : 'follow' }, timeout)
+    if (r.status === 429 || r.status === 503) { await new Promise((ok) => setTimeout(ok, Math.min(10, Number(r.headers.get('retry-after')) || 2) * 1000)); continue }
+    if (raw) return r
+    const j = r.status === 204 ? {} : await r.json().catch(() => ({}))
+    if (!r.ok) { const e = new Error(j.error?.message || `Graph ${r.status}`); e.status = r.status; e.code = j.error?.code; throw e }
+    return j
+  }
+  throw new Error('Graph: zu viele Anfragen (429)')
+}
+const graphItem = (it) => ({ id: it.id, name: it.name, isFolder: Boolean(it.folder), size: it.size || 0, modified: it.lastModifiedDateTime || '', webUrl: it.webUrl || '', driveId: it.parentReference?.driveId || '', parentId: it.parentReference?.id || '', childCount: it.folder?.childCount ?? null })
+const ITEM_SELECT = '$select=id,name,folder,file,size,lastModifiedDateTime,webUrl,parentReference'
+
+/** Download a drive item: Graph answers 302 to a pre-authenticated URL (no bearer there). */
+async function msDownload(token, driveId, itemId) {
+  const meta = await graph(token, `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?${ITEM_SELECT}`)
+  if (meta.folder) throw new Error(`„${meta.name}“ ist ein Ordner.`)
+  if ((meta.size || 0) > MAX_UPLOAD_BYTES) throw new Error(`„${meta.name}“ überschreitet ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`)
+  const r = await graph(token, `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/content`, { raw: true })
+  let buf
+  if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+    const dl = await fetchWithTimeout(r.headers.get('location'), {}, 60_000)
+    if (!dl.ok) throw new Error(`Download fehlgeschlagen (${dl.status})`)
+    buf = Buffer.from(await dl.arrayBuffer())
+  } else if (r.ok) buf = Buffer.from(await r.arrayBuffer())
+  else throw new Error(`Download fehlgeschlagen (${r.status})`)
+  return { meta: graphItem(meta), buf }
+}
+
+/** Upload (≤ 4 MB directly, else via upload session); existing names are kept, the new file is renamed. */
+async function msUpload(token, driveId, parentId, name, buf) {
+  const base = `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(parentId)}:/${encodeURIComponent(name)}:`
+  if (buf.length <= MS_UPLOAD_SIMPLE_MAX) {
+    const it = await graph(token, `${base}/content?@microsoft.graph.conflictBehavior=rename`, { method: 'PUT', body: buf, headers: { 'Content-Type': 'application/octet-stream' }, timeout: 120_000 })
+    return graphItem(it)
+  }
+  const sess = await graph(token, `${base}/createUploadSession`, { method: 'POST', body: { item: { '@microsoft.graph.conflictBehavior': 'rename', name } } })
+  const CHUNK = 5 * 1024 * 1024
+  let last = null
+  for (let off = 0; off < buf.length; off += CHUNK) {
+    const end = Math.min(off + CHUNK, buf.length)
+    const r = await fetchWithTimeout(sess.uploadUrl, { method: 'PUT', headers: { 'Content-Length': String(end - off), 'Content-Range': `bytes ${off}-${end - 1}/${buf.length}` }, body: buf.subarray(off, end) }, 180_000)
+    if (!r.ok && r.status !== 202) throw new Error(`Upload-Block fehlgeschlagen (${r.status})`)
+    last = await r.json().catch(() => null)
+  }
+  return graphItem(last || {})
+}
+
+// ---------------------------------------------------------------------------
 // Express
 // ---------------------------------------------------------------------------
 const app = express()
+app.set('trust proxy', 1)
 app.use(express.json({ limit: '40mb' }))
 app.use(express.static(path.join(__dirname, 'public')))
 
+// ---- Microsoft 365 routes ----
+app.get('/api/ms/login', (req, res) => {
+  if (!MS.clientId) return res.status(503).send('Microsoft 365 ist nicht konfiguriert (MS_CLIENT_ID fehlt).')
+  const verifier = crypto.randomBytes(48).toString('base64url')
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
+  const state = crypto.randomBytes(16).toString('base64url')
+  setCookie(req, res, 'ms_oauth', seal({ verifier, state, t: Date.now() }), 600)
+  const u = new URL(`${MS.loginBase}/${MS.tenant}/oauth2/v2.0/authorize`)
+  for (const [k, v] of Object.entries({ client_id: MS.clientId, response_type: 'code', redirect_uri: msRedirectUri(req), response_mode: 'query', scope: MS.scopes, state, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account' })) u.searchParams.set(k, v)
+  res.redirect(u.toString())
+})
+app.get('/api/ms/callback', async (req, res) => {
+  const o = unseal(parseCookies(req).ms_oauth)
+  clearCookie(req, res, 'ms_oauth')
+  if (req.query.error) return res.redirect('/?ms=error&reason=' + encodeURIComponent(String(req.query.error_description || req.query.error).slice(0, 200)))
+  if (!o || !req.query.code || req.query.state !== o.state || Date.now() - o.t > 600_000) return res.redirect('/?ms=error&reason=' + encodeURIComponent('Anmeldung abgelaufen oder ungültig'))
+  try {
+    const j = await msTokenRequest(req, { grant_type: 'authorization_code', code: String(req.query.code), code_verifier: o.verifier })
+    if (!j.refresh_token) throw new Error('Kein Refresh-Token erhalten (offline_access fehlt?)')
+    let account = { name: '', email: '' }
+    try { const me = await graph(j.access_token, '/me?$select=displayName,mail,userPrincipalName'); account = { name: me.displayName || '', email: me.mail || me.userPrincipalName || '' } } catch {}
+    msWriteSession(req, res, { rt: j.refresh_token, account })
+    msTokenCache.set(crypto.createHash('sha256').update(j.refresh_token).digest('hex'), { accessToken: j.access_token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 })
+    res.redirect('/?ms=connected')
+  } catch (e) { res.redirect('/?ms=error&reason=' + encodeURIComponent(String(e?.message || e).slice(0, 200))) }
+})
+app.post('/api/ms/logout', (req, res) => { msClearSession(req, res); res.json({ ok: true }) })
+app.get('/api/ms/me', async (req, res) => {
+  if (!MS.clientId) return res.json({ configured: false, connected: false })
+  const a = await msAccessToken(req, res)
+  res.json({ configured: true, connected: Boolean(a), account: a?.account || null })
+})
+const msGuard = async (req, res) => { const a = await msAccessToken(req, res); if (!a) { res.status(401).json({ error: 'Nicht mit Microsoft 365 verbunden.', reauth: true }); return null } return a.token }
+app.get('/api/ms/sites', async (req, res) => {
+  const token = await msGuard(req, res); if (!token) return
+  try {
+    const q = String(req.query.q || '').trim()
+    const j = q ? await graph(token, `/sites?search=${encodeURIComponent(q)}&$select=id,displayName,name,webUrl&$top=25`) : await graph(token, '/me/followedSites?$select=id,displayName,name,webUrl')
+    res.json({ sites: (j.value || []).map((s) => ({ id: s.id, name: s.displayName || s.name, webUrl: s.webUrl })) })
+  } catch (e) { res.status(e.status === 401 ? 401 : 502).json({ error: e.message, reauth: e.status === 401 }) }
+})
+app.get('/api/ms/site-drives', async (req, res) => {
+  const token = await msGuard(req, res); if (!token) return
+  try {
+    const j = await graph(token, `/sites/${encodeURIComponent(String(req.query.siteId || ''))}/drives?$select=id,name,webUrl,driveType`)
+    res.json({ drives: (j.value || []).map((d) => ({ id: d.id, name: d.name, webUrl: d.webUrl })) })
+  } catch (e) { res.status(502).json({ error: e.message }) }
+})
+app.get('/api/ms/browse', async (req, res) => {
+  const token = await msGuard(req, res); if (!token) return
+  try {
+    let { driveId = '', itemId = '' } = req.query
+    let current = null
+    if (!driveId) { const d = await graph(token, '/me/drive?$select=id,name,webUrl'); driveId = d.id; const root = await graph(token, `/me/drive/root?${ITEM_SELECT}`); current = graphItem(root); itemId = root.id }
+    else if (!itemId) { const root = await graph(token, `/drives/${encodeURIComponent(driveId)}/root?${ITEM_SELECT}`); current = graphItem(root); itemId = root.id }
+    else current = graphItem(await graph(token, `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?${ITEM_SELECT}`))
+    const items = []
+    let next = `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/children?${ITEM_SELECT}&$top=200&$orderby=name`
+    while (next && items.length < 600) { const page = await graph(token, next); items.push(...(page.value || []).map(graphItem)); next = page['@odata.nextLink'] || null }
+    items.sort((a, b) => (a.isFolder === b.isFolder ? a.name.localeCompare(b.name, 'de') : a.isFolder ? -1 : 1))
+    res.json({ driveId, itemId, current: { ...current, driveId: driveId }, items })
+  } catch (e) { res.status(e.status === 401 ? 401 : 502).json({ error: e.message, reauth: e.status === 401 }) }
+})
+
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), models: { main: MODEL_MAIN, code: MODEL_CODE }, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS } })
+  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, code: MODEL_CODE }, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -905,6 +1122,9 @@ app.post('/api/chat', async (req, res) => {
   const body = req.body ?? {}
   // The client may supply the job id so it can resume even if this response never arrives.
   const jobId = typeof body.jobId === 'string' && /^[\w-]{8,64}$/.test(body.jobId) && !jobs.has(body.jobId) ? body.jobId : `j_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  // The Microsoft 365 token is resolved before the SSE headers go out (a refresh may set cookies).
+  const wantsMs = Array.isArray(body.msFiles) && body.msFiles.length > 0 || (body.msSync && body.msSync.enabled !== false && body.msSync.driveId)
+  const msAuth = MS.clientId && wantsMs ? await msAccessToken(req, res) : null
   const job = newJob(jobId)
   const send = job.send
   attachListener(job, res, 0)
@@ -913,7 +1133,7 @@ app.post('/api/chat', async (req, res) => {
 
   if (!OPENAI_API_KEY) { send('error', { message: 'Server: OPENAI_API_KEY fehlt.' }); return finish() }
 
-  const { history = [], files: rawUploads = [], sessionId, privacy = 'off', webSearch = true, task = null, aissThreadId = null } = body
+  const { history = [], files: rawUploads = [], sessionId, webSearch = true, task = null, aissThreadId = null, msFiles: rawMsFiles = [], msSync = null } = body
   let prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   let taskExtra = ''
   let forceMode = null
@@ -926,7 +1146,6 @@ app.post('/api/chat', async (req, res) => {
   if (!prompt) { send('error', { message: 'Bitte eine Frage oder Aufgabe eingeben.' }); return finish() }
 
   const persistent = typeof sessionId === 'string' && sessionId.length > 0
-  const privacyMode = privacy === 'pseudonymize' || privacy === 'anonymize' ? privacy : 'off'
   const useWeb = WEB_SEARCH_ENABLED && webSearch !== false
   const threadIn = typeof aissThreadId === 'string' && aissThreadId.length < 200 ? aissThreadId : null
 
@@ -941,6 +1160,8 @@ app.post('/api/chat', async (req, res) => {
     uploads.push({ name, buf })
     if (uploads.length >= MAX_UPLOADS) break
   }
+  const msFilesReq = (Array.isArray(rawMsFiles) ? rawMsFiles : []).filter((f) => f && typeof f.driveId === 'string' && typeof f.itemId === 'string').slice(0, MAX_UPLOADS)
+  const msSources = [] // metadata of files fetched from Microsoft 365 (default write-back folder)
 
   const ctx = { usage: newUsage() }
   const startedAt = Date.now()
@@ -1160,6 +1381,20 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
+    // ---- 0a. files from OneDrive / SharePoint ----
+    if (msFilesReq.length) {
+      if (!msAuth) throw new Error('Nicht mit Microsoft 365 verbunden – bitte im Menü anmelden.')
+      const sid = step('cloud', `${msFilesReq.length} Datei${msFilesReq.length > 1 ? 'en' : ''} aus Microsoft 365 laden`)
+      for (const f of msFilesReq) {
+        if (uploads.length >= MAX_UPLOADS) break
+        const { meta, buf } = await msDownload(msAuth.token, f.driveId, f.itemId)
+        const name = path.basename(meta.name).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_')
+        if (!uploads.some((u) => u.name === name)) uploads.push({ name, buf })
+        msSources.push(meta)
+      }
+      stepDone(sid, { detail: msSources.map((m) => m.name).join(', ') })
+    }
+
     // ---- 0. uploads: extract text ----
     if (uploads.length) {
       const sid = step('read', `${uploads.length} Datei${uploads.length > 1 ? 'en' : ''} wird vorbereitet`)
@@ -1172,22 +1407,16 @@ app.post('/api/chat', async (req, res) => {
       .slice(-8)
       .map((m) => ({ role: m.role, content: m.content.slice(0, 12_000) }))
 
-    const privacyLine =
-      privacyMode === 'pseudonymize'
-        ? 'DATENSCHUTZ (DSGVO) – PSEUDONYMISIERUNG AKTIV: Ersetze personenbezogene Daten (Namen natürlicher Personen, Adressen, E-Mail, Telefon, IBAN, Akten-/SV-/Steuernummern, Geburtsdaten) in Fragen an die Wissensdatenbank, in deiner Antwort und in erzeugten Dateien konsequent durch typisierte Platzhalter ([PERSON_1], [ADRESSE_1] …). Bei Dateiausgaben zusätzlich eine Zuordnungstabelle mapping.xlsx erzeugen. Weise darauf hin, dass pseudonymisierte Daten weiterhin personenbezogen sind.\n\n'
-        : privacyMode === 'anonymize'
-        ? 'DATENSCHUTZ (DSGVO) – ANONYMISIERUNG AKTIV: Entferne personenbezogene Daten irreversibel ([geschwärzt]) in Fragen an die Wissensdatenbank, in der Antwort und in erzeugten Dateien; keine Zuordnungstabelle.\n\n'
-        : ''
     const uploadLine = uploads.length
       ? `HOCHGELADENE DATEIEN (mit read_document lesen; für Dateiausgaben liegen sie in /home/user): ${uploads.map((u) => { const t = uploadTexts.get(u.name); return `${u.name} (${t.unsupported ? 'Typ nur per create_or_edit_file lesbar' : `${t.text.length} Zeichen Text, ${Math.max(1, Math.ceil(t.text.length / UPLOAD_PART_CHARS))} Teil(e)`})` }).join('; ')}\n\n`
       : ''
-    const userContent = privacyLine + (taskExtra ? taskExtra + '\n\n' : '') + uploadLine + prompt
+    const userContent = (taskExtra ? taskExtra + '\n\n' : '') + uploadLine + prompt
 
     // ---- 1. plan (Sol decides mode + legal area) ----
     const pid = step('triage', 'Sol analysiert die Anfrage', { model: MODEL_MAIN })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', question: prompt, title: prompt.slice(0, 60) }
     try {
-      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${privacyMode !== 'off' ? 'Datenschutz: personenbezogene Daten in "question" pseudonymisieren.\n' : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
+      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
       const planFormat = { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } }
       // max_output_tokens includes reasoning tokens: retry once with more room if truncated.
       let pr = await callModel(ctx, { model: MODEL_MAIN, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 6000, input: planInput, text: planFormat })
@@ -1228,7 +1457,7 @@ app.post('/api/chat', async (req, res) => {
           try {
             const resp = await callModel(ctx, {
               model: MODEL_MAIN, instructions: reviewInstructions(useWeb), effort: EFFORT_MAIN, maxOut: 8000,
-              input: [...histInput, { role: 'user', content: `${privacyLine}NUTZERFRAGE:\n${prompt}\n\nFRAGE AN DIE WISSENSDATENBANK (${areaLabel}):\n${plan.question}\n\nANTWORT DER WISSENSDATENBANK:\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}` }],
+              input: [...histInput, { role: 'user', content: `NUTZERFRAGE:\n${prompt}\n\nFRAGE AN DIE WISSENSDATENBANK (${areaLabel}):\n${plan.question}\n\nANTWORT DER WISSENSDATENBANK:\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}` }],
               tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined,
             })
             collectWebCitations(resp)
@@ -1309,6 +1538,31 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) { console.error('file capture failed:', e?.message) }
     }
 
+    // ---- 5b. write results back to OneDrive / SharePoint ----
+    const sync = []
+    const target = msSync && typeof msSync === 'object' && msSync.driveId && msSync.itemId
+      ? { driveId: String(msSync.driveId), itemId: String(msSync.itemId), name: String(msSync.name || '') }
+      : msSources[0]?.driveId && msSources[0]?.parentId ? { driveId: msSources[0].driveId, itemId: msSources[0].parentId, name: 'Ordner der Quelldatei' } : null
+    if (msAuth && target && !(msSync && msSync.enabled === false)) {
+      const toUpload = filesOut.filter((f) => f.base64 && !f.tooLarge).map((f) => ({ name: f.name, buf: Buffer.from(f.base64, 'base64') }))
+      if (!(msSync && msSync.saveAnswer === false) && answer.trim() && plan.mode !== 'general') {
+        try {
+          const stem = (plan.title || 'Antwort').replace(/[^\w\-äöüÄÖÜß ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60) || 'Antwort'
+          toUpload.push({ name: `AIssociate_${stem}_${new Date().toISOString().slice(0, 10)}.docx`, buf: await markdownToDocx(plan.title || 'Antwort', answer) })
+        } catch (e) { console.error('answer docx failed:', e?.message) }
+      }
+      if (toUpload.length) {
+        const sid = step('cloud', `${toUpload.length} Datei${toUpload.length > 1 ? 'en' : ''} nach Microsoft 365 speichern${target.name ? ` (${target.name})` : ''}`)
+        for (const f of toUpload) {
+          try { const it = await msUpload(msAuth.token, target.driveId, target.itemId, f.name, f.buf); sync.push({ name: it.name || f.name, webUrl: it.webUrl || '', ok: true }) }
+          catch (e) { sync.push({ name: f.name, webUrl: '', ok: false, error: String(e?.message || e).slice(0, 200) }) }
+        }
+        const okN = sync.filter((s) => s.ok).length
+        if (okN === sync.length) stepDone(sid, { detail: sync.map((s) => s.name).join(', ') })
+        else stepFail(sid, { detail: `${okN}/${sync.length} gespeichert · ${sync.find((s) => !s.ok)?.error || ''}` })
+      }
+    }
+
     const cited = new Set([...answer.matchAll(/\[Q(\d+)\]/g)].map((m) => 'Q' + m[1]))
     // Knowledge-base documents are always shown; web citations are shown directly when the web search contributed.
     const sources = evidence.map((e) => ({ marker: e.marker, type: e.type, title: e.title, url: e.url, read: Boolean(e.read), cited: cited.has(e.marker) || e.type === 'aissociate' || (e.type === 'web' && verdict !== 'sufficient'), raw: e.raw || null }))
@@ -1317,6 +1571,7 @@ app.post('/api/chat', async (req, res) => {
       answer, sources, verification, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
       models: { main: MODEL_MAIN, code: MODEL_CODE, knowledgeBase: aissOk ? 'AI:ssociate' : null },
       aissThreadId: aissThreadOut,
+      sync, syncTarget: target,
       execution: { images, files: filesOut },
       cost: computeCost(ctx.usage, sandboxStart ? (Date.now() - sandboxStart) / 1000 : 0),
       durationMs: Date.now() - startedAt,
@@ -1337,4 +1592,4 @@ if (process.env.NO_LISTEN !== '1') {
 }
 
 // Exported for tests (NO_LISTEN=1).
-export { extractNormCitations, extractDecisionCitations, normalizeRisDoc, htmlToText, markdownToDocx, askAissociate, parseSseBlock, sourceFromDocumentEvent, risLinkForDocNumber, linkCitations, normQueryParams, app }
+export { extractNormCitations, extractDecisionCitations, normalizeRisDoc, htmlToText, markdownToDocx, askAissociate, parseSseBlock, sourceFromDocumentEvent, risLinkForDocNumber, linkCitations, normQueryParams, seal, unseal, app }

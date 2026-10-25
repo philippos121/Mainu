@@ -84,7 +84,38 @@
       .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
-      .privacy-note { font-size: 11.5px; color: #b36a00; text-align: center; margin-top: 8px; }
+      .sync-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 8px; }
+      .chip svg { width: 13px; height: 13px; color: var(--accent); flex: 0 0 auto; }
+      .badge.ms { background: rgba(14,124,138,0.12); color: var(--accent); }
+      /* Microsoft 365 picker */
+      .ms-card { max-width: 640px; padding: 16px 16px 14px; display: flex; flex-direction: column; max-height: calc(100dvh - 32px); }
+      .ms-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+      .ms-head h2 { margin: 0; font-size: 16px; font-weight: 800; flex: 1; }
+      .ms-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+      .ms-tab { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted); }
+      .ms-tab.on { background: var(--accent-soft); color: var(--accent); border-color: rgba(14,124,138,0.3); }
+      .ms-crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; min-height: 20px; }
+      .ms-crumbs button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12.5px; padding: 0 2px; font-weight: 600; }
+      .ms-search { display: flex; gap: 6px; margin-bottom: 8px; }
+      .ms-search input { flex: 1; font-family: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px; }
+      .ms-list { flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; min-height: 180px; max-height: 50vh; }
+      .ms-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 14px; cursor: pointer; }
+      .ms-row:last-child { border-bottom: none; }
+      .ms-row:hover { background: var(--surface-2); }
+      .ms-row.dim { opacity: .45; cursor: default; }
+      .ms-row .ico { width: 20px; height: 20px; color: var(--muted); flex: 0 0 auto; }
+      .ms-row .ico svg { width: 20px; height: 20px; }
+      .ms-row .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ms-row .m { font-size: 12px; color: var(--faint); flex: 0 0 auto; }
+      .ms-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); }
+      .ms-row.sel { background: var(--accent-soft); }
+      .ms-empty { padding: 24px; text-align: center; color: var(--faint); font-size: 13px; }
+      .ms-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+      .ms-foot .sp { flex: 1; font-size: 12.5px; color: var(--muted); min-width: 120px; }
+      .sync-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 0; border-top: 1px dashed var(--border); }
+      .sync-row:first-of-type { border-top: none; }
+      .sync-row a { font-weight: 600; text-decoration: none; }
+      .sync-row .err { color: var(--err); font-size: 12px; }
 
       /* ---------- chat ---------- */
       #chat { padding-bottom: 0; }
@@ -348,16 +379,19 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
           <span class="lbl">Dokumente</span>
         </button>
-        <button class="ctool" id="privacyBtn" title="Pseudonymisierung / Anonymisierung (DSGVO)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>
-          <span class="lbl" id="privacyLbl">Pseudonymisierung</span>
+        <button class="ctool" id="msBtn" title="Dokumente aus OneDrive / SharePoint anhängen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
+          <span class="lbl">Microsoft 365</span>
         </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
-      <div class="privacy-note" id="privacyNote" hidden></div>
+      <div class="sync-note" id="syncNote" hidden></div>
     </div>
+
+    <!-- ================= MICROSOFT 365 PICKER ================= -->
+    <div class="modal" id="msModal"><div class="modal-card ms-card" id="msCard"></div></div>
 
     <!-- ================= DRAWERS ================= -->
     <div class="overlay" id="overlay"></div>
@@ -369,8 +403,18 @@
         <button class="menu-item" id="miTour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 6L9 15l1-5z"/></svg>Feature-Tour</button>
         <div class="menu-sec">Einstellungen</div>
         <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Fallback nach der Wissensdatenbank (max. 3 Suchen)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
-        <div class="setting"><div><div class="sl">Datenschutz-Modus</div><div class="sd">Standard für neue Fragen</div></div>
-          <select class="sel" id="selPrivacy"><option value="off">Aus</option><option value="pseudonymize">Pseudonymisierung</option><option value="anonymize">Anonymisierung</option></select></div>
+        <div class="menu-sec">Microsoft 365</div>
+        <div class="kv"><span>Konto</span><b id="kvMsAccount">nicht verbunden</b></div>
+        <div style="padding:4px 10px 6px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" id="msConnectBtn" style="padding:7px 12px;font-size:13px">Mit Microsoft anmelden</button>
+          <button class="mini" id="msDisconnectBtn" hidden>Trennen</button>
+        </div>
+        <div class="setting"><div><div class="sl">Ergebnisse zurückschreiben</div><div class="sd" id="msTargetText">Standard: Ordner der Quelldatei</div></div><button class="switch on" id="swMsSync" role="switch" aria-checked="true"></button></div>
+        <div class="setting"><div><div class="sl">Antwort als Word speichern</div><div class="sd">Memo zusätzlich zu erzeugten Dateien</div></div><button class="switch on" id="swMsAnswer" role="switch" aria-checked="true"></button></div>
+        <div style="padding:0 10px 4px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="mini" id="msPickTargetBtn">Zielordner wählen</button>
+          <button class="mini" id="msClearTargetBtn" hidden>Zielordner zurücksetzen</button>
+        </div>
         <div class="menu-sec">Modelle &amp; Budget</div>
         <div class="kv"><span>Rechtsgebiet, Prüfung, Antwort</span><b id="kvMain">–</b></div>
         <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
@@ -406,17 +450,18 @@
       const $ = (id) => document.getElementById(id)
       const home = $('home'), chatView = $('chat'), messages = $('messages'), composer = $('composer')
       const input = $('input'), sendBtn = $('sendBtn'), attachBtn = $('attachBtn'), fileInput = $('fileInput'), attachList = $('attachList')
-      const privacyBtn = $('privacyBtn'), privacyLbl = $('privacyLbl'), privacyNote = $('privacyNote')
+      const msBtn = $('msBtn'), syncNote = $('syncNote')
       const costPill = $('costPill'), topTitle = $('topTitle')
 
       const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v2'
       const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024, MAX_TOTAL_UPLOAD_BYTES = 28 * 1024 * 1024 // base64 of 28 MB stays under the server's 40 MB JSON limit
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
 
-      let settings = { webSearch: true, privacy: 'off' }
+      let settings = { webSearch: true, msSync: true, msSaveAnswer: true }
       try { settings = { ...settings, ...JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}') } } catch {}
-      let privacyMode = settings.privacy || 'off'
       let pendingFiles = []
+      let pendingMs = [] // files picked from OneDrive / SharePoint: { driveId, itemId, name, size }
+      let msState = { configured: false, connected: false, account: null }
       let busy = false
       let sessionCostUsd = 0
       let convos = []
@@ -452,6 +497,9 @@
       function addCost(c) { if (!c) return; sessionCostUsd += c.totalUsd || 0; costPill.textContent = 'Σ ' + fmtUsd(sessionCostUsd); $('kvCost').textContent = fmtUsd(sessionCostUsd) }
 
       const ICONS = {
+        cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>',
+        folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+        site: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 20V9"/></svg>',
         triage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 6L9 15l1-5z"/></svg>',
         think: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>',
         search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
@@ -621,7 +669,9 @@
       function renderAttachments() {
         attachList.innerHTML = ''
         pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
+        pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsMenu() }); c.appendChild(x); attachList.appendChild(c) })
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
+        msBtn.classList.toggle('on', pendingMs.length > 0)
         updateSend()
       }
       const defaultFileChange = async () => { await addFiles(fileInput.files); fileInput.value = '' }
@@ -634,25 +684,132 @@
       // ------------------------------------------------------------------
       // Composer behaviour
       // ------------------------------------------------------------------
-      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
+      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0 || pendingMs.length > 0) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
       input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
       sendBtn.addEventListener('click', submit)
-      const PRIVACY_CYCLE = ['off', 'pseudonymize', 'anonymize']
-      function updatePrivacyUI() {
-        privacyBtn.classList.toggle('on', privacyMode === 'pseudonymize'); privacyBtn.classList.toggle('warnon', privacyMode === 'anonymize')
-        privacyLbl.textContent = privacyMode === 'anonymize' ? 'Anonymisierung' : 'Pseudonymisierung'
-        privacyNote.hidden = privacyMode === 'off'
-        privacyNote.textContent = privacyMode === 'pseudonymize' ? 'Pseudonymisierung aktiv: personenbezogene Daten werden durch Platzhalter ersetzt (Zuordnungstabelle bei Dateiausgaben).' : privacyMode === 'anonymize' ? 'Anonymisierung aktiv: personenbezogene Daten werden irreversibel entfernt.' : ''
-        $('selPrivacy').value = privacyMode
-      }
-      privacyBtn.addEventListener('click', () => { privacyMode = PRIVACY_CYCLE[(PRIVACY_CYCLE.indexOf(privacyMode) + 1) % 3]; settings.privacy = privacyMode; saveSettings(); updatePrivacyUI() })
-      $('selPrivacy').addEventListener('change', (e) => { privacyMode = e.target.value; settings.privacy = privacyMode; saveSettings(); updatePrivacyUI() })
       $('swWeb').addEventListener('click', () => { settings.webSearch = !settings.webSearch; saveSettings(); $('swWeb').classList.toggle('on', settings.webSearch); $('swWeb').setAttribute('aria-checked', String(settings.webSearch)) })
+
+      // ------------------------------------------------------------------
+      // Microsoft 365 (OneDrive / SharePoint)
+      // ------------------------------------------------------------------
+      const MS_EXT = /\.(pdf|docx|txt|md|csv|json|html?|xlsx|rtf|xml)$/i
+      function setSwitch(id, on) { $(id).classList.toggle('on', on); $(id).setAttribute('aria-checked', String(on)) }
+      function renderMsMenu() {
+        $('kvMsAccount').textContent = !msState.configured ? 'nicht konfiguriert' : msState.connected ? (msState.account?.email || msState.account?.name || 'verbunden') : 'nicht verbunden'
+        $('msConnectBtn').hidden = !msState.configured || msState.connected
+        $('msDisconnectBtn').hidden = !msState.connected
+        const t = current?.msTarget
+        $('msTargetText').textContent = t ? `Ziel: ${t.name || 'gewählter Ordner'}` : 'Standard: Ordner der Quelldatei'
+        $('msClearTargetBtn').hidden = !t
+        $('msPickTargetBtn').hidden = !msState.connected
+        setSwitch('swMsSync', settings.msSync !== false); setSwitch('swMsAnswer', settings.msSaveAnswer !== false)
+        msBtn.classList.toggle('on', pendingMs.length > 0)
+        syncNote.hidden = !(msState.connected && settings.msSync !== false && (pendingMs.length || t))
+        syncNote.textContent = t ? `Ergebnisse werden nach „${t.name || 'Zielordner'}“ zurückgeschrieben.` : 'Ergebnisse werden in den Ordner der ausgewählten Datei zurückgeschrieben.'
+      }
+      async function loadMsState() {
+        try { msState = await (await fetch('/api/ms/me', { cache: 'no-store' })).json() } catch { msState = { configured: false, connected: false } }
+        renderMsMenu()
+      }
+      async function msApi(url) {
+        const r = await fetch(url, { cache: 'no-store' })
+        const j = await r.json().catch(() => ({}))
+        if (r.status === 401 || j.reauth) { msState.connected = false; renderMsMenu(); throw new Error('Microsoft-Anmeldung abgelaufen – bitte erneut anmelden.') }
+        if (!r.ok) throw new Error(j.error || 'Microsoft 365: Anfrage fehlgeschlagen')
+        return j
+      }
+      $('msConnectBtn').addEventListener('click', () => { location.href = '/api/ms/login' })
+      $('msDisconnectBtn').addEventListener('click', async () => { await fetch('/api/ms/logout', { method: 'POST' }); pendingMs = []; renderAttachments(); await loadMsState(); toast('Microsoft 365 getrennt.') })
+      $('swMsSync').addEventListener('click', () => { settings.msSync = settings.msSync === false; saveSettings(); renderMsMenu() })
+      $('swMsAnswer').addEventListener('click', () => { settings.msSaveAnswer = settings.msSaveAnswer === false; saveSettings(); renderMsMenu() })
+      $('msPickTargetBtn').addEventListener('click', () => { closeDrawers(); openMsPicker({ pickFolder: true }) })
+      $('msClearTargetBtn').addEventListener('click', () => { if (current) { current.msTarget = null; persistCurrent() } renderMsMenu() })
+      msBtn.addEventListener('click', () => {
+        if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
+        if (!msState.connected) { openMsConnect(); return }
+        openMsPicker({})
+      })
+      function openMsConnect() {
+        const card = $('msCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, 'Microsoft 365 verbinden'))
+        card.appendChild(el('div', 'md', 'Dokumente direkt aus OneDrive und SharePoint anhängen. Erzeugte Dateien und die Antwort als Word-Memo werden in den Aktenordner zurückgeschrieben – vorhandene Dateien werden nie überschrieben.'))
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeMs); const go = el('button', 'btn', 'Mit Microsoft anmelden'); go.addEventListener('click', () => { location.href = '/api/ms/login' }); a.append(c, go); card.appendChild(a)
+        $('msModal').classList.add('show')
+      }
+      function closeMs() { $('msModal').classList.remove('show') }
+      $('msModal').addEventListener('click', (e) => { if (e.target === $('msModal')) closeMs() })
+
+      const msNav = { tab: 'onedrive', driveId: '', itemId: '', crumbs: [], siteQuery: '' }
+      function openMsPicker({ pickFolder = false }) {
+        const card = $('msCard'); card.innerHTML = ''
+        const head = el('div', 'ms-head'); head.appendChild(svg('cloud')); head.appendChild(el('h2', null, pickFolder ? 'Zielordner wählen' : 'Aus Microsoft 365 anhängen'))
+        const x = el('button', 'iconbtn', ''); x.style.color = 'var(--muted)'; x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'; x.addEventListener('click', closeMs); head.appendChild(x)
+        card.appendChild(head)
+        const tabs = el('div', 'ms-tabs'); const tOne = el('button', 'ms-tab', 'OneDrive'); const tSp = el('button', 'ms-tab', 'SharePoint'); tabs.append(tOne, tSp); card.appendChild(tabs)
+        const search = el('div', 'ms-search'); const si = el('input'); si.placeholder = 'SharePoint-Site suchen (z. B. Akten, Mandanten)…'; const sb = el('button', 'btn ghost', 'Suchen'); sb.style.padding = '7px 12px'; search.append(si, sb); card.appendChild(search)
+        const crumbs = el('div', 'ms-crumbs'); card.appendChild(crumbs)
+        const list = el('div', 'ms-list'); card.appendChild(list)
+        const foot = el('div', 'ms-foot'); const sp = el('span', 'sp'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.addEventListener('click', closeMs)
+        const useFolder = el('button', 'btn ghost', 'Ergebnisse hierher speichern'); const attachB = el('button', 'btn', 'Anhängen'); attachB.disabled = true
+        foot.append(sp, cancel, useFolder, pickFolder ? el('span') : attachB); card.appendChild(foot)
+        const selected = new Map(pendingMs.map((f) => [f.driveId + '|' + f.itemId, f]))
+        const updateFoot = () => { attachB.textContent = `Anhängen (${selected.size})`; attachB.disabled = !selected.size; useFolder.disabled = !(msNav.driveId && msNav.itemId) }
+        const setTab = (t) => { msNav.tab = t; tOne.classList.toggle('on', t === 'onedrive'); tSp.classList.toggle('on', t === 'sharepoint'); search.hidden = t !== 'sharepoint'; if (t === 'onedrive') browse('', '', [{ name: 'OneDrive' }]); else showSites(msNav.siteQuery) }
+        tOne.addEventListener('click', () => setTab('onedrive')); tSp.addEventListener('click', () => setTab('sharepoint'))
+        const renderCrumbs = () => { crumbs.innerHTML = ''; msNav.crumbs.forEach((c, i) => { if (i) crumbs.appendChild(el('span', null, '›')); const b = el('button', null, c.name); b.addEventListener('click', () => { if (c.sites) showSites(msNav.siteQuery); else if (c.drives) showDrives(c.siteId, c.name); else browse(c.driveId, c.itemId, msNav.crumbs.slice(0, i + 1)) }); crumbs.appendChild(b) }) }
+        const busyList = (t) => { list.innerHTML = ''; list.appendChild(el('div', 'ms-empty', t)) }
+        async function browse(driveId, itemId, crumbPath) {
+          busyList('Lädt…'); updateFoot()
+          try {
+            const j = await msApi(`/api/ms/browse?driveId=${encodeURIComponent(driveId)}&itemId=${encodeURIComponent(itemId)}`)
+            msNav.driveId = j.driveId; msNav.itemId = j.itemId
+            msNav.crumbs = crumbPath.map((c, i) => (i === crumbPath.length - 1 ? { ...c, driveId: j.driveId, itemId: j.itemId } : c)); renderCrumbs()
+            list.innerHTML = ''
+            if (!j.items.length) list.appendChild(el('div', 'ms-empty', 'Leerer Ordner'))
+            for (const it of j.items) {
+              const row = el('div', 'ms-row'); const ico = el('span', 'ico'); ico.appendChild(svg(it.isFolder ? 'folder' : 'upload')); row.appendChild(ico)
+              row.appendChild(el('span', 'n', it.name)); row.appendChild(el('span', 'm', it.isFolder ? `${it.childCount ?? ''}`.trim() : fmtSize(it.size)))
+              if (it.isFolder) row.addEventListener('click', () => browse(j.driveId, it.id, [...msNav.crumbs, { name: it.name, driveId: j.driveId, itemId: it.id }]))
+              else if (pickFolder || !MS_EXT.test(it.name) || it.size > MAX_UPLOAD_BYTES) row.classList.add('dim')
+              else {
+                const key = j.driveId + '|' + it.id; const cb = el('input'); cb.type = 'checkbox'; cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked)
+                const toggle = () => { if (selected.has(key)) selected.delete(key); else { if (selected.size >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien.`); cb.checked = false; return } selected.set(key, { driveId: j.driveId, itemId: it.id, name: it.name, size: it.size }) } cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked); updateFoot() }
+                cb.addEventListener('click', (e) => { e.stopPropagation(); toggle() }); row.addEventListener('click', toggle); row.appendChild(cb)
+              }
+              list.appendChild(row)
+            }
+          } catch (e) { busyList(e.message) }
+          updateFoot()
+        }
+        async function showSites(q) {
+          msNav.driveId = ''; msNav.itemId = ''; msNav.crumbs = [{ name: 'SharePoint', sites: true }]; renderCrumbs(); busyList('Lädt…'); updateFoot()
+          try {
+            const j = await msApi(`/api/ms/sites?q=${encodeURIComponent(q || '')}`)
+            list.innerHTML = ''
+            if (!j.sites.length) list.appendChild(el('div', 'ms-empty', q ? 'Keine Site gefunden.' : 'Keine gefolgten Sites – oben nach einer Site suchen.'))
+            for (const s of j.sites) { const row = el('div', 'ms-row'); const ico = el('span', 'ico'); ico.appendChild(svg('site')); row.append(ico, el('span', 'n', s.name)); row.addEventListener('click', () => showDrives(s.id, s.name)); list.appendChild(row) }
+          } catch (e) { busyList(e.message) }
+        }
+        async function showDrives(siteId, siteName) {
+          msNav.driveId = ''; msNav.itemId = ''; msNav.crumbs = [{ name: 'SharePoint', sites: true }, { name: siteName, drives: true, siteId }]; renderCrumbs(); busyList('Lädt…'); updateFoot()
+          try {
+            const j = await msApi(`/api/ms/site-drives?siteId=${encodeURIComponent(siteId)}`)
+            list.innerHTML = ''
+            if (!j.drives.length) list.appendChild(el('div', 'ms-empty', 'Keine Dokumentbibliothek.'))
+            for (const d of j.drives) { const row = el('div', 'ms-row'); const ico = el('span', 'ico'); ico.appendChild(svg('folder')); row.append(ico, el('span', 'n', d.name)); row.addEventListener('click', () => browse(d.id, '', [...msNav.crumbs, { name: d.name, driveId: d.id, itemId: '' }])); list.appendChild(row) }
+          } catch (e) { busyList(e.message) }
+        }
+        sb.addEventListener('click', () => { msNav.siteQuery = si.value.trim(); showSites(msNav.siteQuery) }); si.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sb.click() } })
+        useFolder.addEventListener('click', () => { if (!current) newConversation(); current.msTarget = { driveId: msNav.driveId, itemId: msNav.itemId, name: msNav.crumbs.map((c) => c.name).join(' › ') }; persistCurrent(); renderMsMenu(); toast('Zielordner gesetzt.'); if (pickFolder) closeMs() })
+        attachB.addEventListener('click', () => { pendingMs = [...selected.values()]; renderAttachments(); renderMsMenu(); closeMs() })
+        $('msModal').classList.add('show')
+        setTab(msNav.tab === 'sharepoint' ? 'sharepoint' : 'onedrive')
+      }
 
       function submit() {
         const text = input.value.trim()
-        if ((!text && !pendingFiles.length) || busy) return
+        if ((!text && !pendingFiles.length && !pendingMs.length) || busy) return
         sendMessage({ text: text || 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.' })
       }
 
@@ -665,8 +822,8 @@
       }
       function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; topTitle.textContent = current?.title || 'Neues Gespräch' }
       function newConversation() {
-        current = { id: uid(), sessionId: uid(), aissThreadId: null, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
-        messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; renderAttachments(); closeDrawers(); showHome()
+        current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
+        messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; pendingMs = []; renderAttachments(); renderMsMenu(); closeDrawers(); showHome()
       }
       function persistCurrent() {
         if (!current || !current.messages.length) return
@@ -679,7 +836,8 @@
       }
       function openConversation(id) {
         const c = convos.find((x) => x.id === id); if (!c) return
-        current = { ...c, sessionId: c.sessionId || uid(), aissThreadId: c.aissThreadId || null, messages: [...c.messages], history: [...(c.history || [])] }
+        current = { ...c, sessionId: c.sessionId || uid(), aissThreadId: c.aissThreadId || null, msTarget: c.msTarget || null, messages: [...c.messages], history: [...(c.history || [])] }
+        renderMsMenu()
         messages.innerHTML = ''
         for (const m of current.messages) { if (m.role === 'user') renderUser(m); else renderAssistantFinal(createAssistantCard(), m.data, { restored: true }) }
         closeDrawers(); showChat(); messages.scrollTop = messages.scrollHeight; window.scrollTo(0, document.body.scrollHeight)
@@ -857,6 +1015,11 @@
         const ex = data.execution || {}
         ;(ex.images || []).forEach((src) => { const img = el('img', 'result'); img.src = src; body.appendChild(img) })
         if (ex.files?.length) { const p = el('div', 'panel'); p.appendChild(el('div', 'panel-title', 'Dateien')); ex.files.forEach((f) => renderFileInto(p, f)); body.appendChild(p) }
+        if (data.sync?.length) {
+          const p = el('div', 'panel'); const t = el('div', 'panel-title', 'Microsoft 365'); const okN = data.sync.filter((s) => s.ok).length; t.appendChild(el('span', 'vsum ' + (okN === data.sync.length ? 'good' : 'warn'), `${okN}/${data.sync.length} gespeichert${data.syncTarget?.name ? ' · ' + data.syncTarget.name : ''}`)); p.appendChild(t)
+          for (const s of data.sync) { const r = el('div', 'sync-row'); r.appendChild(svg('cloud')); if (s.ok && s.webUrl) { const a = el('a', null, s.name); a.href = s.webUrl; a.target = '_blank'; a.rel = 'noopener noreferrer'; r.appendChild(a) } else r.appendChild(el('span', null, s.name)); if (!s.ok) r.appendChild(el('span', 'err', s.error || 'fehlgeschlagen')); p.appendChild(r) }
+          body.appendChild(p)
+        }
 
         if (data.answer) {
           const acts = el('div', 'actions')
@@ -886,12 +1049,14 @@
       async function sendMessage({ text, task = null, taskTitle = null }) {
         if (busy) return
         if (!current) newConversation()
-        const uploads = pendingFiles.slice(); pendingFiles = []; renderAttachments()
+        const uploads = pendingFiles.slice(); pendingFiles = []
+        const msFiles = pendingMs.slice(); pendingMs = []
+        renderAttachments(); renderMsMenu()
         input.value = ''; input.style.height = 'auto'
         busy = true; updateSend()
         if (!current.title) { current.title = taskTitle ? `${taskTitle}: ${text.split('\n')[0].replace(taskTitle + ': ', '').slice(0, 50)}` : text.slice(0, 60) }
         showChat()
-        const um = { role: 'user', text, files: uploads.map((f) => f.name), taskTitle }
+        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle }
         current.messages.push(um); renderUser(um)
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
@@ -920,7 +1085,7 @@
         let hardFail = false // the server rejected the request itself (4xx/5xx) → no job to resume
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null }) })
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readStream(resp)
         } catch (err) { firstError = err }
@@ -952,7 +1117,7 @@
       // ------------------------------------------------------------------
       const TOUR = [
         { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. Sol wählt das Rechtsgebiet, die juristische Wissensdatenbank AI:ssociate recherchiert und antwortet; reicht das nicht, ergänzt Sol mit höchstens drei Websuchen.' },
-        { sel: '#privacyBtn', title: 'Datenschutz', text: 'Pseudonymisierung ersetzt personenbezogene Daten durch Platzhalter, Anonymisierung entfernt sie irreversibel – auch in erzeugten Dateien.' },
+        { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente direkt aus OneDrive oder SharePoint anhängen. Erzeugte Dateien und die Antwort als Word-Memo werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
         { sel: '#actionsSec', title: 'Workflows', text: 'Geführte Aufgaben mit Formular statt Prompt-Vorlagen: Vertragsprüfung mit Kommentaren im Dokument, Versionsvergleich, Entwürfe, Fristen.' },
         { sel: '#historyBtn', title: 'Verlauf', text: 'Alle Gespräche bleiben in diesem Browser gespeichert und können jederzeit fortgesetzt werden – mit Kontext.' },
@@ -989,11 +1154,17 @@
           if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
         } catch { toast('Server nicht erreichbar.') }
       }
-      renderActions(); renderRecent(); updatePrivacyUI()
+      renderActions(); renderRecent()
+      try {
+        const q = new URLSearchParams(location.search)
+        if (q.get('ms') === 'connected') toast('Microsoft 365 verbunden.')
+        if (q.get('ms') === 'error') toast('Microsoft-Anmeldung fehlgeschlagen: ' + (q.get('reason') || ''))
+        if (q.has('ms')) history.replaceState(null, '', location.pathname)
+      } catch {}
       $('swWeb').classList.toggle('on', settings.webSearch !== false); $('swWeb').setAttribute('aria-checked', String(settings.webSearch !== false))
       newConversation()
       try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
-      checkHealth()
+      checkHealth(); loadMsState()
     </script>
   </body>
 </html>
