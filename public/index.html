@@ -100,6 +100,10 @@
       .model-tag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
       .model-tag.sol { background: rgba(14,124,138,0.12); color: var(--accent); }
       .model-tag.luna { background: rgba(243,146,0,0.14); color: #b36a00; }
+      .model-tag.kb { background: rgba(14,92,105,0.14); color: var(--header); }
+      .answer.live { color: var(--text); opacity: .9; margin-bottom: 8px; }
+      .answer.live > :last-child::after { content: '▍'; color: var(--accent); animation: blink 1s steps(2) infinite; }
+      @keyframes blink { to { opacity: 0; } }
 
       /* steps */
       .steps { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); margin-bottom: 12px; overflow: hidden; }
@@ -163,6 +167,7 @@
       .badge.ris { background: rgba(14,92,105,0.12); color: var(--header); }
       .badge.web { background: rgba(86,106,115,0.14); color: var(--muted); }
       .badge.upload { background: rgba(243,146,0,0.14); color: #b36a00; }
+      .badge.aissociate { background: rgba(14,92,105,0.14); color: var(--header); }
       .badge.read { background: rgba(26,156,91,0.12); color: var(--ok); }
       .badge.found { background: var(--surface-2); color: var(--muted); }
       .more-toggle { background: none; border: none; color: var(--accent); font-size: 12.5px; cursor: pointer; padding: 6px 0 0; font-weight: 600; }
@@ -365,9 +370,11 @@
         <div class="setting"><div><div class="sl">Datenschutz-Modus</div><div class="sd">Standard für neue Fragen</div></div>
           <select class="sel" id="selPrivacy"><option value="off">Aus</option><option value="pseudonymize">Pseudonymisierung</option><option value="anonymize">Anonymisierung</option></select></div>
         <div class="menu-sec">Modelle &amp; Budget</div>
-        <div class="kv"><span>Einfach / Recherche</span><b id="kvFast">–</b></div>
-        <div class="kv"><span>Komplex / Endantwort</span><b id="kvMain">–</b></div>
+        <div class="kv"><span>Rechtsgebiet, Prüfung, Antwort</span><b id="kvMain">–</b></div>
+        <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
+        <div class="kv"><span>Websuche (Fallback)</span><b id="kvWeb">–</b></div>
         <div class="kv"><span>Dateien (Code)</span><b id="kvCode">–</b></div>
+        <div class="kv"><span>Folgefragen</span><b id="kvFast">–</b></div>
         <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
         <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
         <div class="menu-sec">Daten</div>
@@ -428,8 +435,14 @@
       function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(t >= 100000 ? 0 : 1) + 'k' : String(t) }
       function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB' }
       function fmtDate(ts) { const d = new Date(ts); const today = new Date(); const same = d.toDateString() === today.toDateString(); return same ? d.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: '2-digit' }) }
-      function modelLabel(m) { if (!m) return ''; if (/luna/i.test(m)) return 'Luna'; if (/sol/i.test(m)) return 'Sol'; if (/terra/i.test(m)) return 'Terra'; return m }
-      function modelTag(m) { const s = el('span', 'model-tag ' + modelLabel(m).toLowerCase(), modelLabel(m)); return s }
+      function modelLabel(m) { if (!m) return ''; if (/^aissociate$/i.test(m)) return 'AI:ssociate'; if (/luna/i.test(m)) return 'Luna'; if (/sol/i.test(m)) return 'Sol'; if (/terra/i.test(m)) return 'Terra'; return m }
+      function modelTag(m) { const lbl = modelLabel(m); return el('span', 'model-tag ' + (lbl === 'AI:ssociate' ? 'kb' : lbl.toLowerCase()), lbl) }
+      function renderModelTags(container, models) {
+        container.innerHTML = ''
+        if (!models) return
+        container.appendChild(modelTag(models.main || models.loop))
+        if (models.knowledgeBase) { container.appendChild(document.createTextNode(' + ')); container.appendChild(modelTag('aissociate')) }
+      }
       let toastT
       function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200) }
       function downloadBlob(blob, filename) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000) }
@@ -445,6 +458,7 @@
         file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M12 11v6M9 14h6"/></svg>',
         verify: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>',
         final: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>',
+        aissociate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>',
         tool: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5 5L13 18l-3-3 6.7-6.7Z"/><path d="m3 21 7-7"/></svg>',
         contract: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>',
         compare: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/><path d="M10 12h4"/></svg>',
@@ -513,7 +527,7 @@
       // Workflows (real, form-driven tasks — not prompt templates)
       // ------------------------------------------------------------------
       const WORKFLOWS = {
-        research: { title: 'Rechtsrecherche', desc: 'Normen und Judikatur direkt aus dem RIS, EU-Recht aus EUR-Lex – mit geprüften Fundstellen.', icon: 'search', fields: [
+        research: { title: 'Rechtsrecherche', desc: 'Antwort aus der juristischen Wissensdatenbank AI:ssociate (Zivil-, Straf-, Steuer-, öffentliches Recht), bei Bedarf durch Websuche ergänzt – Fundstellen gegen das RIS geprüft.', icon: 'search', fields: [
           { k: 'question', label: 'Rechtsfrage', type: 'textarea', required: true, ph: 'z. B. Kann der Vermieter bei befristetem Mietvertrag nach MRG vorzeitig kündigen, wenn …?' },
           { k: 'jurisdiction', label: 'Rechtsordnung', type: 'select', opts: ['Österreich', 'Österreich + EU-Recht', 'EU-Recht', 'Deutschland'] },
           { k: 'depth', label: 'Tiefe', type: 'select', opts: ['ausführlich', 'kurz'] } ] },
@@ -646,7 +660,7 @@
       }
       function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; topTitle.textContent = current?.title || 'Neues Gespräch' }
       function newConversation() {
-        current = { id: uid(), sessionId: uid(), title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
+        current = { id: uid(), sessionId: uid(), aissThreadId: null, title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
         messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; renderAttachments(); closeDrawers(); showHome()
       }
       function persistCurrent() {
@@ -660,7 +674,7 @@
       }
       function openConversation(id) {
         const c = convos.find((x) => x.id === id); if (!c) return
-        current = { ...c, sessionId: c.sessionId || uid(), messages: [...c.messages], history: [...(c.history || [])] }
+        current = { ...c, sessionId: c.sessionId || uid(), aissThreadId: c.aissThreadId || null, messages: [...c.messages], history: [...(c.history || [])] }
         messages.innerHTML = ''
         for (const m of current.messages) { if (m.role === 'user') renderUser(m); else renderAssistantFinal(createAssistantCard(), m.data, { restored: true }) }
         closeDrawers(); showChat(); messages.scrollTop = messages.scrollHeight; window.scrollTo(0, document.body.scrollHeight)
@@ -714,9 +728,10 @@
         const sh = el('div', 'steps-head'); sh.appendChild(svg('chev')); const sum = el('span', 'sum', 'Arbeitsschritte'); sh.appendChild(sum); sh.addEventListener('click', () => steps.classList.toggle('open')); steps.appendChild(sh)
         const sb = el('div', 'steps-body'); steps.appendChild(sb); card.appendChild(steps)
         const running = el('div', 'running-line'); running.innerHTML = '<span class="spinner"></span><span>Startet…</span>'; card.appendChild(running)
+        const live = el('div', 'answer live'); live.hidden = true; card.appendChild(live)
         const body = el('div'); card.appendChild(body)
         messages.appendChild(card)
-        return { card, head, models, steps, sum, sb, running, body, stepEls: new Map(), stepCount: 0, kinds: {} }
+        return { card, head, models, steps, sum, sb, running, live, body, stepEls: new Map(), stepCount: 0, kinds: {} }
       }
       function addStep(ui, ev) {
         const s = el('div', 'step running'); s.dataset.id = ev.id
@@ -735,11 +750,12 @@
       }
       function stepsSummary(ui, data) {
         const k = ui.kinds; const parts = []
-        if (k.search) parts.push(`${k.search} RIS-Suche${k.search > 1 ? 'n' : ''}`)
-        if (k.read) parts.push(`${k.read} Dokument${k.read > 1 ? 'e' : ''} gelesen`)
-        if (k.web) parts.push(`${k.web} Web`)
+        if (k.aissociate) parts.push('AI:ssociate')
+        if (k.upload) parts.push(`${k.upload} Dokument${k.upload > 1 ? 'e' : ''} gelesen`)
+        if (k.web) parts.push(`${k.web} Websuche${k.web > 1 ? 'n' : ''}`)
         if (k.file) parts.push(`${k.file} Datei${k.file > 1 ? 'en' : ''}`)
-        const m = data?.models ? [modelLabel(data.models.loop), data.models.final !== data.models.loop ? modelLabel(data.models.final) : null].filter(Boolean).join(' → ') : ''
+        if (k.verify) parts.push('RIS-Prüfung')
+        const m = data?.models ? modelLabel(data.models.main || data.models.loop) : ''
         return `${ui.stepCount} Schritte${parts.length ? ' · ' + parts.join(' · ') : ''}${m ? ' · ' + m : ''}`
       }
       function scrollBottom() { window.scrollTo({ top: document.body.scrollHeight }) }
@@ -758,14 +774,14 @@
         row.appendChild(el('span', 'q', s.marker))
         const body = el('div', 'body')
         const t = el('div', 't')
-        const badge = el('span', 'badge ' + (s.type === 'ris' ? 'ris' : s.type === 'web' ? 'web' : 'upload'), s.type === 'ris' ? 'RIS' : s.type === 'web' ? 'Web' : 'Upload'); t.appendChild(badge)
+        const badge = el('span', 'badge ' + (s.type === 'ris' ? 'ris' : s.type === 'web' ? 'web' : s.type === 'aissociate' ? 'aissociate' : 'upload'), s.type === 'ris' ? 'RIS' : s.type === 'web' ? 'Web' : s.type === 'aissociate' ? 'AI:ssociate' : 'Upload'); t.appendChild(badge)
         if (s.url) { const a = el('a', null, s.title || s.url); a.href = s.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; t.appendChild(a) } else t.appendChild(document.createTextNode(s.title || ''))
         body.appendChild(t)
         const metaParts = []
         if (s.meta?.inForceFrom) metaParts.push(`gilt seit ${s.meta.inForceFrom}`)
         if (s.meta?.inForceTo) metaParts.push(`außer Kraft ${s.meta.inForceTo}`)
         if (s.meta?.docType) metaParts.push(s.meta.docType)
-        const m = el('div', 'm'); const st = el('span', 'badge ' + (s.read ? 'read' : 'found'), s.read ? 'Volltext geprüft' : s.type === 'web' ? 'Suchtreffer (nicht gelesen)' : 'Suchtreffer'); m.appendChild(st); m.appendChild(document.createTextNode(metaParts.join(' · ')))
+        const m = el('div', 'm'); const st = el('span', 'badge ' + (s.read ? 'read' : 'found'), s.type === 'aissociate' ? 'Wissensdatenbank' : s.read ? 'Volltext geprüft' : s.type === 'web' ? 'Websuche' : 'Suchtreffer'); m.appendChild(st); m.appendChild(document.createTextNode(metaParts.join(' · ')))
         body.appendChild(m); row.appendChild(body)
         return row
       }
@@ -796,10 +812,10 @@
 
       function renderAssistantFinal(ui, data, opts = {}) {
         ui.running.remove()
+        ui.live?.remove()
         ui.steps.classList.remove('open')
         if (opts.restored || !ui.stepCount) { ui.steps.remove() } else ui.sum.textContent = stepsSummary(ui, data)
-        ui.models.innerHTML = ''
-        if (data.models) { ui.models.appendChild(modelTag(data.models.loop)); if (data.models.final && data.models.final !== data.models.loop) { ui.models.appendChild(document.createTextNode(' → ')); ui.models.appendChild(modelTag(data.models.final)) } }
+        renderModelTags(ui.models, data.models)
         const body = ui.body; body.innerHTML = ''
         const ans = el('div', 'answer'); ans.innerHTML = renderMarkdown(data.answer || '')
         body.appendChild(ans)
@@ -807,7 +823,7 @@
         const sources = (data.sources || []).filter((s) => s.type !== 'upload' || s.cited)
         const cited = sources.filter((s) => s.cited), others = sources.filter((s) => !s.cited)
         if (sources.length) {
-          const p = el('div', 'panel'); const t = el('div', 'panel-title', 'Quellen'); t.appendChild(el('span', 'vsum', `${sources.filter((s) => s.read).length} im Volltext geprüft`)); p.appendChild(t)
+          const p = el('div', 'panel'); const t = el('div', 'panel-title', 'Quellen'); const nKb = sources.filter((s) => s.type === 'aissociate').length; t.appendChild(el('span', 'vsum', nKb ? `${nKb} aus der Wissensdatenbank${sources.length > nKb ? ` · ${sources.length - nKb} Web` : ''}` : `${sources.length} Web`)); p.appendChild(t)
           cited.forEach((s) => p.appendChild(sourceRow(s)))
           if (others.length) {
             const box = el('div'); box.hidden = true; others.forEach((s) => box.appendChild(sourceRow(s)))
@@ -839,6 +855,7 @@
           line.appendChild(el('span', null, `≈ ${fmtUsd(c.totalUsd)}`))
           line.appendChild(el('span', null, `${fmtTok(c.inTok)} in / ${fmtTok(c.outTok)} out`))
           const bm = Object.entries(c.byModel || {}).map(([m, v]) => `${modelLabel(m)} ${fmtUsd(v.usd)}`).join(' · '); if (bm) line.appendChild(el('span', null, bm))
+          if (c.aissociateCalls) line.appendChild(el('span', null, `AI:ssociate ${c.aissociateCalls}×${c.aissociateUsd ? ' ' + fmtUsd(c.aissociateUsd) : ''}`))
           if (c.webSearchCalls) line.appendChild(el('span', null, `Web ${c.webSearchCalls}× ${fmtUsd(c.webSearchUsd)}`))
           if (c.seconds) line.appendChild(el('span', null, `Sandbox ${c.seconds}s ${fmtUsd(c.e2bUsd)}`))
           if (data.durationMs) line.appendChild(el('span', null, `${Math.round(data.durationMs / 1000)}s`))
@@ -865,13 +882,14 @@
         const handle = (ev) => {
           if (ev.event === 'step') addStep(ui, ev)
           else if (ev.event === 'step_update') updateStep(ui, ev)
-          else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } ui.models.innerHTML = ''; if (ev.models) { ui.models.appendChild(modelTag(ev.models.loop)); if (ev.models.final !== ev.models.loop) { ui.models.appendChild(document.createTextNode(' → ')); ui.models.appendChild(modelTag(ev.models.final)) } } }
+          else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } renderModelTags(ui.models, ev.models) }
+          else if (ev.event === 'delta') { if (ui.live.hidden) { ui.live.hidden = false } ui.liveText = (ui.liveText || '') + (ev.text || ''); ui.live.innerHTML = renderMarkdown(ui.liveText); scrollBottom() }
           else if (ev.event === 'status') { ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.message)}</span>` }
-          else if (ev.event === 'final') { finalData = ev; if (ev.title && !current.titleLocked) { current.title = ev.title; topTitle.textContent = ev.title } renderAssistantFinal(ui, ev); addCost(ev.cost) }
-          else if (ev.event === 'error') { ui.running.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
+          else if (ev.event === 'final') { finalData = ev; if (ev.title && !current.titleLocked) { current.title = ev.title; topTitle.textContent = ev.title } if (ev.aissThreadId) current.aissThreadId = ev.aissThreadId; renderAssistantFinal(ui, ev); addCost(ev.cost) }
+          else if (ev.event === 'error') { ui.running.remove(); ui.live?.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
         }
         try {
-          const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
+          const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
           if (!resp.ok || !resp.body) { let msg = 'Anfrage fehlgeschlagen'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
           for (;;) { const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith('data: ')) { try { handle(JSON.parse(chunk.slice(6))) } catch {} } } }
@@ -890,13 +908,13 @@
       // Feature tour
       // ------------------------------------------------------------------
       const TOUR = [
-        { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. AI:ssociate recherchiert iterativ im RIS (ris.bka.gv.at) und in EU-Quellen, liest die Dokumente und antwortet belegt.' },
+        { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. Sol wählt das Rechtsgebiet, die juristische Wissensdatenbank AI:ssociate recherchiert und antwortet; reicht das nicht, ergänzt Sol mit höchstens drei Websuchen.' },
         { sel: '#privacyBtn', title: 'Datenschutz', text: 'Pseudonymisierung ersetzt personenbezogene Daten durch Platzhalter, Anonymisierung entfernt sie irreversibel – auch in erzeugten Dateien.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
         { sel: '#actionsSec', title: 'Workflows', text: 'Geführte Aufgaben mit Formular statt Prompt-Vorlagen: Vertragsprüfung mit Kommentaren im Dokument, Versionsvergleich, Entwürfe, Fristen.' },
         { sel: '#historyBtn', title: 'Verlauf', text: 'Alle Gespräche bleiben in diesem Browser gespeichert und können jederzeit fortgesetzt werden – mit Kontext.' },
-        { sel: '#menuBtn', title: 'Menü & Einstellungen', text: 'Websuche, Datenschutz-Standard, Modell-Routing (Luna für einfache, Sol für komplexe Aufgaben) und Sitzungskosten.' },
-        { sel: null, title: 'Schritte, Quellen, Verifikation', text: 'Jede Antwort zeigt die Arbeitsschritte (ohne Code), die Quellen mit Status „Volltext geprüft“ und eine automatische Prüfung aller zitierten §§ und Geschäftszahlen gegen das RIS.' },
+        { sel: '#menuBtn', title: 'Menü & Einstellungen', text: 'Websuche als Fallback, Datenschutz-Standard, eingesetzte Modelle (Sol, Wissensdatenbank AI:ssociate) und Sitzungskosten.' },
+        { sel: null, title: 'Schritte, Quellen, Verifikation', text: 'Jede Antwort zeigt die wenigen Arbeitsschritte (ohne Code), die Dokumente der Wissensdatenbank bzw. Web-Quellen und eine automatische Prüfung aller zitierten §§ und Geschäftszahlen gegen das RIS.' },
       ]
       let tourIdx = -1, tourCard = null, tourTarget = null
       function startTour() { closeDrawers(); if (home.hidden) showHome(); tourIdx = 0; showTourStep() }
@@ -922,6 +940,8 @@
         try {
           health = await (await fetch('/api/health')).json()
           $('kvFast').textContent = health.models?.fast || '–'; $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'
+          $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
+          if (!health.aissociate) toast('Server: AISSOCIATE_API_KEY fehlt.')
           $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`
           if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
         } catch { toast('Server nicht erreichbar.') }

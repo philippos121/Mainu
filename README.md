@@ -1,31 +1,34 @@
 # AI:ssociate Playground
 
-Legal AI assistant for Austrian law firms. Users ask questions or run guided
-workflows; an agent researches **iteratively in the RIS (ris.bka.gv.at)**,
-reads the actual documents, answers with `[Qn]` source markers, and every cited
-§ / Geschäftszahl is **verified against the RIS** afterwards. Documents can be
-uploaded, analysed and returned as Word/Excel/PDF — the code for that is a
+Legal AI assistant for Austrian law firms. Every legal question goes to the
+**AI:ssociate knowledge base** (its own agentic research over Austrian statutes
+and case law); **Sol** picks the legal area first and reviews the answer
+afterwards, adding at most **three web searches** when something is missing.
+Every cited § / Geschäftszahl is then **verified against the RIS**. Documents can
+be uploaded, analysed and returned as Word/Excel/PDF — the code for that is a
 single tool call executed in an **E2B sandbox** (never shown to the user).
 
-## How a question is processed
+## How a question is processed (≈ 5 steps)
 
 ```
-question ──▶ triage (Luna) ──▶ simple    → Luna answers (≤ 4 steps)
-                            ├▶ research  → Luna research loop (RIS/EU) → Sol writes the answer
-                            └▶ complex   → Sol agent loop (uploads, files, drafting)
-                                     │
-                     verification (deterministic RIS checks of §§ and GZ) + follow-ups (Luna)
+question ──▶ Sol: mode + legal area (1 call) ──▶ legal    → AI:ssociate API (1 call, streamed)
+                                                            → Sol review: sufficient | ≤ 3 web searches + supplement
+                                               ├▶ document → short Sol tool loop (read_document, create_or_edit_file,
+                                               │              ask_aissociate ×1, web_search ≤ 3)
+                                               └▶ general  → Sol answers directly
+                                                     │
+                              RIS verification of §§ / GZ (deterministic) + 3 follow-ups (Luna)
 ```
 
-* **Tools of the agent:** `ris_search` (Bundesrecht, Landesrecht, Judikatur,
-  BGBl via the OGD API v2.6), `ris_read` (full text), `fetch_page` (EUR-Lex etc.),
-  `read_document` (uploaded files, extracted server-side), `create_or_edit_file`
-  (code model writes Python, runs in E2B, retries on errors), hosted `web_search`.
-* **Model routing:** `gpt-6-luna` for triage, simple tasks, research loop and
-  follow-ups; `gpt-6-sol` for complex tasks and the final answer; the code model
+* **Knowledge base:** `POST /api/public/v1/chat/ask` on app.aissociate.at
+  (header `x-api-key`, SSE stream; legal areas civil / criminal / tax / public,
+  optional Bundesland scope; `thread_id` keeps follow-ups in one thread).
+* **Models:** `gpt-6-sol` for the legal-area decision, review, document tasks
+  and final answers; `gpt-6-luna` only for follow-up suggestions; the code model
   defaults to Sol (set `OPENAI_MODEL_CODE` if you have another id).
 * **Budgets:** hard caps per question — 1,000,000 input and 100,000 output
-  tokens summed over all model calls (`MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`).
+  tokens summed over all model calls (`MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`);
+  `MAX_WEB_SEARCHES` (3) and `DOC_MAX_STEPS` (8) bound the step count.
 * **UI:** app.aissociate.at look (teal bar, centred logo, "Frage AI:ssociate."
   card with Pseudonymisierung toggle), no Rechtsgebiet selection. Workflows with
   forms (Rechtsrecherche, Vertrag prüfen, Versionen vergleichen, Entwurf,
@@ -43,20 +46,20 @@ npm run dev            # http://localhost:3000
 
 ## Deploy on Render
 
-The service builds from the `Dockerfile`. Set `OPENAI_API_KEY` and
-`E2B_API_KEY` in the Render dashboard; everything else has defaults
-(see `.env.example`). `GET /api/health` reports the configured models.
+The service builds from the `Dockerfile`. Set `OPENAI_API_KEY`,
+`AISSOCIATE_API_KEY` and `E2B_API_KEY` in the Render dashboard; everything else
+has defaults (see `.env.example`). `GET /api/health` reports the configuration.
 
 ## Endpoints
 
 | Route | Purpose |
 |---|---|
-| `POST /api/chat` | SSE stream: `step`, `step_update`, `route`, `final`, `error` |
+| `POST /api/chat` | SSE stream: `step`, `step_update`, `route`, `delta`, `final`, `error` |
 | `POST /api/verify` | Re-run the RIS verification for a text |
-| `GET /api/ris/search` | Direct RIS search (same parameters as the tool) |
 | `POST /api/export/docx` | Markdown → Word export of an answer |
 
 ## Security note
 
-The E2B key has a hardcoded **test-only** fallback in `server.js`; set
-`E2B_API_KEY` in production and rotate any key that was ever pasted into a chat.
+The E2B and AI:ssociate keys have hardcoded **test-only** fallbacks in
+`server.js`; set the env vars in production and rotate any key that was ever
+pasted into a chat.
