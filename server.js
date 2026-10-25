@@ -404,7 +404,7 @@ function normalizeRisDoc(ref) {
 async function risRequest(controller, params) {
   const url = new URL(`${RIS_BASE}/${controller}`)
   for (const [k, v] of Object.entries(params)) if (v != null && v !== '') url.searchParams.set(k, String(v))
-  const r = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 25_000)
+  const r = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, RIS_TIMEOUT_MS)
   if (!r.ok) throw new Error(`RIS HTTP ${r.status}`)
   const j = await r.json()
   const res = j?.OgdSearchResult || j
@@ -417,13 +417,25 @@ async function risRequest(controller, params) {
 
 // RIS only accepts these page sizes (schema type PageSize): Ten, Twenty, Fifty, OneHundred.
 const RIS_PAGE_SIZE = 'Ten'
+const RIS_TIMEOUT_MS = Number(process.env.RIS_TIMEOUT_MS || 10_000)
+const VERIFY_DEADLINE_MS = Number(process.env.VERIFY_DEADLINE_MS || 25_000)
 
 // ---------------------------------------------------------------------------
 // Citation verification (deterministic checks against RIS)
 // ---------------------------------------------------------------------------
-const KNOWN_DE_LAWS = new Set(['BGB', 'HGB', 'GG', 'VwGO', 'AO', 'InsO', 'DSGVO', 'EMRK', 'GRC', 'AEUV', 'EUV'])
-const NORM_RE = /(§§?|Art\.?|Artikel)\s*(\d{1,4}[a-z]{0,2})\s*(?:ff?\.?\s*)?(?:(?:Abs\.?|Absatz)\s*\d+[a-z]?\s*)?(?:(?:Z|Ziffer|Zif\.?)\s*\d+[a-z]?\s*)?(?:lit\.?\s*[a-z]\s*)?(?:(?:Satz|S\.)\s*\d+\s*)?(?:ff?\.?\s*)?([A-ZÄÖÜ][A-Za-zÄÖÜäöü]{0,5}(?:-[A-ZÄÖÜ][A-Za-zÄÖÜäöü]{0,8})?)\b/g
-const LAW_STOP = new Set(['Abs', 'Satz', 'Z', 'Art', 'Nr', 'Rz', 'Rn', 'RS', 'OGH', 'VwGH', 'VfGH', 'OLG', 'LG', 'BG', 'EuGH', 'EGMR', 'Und', 'Oder', 'Iv', 'Ivm', 'IVm', 'Ff', 'F', 'Bzw', 'Vgl', 'Siehe', 'Dazu', 'Der', 'Die', 'Das', 'Des', 'Dem', 'Den', 'Q'])
+// EU and foreign law is not in RIS Bundesrecht (the EMRK is: it has Verfassungsrang and is consolidated there).
+const FOREIGN_LAWS = new Set(['BGB', 'HGB', 'GG', 'VwGO', 'AO', 'InsO', 'DSGVO', 'GRC', 'AEUV', 'EUV', 'ZGB', 'OR'])
+const NUM = '\\d{1,4}[a-z]{0,2}'
+const NUM_LIST = `(?:\\s*(?:,|und|bis|–|-)\\s*${NUM})*`
+const NORM_RE = new RegExp(
+  `(§§?|Art\\.?|Artikel)\\s*(${NUM})${NUM_LIST}\\s*(?:ff?\\.?\\s*)?` +
+  `(?:(?:Abs\\.?|Absatz)\\s*${NUM}${NUM_LIST}\\s*)?(?:(?:Z|Ziffer|Zif\\.?)\\s*${NUM}${NUM_LIST}\\s*)?` +
+  `(?:lit\\.?\\s*[a-z]{1,2}\\s*)?(?:sublit\\.?\\s*[a-z]{1,2}\\s*)?` +
+  `(?:(?:erster|zweiter|dritter|vierter|fünfter|letzter|vorletzter)\\s+Satz\\s*)?(?:(?:Satz|S\\.?)\\s*\\d+\\s*)?(?:ff?\\.?\\s*)?` +
+  `([A-ZÄÖÜ][A-Za-zÄÖÜäöüß]{0,9}(?:-(?:VG|BG|G|K|L|JZG|KUVG|VO|DG|BetrG)\\b)?)(?![\\wäöüß-])`,
+  'g',
+)
+const LAW_STOP = new Set(['Abs', 'Satz', 'Z', 'Art', 'Nr', 'Rz', 'Rn', 'RS', 'OGH', 'VwGH', 'VfGH', 'OLG', 'LG', 'BG', 'BVwG', 'LVwG', 'EuGH', 'EGMR', 'Und', 'Oder', 'Iv', 'Ivm', 'IVm', 'Ff', 'F', 'Bzw', 'Vgl', 'Siehe', 'Dazu', 'Der', 'Die', 'Das', 'Des', 'Dem', 'Den', 'Q', 'GmbH', 'AG', 'KG', 'OG', 'HG', 'BGBl', 'LGBl', 'ABl', 'Nov'])
 
 function extractNormCitations(text) {
   const out = new Map()
@@ -441,9 +453,12 @@ function extractNormCitations(text) {
 }
 
 const GZ_PATTERNS = [
-  { app: 'Justiz', re: /\b(\d{1,2})\s?(Ob|Os|ObA|ObS|Nc|Nd|Ns|Fsc|Fss|Bkd|Ds|Dg|Präs|R|Bs|Cg|Cga|Cgs|Cgb|Ra|Rs|Msch|Fam|Hv|U|St|HR|Kt|Okt|Nr)\s?(\d{1,4})\/(\d{2})([a-z])?\b/g, fmt: (m) => `${m[1]}${m[2]}${m[3]}/${m[4]}${m[5] || ''}` },
-  { app: 'Vwgh', re: /\b(Ra|Ro|Fr|Fe|Fra|Ko)\s?(\d{4})\/(\d{2})\/(\d{4})\b/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}/${m[4]}` },
-  { app: 'Vfgh', re: /\b(G|B|E|V|SV|WI|KI|KR|KIV|A|UA)\s?(\d{1,4})\/(\d{4})(?:-\d+)?\b/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}` },
+  { app: 'Justiz', re: /\b(\d{1,2})\s?(ObA|ObS|Ob|Os|Nc|Nd|Ns|Fsc|Fss|Bkd|Ds|Dg|Präs|R|Bs|Cga|Cgs|Cgb|Cg|Ra|Rs|Msch|Fam|Hv|U|St|HR|Kt|Okt)\s?(\d{1,4})\/(\d{2})([a-z])?(?![\d/])/g, fmt: (m) => `${m[1]}${m[2]}${m[3]}/${m[4]}${m[5] || ''}` },
+  { app: 'Vwgh', re: /\b(Ra|Ro|Fr|Fe|Fra|Ko)\s?(\d{4})\/(\d{2})\/(\d{4})(?![\d/])/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}/${m[4]}` },
+  // Pre-2014 VwGH numbering (e.g. 2012/15/0123), only when VwGH is named nearby and
+  // the number carries no letter prefix (those are matched above).
+  { app: 'Vwgh', re: /VwGH[^\n]{0,40}?(?<![A-Za-z]\s?)\b(\d{4})\/(\d{2})\/(\d{4})(?![\d/])/g, fmt: (m) => `${m[1]}/${m[2]}/${m[3]}` },
+  { app: 'Vfgh', re: /\b(G|B|E|V|SV|WI|KI|KR|KIV|A|UA)\s?(\d{1,4})\/(\d{4})(?:-\d+)?(?![\d/])/g, fmt: (m) => `${m[1]} ${m[2]}/${m[3]}` },
 ]
 function extractDecisionCitations(text) {
   const out = new Map()
@@ -459,17 +474,28 @@ function extractDecisionCitations(text) {
   return [...out.values()]
 }
 
+// RIS stores some abbreviations with a year (EStG 1988, GewO 1994, WEG 2002): compare by prefix,
+// also against the Kurztitel, so a hit in a *different* statute is never reported as confirmed.
+function lawMatches(doc, law) {
+  const l = law.toLowerCase()
+  const abbr = (doc.abbr || '').toLowerCase()
+  const title = (doc.law || '').toLowerCase().replace(/[^a-zäöüß0-9]/g, '')
+  return (abbr && (abbr === l || abbr.startsWith(l + ' ') || abbr.startsWith(l))) || (title && title === l.replace(/[^a-zäöüß0-9]/g, ''))
+}
+
 async function verifyNorm(n) {
-  if (KNOWN_DE_LAWS.has(n.law)) return { ...n, status: 'skipped', note: 'Keine österreichische Bundesnorm – nicht im RIS geprüft.' }
+  if (FOREIGN_LAWS.has(n.law)) return { ...n, status: 'skipped', note: 'EU-Recht/ausländisches Recht – nicht im RIS (Bundesrecht) enthalten, nicht geprüft.' }
   const attempts = n.kind === 'Art'
     ? [{ Titel: n.law, Artikel: n.num }, { Suchworte: n.law, Artikel: n.num }]
     : [{ Titel: n.law, Paragraf: n.num }, { Suchworte: n.law, Paragraf: n.num }]
   let lastErr = null
+  let otherHit = null
   for (const extra of attempts) {
     try {
       const r = await risRequest('Bundesrecht', { Applikation: 'BrKons', DokumenteProSeite: RIS_PAGE_SIZE, Seitennummer: 1, ...extra })
       if (r.hits > 0 && r.docs.length) {
-        const best = r.docs.find((d) => d.abbr && d.abbr.toLowerCase() === n.law.toLowerCase()) || r.docs[0]
+        const best = r.docs.find((d) => lawMatches(d, n.law))
+        if (!best) { otherHit = otherHit || r.docs[0]; continue }
         const today = new Date().toISOString().slice(0, 10)
         const expired = best.inForceTo && best.inForceTo <= today
         return {
@@ -477,12 +503,13 @@ async function verifyNorm(n) {
           status: expired ? 'expired' : 'ok',
           title: best.title, url: best.url, htmlUrl: best.htmlUrl, inForceFrom: best.inForceFrom, inForceTo: best.inForceTo, id: best.id,
           note: expired ? `Außer Kraft seit ${best.inForceTo}` : (best.inForceFrom ? `Geltende Fassung seit ${best.inForceFrom}` : 'Im RIS gefunden'),
-          exactAbbr: Boolean(best.abbr && best.abbr.toLowerCase() === n.law.toLowerCase()),
         }
       }
-    } catch (e) { lastErr = e }
+    } catch (e) { lastErr = e; break } // transport/validation errors would repeat identically
   }
-  return { ...n, status: lastErr ? 'error' : 'not_found', note: lastErr ? `RIS nicht erreichbar (${lastErr.message})` : 'Im RIS (Bundesrecht konsolidiert) nicht gefunden – Landesrecht/EU-Recht oder Zitierfehler?' }
+  if (lastErr) return { ...n, status: 'error', note: `RIS nicht erreichbar (${lastErr.message})` }
+  if (otherHit) return { ...n, status: 'unsure', title: otherHit.title, url: otherHit.url, note: `Nur Treffer in einem anderen Gesetz (${otherHit.title}) – Zitat prüfen` }
+  return { ...n, status: 'not_found', note: 'Im RIS (Bundesrecht konsolidiert) nicht gefunden – Landesrecht/EU-Recht oder Zitierfehler?' }
 }
 
 async function verifyDecision(d) {
@@ -495,7 +522,7 @@ async function verifyDecision(d) {
         const best = r.docs.find((x) => x.docType === 'Entscheidungstext') || r.docs[0]
         return { ...d, status: 'ok', title: best.title, url: best.url, htmlUrl: best.htmlUrl, date: best.date, court: best.court, id: best.id, hits: r.hits, note: `Im RIS gefunden (${r.hits} Dokument${r.hits === 1 ? '' : 'e'})` }
       }
-    } catch (e) { lastErr = e }
+    } catch (e) { lastErr = e; break }
   }
   return { ...d, status: lastErr ? 'error' : 'not_found', note: lastErr ? `RIS nicht erreichbar (${lastErr.message})` : 'Geschäftszahl im RIS nicht gefunden – bitte prüfen.' }
 }
@@ -508,9 +535,12 @@ async function verifyAnswer(answer) {
     Promise.all(decisions.map((x) => verifyDecision(x).catch((e) => ({ ...x, status: 'error', note: e.message })))),
   ])
   const all = [...n, ...d]
+  const count = (s) => all.filter((x) => x.status === s).length
+  const skipped = count('skipped')
   return {
     norms: n, decisions: d,
-    summary: { checked: all.length, ok: all.filter((x) => x.status === 'ok').length, warn: all.filter((x) => x.status === 'expired').length, notFound: all.filter((x) => x.status === 'not_found').length, error: all.filter((x) => x.status === 'error').length, skipped: all.filter((x) => x.status === 'skipped').length },
+    // "checked" excludes citations that were deliberately not verified (EU/foreign law).
+    summary: { checked: all.length - skipped, ok: count('ok'), warn: count('expired'), unsure: count('unsure'), notFound: count('not_found'), error: count('error'), skipped },
   }
 }
 
@@ -591,23 +621,29 @@ const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichisc
 - question: die Frage an die Wissensdatenbank – eigenständig, präzise, vollständig (relevanten Kontext und Fakten aus Anfrage und Verlauf einarbeiten, keine Verweise wie "siehe oben"), auf Deutsch. Bei mode document/general: kurze Beschreibung der Aufgabe.
 - title: prägnanter Titel (max. 6 Wörter) für die Verlaufsliste.`
 
-const REVIEW_INSTRUCTIONS = `Du bist AI:ssociate (Modell Sol) und prüfst die Antwort der juristischen Wissensdatenbank (AI:ssociate, österreichisches Recht; sie recherchiert selbst agentisch in Normen und Judikatur). Du bekommst die Nutzerfrage und diese Antwort.
+// The web-search wording depends on whether the hosted tool is actually offered.
+const WEB_SOURCES = 'bevorzugt ris.bka.gv.at, eur-lex.europa.eu, curia.europa.eu, parlament.gv.at, jusline.at, offizielle Quellen'
+const webClause = (web) => web
+  ? `nutze die Websuche, höchstens ${MAX_WEB_SEARCHES} Suchen (${WEB_SOURCES})`
+  : 'eine Websuche ist NICHT verfügbar – ergänze nur aus gesichertem Wissen und kennzeichne Unsicheres ausdrücklich als nicht verifiziert'
+
+const reviewInstructions = (web) => `Du bist AI:ssociate (Modell Sol) und prüfst die Antwort der juristischen Wissensdatenbank (AI:ssociate, österreichisches Recht; sie recherchiert selbst agentisch in Normen und Judikatur). Du bekommst die Nutzerfrage und diese Antwort.
 
 Prüfe: Ist die Frage damit vollständig, aktuell und belegt beantwortet?
 - JA → erste Zeile exakt "VERDICT: AUSREICHEND". Danach entweder nichts oder höchstens 1–3 Sätze mit einem wichtigen Hinweis (z. B. Frist, Risiko, Praxis-Tipp). Keine Wiederholung der Antwort.
-- NEIN (wesentliche Lücke, Unsicherheit, veraltete Rechtslage, fehlendes EU-/ausländisches Recht, aktuelle Entwicklung, Widerspruch) → nutze die Websuche, höchstens ${MAX_WEB_SEARCHES} Suchen (bevorzugt ris.bka.gv.at, eur-lex.europa.eu, curia.europa.eu, parlament.gv.at, jusline.at, offizielle Quellen). Dann erste Zeile exakt "VERDICT: ERGAENZT", danach eine kompakte Ergänzung in Markdown: nur was fehlt oder zu korrigieren ist, mit Fundstellen (§, Gesetz; Gericht, Datum, Geschäftszahl) und Links. Keine Wiederholung der Wissensdatenbank-Antwort.
+- NEIN (wesentliche Lücke, Unsicherheit, veraltete Rechtslage, fehlendes EU-/ausländisches Recht, aktuelle Entwicklung, Widerspruch) → ${webClause(web)}. Dann erste Zeile exakt "VERDICT: ERGAENZT", danach eine kompakte Ergänzung in Markdown: nur was fehlt oder zu korrigieren ist, mit Fundstellen (§, Gesetz; Gericht, Datum, Geschäftszahl)${web ? ' und Links' : ''}. Keine Wiederholung der Wissensdatenbank-Antwort.
 Nie Normen, Entscheidungen oder Fundstellen erfinden. Sprache: wie die Nutzerfrage.`
 
-const DIRECT_INSTRUCTIONS = `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Die juristische Wissensdatenbank ist gerade nicht verfügbar. Beantworte die Rechtsfrage selbst: nutze die Websuche (höchstens ${MAX_WEB_SEARCHES} Suchen; bevorzugt ris.bka.gv.at, eur-lex.europa.eu, curia.europa.eu, offizielle Quellen) und antworte strukturiert in Markdown: **Kurzantwort**, **Rechtliche Grundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Beurteilung**, **Ergebnis / Empfehlung**. Belege mit Links. Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
+const directInstructions = (web) => `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Die juristische Wissensdatenbank ist gerade nicht verfügbar. Beantworte die Rechtsfrage selbst: ${webClause(web)}. Antworte strukturiert in Markdown: **Kurzantwort**, **Rechtliche Grundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Beurteilung**, **Ergebnis / Empfehlung**. ${web ? 'Belege mit Links. ' : ''}Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
 
 const GENERAL_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Erledige die Aufgabe direkt, präzise und in der Sprache der Nutzerin (Markdown, keine Floskeln). Keine Rechtsrecherche nötig; falls doch eine Rechtsfrage enthalten ist, beantworte sie nach bestem Wissen und weise darauf hin, dass dafür keine Datenbankrecherche erfolgte.`
 
-const DOC_INSTRUCTIONS = `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte, und bearbeitest eine Dokumentaufgabe mit wenigen, gezielten Schritten.
+const docInstructions = (web) => `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte, und bearbeitest eine Dokumentaufgabe mit wenigen, gezielten Schritten.
 
 WERKZEUGE
 - read_document: hochgeladene Dateien lesen (in Teilen; lies so viel wie nötig, nicht mehr).
 - ask_aissociate: EIN Aufruf an die juristische Wissensdatenbank (österreichisches Recht, agentisch, mit Normen und Judikatur) für die rechtliche Beurteilung. Formuliere die Frage vollständig und eigenständig, mit den relevanten Fakten/Klauseln aus dem Dokument. Nur einmal verfügbar – bündle alle Rechtsfragen.
-- web_search: nur falls die Wissensdatenbank nicht ausreicht (höchstens ${MAX_WEB_SEARCHES} Suchen).
+${web ? `- web_search: nur falls die Wissensdatenbank nicht ausreicht (höchstens ${MAX_WEB_SEARCHES} Suchen).` : '- Eine Websuche ist NICHT verfügbar; Unsicheres ausdrücklich kennzeichnen.'}
 - create_or_edit_file: erzeugt/bearbeitet Dateien (Word/Excel/PDF/HTML). Ein Aufruf je Deliverable. Die gesamte juristische Arbeit (welche Klausel, welcher Kommentar, welche Formulierung) machst DU vorher und gibst sie wörtlich in task mit. Niemals generische oder identische Kommentare für mehrere Absätze; jeder Kommentar nennt das konkrete Problem der konkreten Klausel.
 
 ABLAUF: lesen → (eine) Rechtsfrage an die Wissensdatenbank → Deliverable erzeugen → kurze Antwort. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
@@ -835,7 +871,9 @@ app.post('/api/chat', async (req, res) => {
   const filesOut = []
   const uploadTexts = new Map()
   let aissThreadOut = threadIn
-  let aissCalls = 0
+  let aissCalls = 0 // attempts (enforces the one-call limit)
+  let aissOk = false // at least one successful knowledge-base answer
+  const assertAlive = () => { if (clientGone) throw new Error('Verbindung geschlossen.') }
 
   async function ensureSandbox() {
     if (sandboxReady) return
@@ -870,6 +908,7 @@ app.post('/api/chat', async (req, res) => {
         r = await attempt(null)
       }
       aissThreadOut = r.threadId || null
+      aissOk = true
       const srcs = r.sources.map((s) => addEvidence({ type: 'aissociate', url: s.url, title: s.title, raw: s.raw, read: true }))
       stepDone(sid, { detail: `Antwort erhalten${srcs.length ? ` · ${srcs.length} Dokument${srcs.length > 1 ? 'e' : ''}` : ''}${r.errors.length ? ' · Hinweis: ' + r.errors[0].slice(0, 80) : ''}` })
       return { ...r, evidence: srcs }
@@ -892,7 +931,7 @@ app.post('/api/chat', async (req, res) => {
     return { text: `${name} – Teil ${part}/${parts}${t.pages ? ` (${t.pages} Seiten)` : ''}\n\n${chunk}`, detail: `Teil ${part}/${parts}` }
   }
   async function toolAskAissociate(args) {
-    if (aissCalls >= 1) return { text: 'Limit erreicht: Die Wissensdatenbank wurde in dieser Aufgabe bereits befragt. Arbeite mit der vorliegenden Antwort weiter (ggf. web_search, höchstens 3 Suchen).', detail: 'Limit (1 Aufruf)' , skipStep: true }
+    if (aissCalls >= 1) return { text: `Limit erreicht: Die Wissensdatenbank wurde in dieser Aufgabe bereits befragt. Arbeite mit der vorliegenden Antwort weiter${useWeb ? ` (ggf. web_search, insgesamt höchstens ${MAX_WEB_SEARCHES} Suchen)` : ''}.`, detail: 'Limit (1 Aufruf)' }
     const r = await runAissociate({ question: String(args.question || ''), legalArea: LEGAL_AREAS[args.legal_area] ? args.legal_area : 'civil', scope: args.scope && SCOPES.includes(args.scope) ? args.scope : '', stream: false })
     const srcLines = r.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')
     return { text: `ANTWORT DER WISSENSDATENBANK:\n${r.answer}\n${srcLines ? `\nQUELLEN:\n${srcLines}` : ''}`, detail: 'Antwort erhalten', skipStep: true }
@@ -975,7 +1014,7 @@ app.post('/api/chat', async (req, res) => {
       const tools = remainingWeb > 0 ? [...baseTools, WEB_SEARCH_TOOL] : baseTools
       const sid = step('think', i === 1 ? 'Sol plant die Bearbeitung' : 'Sol wertet Ergebnisse aus', { model: MODEL_MAIN })
       let resp
-      try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DOC_INSTRUCTIONS, input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
+      try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: docInstructions(useWeb), input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
       prevId = resp.id
       input = [] // everything sent so far is now part of the chain (previous_response_id)
       collectWebCitations(resp)
@@ -989,7 +1028,7 @@ app.post('/api/chat', async (req, res) => {
     if (!text && prevId) {
       // Only unsent tool outputs (if any) plus the wrap-up request go into the chain.
       const sid = step('think', 'Sol fasst zusammen (Schrittlimit)', { model: MODEL_MAIN })
-      const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DOC_INSTRUCTIONS, input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
+      const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: docInstructions(useWeb), input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
       collectWebCitations(resp)
       text = resp.output_text || ''
       stepDone(sid)
@@ -1000,7 +1039,7 @@ app.post('/api/chat', async (req, res) => {
   try {
     // ---- 0. uploads: extract text ----
     if (uploads.length) {
-      const sid = step('upload', `${uploads.length} Datei${uploads.length > 1 ? 'en' : ''} wird gelesen`)
+      const sid = step('read', `${uploads.length} Datei${uploads.length > 1 ? 'en' : ''} wird vorbereitet`)
       for (const u of uploads) uploadTexts.set(u.name, await extractText(u.name, u.buf))
       stepDone(sid, { detail: uploads.map((u) => `${u.name} (${(uploadTexts.get(u.name).text.length / 1000).toFixed(0)}k Zeichen)`).join(', ') })
     }
@@ -1038,13 +1077,15 @@ app.post('/api/chat', async (req, res) => {
       else console.error('plan: no usable JSON, using defaults')
     } catch (e) { console.error('plan failed:', e?.message) }
     if (uploads.length) plan.mode = 'document'
-    if (forceMode) plan.mode = forceMode
+    // A preset decides the mode, except that attached documents must not be ignored.
+    if (forceMode && !(uploads.length && forceMode === 'legal')) plan.mode = forceMode
     if (!LEGAL_AREAS[plan.legal_area]) plan.legal_area = plan.mode === 'legal' ? 'civil' : 'none'
     if (!SCOPES.includes(plan.scope)) plan.scope = ''
     if (!plan.question?.trim()) plan.question = prompt
     const areaLabel = LEGAL_AREA_LABEL[plan.legal_area] || 'allgemein'
     stepDone(pid, { detail: plan.mode === 'legal' ? `Rechtsfrage · ${areaLabel}${plan.scope ? ' (' + plan.scope + ')' : ''}` : plan.mode === 'document' ? 'Dokumentaufgabe' : 'Allgemeine Aufgabe' })
     send('route', { route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, title: plan.title, models: { main: MODEL_MAIN, code: MODEL_CODE, knowledgeBase: plan.mode === 'general' ? null : 'AI:ssociate' } })
+    assertAlive()
 
     // ---- 2. answer ----
     let answer = ''
@@ -1059,10 +1100,11 @@ app.post('/api/chat', async (req, res) => {
           // The knowledge-base answer is the deliverable; the review only adds to it,
           // so a failing review (API error, budget) must never discard it.
           answer = kb.answer.trim()
+          assertAlive()
           const sid = step('think', 'Sol prüft die Antwort', { model: MODEL_MAIN })
           try {
             const resp = await callModel(ctx, {
-              model: MODEL_MAIN, instructions: REVIEW_INSTRUCTIONS, effort: EFFORT_MAIN, maxOut: 8000,
+              model: MODEL_MAIN, instructions: reviewInstructions(useWeb), effort: EFFORT_MAIN, maxOut: 8000,
               input: [...histInput, { role: 'user', content: `${privacyLine}NUTZERFRAGE:\n${prompt}\n\nFRAGE AN DIE WISSENSDATENBANK (${areaLabel}):\n${plan.question}\n\nANTWORT DER WISSENSDATENBANK:\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}` }],
               tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined,
             })
@@ -1070,8 +1112,9 @@ app.post('/api/chat', async (req, res) => {
             emitWebSteps(resp)
             const txt = (resp.output_text || '').trim()
             // Tolerate Markdown decoration around the verdict line (**VERDICT: …**, # VERDICT: …).
-            const vm = txt.match(/^[\s*#_>`]*VERDICT:?\s*(AUSREICHEND|ERG(?:AE|Ä)NZT)[\s*_`:.-]*/i)
-            verdict = vm ? (/AUSREICHEND/i.test(vm[1]) ? 'sufficient' : 'supplemented') : (txt ? 'supplemented' : 'sufficient')
+            const vm = txt.match(/^[\s*#_>`]*VERDICT:?\s*[*_`]*\s*(AUSREICHEND|ERG(?:AE|Ä)NZT)[\s*_`:.-]*/i)
+            // Without a usable verdict line, let the evidence decide: a web search means "ergänzt".
+            verdict = vm ? (/AUSREICHEND/i.test(vm[1]) ? 'sufficient' : 'supplemented') : (ctx.usage.webSearchCalls > 0 && txt ? 'supplemented' : 'sufficient')
             const supplement = (vm ? txt.slice(vm[0].length) : txt).trim()
             const webN = ctx.usage.webSearchCalls
             stepDone(sid, { detail: verdict === 'sufficient' ? 'ausreichend' : `ergänzt${webN ? ` (${webN} Websuche${webN > 1 ? 'n' : ''})` : ''}${resp.status === 'incomplete' ? ' · abgeschnitten' : ''}` })
@@ -1084,8 +1127,9 @@ app.post('/api/chat', async (req, res) => {
           }
         } else {
           // Knowledge base unavailable → Sol answers directly with ≤3 web searches.
+          assertAlive()
           const sid = step('think', 'Sol beantwortet die Frage (Wissensdatenbank nicht verfügbar)', { model: MODEL_MAIN })
-          const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: DIRECT_INSTRUCTIONS, effort: EFFORT_MAIN, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
+          const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: directInstructions(useWeb), effort: EFFORT_MAIN, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
           collectWebCitations(resp)
           emitWebSteps(resp)
           stepDone(sid, { detail: ctx.usage.webSearchCalls ? `${ctx.usage.webSearchCalls} Websuche${ctx.usage.webSearchCalls > 1 ? 'n' : ''}` : 'ohne Websuche' })
@@ -1107,19 +1151,24 @@ app.post('/api/chat', async (req, res) => {
     }
     if (!answer.trim()) answer = 'Es konnte keine Antwort erzeugt werden. Bitte die Frage präzisieren.'
 
-    // ---- 3. verification (deterministic, against RIS) ----
+    // ---- 3. verification (deterministic, against RIS, bounded by a deadline) ----
     let verification = null
     if (plan.mode !== 'general') {
+      assertAlive()
       const vid = step('verify', 'Zitate werden gegen das RIS geprüft')
       try {
-        verification = await verifyAnswer(answer)
-        const s = verification.summary
-        stepDone(vid, { detail: s.checked ? `${s.ok} von ${s.checked} Fundstellen bestätigt${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}` : 'keine Normzitate erkannt' })
+        verification = await Promise.race([verifyAnswer(answer), new Promise((r) => setTimeout(() => r(null), VERIFY_DEADLINE_MS).unref?.())])
+        if (!verification) { stepFail(vid, { detail: 'RIS-Prüfung übersprungen (Zeitüberschreitung) – „Erneut prüfen“ in der Antwort nutzen' }) }
+        else {
+          const s = verification.summary
+          stepDone(vid, { detail: s.checked ? `${s.ok} von ${s.checked} Fundstellen bestätigt${s.warn ? `, ${s.warn} außer Kraft` : ''}${s.unsure ? `, ${s.unsure} unklar` : ''}${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}${s.skipped ? ` · ${s.skipped} EU-/ausländisches Recht nicht geprüft` : ''}` : s.skipped ? `keine prüfbaren österreichischen Normzitate (${s.skipped} EU-/ausländisches Recht)` : 'keine Normzitate erkannt' })
+        }
       } catch (e) { stepFail(vid, { detail: e.message }) }
     }
 
     // ---- 4. follow-ups (Luna, tiny) ----
     let followups = []
+    assertAlive()
     try {
       const fr = await callModel(ctx, { model: MODEL_FAST, instructions: FOLLOWUP_INSTRUCTIONS, effort: 'low', maxOut: 2000, input: [{ role: 'user', content: `FRAGE: ${prompt.slice(0, 2000)}\n\nANTWORT (Auszug): ${answer.slice(0, 6000)}` }], text: { format: { type: 'json_schema', name: 'followups', schema: { type: 'object', additionalProperties: false, properties: { followups: { type: 'array', items: { type: 'string' } } }, required: ['followups'] }, strict: true } } })
       followups = (parseJsonLoose(fr.output_text || '')?.followups || []).filter((s) => typeof s === 'string').slice(0, 3)
@@ -1143,7 +1192,7 @@ app.post('/api/chat', async (req, res) => {
 
     send('final', {
       answer, sources, verification, followups, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
-      models: { main: MODEL_MAIN, code: MODEL_CODE, knowledgeBase: aissCalls ? 'AI:ssociate' : null },
+      models: { main: MODEL_MAIN, code: MODEL_CODE, knowledgeBase: aissOk ? 'AI:ssociate' : null },
       aissThreadId: aissThreadOut,
       execution: { images, files: filesOut },
       cost: computeCost(ctx.usage, sandboxStart ? (Date.now() - sandboxStart) / 1000 : 0),

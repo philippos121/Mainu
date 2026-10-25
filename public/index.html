@@ -175,7 +175,7 @@
       .vrow:first-of-type { border-top: none; }
       .vmark { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; margin-top: 1px; }
       .vmark.ok { background: rgba(26,156,91,0.14); color: var(--ok); }
-      .vmark.expired { background: rgba(224,138,0,0.16); color: #a96500; }
+      .vmark.expired, .vmark.unsure { background: rgba(224,138,0,0.16); color: #a96500; }
       .vmark.not_found { background: rgba(217,45,32,0.12); color: var(--err); }
       .vmark.error, .vmark.skipped { background: var(--surface-2); color: var(--faint); }
       .vrow .vt { font-weight: 600; }
@@ -366,7 +366,7 @@
         <button class="menu-item" id="miHistory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>Verlauf</button>
         <button class="menu-item" id="miTour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 6L9 15l1-5z"/></svg>Feature-Tour</button>
         <div class="menu-sec">Einstellungen</div>
-        <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Zusätzlich zum RIS (EUR-Lex, Kommentare)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
+        <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Fallback nach der Wissensdatenbank (max. 3 Suchen)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
         <div class="setting"><div><div class="sl">Datenschutz-Modus</div><div class="sd">Standard für neue Fragen</div></div>
           <select class="sel" id="selPrivacy"><option value="off">Aus</option><option value="pseudonymize">Pseudonymisierung</option><option value="anonymize">Anonymisierung</option></select></div>
         <div class="menu-sec">Modelle &amp; Budget</div>
@@ -409,7 +409,7 @@
       const costPill = $('costPill'), topTitle = $('topTitle')
 
       const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v2'
-      const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+      const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024, MAX_TOTAL_UPLOAD_BYTES = 28 * 1024 * 1024 // base64 of 28 MB stays under the server's 40 MB JSON limit
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
 
       let settings = { webSearch: true, privacy: 'off' }
@@ -609,6 +609,7 @@
         for (const file of fileList) {
           if (pendingFiles.length >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht.`); break }
           if (file.size > MAX_UPLOAD_BYTES) { toast(`„${file.name}“ ist zu groß (max. 15 MB).`); continue }
+          if (pendingFiles.reduce((a, f) => a + f.size, 0) + file.size > MAX_TOTAL_UPLOAD_BYTES) { toast('Anhänge zusammen höchstens 28 MB pro Nachricht.'); continue }
           pendingFiles.push({ name: file.name, base64: await readAsBase64(file), size: file.size })
         }
         renderAttachments()
@@ -660,7 +661,7 @@
       }
       function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; topTitle.textContent = current?.title || 'Neues Gespräch' }
       function newConversation() {
-        current = { id: uid(), sessionId: uid(), aissThreadId: null, title: '', createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
+        current = { id: uid(), sessionId: uid(), aissThreadId: null, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
         messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; renderAttachments(); closeDrawers(); showHome()
       }
       function persistCurrent() {
@@ -745,8 +746,9 @@
       }
       function updateStep(ui, ev) {
         const s = ui.stepEls.get(ev.id); if (!s) return
-        s.classList.remove('running', 'done', 'error'); s.classList.add(ev.status === 'error' ? 'error' : 'done')
+        s.classList.remove('running', 'done', 'error'); s.classList.add(ev.status === 'error' ? 'error' : ev.status === 'running' ? 'running' : 'done')
         if (ev.detail != null) s.querySelector('.sd').textContent = ev.detail
+        if (ev.status === 'running' && ev.detail) ui.running.innerHTML = `<span class="spinner"></span><span>${esc(s.querySelector('.st').textContent)} – ${esc(ev.detail)}</span>`
       }
       function stepsSummary(ui, data) {
         const k = ui.kinds; const parts = []
@@ -790,12 +792,17 @@
         const p = el('div', 'panel'); const title = el('div', 'panel-title', 'Verifikation gegen das RIS')
         const sum = v?.summary
         if (sum && sum.checked) {
-          const cls = sum.notFound || sum.error ? (sum.ok ? 'warn' : 'bad') : sum.warn ? 'warn' : 'good'
-          title.appendChild(el('span', 'vsum ' + cls, `${sum.ok}/${sum.checked} Fundstellen bestätigt${sum.warn ? ` · ${sum.warn} außer Kraft` : ''}${sum.notFound ? ` · ${sum.notFound} nicht gefunden` : ''}${sum.error ? ` · ${sum.error} nicht prüfbar` : ''}`))
-        } else title.appendChild(el('span', 'vsum', 'keine Normzitate erkannt'))
+          // All requests failed → infrastructure problem, not a verdict on the citations.
+          const onlyErrors = sum.error && !sum.ok && !sum.warn && !sum.notFound && !sum.unsure
+          const cls = onlyErrors ? '' : (sum.notFound || sum.error || sum.unsure) ? (sum.ok ? 'warn' : 'bad') : sum.warn ? 'warn' : 'good'
+          const txt = onlyErrors
+            ? `RIS nicht erreichbar – ${sum.error} Fundstellen nicht geprüft`
+            : `${sum.ok}/${sum.checked} Fundstellen bestätigt${sum.warn ? ` · ${sum.warn} außer Kraft` : ''}${sum.unsure ? ` · ${sum.unsure} unklar` : ''}${sum.notFound ? ` · ${sum.notFound} nicht gefunden` : ''}${sum.error ? ` · ${sum.error} nicht prüfbar` : ''}${sum.skipped ? ` · ${sum.skipped} EU-/ausl. Recht nicht geprüft` : ''}`
+          title.appendChild(el('span', 'vsum ' + cls, txt))
+        } else title.appendChild(el('span', 'vsum', sum?.skipped ? `nur EU-/ausländisches Recht zitiert (${sum.skipped}) – nicht im RIS prüfbar` : 'keine Normzitate erkannt'))
         p.appendChild(title)
         const rows = el('div')
-        const MARK = { ok: '✓', expired: '!', not_found: '✗', error: '?', skipped: '–' }
+        const MARK = { ok: '✓', expired: '!', unsure: '?', not_found: '✗', error: '?', skipped: '–' }
         for (const x of [...(v?.norms || []), ...(v?.decisions || [])]) {
           const r = el('div', 'vrow'); r.appendChild(el('div', 'vmark ' + x.status, MARK[x.status] || '?'))
           const b = el('div'); b.appendChild(el('div', 'vt', x.label))
@@ -819,6 +826,7 @@
         const body = ui.body; body.innerHTML = ''
         const ans = el('div', 'answer'); ans.innerHTML = renderMarkdown(data.answer || '')
         body.appendChild(ans)
+        if (data.error) body.appendChild(el('div', 'err-box', 'Fehler: ' + (data.message || 'Anfrage fehlgeschlagen')))
 
         const sources = (data.sources || []).filter((s) => s.type !== 'upload' || s.cited)
         const cited = sources.filter((s) => s.cited), others = sources.filter((s) => !s.cited)
@@ -879,27 +887,28 @@
         current.messages.push(um); renderUser(um)
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
+        let ended = false, lastError = null
         const handle = (ev) => {
           if (ev.event === 'step') addStep(ui, ev)
           else if (ev.event === 'step_update') updateStep(ui, ev)
           else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } renderModelTags(ui.models, ev.models) }
           else if (ev.event === 'delta') { if (ui.live.hidden) { ui.live.hidden = false } ui.liveText = (ui.liveText || '') + (ev.text || ''); ui.live.innerHTML = renderMarkdown(ui.liveText); scrollBottom() }
           else if (ev.event === 'status') { ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.message)}</span>` }
-          else if (ev.event === 'final') { finalData = ev; if (ev.title && !current.titleLocked) { current.title = ev.title; topTitle.textContent = ev.title } if ('aissThreadId' in ev) current.aissThreadId = ev.aissThreadId || null; renderAssistantFinal(ui, ev); addCost(ev.cost) }
-          else if (ev.event === 'error') { ui.running.remove(); ui.live?.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
+          else if (ev.event === 'final') { finalData = ev; ended = true; if (ev.title && !current.titleLocked && !taskTitle) { current.title = ev.title; topTitle.textContent = ev.title } current.titleLocked = true; if ('aissThreadId' in ev) current.aissThreadId = ev.aissThreadId || null; renderAssistantFinal(ui, ev); addCost(ev.cost) }
+          else if (ev.event === 'error') { ended = true; lastError = ev.message; ui.running.remove(); ui.live?.remove(); ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
         }
         try {
           const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, privacy: privacyMode, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })) }) })
-          if (!resp.ok || !resp.body) { let msg = 'Anfrage fehlgeschlagen'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
+          if (!resp.ok || !resp.body) { let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
           for (;;) { const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith('data: ')) { try { handle(JSON.parse(chunk.slice(6))) } catch {} } } }
-          if (!finalData) handle({ event: 'error', message: 'Verbindung beendet, bevor eine Antwort vorlag.' })
+          if (!ended) handle({ event: 'error', message: 'Verbindung beendet, bevor eine Antwort vorlag.' })
         } catch (err) { handle({ event: 'error', message: err.message }) }
         finally {
           busy = false; updateSend(); input.focus()
           current.history.push({ role: 'user', content: text })
           if (finalData?.answer) { current.history.push({ role: 'assistant', content: finalData.answer }); current.history = current.history.slice(-16) }
-          current.messages.push({ role: 'assistant', data: finalData || { answer: '', error: true } })
+          current.messages.push({ role: 'assistant', data: finalData || { answer: '', error: true, message: lastError } })
           persistCurrent()
         }
       }
