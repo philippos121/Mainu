@@ -142,6 +142,14 @@
       .trace-act { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
       .trace-out { margin-top: 8px; max-height: 220px; overflow: auto; font-size: 12px; }
       .chat-answer { margin: 6px 0 4px; line-height: 1.6; white-space: pre-wrap; }
+      details.trace-details { margin: 0 0 10px; }
+      details.trace-details > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); list-style: none; user-select: none; }
+      details.trace-details > summary::-webkit-details-marker { display: none; }
+      details.trace-details > summary::before { content: '▸ '; color: var(--faint); }
+      details.trace-details[open] > summary::before { content: '▾ '; }
+      .sources { display: flex; flex-wrap: wrap; gap: 8px; }
+      .answer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .answer-note { font-size: 11px; color: var(--faint); margin-top: 10px; }
       .trace-err { margin-top: 8px; font-size: 12.5px; color: var(--err); }
       .desk-live { margin: 0 0 14px; }
       .desk-live-lbl { font-size: 12px; color: var(--faint); margin-bottom: 6px; }
@@ -241,6 +249,15 @@
           </div>
         </div>
 
+        <div class="examples">
+          <div class="ex-label">Schnellaktionen — Dokument anhängen (📎) und starten</div>
+          <button class="ex" onclick="fillExample(this)" data-p="Prüfe den hochgeladenen Vertrag Klausel für Klausel rechtlich und füge zu jeder relevanten Stelle einen konkreten, spezifischen Word-Kommentar (Autor AI:ssociate) direkt ins Dokument ein. Gib die kommentierte .docx zurück.">Vertrag prüfen &amp; kommentieren</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Liste die rechtlichen Risiken, unüblichen und fehlenden Klauseln im hochgeladenen Vertrag auf — mit kurzer Begründung und Ampel-Risikobewertung.">Risiken &amp; fehlende Klauseln</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Vergleiche die zwei hochgeladenen Dokumente: visuelle Delta-Ansicht (rot/grün) als delta.html UND als delta.docx (Zusätze grün, Streichungen rot durchgestrichen) + kurze Zusammenfassung der wesentlichen Änderungen.">Zwei Versionen vergleichen (Delta)</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Fasse das hochgeladene Dokument strukturiert zusammen: Sachverhalt, rechtliche Würdigung, Fazit/Empfehlung.">Dokument zusammenfassen</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Erkenne im hochgeladenen Dokument alle Fristen und fristrelevanten Daten und liste sie mit Datum, Bezug und Rechtsfolge als Tabelle (und als Excel-Datei) auf.">Fristen erkennen</button>
+          <button class="ex" onclick="fillExample(this)" data-p="Recherchiere die folgende Rechtsfrage und belege jede Aussage mit konkreter Fundstelle und Link; nutze für österreichisches Recht vorrangig das RIS (ris.bka.gv.at) und für EU-Recht EUR-Lex: ">Rechtsfrage recherchieren (RIS/EUR-Lex)</button>
+        </div>
       </div>
     </main>
 
@@ -255,6 +272,14 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
               <span class="tlabel">Dateien</span>
             </button>
+            <button id="privacyBtn" class="tool" title="Pseudonymisierung / Anonymisierung (DSGVO)" aria-label="Datenschutz">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>
+              <span class="tlabel">Datenschutz</span>
+            </button>
+            <button id="webBtn" class="tool active" title="Websuche für aktuelle Fakten/Rechtslage" aria-label="Websuche">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
+              <span class="tlabel">Websuche</span>
+            </button>
           </div>
           <button id="send" aria-label="Senden">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
@@ -262,6 +287,7 @@
         </div>
       </div>
       <div class="hint" id="hint">Enter senden · Shift+Enter neue Zeile · 📎 Dokumente analysieren, schreiben, bearbeiten</div>
+      <div class="disclaimer" id="privacyNote" hidden></div>
       <div class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können falsch sein und müssen vor Verwendung juristisch geprüft werden.</div>
     </footer>
 
@@ -277,16 +303,31 @@
       const attachments = document.getElementById('attachments')
       const hint = document.getElementById('hint')
       const costPill = document.getElementById('costPill')
+      const privacyBtn = document.getElementById('privacyBtn')
+      const webBtn = document.getElementById('webBtn')
+      const privacyNote = document.getElementById('privacyNote')
 
       const history = []
       let pendingFiles = []
       let sessionCostUsd = 0
+      let privacyMode = 'off' // off | pseudonymize | anonymize
+      let webSearch = true
 
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
       // Stable per-tab id so chat follow-ups reuse the same sandbox (context).
       const sessionId = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2)
 
       function fmtUsd(n) { return '$' + (n < 0.01 ? n.toFixed(4) : n.toFixed(3)) }
+      function downloadText(text, filename) {
+        try {
+          const blob = new Blob([text], { type: 'text/markdown' })
+          const a = document.createElement('a')
+          a.href = URL.createObjectURL(blob)
+          a.download = filename
+          a.click()
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+        } catch {}
+      }
       function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(1) + 'k' : String(t) }
       function costLineText(c) {
         return `≈ ${fmtUsd(c.totalUsd)}  ·  ${fmtTok(c.inTok)} in / ${fmtTok(c.outTok)} out  ·  ${c.seconds}s Sandbox` +
@@ -481,42 +522,77 @@
       async function runChat(prompt, uploads = []) {
         const bubble = addMessage('assistant')
         bubble.innerHTML = ''
+        const details = el('details', 'trace-details')
+        details.open = true
+        details.appendChild(el('summary', null, 'Arbeitsschritte'))
+        bubble.appendChild(details)
         const spin = el('div', 'trace-status')
         spin.innerHTML = '<span class="spinner"></span> Startet…'
         bubble.appendChild(spin)
 
         let curOut = null // current step's live output <pre>
-        let codeShown = false
 
         function handle(ev) {
           if (ev.event === 'status') {
             spin.innerHTML = '<span class="spinner"></span> ' + ev.message
           } else if (ev.event === 'code') {
-            codeShown = true
-            bubble.insertBefore(el('div', 'label', 'Code'), spin)
-            bubble.insertBefore(el('pre', null, ev.code || ''), spin)
+            details.appendChild(el('div', 'label', 'Code'))
+            details.appendChild(el('pre', null, ev.code || ''))
             curOut = el('pre', 'trace-out')
-            bubble.insertBefore(curOut, spin)
-          } else if (ev.event === 'stdout') {
-            if (!curOut) { curOut = el('pre', 'trace-out'); bubble.insertBefore(curOut, spin) }
-            curOut.textContent += ev.chunk
-          } else if (ev.event === 'stderr') {
-            if (!curOut) { curOut = el('pre', 'trace-out'); bubble.insertBefore(curOut, spin) }
+            details.appendChild(curOut)
+          } else if (ev.event === 'stdout' || ev.event === 'stderr') {
+            if (!curOut) { curOut = el('pre', 'trace-out'); details.appendChild(curOut) }
             curOut.textContent += ev.chunk
           } else if (ev.event === 'final') {
             spin.remove()
+            details.open = false
+            if (!details.querySelector('pre')) details.remove() // no code ran (e.g. web-only answer)
             if (ev.answer) bubble.appendChild(el('div', 'chat-answer', ev.answer))
+
+            if (ev.citations?.length) {
+              bubble.appendChild(el('div', 'label', 'Quellen'))
+              const box = el('div', 'sources')
+              ev.citations.forEach((c) => {
+                const a = el('a', 'file-link', c.title || c.url)
+                a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer'
+                box.appendChild(a)
+              })
+              bubble.appendChild(box)
+            }
+
             const ex = ev.execution || {}
             ex.images?.forEach((src) => { const img = el('img', 'result'); img.src = src; bubble.appendChild(img) })
             if (ex.files?.length) {
               bubble.appendChild(el('div', 'label', 'Dateien'))
               ex.files.forEach((f) => renderFileInto(bubble, f))
             }
+
+            if (ev.answer) {
+              const actions = el('div', 'answer-actions')
+              const copyBtn = el('button', 'mini', 'Kopieren')
+              copyBtn.addEventListener('click', () => {
+                try { navigator.clipboard.writeText(ev.answer) } catch {}
+                copyBtn.textContent = 'Kopiert ✓'; setTimeout(() => (copyBtn.textContent = 'Kopieren'), 1500)
+              })
+              const mdBtn = el('button', 'mini', 'Als Markdown')
+              mdBtn.addEventListener('click', () => downloadText(ev.answer, 'antwort.md'))
+              const docxBtn = el('button', 'mini', 'Als Word (.docx)')
+              docxBtn.addEventListener('click', () => {
+                if (send.disabled) return
+                runChat('Erzeuge aus folgendem Text eine sauber formatierte Word-Datei (.docx) und gib sie zum Download zurück:\n\n' + ev.answer)
+              })
+              actions.append(copyBtn, mdBtn, docxBtn)
+              bubble.appendChild(actions)
+            }
+
+            bubble.appendChild(el('div', 'answer-note', 'KI-generiert — Inhalte und Fundstellen vor Verwendung juristisch prüfen.'))
+
             if (ev.cost) { bubble.appendChild(el('div', 'cost-line', costLineText(ev.cost))); addCost(ev.cost) }
             history.push({ role: 'user', content: prompt })
             if (ev.answer) history.push({ role: 'assistant', content: ev.answer })
           } else if (ev.event === 'error') {
             spin.remove()
+            details.open = false
             bubble.appendChild(el('div', 'label err', 'Fehler'))
             bubble.appendChild(el('pre', null, ev.message))
           }
@@ -531,6 +607,8 @@
               prompt,
               history,
               sessionId,
+              privacy: privacyMode,
+              webSearch,
               files: uploads.map((f) => ({ name: f.name, base64: f.base64 })),
             }),
           })
@@ -586,6 +664,30 @@
         }
       }
 
+      const PRIVACY_CYCLE = ['off', 'pseudonymize', 'anonymize']
+      const PRIVACY_LABEL = { off: 'Datenschutz', pseudonymize: 'Pseudonym.', anonymize: 'Anonym.' }
+      function updatePrivacyUI() {
+        privacyBtn.classList.toggle('active', privacyMode !== 'off')
+        const lbl = privacyBtn.querySelector('.tlabel')
+        if (lbl) lbl.textContent = PRIVACY_LABEL[privacyMode]
+        if (privacyMode === 'pseudonymize') {
+          privacyNote.hidden = false
+          privacyNote.textContent = 'Pseudonymisierung aktiv — personenbezogene Daten werden durch Platzhalter ersetzt (bleiben DSGVO-relevant); Zuordnungstabelle als mapping.xlsx.'
+        } else if (privacyMode === 'anonymize') {
+          privacyNote.hidden = false
+          privacyNote.textContent = 'Anonymisierung aktiv — personenbezogene Daten werden irreversibel geschwärzt (keine Zuordnungstabelle).'
+        } else {
+          privacyNote.hidden = true
+        }
+      }
+      privacyBtn.addEventListener('click', () => {
+        privacyMode = PRIVACY_CYCLE[(PRIVACY_CYCLE.indexOf(privacyMode) + 1) % PRIVACY_CYCLE.length]
+        updatePrivacyUI()
+      })
+      webBtn.addEventListener('click', () => {
+        webSearch = !webSearch
+        webBtn.classList.toggle('active', webSearch)
+      })
       attach.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', async () => {
         await addFiles(fileInput.files)

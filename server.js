@@ -256,12 +256,15 @@ app.post('/api/chat', async (req, res) => {
     return res.end()
   }
 
-  const { prompt, history = [], files: rawUploads = [], sessionId } = req.body ?? {}
+  const { prompt, history = [], files: rawUploads = [], sessionId, privacy = 'off', webSearch = true } = req.body ?? {}
   if (!prompt || typeof prompt !== 'string') {
     send('error', { message: 'Feld "prompt" fehlt.' })
     return res.end()
   }
   const persistent = typeof sessionId === 'string' && sessionId.length > 0
+  const privacyMode = privacy === 'pseudonymize' || privacy === 'anonymize' ? privacy : 'off'
+  // Per-request tool set: web search only when enabled globally AND requested.
+  const toolsForReq = WEB_SEARCH_ENABLED && webSearch !== false ? [CHAT_TOOL_RESP, WEB_SEARCH_TOOL] : [CHAT_TOOL_RESP]
 
   // Validate & normalize uploaded files.
   const uploads = []
@@ -286,15 +289,35 @@ app.post('/api/chat', async (req, res) => {
           .map((u) => u.name)
           .join(', ')}. Lies sie unter genau diesen Namen.\n\n`
       : ''
+    // DSGVO: pseudonymize/anonymize personal data before any processing.
+    const privacyLine =
+      privacyMode === 'pseudonymize'
+        ? 'DATENSCHUTZ (DSGVO): Erkenne ZUERST alle personenbezogenen Daten (Namen, Adressen, E-Mail, Telefon, IBAN/Konten, Akten-/Steuer-/SV-Nummern, Geburtsdaten, Geldbeträge, Geo-/Kennzeichen) in den Eingaben. Ersetze sie VOR jeder inhaltlichen Verarbeitung durch typisierte, konsistente Platzhalter (z. B. [PERSON_1], [IBAN_1], [ADRESSE_1]). Arbeite danach ausschließlich mit den Platzhaltern. Erstelle eine getrennte Zuordnungstabelle und speichere sie als mapping.xlsx in /home/user (zum Download). Weise im Ergebnis darauf hin, dass pseudonymisierte Daten weiterhin personenbezogen sind.\n\n'
+        : privacyMode === 'anonymize'
+        ? 'DATENSCHUTZ (DSGVO): Anonymisiere ZUERST alle personenbezogenen Daten (Namen, Adressen, E-Mail, Telefon, IBAN/Konten, Akten-/Steuer-/SV-Nummern, Geburtsdaten, Geldbeträge, Geo-/Kennzeichen) in den Eingaben durch unkenntliche Schwärzung bzw. generische Begriffe ([geschwärzt]) — OHNE Zuordnungstabelle, irreversibel. Arbeite nur mit den anonymisierten Daten.\n\n'
+        : ''
     // Responses-API conversation input (the system prompt goes in `instructions`).
     let input = [
       ...history
         .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
         .slice(-8)
         .map((m) => ({ role: m.role, content: m.content })),
-      { role: 'user', content: uploadLine + prompt },
+      { role: 'user', content: privacyLine + uploadLine + prompt },
     ]
     let prevId
+    const citations = []
+    const collectCitations = (resp) => {
+      for (const o of resp.output || []) {
+        if (o.type !== 'message') continue
+        for (const part of o.content || []) {
+          for (const ann of part.annotations || []) {
+            if (ann.type === 'url_citation' && ann.url && !citations.some((c) => c.url === ann.url)) {
+              citations.push({ url: ann.url, title: ann.title || ann.url })
+            }
+          }
+        }
+      }
+    }
 
     const allImages = []
     const files = []
@@ -372,12 +395,13 @@ app.post('/api/chat', async (req, res) => {
           model: OPENAI_MODEL,
           instructions: CHAT_SYSTEM,
           input,
-          tools: CHAT_TOOLS,
+          tools: toolsForReq,
           tool_choice: 'auto',
           reasoning: { effort: REASONING_EFFORT },
           ...(prevId ? { previous_response_id: prevId } : {}),
         })
         addUsage(usage, resp.usage)
+        collectCitations(resp)
         prevId = resp.id
         const calls = (resp.output || []).filter((o) => o.type === 'function_call')
         if (!calls.length) {
@@ -405,12 +429,13 @@ app.post('/api/chat', async (req, res) => {
               ...input,
               { role: 'user', content: 'Du hast das Schrittlimit fast erreicht. Erledige die Aufgabe JETZT in EINEM einzigen run_python-Aufruf vollständig und speichere die angeforderte Ausgabedatei (z. B. .docx/.xlsx) in /home/user.' },
             ],
-            tools: CHAT_TOOLS,
+            tools: toolsForReq,
             tool_choice: { type: 'function', name: 'run_python' },
             reasoning: { effort: REASONING_EFFORT },
             ...(prevId ? { previous_response_id: prevId } : {}),
           })
           addUsage(usage, fc.usage)
+          collectCitations(fc)
           const c = (fc.output || []).find((o) => o.type === 'function_call')
           if (c) {
             let codeStr = ''
@@ -448,6 +473,7 @@ app.post('/api/chat', async (req, res) => {
 
     send('final', {
       answer,
+      citations,
       execution: { images: allImages, files },
       cost: computeCost(usage.inTok, usage.outTok, sandboxStart ? (Date.now() - sandboxStart) / 1000 : 0, usage.cachedTok),
     })
