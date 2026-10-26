@@ -1391,14 +1391,14 @@
         let ended = false, seq = lastSeq
         const handle = (ev) => { if (ev.seq) { if (ev.seq <= seq) return; seq = ev.seq } if (ev.event === 'end') ended = true; onEvent(ev) }
         try {
-          for (let attempt = 0; !ended && attempt <= 10; attempt++) {
-            if (attempt) await new Promise((r) => setTimeout(r, Math.min(8000, 700 * 2 ** (attempt - 1))))
+          for (let attempt = 0; !ended && attempt <= 40; attempt++) {
+            if (attempt) await new Promise((r) => setTimeout(r, Math.min(10000, 700 * 2 ** Math.min(attempt - 1, 4))))
             try {
               const r = await fetch(`/api/jobs/${jobId}/stream?after=${seq}`, { signal: ctl.signal, cache: 'no-store' })
               if (r.status === 404) { ended = true; onEvent({ event: 'end', lost: true }); break }
               if (!r.ok || !r.body) continue
               await readSse(r, handle)
-              if (!ended) { ended = true; onEvent({ event: 'end' }) } // stream closed normally
+              // The server always sends `end` before closing; a close without it is a dropped connection → reconnect.
             } catch (e) { if (ctl.signal.aborted) break }
           }
         } finally { followers.delete(jobId) }
@@ -1628,7 +1628,7 @@
           if (ev.event === 'dd') { matter.job.stage = ev.stage; if (ev.progress) matter.job.progress = ev.progress; if (ev.message) { matter.job.log = [...(matter.job.log || []), { t: Date.now(), message: ev.message }].slice(-80); const lg = $('matterLog'); if (lg) { lg.appendChild(el('div', null, `${new Date().toLocaleTimeString('de-AT')}  ${ev.message}`)); lg.scrollTop = lg.scrollHeight } } updateRunBox(ev.stage, ev.progress, ev.message, true) }
           else if (ev.event === 'table') { updateRunBox('table', { done: ev.done, total: ev.total }, ev.message || (ev.docName ? `Ausgewertet: ${ev.docName}` : ''), true) }
           else if (ev.event === 'error') { toast('Vorgang fehlgeschlagen: ' + ev.message, 5000) }
-          else if (ev.event === 'end') { reloadMatter().then(() => { if (matter?.job?.status === 'done' && ev.kind === 'dd') toast('Analyse abgeschlossen – Bericht liegt unter „Berichte“.', 4000) }) }
+          else if (ev.event === 'end') { reloadMatter().then(() => { if (matter?.id !== mid) return; if (matter.job.running && matter.job.jobId) { setTimeout(() => followMatterJob(matter.job.jobId), 1500); return } if (matter.job.status === 'done' && ev.kind === 'dd') toast('Analyse abgeschlossen – Bericht liegt unter „Berichte“.', 4000) }) }
         })
       }
       async function startDd(opts) {

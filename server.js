@@ -1038,7 +1038,7 @@ async function msUpload(token, driveId, parentId, name, buf) {
 // ---------------------------------------------------------------------------
 const app = express()
 app.set('trust proxy', 1)
-app.use(express.json({ limit: '40mb' }))
+app.use(express.json({ limit: '48mb' })) // one 30 MB document as base64 plus envelope
 app.use(express.static(path.join(__dirname, 'public')))
 
 // ---- Microsoft 365 routes ----
@@ -1135,7 +1135,10 @@ app.post('/api/verify', async (req, res) => {
 const jobs = new Map() // id -> { seq, events: [{seq,line}], done, listeners:Set<res>, createdAt }
 const JOB_TTL_MS = Number(process.env.JOB_TTL_MS || 30 * 60 * 1000)
 const HEARTBEAT_MS = 10_000
-setInterval(() => { const now = Date.now(); for (const [id, j] of jobs) if (now - j.createdAt > JOB_TTL_MS) jobs.delete(id) }, 60_000).unref?.()
+// Finished jobs stay for JOB_TTL_MS so a client can still replay them; running
+// jobs (a due diligence can take hours) are only dropped after a hard limit.
+const JOB_MAX_AGE_MS = Number(process.env.JOB_MAX_AGE_MS || 12 * 3600 * 1000)
+setInterval(() => { const now = Date.now(); for (const [id, j] of jobs) if ((j.done && now - (j.finishedAt || j.createdAt) > JOB_TTL_MS) || now - j.createdAt > JOB_MAX_AGE_MS) jobs.delete(id) }, 60_000).unref?.()
 
 function sseStart(res) {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
@@ -1166,6 +1169,7 @@ function newJob(id) {
   }
   job.finish = () => {
     job.done = true
+    job.finishedAt = Date.now()
     for (const l of job.listeners) { try { l.end() } catch {} }
     job.listeners.clear()
   }
@@ -1189,6 +1193,7 @@ app.get('/api/jobs/:id/stream', streamJob)
 // it to the Microsoft login or an SSO identity before multi-tenant use.
 // ---------------------------------------------------------------------------
 const store = new JsonStore(DATA_DIR)
+store.reconcileInterrupted().then((n) => { if (n) console.log(`matters: ${n} interrupted run(s) marked as paused`) }).catch((e) => console.error('reconcile failed:', e?.message))
 const ddRuns = new Map() // matterId -> { jobId, kind }
 const ownerOf = (req) => { const k = String(req.get('x-owner-key') || ''); return /^[\w-]{16,80}$/.test(k) ? k : null }
 const matterSummary = (m) => ({
