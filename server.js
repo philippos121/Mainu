@@ -80,8 +80,16 @@ const MS = {
   loginBase: (process.env.MS_LOGIN_BASE_URL || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
   graphBase: (process.env.MS_GRAPH_BASE_URL || 'https://graph.microsoft.com/v1.0').replace(/\/+$/, ''),
 }
-const MS_COOKIE_KEY = crypto.createHash('sha256').update(process.env.MS_COOKIE_SECRET || process.env.MS_CLIENT_SECRET || 'dev-insecure-' + MS.clientId).digest()
+// Cookie encryption key: MS_COOKIE_SECRET, else the client secret. Never a guessable
+// value: without both, a random per-process key is used (logins survive until restart).
+const MS_COOKIE_SECRET = process.env.MS_COOKIE_SECRET || process.env.MS_CLIENT_SECRET || ''
+if (MS.clientId && !MS_COOKIE_SECRET) console.warn('MS_COOKIE_SECRET/MS_CLIENT_SECRET fehlen: Microsoft-Logins gelten nur bis zum nächsten Neustart.')
+const MS_COOKIE_KEY = MS_COOKIE_SECRET ? crypto.createHash('sha256').update(MS_COOKIE_SECRET).digest() : crypto.randomBytes(32)
 const MS_UPLOAD_SIMPLE_MAX = 4 * 1024 * 1024 // Graph: simple PUT up to 4 MB, else upload session
+const MS_SESSION_TTL_MS = 90 * 86400 * 1000
+
+// Never let a stray rejection take the whole service down (Node exits on unhandled rejections).
+process.on('unhandledRejection', (e) => console.error('unhandledRejection:', e?.stack || e))
 
 function priceFor(model) {
   return PRICES[model] || PRICES[String(model).replace(/-\d{4}-\d{2}-\d{2}$/, '')] || { in: 2, cached: 0.2, out: 10 }
@@ -861,7 +869,12 @@ function unseal(s) {
 }
 function parseCookies(req) {
   const out = {}
-  for (const part of String(req.headers.cookie || '').split(';')) { const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim()) }
+  for (const part of String(req.headers.cookie || '').split(';')) {
+    const i = part.indexOf('=')
+    if (i <= 0) continue
+    const v = part.slice(i + 1).trim()
+    try { out[part.slice(0, i).trim()] = decodeURIComponent(v) } catch { out[part.slice(0, i).trim()] = v } // malformed %-escapes must not throw
+  }
   return out
 }
 const isHttps = (req) => req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0] === 'https'
@@ -875,15 +888,21 @@ const clearCookie = (req, res, name) => setCookie(req, res, name, '', 0)
 const msRedirectUri = (req) => MS.redirectUri || `${isHttps(req) ? 'https' : 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}/api/ms/callback`
 
 // Big refresh tokens that do not fit a cookie live in memory under a session id.
-const msSessions = new Map() // sid -> { rt, account, at }
+const msSessions = new Map() // sid -> { rt, account, createdAt }
 const msTokenCache = new Map() // hash(rt) -> { accessToken, expiresAt }
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of msTokenCache) if (v.expiresAt < now) msTokenCache.delete(k)
+  for (const [k, v] of msSessions) if (now - (v.createdAt || 0) > MS_SESSION_TTL_MS) msSessions.delete(k)
+}, 10 * 60_000).unref?.()
+const rtKey = (rt) => crypto.createHash('sha256').update(rt).digest('hex')
 
 async function msTokenRequest(req, form) {
   const body = new URLSearchParams({ client_id: MS.clientId, redirect_uri: msRedirectUri(req), scope: MS.scopes, ...form })
   if (MS.clientSecret) body.set('client_secret', MS.clientSecret)
   const r = await fetchWithTimeout(`${MS.loginBase}/${MS.tenant}/oauth2/v2.0/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, 20_000)
   const j = await r.json().catch(() => ({}))
-  if (!r.ok || !j.access_token) throw new Error(j.error_description || j.error || `Token-Anfrage fehlgeschlagen (${r.status})`)
+  if (!r.ok || !j.access_token) { const e = new Error(j.error_description || j.error || `Token-Anfrage fehlgeschlagen (${r.status})`); e.status = r.status; e.code = j.error; throw e }
   return j
 }
 
@@ -894,10 +913,12 @@ function msReadSession(req) {
   return null
 }
 function msWriteSession(req, res, sess) {
+  const old = parseCookies(req).ms_sid
+  if (old) msSessions.delete(old) // never keep a superseded refresh token around
   const sealed = seal(sess)
-  if (sealed.length <= 3900) { setCookie(req, res, 'ms_auth', sealed, 90 * 86400); clearCookie(req, res, 'ms_sid'); return }
+  if (sealed.length <= 3900) { setCookie(req, res, 'ms_auth', sealed, 90 * 86400); if (old) clearCookie(req, res, 'ms_sid'); return }
   const sid = crypto.randomBytes(24).toString('base64url')
-  msSessions.set(sid, sess)
+  msSessions.set(sid, { ...sess, createdAt: Date.now() })
   clearCookie(req, res, 'ms_auth')
   setCookie(req, res, 'ms_sid', sid, 90 * 86400)
 }
@@ -907,22 +928,32 @@ function msClearSession(req, res) {
   clearCookie(req, res, 'ms_auth'); clearCookie(req, res, 'ms_sid')
 }
 
-/** Access token for Graph (refreshes with the stored refresh token). */
-async function msAccessToken(req, res) {
+/** Refresh grant that only updates the in-memory token cache (usable after headers were sent). */
+async function msRefreshToCache(req, sess) {
+  const j = await msTokenRequest(req, { grant_type: 'refresh_token', refresh_token: sess.rt })
+  const entry = { accessToken: j.access_token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 }
+  msTokenCache.set(rtKey(sess.rt), entry)
+  if (j.refresh_token && j.refresh_token !== sess.rt) msTokenCache.set(rtKey(j.refresh_token), entry)
+  return { token: j.access_token, newRt: j.refresh_token && j.refresh_token !== sess.rt ? j.refresh_token : null }
+}
+
+/**
+ * Access token for Graph with at least minTtlMs of validity left (refreshes with
+ * the stored refresh token). The session is only dropped when the identity
+ * platform definitively rejects the refresh token (400/401), never on outages.
+ */
+async function msAccessToken(req, res, minTtlMs = 60_000) {
   const sess = msReadSession(req)
   if (!sess?.rt) return null
-  const key = crypto.createHash('sha256').update(sess.rt).digest('hex')
-  const cached = msTokenCache.get(key)
-  if (cached && cached.expiresAt > Date.now() + 60_000) return { token: cached.accessToken, account: sess.account }
+  const cached = msTokenCache.get(rtKey(sess.rt))
+  if (cached && cached.expiresAt > Date.now() + minTtlMs) return { token: cached.accessToken, account: sess.account, session: sess }
   try {
-    const j = await msTokenRequest(req, { grant_type: 'refresh_token', refresh_token: sess.rt })
-    const token = j.access_token
-    msTokenCache.set(key, { accessToken: token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 })
-    if (j.refresh_token && j.refresh_token !== sess.rt) { const next = { ...sess, rt: j.refresh_token }; msWriteSession(req, res, next); msTokenCache.set(crypto.createHash('sha256').update(next.rt).digest('hex'), msTokenCache.get(key)) }
-    return { token, account: sess.account }
+    const { token, newRt } = await msRefreshToCache(req, sess)
+    if (newRt) { const next = { ...sess, rt: newRt }; if (res) msWriteSession(req, res, next); return { token, account: sess.account, session: next } }
+    return { token, account: sess.account, session: sess }
   } catch (e) {
-    console.error('ms refresh failed:', e?.message)
-    msClearSession(req, res)
+    console.error('ms refresh failed:', e?.status, e?.message)
+    if (res && (e?.status === 400 || e?.status === 401)) msClearSession(req, res)
     return null
   }
 }
@@ -1007,7 +1038,7 @@ app.get('/api/ms/callback', async (req, res) => {
     let account = { name: '', email: '' }
     try { const me = await graph(j.access_token, '/me?$select=displayName,mail,userPrincipalName'); account = { name: me.displayName || '', email: me.mail || me.userPrincipalName || '' } } catch {}
     msWriteSession(req, res, { rt: j.refresh_token, account })
-    msTokenCache.set(crypto.createHash('sha256').update(j.refresh_token).digest('hex'), { accessToken: j.access_token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 })
+    msTokenCache.set(rtKey(j.refresh_token), { accessToken: j.access_token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 })
     res.redirect('/?ms=connected')
   } catch (e) { res.redirect('/?ms=error&reason=' + encodeURIComponent(String(e?.message || e).slice(0, 200))) }
 })
@@ -1015,7 +1046,9 @@ app.post('/api/ms/logout', (req, res) => { msClearSession(req, res); res.json({ 
 app.get('/api/ms/me', async (req, res) => {
   if (!MS.clientId) return res.json({ configured: false, connected: false })
   const a = await msAccessToken(req, res)
-  res.json({ configured: true, connected: Boolean(a), account: a?.account || null })
+  const sess = a ? null : msReadSession(req)
+  // A session that survived a transient refresh failure still counts as connected.
+  res.json({ configured: true, connected: Boolean(a || sess?.rt), degraded: Boolean(!a && sess?.rt), account: a?.account || sess?.account || null })
 })
 const msGuard = async (req, res) => { const a = await msAccessToken(req, res); if (!a) { res.status(401).json({ error: 'Nicht mit Microsoft 365 verbunden.', reauth: true }); return null } return a.token }
 app.get('/api/ms/sites', async (req, res) => {
@@ -1124,7 +1157,8 @@ app.post('/api/chat', async (req, res) => {
   const jobId = typeof body.jobId === 'string' && /^[\w-]{8,64}$/.test(body.jobId) && !jobs.has(body.jobId) ? body.jobId : `j_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
   // The Microsoft 365 token is resolved before the SSE headers go out (a refresh may set cookies).
   const wantsMs = Array.isArray(body.msFiles) && body.msFiles.length > 0 || (body.msSync && body.msSync.enabled !== false && body.msSync.driveId)
-  const msAuth = MS.clientId && wantsMs ? await msAccessToken(req, res) : null
+  // Ask for a token that outlives the job (jobs can run for many minutes); a refresh now still sets cookies.
+  const msAuth = MS.clientId && wantsMs ? await msAccessToken(req, res, 30 * 60_000) : null
   const job = newJob(jobId)
   const send = job.send
   attachListener(job, res, 0)
@@ -1385,14 +1419,16 @@ app.post('/api/chat', async (req, res) => {
     if (msFilesReq.length) {
       if (!msAuth) throw new Error('Nicht mit Microsoft 365 verbunden – bitte im Menü anmelden.')
       const sid = step('cloud', `${msFilesReq.length} Datei${msFilesReq.length > 1 ? 'en' : ''} aus Microsoft 365 laden`)
+      let dropped = 0
       for (const f of msFilesReq) {
-        if (uploads.length >= MAX_UPLOADS) break
+        if (uploads.length >= MAX_UPLOADS) { dropped++; continue }
         const { meta, buf } = await msDownload(msAuth.token, f.driveId, f.itemId)
         const name = path.basename(meta.name).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_')
         if (!uploads.some((u) => u.name === name)) uploads.push({ name, buf })
         msSources.push(meta)
       }
-      stepDone(sid, { detail: msSources.map((m) => m.name).join(', ') })
+      if (dropped) stepFail(sid, { detail: `${msSources.map((m) => m.name).join(', ')} · ${dropped} Datei${dropped > 1 ? 'en' : ''} nicht geladen (höchstens ${MAX_UPLOADS} Anhänge je Nachricht)` })
+      else stepDone(sid, { detail: msSources.map((m) => m.name).join(', ') })
     }
 
     // ---- 0. uploads: extract text ----
@@ -1543,8 +1579,22 @@ app.post('/api/chat', async (req, res) => {
     const target = msSync && typeof msSync === 'object' && msSync.driveId && msSync.itemId
       ? { driveId: String(msSync.driveId), itemId: String(msSync.itemId), name: String(msSync.name || '') }
       : msSources[0]?.driveId && msSources[0]?.parentId ? { driveId: msSources[0].driveId, itemId: msSources[0].parentId, name: 'Ordner der Quelldatei' } : null
+    if (!msAuth && target && !(msSync && msSync.enabled === false) && MS.clientId) {
+      sync.push({ name: 'Rückschreiben nach Microsoft 365', webUrl: '', ok: false, error: 'Nicht mit Microsoft 365 verbunden – bitte im Menü erneut anmelden.' })
+    }
     if (msAuth && target && !(msSync && msSync.enabled === false)) {
       const toUpload = filesOut.filter((f) => f.base64 && !f.tooLarge).map((f) => ({ name: f.name, buf: Buffer.from(f.base64, 'base64') }))
+      // The job may have outlived the token: refresh into the cache (cookies are already sent).
+      let token = msAuth.token
+      try { const fresh = await msAccessToken(req, null, 5 * 60_000); if (fresh?.token) token = fresh.token } catch {}
+      const uploadWithRetry = async (f) => {
+        try { return await msUpload(token, target.driveId, target.itemId, f.name, f.buf) }
+        catch (e) {
+          if (e?.status !== 401 || !msAuth.session?.rt) throw e
+          token = (await msRefreshToCache(req, msAuth.session)).token
+          return msUpload(token, target.driveId, target.itemId, f.name, f.buf)
+        }
+      }
       if (!(msSync && msSync.saveAnswer === false) && answer.trim() && plan.mode !== 'general') {
         try {
           const stem = (plan.title || 'Antwort').replace(/[^\w\-äöüÄÖÜß ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60) || 'Antwort'
@@ -1554,7 +1604,7 @@ app.post('/api/chat', async (req, res) => {
       if (toUpload.length) {
         const sid = step('cloud', `${toUpload.length} Datei${toUpload.length > 1 ? 'en' : ''} nach Microsoft 365 speichern${target.name ? ` (${target.name})` : ''}`)
         for (const f of toUpload) {
-          try { const it = await msUpload(msAuth.token, target.driveId, target.itemId, f.name, f.buf); sync.push({ name: it.name || f.name, webUrl: it.webUrl || '', ok: true }) }
+          try { const it = await uploadWithRetry(f); sync.push({ name: it.name || f.name, webUrl: it.webUrl || '', ok: true }) }
           catch (e) { sync.push({ name: f.name, webUrl: '', ok: false, error: String(e?.message || e).slice(0, 200) }) }
         }
         const okN = sync.filter((s) => s.ok).length

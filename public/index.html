@@ -623,7 +623,11 @@
           const fb = el('div', 'filebox')
           fb.appendChild(el('div', null, w.minFiles === 2 ? 'Zwei Dokumentversionen anhängen (PDF, Word, Text)' : 'Dokument(e) anhängen (PDF, Word, Text) – tippen zum Auswählen'))
           const list = el('div', 'attach-list'); fb.appendChild(list)
-          const refresh = () => { list.innerHTML = ''; pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingFiles.splice(i, 1); renderAttachments(); refresh() }); c.appendChild(x); list.appendChild(c) }) }
+          const refresh = () => {
+            list.innerHTML = ''
+            pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingFiles.splice(i, 1); renderAttachments(); refresh() }); c.appendChild(x); list.appendChild(c) })
+            pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingMs.splice(i, 1); renderAttachments(); renderMsMenu(); refresh() }); c.appendChild(x); list.appendChild(c) })
+          }
           fb.addEventListener('click', () => { fileInput.onchange = async () => { await addFiles(fileInput.files); fileInput.value = ''; refresh(); fileInput.onchange = defaultFileChange }; fileInput.click() })
           refresh(); form.appendChild(fb)
         }
@@ -644,7 +648,7 @@
           e.preventDefault()
           const params = {}
           for (const f of w.fields) { const v = inputs[f.k].value.trim(); if (f.required && !v) { inputs[f.k].focus(); toast(`Bitte „${f.label}“ ausfüllen.`); return } if (v) params[f.k] = v }
-          if (w.needsFiles && pendingFiles.length < (w.minFiles || 1)) { toast(w.minFiles === 2 ? 'Bitte zwei Dokumente anhängen.' : 'Bitte mindestens ein Dokument anhängen.'); return }
+          if (w.needsFiles && pendingFiles.length + pendingMs.length < (w.minFiles || 1)) { toast(w.minFiles === 2 ? 'Bitte zwei Dokumente anhängen.' : 'Bitte mindestens ein Dokument anhängen.'); return }
           closeTask()
           const label = w.title + (params.question ? ': ' + params.question : params.doc_type ? ': ' + params.doc_type : '') + Object.entries(params).filter(([k]) => !['question', 'doc_type'].includes(k)).map(([k, v]) => `\n${(w.fields.find((x) => x.k === k) || {}).label || k}: ${v}`).join('')
           sendMessage({ text: label, task: { type: key, params }, taskTitle: w.title })
@@ -662,7 +666,7 @@
       function readAsBase64(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(file) }) }
       async function addFiles(fileList) {
         for (const file of fileList) {
-          if (pendingFiles.length >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht.`); break }
+          if (pendingFiles.length + pendingMs.length >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht (lokal und Microsoft 365 zusammen).`); break }
           if (file.size > MAX_UPLOAD_BYTES) { toast(`„${file.name}“ ist zu groß (max. 15 MB).`); continue }
           if (pendingFiles.reduce((a, f) => a + f.size, 0) + file.size > MAX_TOTAL_UPLOAD_BYTES) { toast('Anhänge zusammen höchstens 28 MB pro Nachricht.'); continue }
           pendingFiles.push({ name: file.name, base64: await readAsBase64(file), size: file.size })
@@ -777,7 +781,7 @@
               else if (pickFolder || !MS_EXT.test(it.name) || it.size > MAX_UPLOAD_BYTES) row.classList.add('dim')
               else {
                 const key = j.driveId + '|' + it.id; const cb = el('input'); cb.type = 'checkbox'; cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked)
-                const toggle = () => { if (selected.has(key)) selected.delete(key); else { if (selected.size >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien.`); cb.checked = false; return } selected.set(key, { driveId: j.driveId, itemId: it.id, name: it.name, size: it.size }) } cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked); updateFoot() }
+                const toggle = () => { if (selected.has(key)) selected.delete(key); else { if (selected.size + pendingFiles.length >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht (lokal und Microsoft 365 zusammen).`); cb.checked = false; return } selected.set(key, { driveId: j.driveId, itemId: it.id, name: it.name, size: it.size }) } cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked); updateFoot() }
                 cb.addEventListener('click', (e) => { e.stopPropagation(); toggle() }); row.addEventListener('click', toggle); row.appendChild(cb)
               }
               list.appendChild(row)
@@ -1052,6 +1056,11 @@
       async function sendMessage({ text, task = null, taskTitle = null }) {
         if (busy) return
         if (!current) newConversation()
+        // The Microsoft session may have ended since the page loaded: check before relying on it.
+        if (msState.connected && (pendingMs.length || current.msTarget)) {
+          await loadMsState()
+          if (!msState.connected) { toast('Microsoft-Anmeldung abgelaufen – bitte im Menü erneut anmelden.'); return }
+        }
         const uploads = pendingFiles.slice(); pendingFiles = []
         const msFiles = pendingMs.slice(); pendingMs = []
         renderAttachments(); renderMsMenu()
