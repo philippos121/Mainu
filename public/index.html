@@ -590,7 +590,7 @@
                   <div class="hero-text">
                     <div class="k">Allgemeiner Agent</div>
                     <div class="t">Assistent <button class="qbtn" id="heroInfo" aria-label="Was kann der Assistent?" title="Was kann der Assistent?">?</button></div>
-                    <div class="d" id="heroDesc" hidden>Rechtsfragen mit verifizierten Fundstellen, Verträge prüfen und kommentieren, Entwürfe, Versionsvergleiche, Fristen, Zusammenfassungen – als Antwort oder als Word, Excel und PDF. Letztlich ist alles möglich: Luna formuliert kompakte Fragen, AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf das Dokument.</div>
+                    <div class="d" id="heroDesc" hidden>Rechtsfragen mit verifizierten Fundstellen, Verträge prüfen und kommentieren, Entwürfe, Versionsvergleiche, Zusammenfassungen – als Antwort oder als Word, Excel und PDF. Letztlich ist alles möglich: Der Assistent formuliert kompakte Fragen an die Wissensdatenbank AI:ssociate, die kurz mit Fundstellen antwortet, und erstellt bei Bedarf das Dokument.</div>
                   </div>
                 </div>
                 <div id="composerSlotHome" style="width:100%"></div>
@@ -658,13 +658,9 @@
             </div>
           </div>
           <div class="card" style="margin-bottom:14px">
-            <h3>Modelle &amp; Budget</h3>
-            <div class="kv"><span>Planung, Fragen, allgemeine Aufgaben (Luna)</span><b id="kvFast">–</b></div>
-            <div class="kv"><span>Deliverables, DD-Synthese (Sol)</span><b id="kvMain">–</b></div>
-            <div class="kv"><span>Dokumentanalyse (Due Diligence)</span><b id="kvExtract">–</b></div>
+            <h3>Recherche &amp; Budget</h3>
             <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
             <div class="kv"><span>Websuche (Fallback)</span><b id="kvWeb">–</b></div>
-            <div class="kv"><span>Dateien (Code)</span><b id="kvCode">–</b></div>
             <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
             <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
           </div>
@@ -770,7 +766,7 @@
       function modelTag(m) { const lbl = modelLabel(m); return el('span', 'model-tag ' + (lbl === 'AI:ssociate' ? 'kb' : lbl.toLowerCase()), lbl) }
       function renderModelTags(container, models) {
         container.innerHTML = ''
-        if (!models) return
+        if (!models || true) return // models are not shown in the UI
         const used = Array.isArray(models.used) && models.used.length ? models.used : [models.main || models.loop]
         const order = (m) => /luna/i.test(m) ? 0 : /sol/i.test(m) ? 2 : 1
         const list = [...new Set(used.filter(Boolean))].sort((a, b) => order(a) - order(b))
@@ -956,7 +952,6 @@
         summary: { title: 'Zusammenfassen', desc: 'Memo, Kurzfassung oder mandantentaugliche Zusammenfassung hochgeladener Dokumente.', icon: 'summary', needsFiles: true, fields: [
           { k: 'style', label: 'Stil', type: 'select', opts: ['Juristisches Memo', 'Kurzfassung (10 Sätze)', 'Für Mandanten verständlich'] },
           { k: 'question', label: 'Schwerpunkt (optional)', type: 'text', ph: 'z. B. Haftungsfragen, Zahlungsmodalitäten' } ] },
-        deadlines: { title: 'Fristen erkennen', desc: 'Alle Fristen mit Auslöser, Berechnung und Rechtsfolge – als Tabelle und Excel-Datei.', icon: 'deadline', needsFiles: true, fields: [ { k: 'reference_date', label: 'Stichtag (optional)', type: 'date' } ] },
       }
       // The workflow forms live behind the chips under the composer (structured inputs, fixed outputs).
       function renderActions() {
@@ -1272,7 +1267,6 @@
         const txt = el('div', 'stxt'); const st = el('div', 'st')
         if (ev.url) { const a = el('a', null, ev.title); a.href = ev.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; st.appendChild(a) } else st.textContent = ev.title
         txt.appendChild(st); const d = el('div', 'sd', ev.detail || ''); txt.appendChild(d); s.appendChild(txt)
-        if (ev.model) s.appendChild(el('div', 'smodel', modelLabel(ev.model)))
         ui.sb.appendChild(s); ui.stepEls.set(ev.id, s); ui.stepCount++; ui.kinds[ev.kind] = (ui.kinds[ev.kind] || 0) + 1
         ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.title)}</span>`
         ui.sum.textContent = `Arbeitsschritte · ${ui.stepCount}`
@@ -1291,8 +1285,7 @@
         if (k.web) parts.push(`${k.web} Websuche${k.web > 1 ? 'n' : ''}`)
         if (k.file) parts.push(`${k.file} Datei${k.file > 1 ? 'en' : ''}`)
         if (k.verify) parts.push('RIS-Prüfung')
-        const m = data?.models ? modelLabel(data.models.main || data.models.loop) : ''
-        return `${ui.stepCount} Schritte${parts.length ? ' · ' + parts.join(' · ') : ''}${m ? ' · ' + m : ''}`
+        return `${ui.stepCount} Schritte${parts.length ? ' · ' + parts.join(' · ') : ''}`
       }
       function scrollBottom() { if (viewName === 'assistant') window.scrollTo({ top: document.body.scrollHeight }) }
 
@@ -1403,7 +1396,6 @@
           const c = data.cost; const line = el('div', 'cost-line')
           line.appendChild(el('span', null, `≈ ${fmtUsd(c.totalUsd)}`))
           line.appendChild(el('span', null, `${fmtTok(c.inTok)} in / ${fmtTok(c.outTok)} out`))
-          const bm = Object.entries(c.byModel || {}).map(([m, v]) => `${modelLabel(m)} ${fmtUsd(v.usd)}`).join(' · '); if (bm) line.appendChild(el('span', null, bm))
           if (c.aissociateCalls) line.appendChild(el('span', null, `AI:ssociate ${c.aissociateCalls}×${c.aissociateUsd ? ' ' + fmtUsd(c.aissociateUsd) : ''}`))
           if (c.webSearchCalls) line.appendChild(el('span', null, `Web ${c.webSearchCalls}× ${fmtUsd(c.webSearchUsd)}`))
           if (c.seconds) line.appendChild(el('span', null, `Sandbox ${c.seconds}s ${fmtUsd(c.e2bUsd)}`))
@@ -1762,7 +1754,7 @@
         if (m.verification) { const vc = el('div', 'card'); vc.style.marginTop = '14px'; vc.appendChild(el('h3', null, 'RIS-Prüfung der Normen')); const s = m.verification.summary; vc.appendChild(el('div', 'sub', s.checked ? `${s.ok} von ${s.checked} Normen bestätigt${s.warn ? `, ${s.warn} außer Kraft` : ''}${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}` : 'keine prüfbaren Normzitate')).style.cssText = 'font-size:13px;color:var(--muted)'; right.appendChild(vc) }
         const cc = el('div', 'card'); cc.style.marginTop = '14px'; cc.appendChild(el('h3', null, 'Aufwand'))
         cc.appendChild(el('div', 'kv')).append(el('span', null, 'Eingabe-Tokens'), el('b', null, fmtTok(m.job.usage?.inTok || 0) + ' / ' + fmtTok(m.settings.budgetTokens)))
-        cc.appendChild(el('div', 'kv')).append(el('span', null, 'Modellaufrufe'), el('b', null, String(m.job.usage?.calls || 0)))
+        cc.appendChild(el('div', 'kv')).append(el('span', null, 'Analyseaufrufe'), el('b', null, String(m.job.usage?.calls || 0)))
         if (m.job.cost) cc.appendChild(el('div', 'kv')).append(el('span', null, 'Kosten (geschätzt)'), el('b', null, fmtUsd(m.job.cost.totalUsd)))
         right.appendChild(cc)
         two.appendChild(right); body.appendChild(two)
@@ -2081,7 +2073,6 @@
         setSwitch('swWeb', settings.webSearch !== false); renderMsUi()
         $('kvOwner').textContent = ownerKey
         if (health) {
-          $('kvMain').textContent = health.models?.main || '–'; $('kvFast').textContent = health.models?.fast || '–'; $('kvCode').textContent = health.models?.code || '–'; $('kvExtract').textContent = health.models?.extract || health.models?.main || '–'
           $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
           $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`
         }
@@ -2094,11 +2085,11 @@
       // Feature tour
       // ------------------------------------------------------------------
       const TOUR = [
-        { sel: '#agentHero', title: 'Allgemeiner Agent', text: 'Rechtsfragen und Dokumentaufgaben in natürlicher Sprache. Luna wählt das Rechtsgebiet und formuliert kompakte Fragen, die Wissensdatenbank AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf Word, Excel oder PDF. Jede Fundstelle wird gegen das RIS geprüft.' },
+        { sel: '#agentHero', title: 'Allgemeiner Agent', text: 'Rechtsfragen und Dokumentaufgaben in natürlicher Sprache. Der Assistent wählt das Rechtsgebiet und formuliert kompakte Fragen, die Wissensdatenbank AI:ssociate antwortet kurz mit Fundstellen; bei Bedarf entstehen Word, Excel oder PDF. Jede Fundstelle wird gegen das RIS geprüft.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
         { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
         { sel: '#navDd', title: 'Spezialagent Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Review-Tabellen im Akt, Request List, Red-Flag-Report als Word und Excel.', nav: true },
-        { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Modelle, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
+        { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
       ]
       let tourIdx = -1, tourCard = null, tourTarget = null
       function startTour() { closeDlg(); if (viewName !== 'assistant') { navigate('#/assistant') } if (home.hidden) showHome(); tourIdx = 0; showTourStep() }

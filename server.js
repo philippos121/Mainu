@@ -813,11 +813,6 @@ Vorgehen: Dokument lesen (read_document) → klauselweise prüfen; strittige Rec
     extra: `AUFGABE: Fasse die hochgeladenen Dokumente zusammen. Stil: ${style || 'juristisches Memo (Sachverhalt, rechtliche Würdigung, Fazit)'}. ${question ? `Schwerpunkt: ${question}.` : ''} Zuerst lesen (read_document). Konkrete Fakten, Daten, Beträge, Fristen und Parteien wiedergeben; keine Floskeln. ask_aissociate nur, wenn eine rechtliche Würdigung verlangt ist.`,
     forceMode: 'document',
   }),
-  deadlines: ({ reference_date }) => ({
-    text: `Fristen erkennen in den hochgeladenen Dokumenten${reference_date ? ` (Stichtag ${reference_date})` : ''}`,
-    extra: `AUFGABE: Erkenne alle Fristen und fristauslösenden Ereignisse in den hochgeladenen Dokumenten (read_document). Für jede Frist: Bezug/Zitat, Auslöser, Dauer, berechnetes Fristende (Stichtag: ${reference_date || 'Datum im Dokument bzw. heute'}; Fristenregeln nach österreichischem Recht nennen – bei Unsicherheit die Regeln in EINEM ask_aissociate-Aufruf klären), Rechtsfolge bei Versäumung, Priorität. Erzeuge mit create_or_edit_file eine Excel-Tabelle fristen.xlsx und gib in der Antwort eine Tabelle mit den dringendsten Fristen zuerst.`,
-    forceMode: 'document',
-  }),
 }
 
 // Tools for document mode (Responses API flat function tools).
@@ -1838,7 +1833,7 @@ app.post('/api/chat', async (req, res) => {
       // only the web budget that is still left over the whole task.
       const remainingWeb = useWeb ? Math.max(0, MAX_WEB_SEARCHES - ctx.usage.webSearchCalls) : 0
       const tools = remainingWeb > 0 ? [...baseTools, WEB_SEARCH_TOOL] : baseTools
-      const sid = step('think', i === 1 ? 'Sol erstellt das Ergebnis' : 'Sol wertet Ergebnisse aus', { model: MODEL_MAIN })
+      const sid = step('think', i === 1 ? 'Ergebnis wird erstellt' : 'Zwischenergebnis wird ausgewertet', { model: MODEL_MAIN })
       let resp
       try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: docInstructions(useWeb), input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
       prevId = resp.id
@@ -1852,7 +1847,7 @@ app.post('/api/chat', async (req, res) => {
     }
     if (!text && prevId) {
       // Only unsent tool outputs (if any) plus the wrap-up request go into the chain.
-      const sid = step('think', 'Sol fasst zusammen (Schrittlimit)', { model: MODEL_MAIN })
+      const sid = step('think', 'Zusammenfassung (Schrittlimit)', { model: MODEL_MAIN })
       const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: docInstructions(useWeb), input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
       collectWebCitations(resp)
       text = resp.output_text || ''
@@ -1916,7 +1911,7 @@ app.post('/api/chat', async (req, res) => {
     const userContent = (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + inlineDocs + prompt
 
     // ---- 1. plan: Luna decides the mode and formulates compact questions for the knowledge base ----
-    const pid = step('triage', 'Luna analysiert die Anfrage und formuliert die Fragen', { model: MODEL_FAST })
+    const pid = step('triage', 'Anfrage wird analysiert', { model: MODEL_FAST })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', questions: [], title: prompt.slice(0, 60) }
     try {
       const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
@@ -1961,7 +1956,7 @@ app.post('/api/chat', async (req, res) => {
           verdict = 'direct'
           assertAlive()
           if (REVIEW_ANSWERS) {
-          const sid = step('think', 'Sol prüft die Antwort', { model: MODEL_MAIN })
+          const sid = step('think', 'Antwort wird geprüft', { model: MODEL_MAIN })
           try {
             const resp = await callModel(ctx, {
               model: MODEL_MAIN, instructions: reviewInstructions(useWeb), effort: EFFORT_MAIN, maxOut: 8000,
@@ -1978,25 +1973,25 @@ app.post('/api/chat', async (req, res) => {
             const supplement = (vm ? txt.slice(vm[0].length) : txt).trim()
             const webN = ctx.usage.webSearchCalls
             stepDone(sid, { detail: verdict === 'sufficient' ? 'ausreichend' : `ergänzt${webN ? ` (${webN} Websuche${webN > 1 ? 'n' : ''})` : ''}${resp.status === 'incomplete' ? ' · abgeschnitten' : ''}` })
-            if (supplement.length > 15) answer += verdict === 'sufficient' ? `\n\n**Hinweis (Sol)**\n\n${supplement}` : `\n\n---\n\n**Ergänzung (Sol, Websuche)**\n\n${supplement}`
+            if (supplement.length > 15) answer += verdict === 'sufficient' ? `\n\n**Hinweis**\n\n${supplement}` : `\n\n---\n\n**Ergänzung (Websuche)**\n\n${supplement}`
           } catch (e) {
             console.error('review failed:', e?.message)
             verdict = 'unreviewed'
             stepFail(sid, { detail: `Prüfung übersprungen: ${String(e?.message || e).slice(0, 140)}` })
-            answer += '\n\n> Hinweis: Die Nachprüfung durch Sol konnte nicht durchgeführt werden; dies ist die ungeprüfte Antwort der Wissensdatenbank.'
+            answer += '\n\n> Hinweis: Die Nachprüfung konnte nicht durchgeführt werden; dies ist die ungeprüfte Antwort der Wissensdatenbank.'
           }
           }
         } else {
           // Knowledge base unavailable → Sol answers directly with ≤3 web searches.
           assertAlive()
-          const sid = step('think', 'Sol beantwortet die Frage (Wissensdatenbank nicht verfügbar)', { model: MODEL_MAIN })
+          const sid = step('think', 'Antwort ohne Wissensdatenbank (nicht erreichbar)', { model: MODEL_MAIN })
           const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: directInstructions(useWeb), effort: EFFORT_MAIN, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
           collectWebCitations(resp)
           emitWebSteps(resp)
           stepDone(sid, { detail: ctx.usage.webSearchCalls ? `${ctx.usage.webSearchCalls} Websuche${ctx.usage.webSearchCalls > 1 ? 'n' : ''}` : 'ohne Websuche' })
           verdict = 'fallback'
           answer = (resp.output_text || '').trim()
-          answer = `> Hinweis: Die juristische Wissensdatenbank (AI:ssociate) war nicht erreichbar; diese Antwort stammt vom Sprachmodell mit Websuche.\n\n${answer}`
+          answer = `> Hinweis: Die juristische Wissensdatenbank (AI:ssociate) war nicht erreichbar; diese Antwort wurde ohne die Wissensdatenbank erstellt (mit Websuche).\n\n${answer}`
         }
       } else if (plan.mode === 'document') {
         // First pass: the knowledge base answers Luna's questions (short); then Sol
@@ -2008,7 +2003,7 @@ app.post('/api/chat', async (req, res) => {
         }
         answer = await documentLoop({ input: [...histInput, { role: 'user', content: kbBlock + userContent }] })
       } else {
-        const sid = step('think', 'Luna antwortet', { model: MODEL_FAST })
+        const sid = step('think', 'Antwort wird formuliert', { model: MODEL_FAST })
         const resp = await callModel(ctx, { model: MODEL_FAST, instructions: GENERAL_INSTRUCTIONS, effort: EFFORT_PLAN, input: [...histInput, { role: 'user', content: userContent }] })
         answer = (resp.output_text || '').trim()
         stepDone(sid)
