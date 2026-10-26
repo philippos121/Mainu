@@ -7,6 +7,9 @@ import { Sandbox } from '@e2b/code-interpreter'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
+import { JsonStore } from './lib/store.js'
+import { newMatter, newDocument, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
+import { DD_AREAS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL } from './lib/ddconfig.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -43,6 +46,17 @@ const DOC_MAX_STEPS = Number(process.env.DOC_MAX_STEPS || 8)
 // Web search (OpenAI hosted tool) — only as a fallback after the knowledge base.
 const WEB_SEARCH_ENABLED = process.env.OPENAI_WEB_SEARCH !== 'off'
 const WEB_SEARCH_TOOL = { type: process.env.OPENAI_WEB_SEARCH_TOOL || 'web_search' }
+
+// Matters (Akten) and due diligence: file-backed store (set DATA_DIR to a
+// persistent disk on Render), a separate extraction model for the per-document
+// pass, and a cap on concurrent long-running analyses per instance.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
+const MODEL_EXTRACT = process.env.OPENAI_MODEL_EXTRACT || MODEL_MAIN
+const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
+const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
+const DD_MAX_DOC_BYTES = Number(process.env.DD_MAX_DOC_BYTES || 30 * 1024 * 1024)
+const DD_MAX_CONCURRENT = Number(process.env.DD_MAX_CONCURRENT || 2)
+const DOC_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml)$/i
 
 // Sandbox (only used by the file tool).
 const WORKDIR = '/home/user'
@@ -150,9 +164,10 @@ class BudgetExceeded extends Error {}
  * structured output).
  */
 async function callModel(ctx, { model, instructions, input, tools, toolChoice, effort, prevId, maxOut, text, maxToolCalls }) {
-  const remainingOut = MAX_OUTPUT_TOKENS - ctx.usage.outTok
-  const remainingIn = MAX_INPUT_TOKENS - ctx.usage.inTok
-  if (remainingOut < 800 || remainingIn < 2000) throw new BudgetExceeded('Token-Budget für diese Frage ausgeschöpft.')
+  // Per-question budgets by default; long-running matter jobs bring their own limits.
+  const remainingOut = (ctx.limits?.outMax ?? MAX_OUTPUT_TOKENS) - ctx.usage.outTok
+  const remainingIn = (ctx.limits?.inMax ?? MAX_INPUT_TOKENS) - ctx.usage.inTok
+  if (remainingOut < 800 || remainingIn < 2000) throw new BudgetExceeded(ctx.limits ? 'Token-Budget der Akte ausgeschöpft.' : 'Token-Budget für diese Frage ausgeschöpft.')
   const params = {
     model,
     instructions,
@@ -624,6 +639,16 @@ async function verifyAnswer(answer) {
   }
 }
 
+/** Verify a plain list of norm citations (due diligence: up to `max`, four at a time). */
+async function verifyNormList(text, max = 60) {
+  const norms = extractNormCitations(text).slice(0, max)
+  const out = []
+  for (let i = 0; i < norms.length; i += 4) out.push(...await Promise.all(norms.slice(i, i + 4).map((x) => verifyNorm(x).catch((e) => ({ ...x, status: 'error', note: e.message })))))
+  const count = (s) => out.filter((x) => x.status === s).length
+  const skipped = count('skipped')
+  return { norms: out, decisions: [], summary: { checked: out.length - skipped, ok: count('ok'), warn: count('expired'), unsure: count('unsure'), notFound: count('not_found'), error: count('error'), skipped } }
+}
+
 // ---------------------------------------------------------------------------
 // Uploads: server-side text extraction
 // ---------------------------------------------------------------------------
@@ -1082,8 +1107,10 @@ app.get('/api/ms/browse', async (req, res) => {
   } catch (e) { res.status(e.status === 401 ? 401 : 502).json({ error: e.message, reauth: e.status === 401 }) }
 })
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, code: MODEL_CODE }, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS } })
+app.get('/api/health', async (_req, res) => {
+  let storeStats = null
+  try { storeStats = await store.stats() } catch {}
+  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, code: MODEL_CODE, extract: MODEL_EXTRACT }, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -1145,10 +1172,305 @@ function newJob(id) {
   return job
 }
 
-app.get('/api/chat/stream/:id', (req, res) => {
+const streamJob = (req, res) => {
   const job = jobs.get(String(req.params.id || ''))
   if (!job) return res.status(404).json({ error: 'Auftrag unbekannt oder abgelaufen.' })
   attachListener(job, res, Number(req.query.after) || 0)
+}
+app.get('/api/chat/stream/:id', streamJob)
+app.get('/api/jobs/:id/stream', streamJob)
+
+// ---------------------------------------------------------------------------
+// Matters (Akten): documents, due diligence, review tables, reports.
+//
+// Isolation: every request carries X-Owner-Key, a random key the browser
+// generates once (shown in the settings so a workspace can be moved to another
+// device). It separates workspaces; it is not an authentication system – bind
+// it to the Microsoft login or an SSO identity before multi-tenant use.
+// ---------------------------------------------------------------------------
+const store = new JsonStore(DATA_DIR)
+const ddRuns = new Map() // matterId -> { jobId, kind }
+const ownerOf = (req) => { const k = String(req.get('x-owner-key') || ''); return /^[\w-]{16,80}$/.test(k) ? k : null }
+const matterSummary = (m) => ({
+  id: m.id, name: m.name, kind: m.kind, client: m.client, createdAt: m.createdAt, updatedAt: m.updatedAt, settings: m.settings,
+  documents: m.documents.length, analysed: m.documents.filter((d) => d.status === 'analysed').length,
+  red: m.findings.filter((f) => f.severity === 'red').length, amber: m.findings.filter((f) => f.severity === 'amber').length,
+  status: m.job?.status || 'idle', stage: m.job?.stage || null, progress: m.job?.progress || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null,
+  assessment: m.executive?.overall_assessment || null, reports: (m.reports || []).length, tables: (m.tables || []).length,
+})
+const matterView = (m) => ({ ...m, ownerKey: undefined, job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
+async function loadMatter(req, res) {
+  const owner = ownerOf(req)
+  if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
+  let m = null
+  try { m = await store.getMatter(String(req.params.id || '')) } catch {}
+  if (!m || m.ownerKey !== owner) { res.status(404).json({ error: 'Akte nicht gefunden.' }); return null }
+  return m
+}
+const ddDeps = (send) => ({ store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send })
+
+/** Run a long task of a matter as a resumable job (one per matter, few per instance). */
+function startMatterJob(m, kind, runner) {
+  if (ddRuns.has(m.id)) return null
+  if (ddRuns.size >= DD_MAX_CONCURRENT) throw Object.assign(new Error(`Es laufen bereits ${DD_MAX_CONCURRENT} Analysen auf diesem Server – bitte später erneut starten.`), { status: 429 })
+  const job = newJob(`dd_${Date.now().toString(36)}_${crypto.randomBytes(6).toString('base64url')}`)
+  m.job.jobId = job.id
+  ddRuns.set(m.id, { jobId: job.id, kind })
+  job.send('job', { id: job.id, matterId: m.id, kind })
+  ;(async () => {
+    try { await runner(ddDeps(job.send)) }
+    catch (e) { console.error('matter job failed:', e); job.send('error', { message: String(e?.message || e).slice(0, 300) }) }
+    finally { ddRuns.delete(m.id); job.send('end', { matterId: m.id, kind, status: m.job.status }); job.finish() }
+  })()
+  return job.id
+}
+async function addDocumentFromBuffer(m, { name, buf, source, ms }) {
+  if (m.documents.length >= DD_MAX_DOCS) throw new Error(`Höchstens ${DD_MAX_DOCS} Dokumente je Akte.`)
+  if (buf.length > DD_MAX_DOC_BYTES) throw new Error(`überschreitet ${Math.round(DD_MAX_DOC_BYTES / 1048576)} MB`)
+  const safe = path.basename(String(name)).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 200)
+  if (!DOC_EXT.test(safe)) throw new Error('Dateityp nicht unterstützt (PDF, Word, Text)')
+  const dup = m.documents.find((d) => d.name === safe && d.size === buf.length)
+  if (dup) return { doc: dup, duplicate: true }
+  const d = newDocument({ name: safe, size: buf.length, source, ms })
+  d.file = await store.putFile(m.id, d.id, safe.split('.').pop(), buf)
+  m.documents.push(d)
+  return { doc: d, duplicate: false }
+}
+
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents }) => ({ key, label, profession, documents })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT } }))
+
+app.get('/api/matters', async (req, res) => {
+  const owner = ownerOf(req)
+  if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
+  try { res.json({ matters: (await store.listMatters(owner)).map(matterSummary) }) } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/matters', async (req, res) => {
+  const owner = ownerOf(req)
+  if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
+  const b = req.body || {}
+  if (!String(b.name || '').trim()) return res.status(400).json({ error: 'Bitte einen Namen für die Akte angeben.' })
+  try {
+    const m = newMatter({ ownerKey: owner, name: String(b.name).trim(), kind: b.kind, client: b.client, settings: b.settings && typeof b.settings === 'object' ? b.settings : {} })
+    await store.saveMatter(m)
+    res.json({ matter: matterView(m) })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.get('/api/matters/:id', async (req, res) => { const m = await loadMatter(req, res); if (m) res.json({ matter: matterView(m) }) })
+app.patch('/api/matters/:id', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const b = req.body || {}
+  if (typeof b.name === 'string' && b.name.trim()) m.name = b.name.trim().slice(0, 120)
+  if (typeof b.client === 'string') m.client = b.client.slice(0, 120)
+  if (b.settings && typeof b.settings === 'object') m.settings = newMatter({ ownerKey: m.ownerKey, name: m.name, settings: { ...m.settings, ...b.settings } }).settings
+  await store.saveMatter(m)
+  res.json({ matter: matterView(m) })
+})
+app.delete('/api/matters/:id', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Für diese Akte läuft gerade ein Vorgang – zuerst pausieren.' })
+  await store.deleteMatter(m.id)
+  res.json({ ok: true })
+})
+
+// ---- documents ----
+app.post('/api/matters/:id/documents', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const files = Array.isArray(req.body?.files) ? req.body.files.slice(0, 20) : []
+  const added = [], errors = []
+  for (const f of files) {
+    if (!f || typeof f.name !== 'string' || typeof f.base64 !== 'string') continue
+    try {
+      const buf = Buffer.from(f.base64, 'base64')
+      if (!buf.length) throw new Error('leere Datei')
+      const r = await addDocumentFromBuffer(m, { name: f.name, buf, source: 'upload' })
+      if (r.duplicate) errors.push(`${f.name}: bereits in der Akte`); else added.push(r.doc)
+    } catch (e) { errors.push(`${f.name}: ${e.message}`) }
+  }
+  await store.saveMatter(m)
+  res.json({ added, errors, documents: m.documents })
+})
+app.delete('/api/matters/:id/documents/:docId', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Während eines laufenden Vorgangs können keine Dokumente entfernt werden.' })
+  const i = m.documents.findIndex((d) => d.id === req.params.docId)
+  if (i < 0) return res.status(404).json({ error: 'Dokument nicht gefunden.' })
+  const [d] = m.documents.splice(i, 1)
+  m.findings = m.findings.filter((f) => f.docId !== d.id)
+  for (const t of m.tables || []) t.rows = (t.rows || []).filter((r) => r.docId !== d.id)
+  try { await store.deleteDocument(m.id, d.id, d.file) } catch {}
+  await store.saveMatter(m)
+  res.json({ ok: true, documents: m.documents })
+})
+app.get('/api/matters/:id/documents/:docId/text', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const d = m.documents.find((x) => x.id === req.params.docId)
+  if (!d) return res.status(404).json({ error: 'Dokument nicht gefunden.' })
+  const text = await store.getText(m.id, d.id)
+  const offset = Math.max(0, Number(req.query.offset) || 0), limit = Math.min(200_000, Math.max(1000, Number(req.query.limit) || 60_000))
+  res.json({ name: d.name, chars: text.length, offset, text: text.slice(offset, offset + limit) })
+})
+const MIME = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', txt: 'text/plain; charset=utf-8', md: 'text/markdown; charset=utf-8', html: 'text/html; charset=utf-8', htm: 'text/html; charset=utf-8', csv: 'text/csv; charset=utf-8', json: 'application/json' }
+const sendFile = (res, name, buf) => { res.setHeader('Content-Type', MIME[name.toLowerCase().split('.').pop()] || 'application/octet-stream'); res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`); res.send(buf) }
+app.get('/api/matters/:id/documents/:docId/file', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const d = m.documents.find((x) => x.id === req.params.docId)
+  const buf = d?.file ? await store.getFile(m.id, d.file) : null
+  if (!buf) return res.status(404).json({ error: 'Datei nicht gefunden.' })
+  sendFile(res, d.name, buf)
+})
+
+// ---- import from OneDrive / SharePoint (single files or a whole folder = data room) ----
+app.post('/api/matters/:id/import-ms', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (!MS.clientId) return res.status(503).json({ error: 'Microsoft 365 ist nicht konfiguriert.' })
+  const auth = await msAccessToken(req, res, 30 * 60_000)
+  if (!auth) return res.status(401).json({ error: 'Nicht mit Microsoft 365 verbunden.', reauth: true })
+  const items = (Array.isArray(req.body?.items) ? req.body.items : []).filter((f) => f && typeof f.driveId === 'string' && typeof f.itemId === 'string').slice(0, DD_MAX_DOCS)
+  const folder = req.body?.folder && typeof req.body.folder.driveId === 'string' && typeof req.body.folder.itemId === 'string' ? req.body.folder : null
+  if (!items.length && !folder) return res.status(400).json({ error: 'Keine Dateien oder Ordner gewählt.' })
+  let jobId
+  try {
+    jobId = startMatterJob(m, 'import', async ({ send }) => {
+      let token = auth.token
+      const list = items.map((f) => ({ ...f }))
+      const progress = (message) => send('dd', { matterId: m.id, stage: 'import', progress: m.job.progress, message })
+      if (folder) {
+        m.job.progress = { done: 0, total: 0 }
+        progress('Ordner wird gelesen…')
+        const walk = async (driveId, itemId, depth) => {
+          let next = `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/children?${ITEM_SELECT}&$top=200`
+          while (next && list.length + m.documents.length < DD_MAX_DOCS) {
+            const page = await graph(token, next)
+            for (const it of page.value || []) {
+              if (list.length + m.documents.length >= DD_MAX_DOCS) break
+              if (it.folder) { if (depth < 5) await walk(driveId, it.id, depth + 1) }
+              else if (DOC_EXT.test(it.name || '') && (it.size || 0) <= DD_MAX_DOC_BYTES) list.push({ driveId, itemId: it.id, name: it.name })
+            }
+            next = page['@odata.nextLink'] || null
+          }
+        }
+        await walk(folder.driveId, folder.itemId, 0)
+      }
+      m.job.progress = { done: 0, total: list.length }
+      let added = 0, failed = 0
+      for (const f of list) {
+        if (m.job.pauseRequested) break
+        try {
+          const { meta, buf } = await msDownload(token, f.driveId, f.itemId)
+          const r = await addDocumentFromBuffer(m, { name: meta.name, buf, source: 'ms', ms: { driveId: f.driveId, itemId: f.itemId, webUrl: meta.webUrl || '', parentId: meta.parentId || '' } })
+          if (!r.duplicate) added++
+          m.job.progress.done++
+          progress(`Importiert: ${meta.name}`)
+        } catch (e) {
+          failed++
+          m.job.progress.done++
+          m.job.log.push({ t: Date.now(), message: `Import fehlgeschlagen: ${f.name || f.itemId} · ${e.message}` })
+          progress(`Fehler: ${f.name || f.itemId} · ${String(e.message).slice(0, 120)}`)
+          if (e?.status === 401 && auth.session?.rt) { try { token = (await msRefreshToCache(req, auth.session)).token } catch {} }
+        }
+        if (m.job.progress.done % 5 === 0) await store.saveMatter(m)
+      }
+      m.job.pauseRequested = false
+      await store.saveMatter(m)
+      send('dd', { matterId: m.id, stage: 'import', progress: m.job.progress, status: 'done', message: `${added} Dokument${added === 1 ? '' : 'e'} importiert${failed ? `, ${failed} fehlgeschlagen` : ''}` })
+    })
+  } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
+  if (!jobId) return res.status(409).json({ error: 'Für diese Akte läuft bereits ein Vorgang.' })
+  res.json({ jobId })
+})
+
+// ---- due diligence run / pause / report ----
+app.post('/api/matters/:id/dd/run', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (!m.documents.length) return res.status(400).json({ error: 'Die Akte enthält noch keine Dokumente.' })
+  if (req.body?.reanalyse && !ddRuns.has(m.id)) {
+    for (const d of m.documents) if (d.status === 'analysed') d.status = 'extracted'
+    m.findings = []; m.areaSummaries = {}; m.executive = null; m.verification = null
+  }
+  if (req.body?.retryErrors && !ddRuns.has(m.id)) for (const d of m.documents) if (d.status === 'error') { d.status = 'new'; d.note = '' }
+  let jobId
+  try { jobId = startMatterJob(m, 'dd', (deps) => runDd(m, deps)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
+  if (!jobId) return res.status(409).json({ error: 'Für diese Akte läuft bereits ein Vorgang.' })
+  res.json({ jobId })
+})
+app.post('/api/matters/:id/dd/pause', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (!ddRuns.has(m.id)) return res.json({ ok: true, running: false })
+  m.job.pauseRequested = true
+  res.json({ ok: true, running: true })
+})
+app.post('/api/matters/:id/report', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Bitte warten, bis der laufende Vorgang beendet ist.' })
+  try { const names = await buildReports(m, ddDeps(() => {})); res.json({ reports: m.reports, created: names }) } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.get('/api/matters/:id/reports/:file', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const buf = await store.getReport(m.id, String(req.params.file))
+  if (!buf) return res.status(404).json({ error: 'Bericht nicht gefunden.' })
+  sendFile(res, String(req.params.file), buf)
+})
+
+// ---- review tables ----
+app.post('/api/matters/:id/tables', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const b = req.body || {}
+  const preset = REVIEW_TABLE_PRESETS.find((p) => p.key === b.preset)
+  const columns = [...new Set((Array.isArray(b.columns) && b.columns.length ? b.columns : preset?.columns || []).map((c) => String(c).trim().slice(0, 80)).filter(Boolean))].slice(0, 16)
+  if (!columns.length) return res.status(400).json({ error: 'Bitte mindestens eine Spalte angeben.' })
+  const docIds = (Array.isArray(b.docIds) ? b.docIds : []).map(String).filter((id) => m.documents.some((d) => d.id === id))
+  const table = { id: JsonStore.newId('t'), name: String(b.name || preset?.label || 'Tabelle').slice(0, 100), columns, docIds, rows: [], status: 'new', createdAt: Date.now(), updatedAt: Date.now() }
+  m.tables = m.tables || []
+  m.tables.push(table)
+  await store.saveMatter(m)
+  let jobId = null
+  try { jobId = startMatterJob(m, 'table', (deps) => runReviewTable(m, table, deps)) } catch (e) { return res.status(e.status || 500).json({ error: e.message, table }) }
+  res.json({ table, jobId })
+})
+app.post('/api/matters/:id/tables/:tid/run', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const t = (m.tables || []).find((x) => x.id === req.params.tid)
+  if (!t) return res.status(404).json({ error: 'Tabelle nicht gefunden.' })
+  let jobId
+  try { jobId = startMatterJob(m, 'table', (deps) => runReviewTable(m, t, deps)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
+  if (!jobId) return res.status(409).json({ error: 'Für diese Akte läuft bereits ein Vorgang.' })
+  res.json({ jobId })
+})
+app.delete('/api/matters/:id/tables/:tid', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  m.tables = (m.tables || []).filter((x) => x.id !== req.params.tid)
+  await store.saveMatter(m)
+  res.json({ ok: true, tables: m.tables })
+})
+app.get('/api/matters/:id/tables/:tid/xlsx', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const t = (m.tables || []).find((x) => x.id === req.params.tid)
+  if (!t) return res.status(404).json({ error: 'Tabelle nicht gefunden.' })
+  try { sendFile(res, `${t.name.replace(/[^\w\-äöüÄÖÜß ]+/g, '').trim().replace(/\s+/g, '_') || 'Tabelle'}.xlsx`, await tableXlsx(m, t)) } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ---- write reports back to OneDrive / SharePoint ----
+app.post('/api/matters/:id/sync', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (!MS.clientId) return res.status(503).json({ error: 'Microsoft 365 ist nicht konfiguriert.' })
+  const auth = await msAccessToken(req, res, 5 * 60_000)
+  if (!auth) return res.status(401).json({ error: 'Nicht mit Microsoft 365 verbunden.', reauth: true })
+  const { driveId, itemId } = req.body || {}
+  if (typeof driveId !== 'string' || typeof itemId !== 'string') return res.status(400).json({ error: 'Zielordner fehlt.' })
+  const names = (Array.isArray(req.body?.files) && req.body.files.length ? req.body.files : (m.reports || []).map((r) => r.name)).map(String).slice(0, 20)
+  const results = []
+  let token = auth.token
+  for (const name of names) {
+    const buf = await store.getReport(m.id, name)
+    if (!buf) { results.push({ name, ok: false, error: 'Bericht nicht gefunden' }); continue }
+    try {
+      let it
+      try { it = await msUpload(token, driveId, itemId, name, buf) }
+      catch (e) { if (e?.status !== 401 || !auth.session?.rt) throw e; token = (await msRefreshToCache(req, auth.session)).token; it = await msUpload(token, driveId, itemId, name, buf) }
+      results.push({ name: it.name || name, webUrl: it.webUrl || '', ok: true })
+    } catch (e) { results.push({ name, ok: false, error: String(e?.message || e).slice(0, 200) }) }
+  }
+  res.json({ sync: results })
 })
 
 app.post('/api/chat', async (req, res) => {
@@ -1159,6 +1481,15 @@ app.post('/api/chat', async (req, res) => {
   const wantsMs = Array.isArray(body.msFiles) && body.msFiles.length > 0 || (body.msSync && body.msSync.enabled !== false && body.msSync.driveId)
   // Ask for a token that outlives the job (jobs can run for many minutes); a refresh now still sets cookies.
   const msAuth = MS.clientId && wantsMs ? await msAccessToken(req, res, 30 * 60_000) : null
+  // Questions about a matter (Akte): its analysis becomes context, chosen documents become attachments.
+  let matterReq = null, matterDocs = []
+  if (typeof body.matterId === 'string' && body.matterId) {
+    const owner = ownerOf(req)
+    try { matterReq = owner ? await store.getMatter(body.matterId) : null } catch {}
+    if (!matterReq || matterReq.ownerKey !== owner) return res.status(404).json({ error: 'Akte nicht gefunden.' })
+    const ids = new Set((Array.isArray(body.matterDocIds) ? body.matterDocIds : []).map(String))
+    matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
+  }
   const job = newJob(jobId)
   const send = job.send
   attachListener(job, res, 0)
@@ -1438,6 +1769,22 @@ app.post('/api/chat', async (req, res) => {
       stepDone(sid, { detail: uploads.map((u) => `${u.name} (${(uploadTexts.get(u.name).text.length / 1000).toFixed(0)}k Zeichen)`).join(', ') })
     }
 
+    // ---- 0b. matter context: the stored analysis (findings, summaries) and chosen documents ----
+    let matterCtx = ''
+    if (matterReq) {
+      const sid = step('read', `Akte „${matterReq.name}“ wird eingebunden`)
+      matterCtx = matterContext(matterReq, 60_000)
+      for (const d of matterDocs) {
+        if (uploads.length >= MAX_UPLOADS || uploads.some((u) => u.name === d.name)) continue
+        const text = await store.getText(matterReq.id, d.id)
+        const buf = d.file ? await store.getFile(matterReq.id, d.file) : null
+        if (!text || !buf) continue
+        uploads.push({ name: d.name, buf })
+        uploadTexts.set(d.name, { text, pages: d.pages })
+      }
+      stepDone(sid, { detail: `${matterReq.documents.length} Dokumente, ${matterReq.findings.length} Befunde${matterDocs.length ? ` · ${matterDocs.length} Dokument${matterDocs.length > 1 ? 'e' : ''} angehängt` : ''}` })
+    }
+
     const histInput = (Array.isArray(history) ? history : [])
       .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .slice(-8)
@@ -1446,13 +1793,14 @@ app.post('/api/chat', async (req, res) => {
     const uploadLine = uploads.length
       ? `HOCHGELADENE DATEIEN (mit read_document lesen; für Dateiausgaben liegen sie in /home/user): ${uploads.map((u) => { const t = uploadTexts.get(u.name); return `${u.name} (${t.unsupported ? 'Typ nur per create_or_edit_file lesbar' : `${t.text.length} Zeichen Text, ${Math.max(1, Math.ceil(t.text.length / UPLOAD_PART_CHARS))} Teil(e)`})` }).join('; ')}\n\n`
       : ''
-    const userContent = (taskExtra ? taskExtra + '\n\n' : '') + uploadLine + prompt
+    const matterLine = matterCtx ? `AKTENKONTEXT (gespeicherte Analyse der Akte; Befunde mit Zitat und Fundstelle sind belegt, alles andere ist Zusammenfassung):\n${matterCtx}\n\n` : ''
+    const userContent = (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + prompt
 
     // ---- 1. plan (Sol decides mode + legal area) ----
     const pid = step('triage', 'Sol analysiert die Anfrage', { model: MODEL_MAIN })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', question: prompt, title: prompt.slice(0, 60) }
     try {
-      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
+      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Frage an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
       const planFormat = { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } }
       // max_output_tokens includes reasoning tokens: retry once with more room if truncated.
       let pr = await callModel(ctx, { model: MODEL_MAIN, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 6000, input: planInput, text: planFormat })
@@ -1642,4 +1990,4 @@ if (process.env.NO_LISTEN !== '1') {
 }
 
 // Exported for tests (NO_LISTEN=1).
-export { extractNormCitations, extractDecisionCitations, normalizeRisDoc, htmlToText, markdownToDocx, askAissociate, parseSseBlock, sourceFromDocumentEvent, risLinkForDocNumber, linkCitations, normQueryParams, seal, unseal, app }
+export { extractNormCitations, extractDecisionCitations, normalizeRisDoc, htmlToText, markdownToDocx, askAissociate, parseSseBlock, sourceFromDocumentEvent, risLinkForDocNumber, linkCitations, normQueryParams, verifyNormList, seal, unseal, app, store }

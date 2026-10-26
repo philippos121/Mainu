@@ -16,36 +16,77 @@
         --text: #16252e; --muted: #566a73; --faint: #8a98a0;
         --accent: #0e7c8a; --accent-hover: #0a6a76; --accent-soft: rgba(14, 124, 138, 0.10);
         --header: #0e5c69; --orange: #f39200; --ok: #1a9c5b; --warn: #e08a00; --err: #d92d20;
+        --red: #b42318; --red-bg: #fde8e8; --amber: #9a6700; --amber-bg: #fff3cd; --green: #3b6d11; --green-bg: #d1e7dd; --info: #566a73; --info-bg: #e2e3e5;
         --sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        --radius: 16px; --topbar: 56px; --maxw: 760px;
+        --radius: 16px; --topbar: 56px; --maxw: 760px; --sidebar: 264px;
       }
       * { box-sizing: border-box; }
       html, body { height: 100%; }
-      body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; line-height: 1.55; min-height: 100dvh; display: flex; flex-direction: column; }
+      body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; line-height: 1.55; min-height: 100dvh; }
       button { font-family: inherit; }
       a { color: var(--accent); }
       [hidden] { display: none !important; }
 
-      /* ---------- top bar ---------- */
-      .topbar { position: sticky; top: 0; z-index: 30; height: calc(var(--topbar) + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: var(--header); color: #fff; display: flex; align-items: center; justify-content: space-between; padding-left: 10px; padding-right: 10px; }
-      .iconbtn { width: 40px; height: 40px; border: none; background: transparent; color: #fff; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; opacity: .95; }
-      .iconbtn:hover { background: rgba(255,255,255,0.12); }
-      .iconbtn svg { width: 24px; height: 24px; }
-      .topbar-title { flex: 1; text-align: center; font-size: 14px; font-weight: 600; letter-spacing: .01em; color: rgba(255,255,255,0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; }
-      .topbar-right { display: flex; align-items: center; gap: 4px; }
-      .cost-pill { font-size: 12px; font-weight: 600; color: #fff; background: rgba(255,255,255,0.14); border-radius: 999px; padding: 4px 10px; white-space: nowrap; cursor: pointer; }
+      /* ---------- app shell ---------- */
+      .app { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); min-height: 100dvh; }
+      .sidebar { position: sticky; top: 0; height: 100dvh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); z-index: 50; }
+      .sb-brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 8px; }
+      .sb-brand img { height: 26px; width: auto; }
+      .sb-brand .tag { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--orange); margin-left: 2px; }
+      .sb-brand .iconbtn { margin-left: auto; color: var(--muted); display: none; }
+      .sb-new { margin: 8px 14px 6px; }
+      .sb-nav { flex: 1; overflow-y: auto; padding: 4px 10px 10px; }
+      .sb-sec { display: flex; align-items: center; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 800; margin: 14px 8px 4px; }
+      .sb-sec a { margin-left: auto; font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 700; text-decoration: none; }
+      .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; border: none; background: none; text-align: left; text-decoration: none; }
+      .nav-item:hover { background: var(--surface-2); color: var(--text); }
+      .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+      .nav-item svg { width: 18px; height: 18px; flex: 0 0 auto; }
+      .nav-item .cnt { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 1px 7px; }
+      .nav-item.active .cnt { background: rgba(14,124,138,0.16); color: var(--accent); }
+      .sb-recent .nav-item { font-weight: 500; font-size: 13px; padding: 6px 10px; }
+      .sb-recent .nav-item span.t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sb-empty { font-size: 12.5px; color: var(--faint); padding: 4px 10px; }
+      .sb-foot { border-top: 1px solid var(--border); padding: 10px 10px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+      .sb-account { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-size: 12.5px; color: var(--muted); }
+      .sb-account .av { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex: 0 0 auto; }
+      .sb-account .who { flex: 1; min-width: 0; }
+      .sb-account .who b { display: block; color: var(--text); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sb-account .who span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      .main { min-width: 0; display: flex; flex-direction: column; min-height: 100dvh; }
+      .mainbar { position: sticky; top: 0; z-index: 30; height: calc(var(--topbar) + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgba(243,245,246,0.86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding-left: 12px; padding-right: 12px; }
+      .mainbar #menuBtn { display: none; }
+      .iconbtn { width: 40px; height: 40px; border: none; background: transparent; color: var(--muted); border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+      .iconbtn:hover { background: var(--surface-2); color: var(--text); }
+      .iconbtn svg { width: 22px; height: 22px; }
+      .mainbar-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; display: flex; align-items: center; gap: 8px; }
+      .mainbar-title .crumb { color: var(--faint); font-weight: 600; }
+      .mainbar-title .crumb::after { content: '›'; margin-left: 8px; }
+      .mainbar-right { display: flex; align-items: center; gap: 6px; }
+      .cost-pill { font-size: 12px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; white-space: nowrap; cursor: pointer; }
       .cost-pill:empty { display: none; }
+      .view { flex: 1; display: none; flex-direction: column; }
+      .view.active { display: flex; }
+      .page { width: 100%; max-width: 1100px; margin: 0 auto; padding: 26px 24px 60px; }
+      .page-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+      .page-head h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
+      .page-head .sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+      .page-head .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .back { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--muted); text-decoration: none; margin-bottom: 8px; }
+      .back:hover { color: var(--accent); }
 
       /* ---------- home ---------- */
-      main { flex: 1; display: flex; flex-direction: column; }
-      #home { align-items: center; padding: 0 16px 40px; }
+      #home { align-items: center; padding: 0 16px 40px; display: flex; flex-direction: column; flex: 1; }
       .home-inner { width: 100%; max-width: var(--maxw); margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
-      .home-logo { height: 46px; width: auto; margin: 56px 0 36px; }
+      .home-logo { height: 42px; width: auto; margin: 56px 0 10px; }
+      .home-claim { font-size: 15px; color: var(--muted); margin: 0 0 26px; text-align: center; }
       .home-inner .composer { width: 100%; }
       .disclaimer { color: var(--faint); font-size: 11.5px; text-align: center; line-height: 1.45; margin: 14px auto 0; max-width: 560px; }
-      .section { width: 100%; margin-top: 40px; }
-      .section-title { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 0 0 12px; }
+      .section { width: 100%; margin-top: 36px; }
+      .section-title { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 0 0 12px; display: flex; align-items: center; }
+      .section-title a { margin-left: auto; font-size: 12px; letter-spacing: 0; text-transform: none; text-decoration: none; font-weight: 700; }
       .recent-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
       .recent-item { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: border-color .15s, transform .15s; min-width: 0; }
       .recent-item:hover { border-color: var(--border-strong); transform: translateY(-1px); }
@@ -56,6 +97,7 @@
       .action { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s, transform .15s; }
       .action:hover { border-color: var(--accent); transform: translateY(-1px); }
       .action .ico { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+      .action.alt .ico { background: rgba(243,146,0,0.14); color: #b36a00; }
       .action .ico svg { width: 20px; height: 20px; }
       .action .t { font-size: 14px; font-weight: 700; }
       .action .d { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
@@ -71,7 +113,6 @@
       .ctool svg { width: 19px; height: 19px; flex: 0 0 auto; }
       .ctool:hover { background: var(--surface-2); color: var(--text); }
       .ctool.on { background: var(--accent-soft); color: var(--accent); border-color: rgba(14,124,138,0.25); }
-      .ctool.warnon { background: rgba(243,146,0,0.12); color: #b36a00; border-color: rgba(243,146,0,0.35); }
       .sendbtn { margin-left: auto; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface-3); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; flex: 0 0 auto; }
       .sendbtn svg { width: 20px; height: 20px; }
       .sendbtn.ready { background: var(--accent); }
@@ -81,12 +122,14 @@
       .attach-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 6px; }
       .attach-list:empty { display: none; }
       .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; color: var(--text); max-width: 100%; }
+      .chip.matter { background: rgba(243,146,0,0.12); border-color: rgba(243,146,0,0.35); color: #8a5300; font-weight: 600; }
       .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
-      .sync-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 8px; }
       .chip svg { width: 13px; height: 13px; color: var(--accent); flex: 0 0 auto; }
+      .sync-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 8px; }
       .badge.ms { background: rgba(14,124,138,0.12); color: var(--accent); }
+
       /* Microsoft 365 picker */
       .ms-card { max-width: 640px; padding: 16px 16px 14px; display: flex; flex-direction: column; max-height: calc(100dvh - 32px); }
       .ms-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -119,9 +162,8 @@
       .sync-row:first-of-type { border-top: none; }
       .sync-row a { font-weight: 600; text-decoration: none; }
       .sync-row .err { color: var(--err); font-size: 12px; }
-
       /* ---------- chat ---------- */
-      #chat { padding-bottom: 0; }
+      #chat { padding-bottom: 0; display: flex; flex-direction: column; flex: 1; }
       #messages { flex: 1; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 22px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
       .msg-user { align-self: flex-end; max-width: 88%; background: var(--accent); color: #fff; border-radius: 18px 18px 4px 18px; padding: 11px 15px; white-space: pre-wrap; word-wrap: break-word; font-size: 15px; box-shadow: 0 2px 10px rgba(14,124,138,0.18); }
       .msg-user .files { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
@@ -213,23 +255,22 @@
       .vmark.ok { background: rgba(26,156,91,0.14); color: var(--ok); }
       .vmark.expired, .vmark.unsure { background: rgba(224,138,0,0.16); color: #a96500; }
       .vmark.not_found { background: rgba(217,45,32,0.12); color: var(--err); }
-      .vmark.error, .vmark.skipped { background: var(--surface-2); color: var(--faint); }
+      .vmark.error, .vmark.skipped, .vmark.unchecked { background: var(--surface-2); color: var(--faint); }
       .vrow .vt { font-weight: 600; }
       .vrow .vn { font-size: 12px; color: var(--faint); }
       .vrow .vn a { color: var(--accent); }
 
-      /* files, followups, actions */
+      /* files, actions */
       img.result { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 1px solid var(--border); }
       .pdf-preview, .html-preview { width: 100%; height: 440px; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; background: #fff; }
       a.file-link { display: inline-flex; align-items: center; gap: 7px; margin: 8px 8px 0 0; padding: 9px 13px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
       a.file-link:hover { border-color: var(--border-strong); }
       .file-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
-      .followups { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-      .fu { background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); border-radius: 999px; padding: 7px 13px; font-size: 13px; cursor: pointer; text-align: left; }
-      .fu:hover { border-color: var(--accent); color: var(--accent); }
       .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-      .mini { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 12.5px; padding: 7px 12px; border-radius: 9px; cursor: pointer; font-weight: 600; }
+      .mini { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 12.5px; padding: 7px 12px; border-radius: 9px; cursor: pointer; font-weight: 600; white-space: nowrap; }
       .mini:hover { border-color: var(--border-strong); color: var(--text); }
+      .mini:disabled { opacity: .5; cursor: not-allowed; }
+      .mini.danger:hover { border-color: rgba(217,45,32,0.4); color: var(--err); }
       .note { font-size: 11px; color: var(--faint); margin-top: 10px; }
       .cost-line { font-size: 12px; color: var(--faint); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px 14px; }
       .err-box { background: rgba(217,45,32,0.08); border: 1px solid rgba(217,45,32,0.3); color: var(--err); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; white-space: pre-wrap; }
@@ -238,48 +279,42 @@
       #chatFooter { position: sticky; bottom: 0; background: linear-gradient(to top, var(--bg) 70%, rgba(243,245,246,0)); padding: 10px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
       #chatFooter .inner { max-width: var(--maxw); margin: 0 auto; }
 
-      /* ---------- drawers / overlay ---------- */
-      .overlay { position: fixed; inset: 0; background: rgba(14,37,46,0.35); z-index: 40; opacity: 0; pointer-events: none; transition: opacity .2s; }
+      /* ---------- overlay / modal ---------- */
+      .overlay { position: fixed; inset: 0; background: rgba(14,37,46,0.35); z-index: 45; opacity: 0; pointer-events: none; transition: opacity .2s; }
       .overlay.show { opacity: 1; pointer-events: auto; }
-      .drawer { position: fixed; top: 0; bottom: 0; width: 320px; max-width: 88vw; background: var(--surface); z-index: 50; box-shadow: 0 0 40px rgba(14,37,46,0.18); transition: transform .22s ease; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
-      .drawer.left { left: 0; transform: translateX(-105%); }
-      .drawer.right { right: 0; transform: translateX(105%); }
-      .drawer.show { transform: translateX(0); }
-      .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
-      .drawer-head h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
-      .drawer-body { flex: 1; overflow-y: auto; padding: 10px 12px 20px; }
-      .menu-item { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none; text-align: left; padding: 11px 10px; border-radius: 10px; font-size: 14.5px; color: var(--text); cursor: pointer; font-weight: 600; }
-      .menu-item:hover { background: var(--surface-2); }
-      .menu-item svg { width: 20px; height: 20px; color: var(--accent); flex: 0 0 auto; }
-      .menu-sec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 16px 10px 6px; }
-      .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; font-size: 14px; }
+      .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; font-size: 14px; border-top: 1px solid var(--border); }
+      .setting:first-of-type { border-top: none; }
       .setting .sl { font-weight: 600; }
       .setting .sd { font-size: 12px; color: var(--faint); font-weight: 400; }
       .switch { position: relative; width: 42px; height: 24px; border-radius: 999px; background: var(--surface-3); border: none; cursor: pointer; flex: 0 0 auto; transition: background .15s; }
       .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
       .switch.on { background: var(--accent); }
       .switch.on::after { transform: translateX(18px); }
-      select.sel { font-family: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; background: var(--surface); color: var(--text); }
-      .kv { font-size: 12.5px; color: var(--muted); padding: 4px 10px; display: flex; justify-content: space-between; gap: 10px; }
-      .kv b { color: var(--text); font-weight: 600; text-align: right; }
-      .hist-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border-radius: 10px; cursor: pointer; border: none; background: none; text-align: left; }
-      .hist-item:hover { background: var(--surface-2); }
+      .kv { font-size: 13px; color: var(--muted); padding: 6px 0; display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border); }
+      .kv:first-of-type { border-top: none; }
+      .kv b { color: var(--text); font-weight: 600; text-align: right; word-break: break-all; }
+      .hist-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border-radius: 10px; cursor: pointer; border: none; background: var(--surface); text-align: left; border: 1px solid var(--border); margin-bottom: 8px; }
+      .hist-item:hover { border-color: var(--border-strong); }
       .hist-item.active { background: var(--accent-soft); }
       .hist-item .ht { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .hist-item .hd { font-size: 11.5px; color: var(--faint); }
+      .hist-item .hd { font-size: 11.5px; color: var(--faint); white-space: nowrap; }
       .hist-item .hx { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 6px; }
       .hist-item .hx:hover { color: var(--err); background: var(--surface-2); }
-      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
       .btn:hover { background: var(--accent-hover); }
       .btn:disabled { opacity: .5; cursor: not-allowed; }
       .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-strong); }
       .btn.ghost:hover { background: var(--accent-soft); }
+      .btn.orange { background: var(--orange); }
+      .btn.orange:hover { background: #d98200; }
+      .btn.sm { padding: 7px 12px; font-size: 13px; }
       .btn.full { width: 100%; }
+      .btn svg { width: 16px; height: 16px; }
 
-      /* ---------- modal ---------- */
-      .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 16px; }
+      .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(14,37,46,0.35); }
       .modal.show { display: flex; }
       .modal-card { background: var(--surface); border-radius: 18px; width: 100%; max-width: 520px; max-height: calc(100dvh - 32px); overflow-y: auto; padding: 20px 20px 18px; box-shadow: 0 20px 60px rgba(14,37,46,0.3); }
+      .modal-card.wide { max-width: 680px; }
       .modal-card h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
       .modal-card .md { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
       .field { margin-bottom: 12px; }
@@ -287,12 +322,128 @@
       .field input, .field select, .field textarea { width: 100%; font-family: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--text); }
       .field textarea { min-height: 86px; resize: vertical; }
       .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+      .field .hint { font-size: 12px; color: var(--faint); margin-top: 4px; }
+      .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+      .checks label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
+      .checks input { accent-color: var(--accent); width: 16px; height: 16px; }
       .filebox { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 12px; text-align: center; font-size: 13px; color: var(--muted); cursor: pointer; }
-      .filebox:hover { border-color: var(--accent); color: var(--accent); }
+      .filebox:hover, .filebox.over { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
       .filebox .attach-list { justify-content: center; padding-top: 8px; }
-      .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+      .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+      .modal-actions .sp { flex: 1; }
 
-      /* ---------- tour ---------- */
+      /* ---------- matters / DD ---------- */
+      .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; min-width: 0; }
+      .card.click { cursor: pointer; transition: border-color .15s, transform .15s; }
+      .card.click:hover { border-color: var(--accent); transform: translateY(-1px); }
+      .card h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+      .card .meta { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+      .card .foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+      .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+      .pill.red { background: var(--red-bg); color: var(--red); }
+      .pill.amber { background: var(--amber-bg); color: var(--amber); }
+      .pill.green { background: var(--green-bg); color: var(--green); }
+      .pill.info { background: var(--info-bg); color: var(--info); }
+      .pill.teal { background: var(--accent-soft); color: var(--accent); }
+      .pill.orange { background: rgba(243,146,0,0.14); color: #b36a00; }
+      .pill.run { background: var(--accent-soft); color: var(--accent); }
+      .pill.run::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1s steps(2) infinite; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; background: var(--faint); }
+      .dot.red { background: #d92d20; } .dot.amber { background: #f5a300; } .dot.green { background: #1a9c5b; } .dot.info { background: #8a98a0; }
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+      .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: default; }
+      .stat.click { cursor: pointer; }
+      .stat.click:hover { border-color: var(--border-strong); }
+      .stat .k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+      .stat .v { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; line-height: 1.2; }
+      .stat .v.red { color: var(--red); } .stat .v.amber { color: var(--amber); } .stat .v.sm { font-size: 15px; }
+      .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 18px; overflow-x: auto; scrollbar-width: none; }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab { background: none; border: none; padding: 10px 14px; font-size: 13.5px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; margin-bottom: -1px; }
+      .tab:hover { color: var(--text); }
+      .tab.active { color: var(--accent); border-color: var(--accent); }
+      .tab .cnt { font-size: 11px; font-weight: 700; background: var(--surface-2); border-radius: 999px; padding: 1px 6px; margin-left: 5px; color: var(--muted); }
+      .progress { height: 6px; background: var(--surface-3); border-radius: 999px; overflow: hidden; }
+      .progress > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+      .progress.indet > i { width: 30% !important; animation: indet 1.2s ease-in-out infinite; }
+      @keyframes indet { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+      .runbox { background: var(--surface); border: 1px solid rgba(14,124,138,0.35); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+      .runbox .rh { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; flex-wrap: wrap; }
+      .runbox .rh .sp { flex: 1; }
+      .runbox .rm { font-size: 12.5px; color: var(--muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .runbox .progress { margin-top: 10px; }
+      .stages { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+      .stage { font-size: 11px; font-weight: 700; color: var(--faint); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
+      .stage.done { color: var(--accent); border-color: rgba(14,124,138,0.35); }
+      .stage.now { background: var(--accent); color: #fff; border-color: var(--accent); }
+      .tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+      .tbl-wrap { overflow-x: auto; border-radius: 12px; }
+      .tbl th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); font-weight: 700; white-space: nowrap; }
+      .tbl td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      .tbl tr:last-child td { border-bottom: none; }
+      .tbl tr.click { cursor: pointer; }
+      .tbl tr.click:hover td { background: var(--surface-2); }
+      .tbl td.n { font-weight: 600; word-break: break-word; min-width: 180px; }
+      .tbl td.c { text-align: center; }
+      .tbl td .sub { font-size: 12px; color: var(--faint); display: block; margin-top: 1px; }
+      .tbl input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+      .tbl .rowacts { display: flex; gap: 4px; justify-content: flex-end; }
+      .tbl .rowacts button { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 7px; padding: 4px 7px; cursor: pointer; font-size: 12px; font-weight: 600; }
+      .tbl .rowacts button:hover { border-color: var(--border); color: var(--text); }
+      .cell-q { display: none; font-size: 12px; color: var(--muted); margin-top: 4px; border-left: 2px solid var(--orange); padding-left: 8px; font-style: italic; }
+      td.open .cell-q { display: block; }
+      td.hasq { cursor: pointer; }
+      td.hasq .v::after { content: 'Beleg'; margin-left: 6px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 1px 5px; vertical-align: 1px; }
+      td.open .v::after { background: var(--accent); color: #fff; }
+      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+      .toolbar .sp { flex: 1; }
+      .toolbar input[type=search], .toolbar select { font-family: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; background: var(--surface); color: var(--text); }
+      .toolbar input[type=search] { min-width: 180px; }
+      .fchip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+      .fchip.on { background: var(--accent-soft); color: var(--accent); border-color: rgba(14,124,138,0.3); }
+      .finding { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
+      .finding .fh { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; cursor: pointer; }
+      .finding .fh:hover { background: var(--surface-2); }
+      .finding .fh .dot { margin-top: 6px; }
+      .finding .ft { font-weight: 700; font-size: 14px; flex: 1; min-width: 0; }
+      .finding .fm { font-size: 12px; color: var(--faint); margin-top: 2px; word-break: break-word; }
+      .finding .fb { display: none; padding: 0 14px 12px 34px; font-size: 13.5px; }
+      .finding.open .fb { display: block; }
+      .finding .fb p { margin: 6px 0; }
+      .finding .fb .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin-top: 10px; }
+      .quote { border-left: 3px solid var(--orange); background: rgba(243,146,0,0.08); padding: 8px 12px; border-radius: 0 8px 8px 0; font-style: italic; margin: 6px 0; }
+      .norms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+      .norm { font-size: 12px; font-weight: 600; border-radius: 7px; padding: 2px 8px; background: var(--surface-2); color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+      .norm.ok { background: rgba(26,156,91,0.12); color: var(--ok); } .norm.expired, .norm.unsure { background: rgba(224,138,0,0.16); color: #a96500; } .norm.not_found { background: rgba(217,45,32,0.12); color: var(--err); }
+      .empty { padding: 44px 20px; text-align: center; color: var(--faint); font-size: 14px; background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 14px; }
+      .empty b { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+      .empty .btn { margin-top: 12px; }
+      .dropzone { border: 1.5px dashed var(--border-strong); border-radius: 14px; padding: 18px; text-align: center; color: var(--muted); font-size: 13.5px; background: var(--surface); cursor: pointer; margin-bottom: 14px; }
+      .dropzone.over, .dropzone:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+      .dropzone b { color: var(--text); }
+      .prose { font-size: 14.5px; line-height: 1.6; }
+      .prose p { margin: 6px 0; }
+      .prose ul { padding-left: 20px; margin: 6px 0; }
+      .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+      .area-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 13.5px; cursor: pointer; }
+      .area-row:first-of-type { border-top: none; }
+      .area-row:hover .al { color: var(--accent); }
+      .area-row .al { flex: 1; font-weight: 600; min-width: 0; }
+      .area-row .as { font-size: 12px; color: var(--faint); }
+      .log { font-family: var(--mono); font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; max-height: 360px; overflow-y: auto; color: var(--muted); }
+      .log div { padding: 2px 0; border-top: 1px dashed var(--border); }
+      .log div:first-child { border-top: none; }
+      .req-group { margin-bottom: 16px; }
+      .req-group h4 { margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--header); }
+      .req { display: flex; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--border); font-size: 13.5px; }
+      .req .rr { font-size: 12px; color: var(--faint); white-space: nowrap; }
+      .kinds { display: flex; gap: 8px; flex-wrap: wrap; }
+      .legend { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+      .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+      /* ---------- tour / toast ---------- */
       .tour-target { position: relative; z-index: 71 !important; box-shadow: 0 0 0 4px rgba(243,146,0,0.9), 0 0 0 9999px rgba(14,37,46,0.55) !important; border-radius: 14px; }
       .tour-card { position: fixed; z-index: 72; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom)); width: min(420px, calc(100vw - 32px)); background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: 0 16px 50px rgba(14,37,46,0.35); }
       .tour-card .tc-step { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--orange); font-weight: 800; }
@@ -303,74 +454,183 @@
       .tour-banner b { color: var(--text); }
       .tour-banner .sp { flex: 1; }
       .tour-banner button { white-space: nowrap; }
-
-      .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom)); background: var(--header); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; z-index: 80; opacity: 0; transition: opacity .2s; pointer-events: none; }
+      .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom)); background: var(--header); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; z-index: 80; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
       .toast.show { opacity: 1; }
 
+      @media (max-width: 960px) {
+        .app { grid-template-columns: 1fr; }
+        .sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 88vw); height: 100dvh; transform: translateX(-105%); transition: transform .22s ease; box-shadow: 0 0 40px rgba(14,37,46,0.18); }
+        .sidebar.show { transform: translateX(0); }
+        .sb-brand .iconbtn { display: inline-flex; }
+        .mainbar #menuBtn { display: inline-flex; }
+        .two { grid-template-columns: 1fr; }
+        .page { padding: 18px 16px 50px; }
+        .page-head h1 { font-size: 20px; }
+      }
       @media (max-width: 640px) {
-        .home-logo { height: 38px; margin: 36px 0 26px; }
-        .recent-list, .action-grid { grid-template-columns: 1fr; }
+        .home-logo { height: 34px; margin: 30px 0 8px; }
+        .recent-list, .action-grid, .field-row, .checks { grid-template-columns: 1fr; }
         .ctool .lbl { display: none; }
         .ctool { padding: 0 9px; }
-        .ctool.on .lbl, .ctool.warnon .lbl { display: inline; }
+        .ctool.on .lbl { display: inline; }
         #messages { padding: 16px 12px 10px; gap: 14px; }
         .msg-ai { padding: 12px 13px 10px; border-radius: 16px; }
         .msg-user { max-width: 92%; }
         .ai-head .models { display: none; }
         .pdf-preview, .html-preview { height: 320px; }
-        .drawer { width: 86vw; }
+        .stats { grid-template-columns: repeat(2, 1fr); }
+        .mainbar-title .crumb { display: none; }
       }
     </style>
   </head>
   <body>
-    <header class="topbar">
-      <button class="iconbtn" id="menuBtn" aria-label="Menü" title="Menü">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
-      <div class="topbar-title" id="topTitle"></div>
-      <div class="topbar-right">
-        <span class="cost-pill" id="costPill" title="Kosten dieser Sitzung (Modelle + Websuche + Sandbox)"></span>
-        <button class="iconbtn" id="historyBtn" aria-label="Verlauf" title="Verlauf">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <!-- ================= HOME ================= -->
-    <main id="home">
-      <div class="home-inner">
-        <img class="home-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-        <div id="composerSlotHome" style="width:100%"></div>
-        <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können fehlerhaft sein und müssen vor Verwendung juristisch geprüft werden. Fundstellen werden automatisch gegen das RIS geprüft.</p>
-
-        <div class="tour-banner" id="tourBanner" hidden>
-          <span class="sp"><b>Neu hier?</b> In 60 Sekunden durch die Funktionen.</span>
-          <button class="btn ghost" id="tourStart">Tour starten</button>
-          <button class="mini" id="tourSkip">Später</button>
+    <div class="app">
+      <!-- ================= SIDEBAR ================= -->
+      <aside class="sidebar" id="sidebar" aria-label="Navigation">
+        <div class="sb-brand">
+          <img src="/aissociate-logo.png" alt="AI:ssociate" />
+          <span class="tag">Playground</span>
+          <button class="iconbtn" id="sidebarClose" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
+        <button class="btn full sb-new" id="sbNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neue Frage</button>
+        <nav class="sb-nav">
+          <div class="sb-sec">Arbeiten</div>
+          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent</a>
+          <a class="nav-item" data-nav="workflows" href="#/workflows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Workflows</a>
+          <div class="sb-sec">Akten</div>
+          <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
+          <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
+          <a class="nav-item" data-nav="tables" href="#/tables" id="navTables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>Review-Tabellen</a>
+          <div class="sb-sec">Verlauf <a href="#/history">Alle</a></div>
+          <div class="sb-recent" id="sbRecent"></div>
+        </nav>
+        <div class="sb-foot">
+          <div class="sb-account" id="sbAccount"><span class="av">M</span><span class="who"><b>Microsoft 365</b><span>nicht verbunden</span></span></div>
+          <a class="nav-item" data-nav="settings" href="#/settings" id="navSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Einstellungen<span class="cnt" id="sbCost" hidden></span></a>
+        </div>
+      </aside>
+      <div class="overlay" id="overlay"></div>
 
-        <section class="section" id="recentSec">
-          <h3 class="section-title">Zuletzt</h3>
-          <div class="recent-list" id="recentList"></div>
+      <!-- ================= MAIN ================= -->
+      <div class="main">
+        <header class="mainbar">
+          <button class="iconbtn" id="menuBtn" aria-label="Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+          <div class="mainbar-title" id="mainTitle"></div>
+          <div class="mainbar-right">
+            <span class="cost-pill" id="costPill" title="Kosten dieser Sitzung (Modelle + Websuche + Sandbox)"></span>
+            <button class="iconbtn" id="historyBtn" aria-label="Verlauf" title="Verlauf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg></button>
+          </div>
+        </header>
+
+        <!-- ---------- assistant ---------- -->
+        <section class="view active" data-view="assistant">
+          <main id="home">
+            <div class="home-inner">
+              <img class="home-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
+              <p class="home-claim">Rechtsfragen, Dokumente, Due Diligence – für österreichische Kanzleien und Steuerberater.</p>
+              <div id="composerSlotHome" style="width:100%"></div>
+              <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können fehlerhaft sein und müssen vor Verwendung juristisch geprüft werden. Fundstellen werden automatisch gegen das RIS geprüft.</p>
+              <div class="tour-banner" id="tourBanner" hidden>
+                <span class="sp"><b>Neu hier?</b> In 60 Sekunden durch die Funktionen.</span>
+                <button class="btn ghost" id="tourStart">Tour starten</button>
+                <button class="mini" id="tourSkip">Später</button>
+              </div>
+              <section class="section" id="recentSec">
+                <h3 class="section-title">Zuletzt <a href="#/history">Alle anzeigen</a></h3>
+                <div class="recent-list" id="recentList"></div>
+              </section>
+              <section class="section" id="actionsSec">
+                <h3 class="section-title">Workflows <a href="#/workflows">Alle</a></h3>
+                <div class="action-grid" id="actionGrid"></div>
+              </section>
+            </div>
+          </main>
+          <main id="chat" hidden>
+            <div id="messages"></div>
+            <footer id="chatFooter">
+              <div class="inner">
+                <div id="composerSlotChat"></div>
+                <p class="disclaimer" style="margin-top:8px">KI-generiert – Inhalte und Fundstellen vor Verwendung juristisch prüfen.</p>
+              </div>
+            </footer>
+          </main>
         </section>
 
-        <section class="section" id="actionsSec">
-          <h3 class="section-title">Workflows</h3>
-          <div class="action-grid" id="actionGrid"></div>
-        </section>
-      </div>
-    </main>
+        <!-- ---------- workflows ---------- -->
+        <section class="view" data-view="workflows"><div class="page">
+          <div class="page-head"><div><h1>Workflows</h1><div class="sub">Geführte Aufgaben mit Formular – explizit programmiert, mit festen Ergebnisformaten.</div></div></div>
+          <h3 class="section-title">Dokumente &amp; Recherche</h3>
+          <div class="action-grid" id="wfGrid"></div>
+          <h3 class="section-title" style="margin-top:28px">Akten &amp; Transaktionen</h3>
+          <div class="action-grid" id="wfGridMatters"></div>
+        </div></section>
 
-    <!-- ================= CHAT ================= -->
-    <main id="chat" hidden>
-      <div id="messages"></div>
-      <footer id="chatFooter">
-        <div class="inner">
-          <div id="composerSlotChat"></div>
-          <p class="disclaimer" style="margin-top:8px">KI-generiert – Inhalte und Fundstellen vor Verwendung juristisch prüfen.</p>
-        </div>
-      </footer>
-    </main>
+        <!-- ---------- matters list ---------- -->
+        <section class="view" data-view="matters"><div class="page" id="mattersPage"></div></section>
+
+        <!-- ---------- matter detail ---------- -->
+        <section class="view" data-view="matter"><div class="page" id="matterPage"></div></section>
+
+        <!-- ---------- tables ---------- -->
+        <section class="view" data-view="tables"><div class="page" id="tablesPage"></div></section>
+
+        <!-- ---------- history ---------- -->
+        <section class="view" data-view="history"><div class="page" style="max-width:760px">
+          <div class="page-head"><div><h1>Verlauf</h1><div class="sub">Gespräche werden nur in diesem Browser gespeichert.</div></div><div class="acts"><button class="btn sm" id="histNew">Neues Gespräch</button><button class="mini danger" id="miClear">Verlauf löschen</button></div></div>
+          <div id="histList"></div>
+        </div></section>
+
+        <!-- ---------- settings ---------- -->
+        <section class="view" data-view="settings"><div class="page" style="max-width:760px">
+          <div class="page-head"><div><h1>Einstellungen</h1><div class="sub">Recherche, Microsoft 365, Modelle und Arbeitsbereich.</div></div></div>
+          <div class="card" style="margin-bottom:14px">
+            <h3>Recherche</h3>
+            <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Fallback nach der Wissensdatenbank (max. 3 Suchen)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
+          </div>
+          <div class="card" style="margin-bottom:14px">
+            <h3>Microsoft 365</h3>
+            <div class="kv"><span>Konto</span><b id="kvMsAccount">nicht verbunden</b></div>
+            <div style="padding:8px 0 4px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn ghost sm" id="msConnectBtn">Mit Microsoft anmelden</button>
+              <button class="mini" id="msDisconnectBtn" hidden>Trennen</button>
+            </div>
+            <div class="setting"><div><div class="sl">Ergebnisse zurückschreiben</div><div class="sd" id="msTargetText">Standard: Ordner der Quelldatei</div></div><button class="switch on" id="swMsSync" role="switch" aria-checked="true"></button></div>
+            <div class="setting"><div><div class="sl">Antwort als Word speichern</div><div class="sd">Memo zusätzlich zu erzeugten Dateien</div></div><button class="switch on" id="swMsAnswer" role="switch" aria-checked="true"></button></div>
+            <div style="padding:6px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="mini" id="msPickTargetBtn">Zielordner wählen</button>
+              <button class="mini" id="msClearTargetBtn" hidden>Zielordner zurücksetzen</button>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:14px">
+            <h3>Modelle &amp; Budget</h3>
+            <div class="kv"><span>Rechtsgebiet, Prüfung, Antwort</span><b id="kvMain">–</b></div>
+            <div class="kv"><span>Dokumentanalyse (Due Diligence)</span><b id="kvExtract">–</b></div>
+            <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
+            <div class="kv"><span>Websuche (Fallback)</span><b id="kvWeb">–</b></div>
+            <div class="kv"><span>Dateien (Code)</span><b id="kvCode">–</b></div>
+            <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
+            <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
+          </div>
+          <div class="card" style="margin-bottom:14px">
+            <h3>Arbeitsbereich</h3>
+            <p class="sub" style="font-size:13px;color:var(--muted);margin:0 0 8px">Akten liegen auf dem Server und sind an diesen Schlüssel gebunden. Zum Weiterarbeiten auf einem anderen Gerät den Schlüssel dort eintragen.</p>
+            <div class="kv"><span>Schlüssel</span><b id="kvOwner">–</b></div>
+            <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="mini" id="ownerCopy">Schlüssel kopieren</button>
+              <button class="mini" id="ownerSet">Anderen Schlüssel übernehmen</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Daten &amp; Hilfe</h3>
+            <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="mini" id="miTour">Feature-Tour</button>
+              <button class="mini danger" id="miClear2">Verlauf in diesem Browser löschen</button>
+            </div>
+            <p class="disclaimer" style="text-align:left;margin-top:14px">Gespräche werden nur in diesem Browser gespeichert. Hochgeladene Dateien einer Frage werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht. Dokumente in Akten bleiben auf dem Server, bis die Akte gelöscht wird.</p>
+          </div>
+        </div></section>
+      </div>
+    </div>
 
     <!-- shared composer (moved between home and chat) -->
     <div class="composer" id="composer">
@@ -386,6 +646,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
           <span class="lbl">Microsoft 365</span>
         </button>
+        <button class="ctool" id="matterBtn" title="Frage im Kontext einer Akte stellen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span class="lbl">Akte</span>
+        </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
@@ -393,59 +657,11 @@
       <div class="sync-note" id="syncNote" hidden></div>
     </div>
 
-    <!-- ================= MICROSOFT 365 PICKER ================= -->
+    <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
     <div class="modal" id="msModal"><div class="modal-card ms-card" id="msCard"></div></div>
-
-    <!-- ================= DRAWERS ================= -->
-    <div class="overlay" id="overlay"></div>
-    <aside class="drawer left" id="menuDrawer" aria-label="Menü">
-      <div class="drawer-head"><h2>AI:ssociate</h2><button class="iconbtn" style="color:var(--muted)" id="menuClose" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-      <div class="drawer-body">
-        <button class="menu-item" id="miNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neues Gespräch</button>
-        <button class="menu-item" id="miHistory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>Verlauf</button>
-        <button class="menu-item" id="miTour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 6L9 15l1-5z"/></svg>Feature-Tour</button>
-        <div class="menu-sec">Einstellungen</div>
-        <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Fallback nach der Wissensdatenbank (max. 3 Suchen)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
-        <div class="menu-sec">Microsoft 365</div>
-        <div class="kv"><span>Konto</span><b id="kvMsAccount">nicht verbunden</b></div>
-        <div style="padding:4px 10px 6px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn ghost" id="msConnectBtn" style="padding:7px 12px;font-size:13px">Mit Microsoft anmelden</button>
-          <button class="mini" id="msDisconnectBtn" hidden>Trennen</button>
-        </div>
-        <div class="setting"><div><div class="sl">Ergebnisse zurückschreiben</div><div class="sd" id="msTargetText">Standard: Ordner der Quelldatei</div></div><button class="switch on" id="swMsSync" role="switch" aria-checked="true"></button></div>
-        <div class="setting"><div><div class="sl">Antwort als Word speichern</div><div class="sd">Memo zusätzlich zu erzeugten Dateien</div></div><button class="switch on" id="swMsAnswer" role="switch" aria-checked="true"></button></div>
-        <div style="padding:0 10px 4px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="mini" id="msPickTargetBtn">Zielordner wählen</button>
-          <button class="mini" id="msClearTargetBtn" hidden>Zielordner zurücksetzen</button>
-        </div>
-        <div class="menu-sec">Modelle &amp; Budget</div>
-        <div class="kv"><span>Rechtsgebiet, Prüfung, Antwort</span><b id="kvMain">–</b></div>
-        <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
-        <div class="kv"><span>Websuche (Fallback)</span><b id="kvWeb">–</b></div>
-        <div class="kv"><span>Dateien (Code)</span><b id="kvCode">–</b></div>
-        <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
-        <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
-        <div class="menu-sec">Daten</div>
-        <button class="menu-item" id="miClear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Verlauf löschen</button>
-        <p class="disclaimer" style="text-align:left;margin-top:14px">Gespräche werden nur in diesem Browser gespeichert. Hochgeladene Dateien werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht.</p>
-      </div>
-    </aside>
-
-    <aside class="drawer right" id="historyDrawer" aria-label="Verlauf">
-      <div class="drawer-head"><h2>Verlauf</h2><button class="iconbtn" style="color:var(--muted)" id="historyClose" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-      <div class="drawer-body">
-        <button class="btn full" id="histNew" style="margin-bottom:10px">Neues Gespräch</button>
-        <div id="histList"></div>
-      </div>
-    </aside>
-
-    <!-- ================= TASK MODAL ================= -->
-    <div class="modal" id="taskModal">
-      <div class="modal-card" id="taskCard"></div>
-    </div>
-
+    <div class="modal" id="taskModal"><div class="modal-card" id="taskCard"></div></div>
+    <div class="modal" id="dlg"><div class="modal-card" id="dlgCard"></div></div>
     <div class="toast" id="toast"></div>
-
     <script>
       // ------------------------------------------------------------------
       // State
@@ -453,12 +669,13 @@
       const $ = (id) => document.getElementById(id)
       const home = $('home'), chatView = $('chat'), messages = $('messages'), composer = $('composer')
       const input = $('input'), sendBtn = $('sendBtn'), attachBtn = $('attachBtn'), fileInput = $('fileInput'), attachList = $('attachList')
-      const msBtn = $('msBtn'), syncNote = $('syncNote')
-      const costPill = $('costPill'), topTitle = $('topTitle')
+      const msBtn = $('msBtn'), matterBtn = $('matterBtn'), syncNote = $('syncNote')
+      const costPill = $('costPill'), mainTitle = $('mainTitle')
 
-      const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v2'
+      const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v3', LS_OWNER = 'aiss.owner.v1'
       const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024, MAX_TOTAL_UPLOAD_BYTES = 28 * 1024 * 1024 // base64 of 28 MB stays under the server's 40 MB JSON limit
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
+      const DOC_RE = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml)$/i
 
       let settings = { webSearch: true, msSync: true, msSaveAnswer: true }
       try { settings = { ...settings, ...JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}') } } catch {}
@@ -469,14 +686,23 @@
       let sessionCostUsd = 0
       let convos = []
       try { convos = JSON.parse(localStorage.getItem(LS_CONVOS) || '[]') } catch {}
-      let current = null // { id, sessionId, title, messages, history }
+      let current = null // { id, sessionId, title, messages, history, matter: {id,name,docIds} }
       let health = null
+      let ddConfig = null
+      let mattersCache = [] // summaries
+      let matter = null // matter detail currently shown
+      let matterTab = 'overview'
+      let viewName = 'assistant'
+      const followers = new Map() // jobId -> AbortController
       let activeAbort = null // AbortController of the running request (test hook below)
       window.__aissAbortActive = () => { try { activeAbort?.abort() } catch {} }
 
       const uid = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2)
+      let ownerKey = ''
+      try { ownerKey = localStorage.getItem(LS_OWNER) || '' } catch {}
+      if (!/^[\w-]{16,80}$/.test(ownerKey)) { ownerKey = 'w_' + uid().replace(/-/g, ''); try { localStorage.setItem(LS_OWNER, ownerKey) } catch {} }
       const saveSettings = () => { try { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)) } catch {} }
-      const saveConvos = () => { try { localStorage.setItem(LS_CONVOS, JSON.stringify(convos.slice(0, 40))) } catch (e) { try { convos = convos.slice(0, 10); localStorage.setItem(LS_CONVOS, JSON.stringify(convos)) } catch {} } }
+      const saveConvos = () => { try { localStorage.setItem(LS_CONVOS, JSON.stringify(convos.slice(0, 60))) } catch (e) { try { convos = convos.slice(0, 10); localStorage.setItem(LS_CONVOS, JSON.stringify(convos)) } catch {} } }
 
       // ------------------------------------------------------------------
       // Helpers
@@ -486,6 +712,7 @@
       function fmtTok(t) { return t >= 1000 ? (t / 1000).toFixed(t >= 100000 ? 0 : 1) + 'k' : String(t) }
       function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB' }
       function fmtDate(ts) { const d = new Date(ts); const today = new Date(); const same = d.toDateString() === today.toDateString(); return same ? d.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: '2-digit' }) }
+      function fmtEur(n) { return Number(n || 0).toLocaleString('de-AT') + ' EUR' }
       function modelLabel(m) { if (!m) return ''; if (/^aissociate$/i.test(m)) return 'AI:ssociate'; if (/luna/i.test(m)) return 'Luna'; if (/sol/i.test(m)) return 'Sol'; if (/terra/i.test(m)) return 'Terra'; return m }
       function modelTag(m) { const lbl = modelLabel(m); return el('span', 'model-tag ' + (lbl === 'AI:ssociate' ? 'kb' : lbl.toLowerCase()), lbl) }
       function renderModelTags(container, models) {
@@ -495,9 +722,39 @@
         if (models.knowledgeBase) { container.appendChild(document.createTextNode(' + ')); container.appendChild(modelTag('aissociate')) }
       }
       let toastT
-      function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200) }
+      function toast(msg, ms = 2400) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms) }
       function downloadBlob(blob, filename) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000) }
-      function addCost(c) { if (!c) return; sessionCostUsd += c.totalUsd || 0; costPill.textContent = 'Σ ' + fmtUsd(sessionCostUsd); $('kvCost').textContent = fmtUsd(sessionCostUsd) }
+      function addCost(c) { if (!c) return; sessionCostUsd += c.totalUsd || 0; costPill.textContent = 'Σ ' + fmtUsd(sessionCostUsd); $('kvCost').textContent = fmtUsd(sessionCostUsd); $('sbCost').textContent = fmtUsd(sessionCostUsd); $('sbCost').hidden = false }
+      async function api(path, { method = 'GET', body, raw = false } = {}) {
+        const r = await fetch(path, { method, cache: 'no-store', headers: { 'X-Owner-Key': ownerKey, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined })
+        if (raw) { if (!r.ok) { let m = `Fehler ${r.status}`; try { m = (await r.json()).error || m } catch {} throw new Error(m) } return r }
+        const j = await r.json().catch(() => ({}))
+        if (r.status === 401 && j.reauth) { msState.connected = false; renderMsUi() }
+        if (!r.ok) throw Object.assign(new Error(j.error || `Fehler ${r.status}`), { status: r.status })
+        return j
+      }
+      async function downloadApi(path, filename) { try { const r = await api(path, { raw: true }); downloadBlob(await r.blob(), filename) } catch (e) { toast('Download fehlgeschlagen: ' + e.message) } }
+      function confirmDlg(title, text, { ok = 'Löschen', danger = true } = {}) {
+        return new Promise((resolve) => {
+          const card = $('dlgCard'); card.innerHTML = ''
+          card.appendChild(el('h2', null, title)); card.appendChild(el('div', 'md', text))
+          const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); const g = el('button', 'btn' + (danger ? ' orange' : ''), ok)
+          c.addEventListener('click', () => { closeDlg(); resolve(false) }); g.addEventListener('click', () => { closeDlg(); resolve(true) }); a.append(c, g); card.appendChild(a)
+          $('dlg').classList.add('show'); g.focus()
+        })
+      }
+      function promptDlg(title, text, { value = '', ok = 'Übernehmen', placeholder = '' } = {}) {
+        return new Promise((resolve) => {
+          const card = $('dlgCard'); card.innerHTML = ''
+          card.appendChild(el('h2', null, title)); if (text) card.appendChild(el('div', 'md', text))
+          const f = el('div', 'field'); const i = el('input'); i.value = value; i.placeholder = placeholder; f.appendChild(i); card.appendChild(f)
+          const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); const g = el('button', 'btn', ok)
+          c.addEventListener('click', () => { closeDlg(); resolve(null) }); g.addEventListener('click', () => { closeDlg(); resolve(i.value) }); i.addEventListener('keydown', (e) => { if (e.key === 'Enter') g.click() }); a.append(c, g); card.appendChild(a)
+          $('dlg').classList.add('show'); setTimeout(() => i.focus(), 30)
+        })
+      }
+      function closeDlg() { $('dlg').classList.remove('show') }
+      $('dlg').addEventListener('click', (e) => { if (e.target === $('dlg')) closeDlg() })
 
       const ICONS = {
         cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>',
@@ -519,6 +776,9 @@
         draft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>',
         summary: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>',
         deadline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m10 16 1.5 1.5L15 14"/></svg>',
+        dd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>',
+        table: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
+        matter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
         chev: '<svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
       }
       const svg = (name) => { const s = document.createElement('span'); s.innerHTML = ICONS[name] || ICONS.tool; return s.firstChild }
@@ -579,6 +839,45 @@
       }
 
       // ------------------------------------------------------------------
+      // Shell: sidebar, router, views
+      // ------------------------------------------------------------------
+      const overlay = $('overlay'), sidebar = $('sidebar')
+      function openSidebar() { sidebar.classList.add('show'); overlay.classList.add('show') }
+      function closeSidebar() { sidebar.classList.remove('show'); overlay.classList.remove('show') }
+      $('menuBtn').addEventListener('click', openSidebar); $('sidebarClose').addEventListener('click', closeSidebar); overlay.addEventListener('click', closeSidebar)
+      $('sbNew').addEventListener('click', () => { newConversation() })
+      $('historyBtn').addEventListener('click', () => navigate('#/history'))
+      costPill.addEventListener('click', () => navigate('#/settings'))
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
+      const VIEW_TITLES = { assistant: 'Assistent', workflows: 'Workflows', matters: 'Akten', dd: 'Due Diligence', tables: 'Review-Tabellen', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akte' }
+      function navigate(hash) { if (location.hash === hash) router(); else location.hash = hash }
+      function setTitle(parts) { mainTitle.innerHTML = ''; parts.forEach((p, i) => mainTitle.appendChild(el('span', i < parts.length - 1 ? 'crumb' : '', p))) }
+      function showView(name, nav) {
+        viewName = name
+        document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === name))
+        const navKey = nav || (name === 'matter' ? (matter?.kind === 'dd' ? 'dd' : 'matters') : name)
+        document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === navKey))
+        closeSidebar(); window.scrollTo(0, 0)
+      }
+      async function router() {
+        const h = location.hash || '#/assistant'
+        const seg = h.replace(/^#\/?/, '').split('/')
+        const v = seg[0] || 'assistant'
+        if (v === 'chat' && seg[1]) { openConversation(seg[1], { silent: true }); return }
+        if (v === 'matter' && seg[1]) { await openMatter(seg[1], seg[2] || matterTab); return }
+        if (!(v in VIEW_TITLES) || v === 'matter') { location.hash = '#/assistant'; return }
+        showView(v === 'dd' ? 'matters' : v, v)
+        if (v === 'assistant') { if (current?.messages.length) showChat(); else showHome() }
+        else setTitle([VIEW_TITLES[v]])
+        if (v === 'workflows') renderWorkflowsPage()
+        if (v === 'matters') renderMatters('all')
+        if (v === 'dd') renderMatters('dd')
+        if (v === 'tables') renderTablesPage()
+        if (v === 'history') renderHistory()
+        if (v === 'settings') renderSettings()
+      }
+      window.addEventListener('hashchange', router)
+      // ------------------------------------------------------------------
       // Workflows (real, form-driven tasks — not prompt templates)
       // ------------------------------------------------------------------
       const WORKFLOWS = {
@@ -602,16 +901,28 @@
           { k: 'question', label: 'Schwerpunkt (optional)', type: 'text', ph: 'z. B. Haftungsfragen, Zahlungsmodalitäten' } ] },
         deadlines: { title: 'Fristen erkennen', desc: 'Alle Fristen mit Auslöser, Berechnung und Rechtsfolge – als Tabelle und Excel-Datei.', icon: 'deadline', needsFiles: true, fields: [ { k: 'reference_date', label: 'Stichtag (optional)', type: 'date' } ] },
       }
-
+      const MATTER_WORKFLOWS = [
+        { key: 'dd', title: 'Due Diligence', desc: 'Datenraum hochladen oder aus SharePoint importieren, feste Prüfbereiche (Gesellschaft, Verträge, Arbeit, Immobilien, IP/IT, Compliance, Verfahren, Finanzierung, Steuern), jeder Befund mit Zitat und Fundstelle – Red Flag Report als Word und Excel.', icon: 'dd', run: () => openMatterWizard('dd') },
+        { key: 'table', title: 'Review-Tabelle', desc: 'Viele Dokumente, gleiche Fragen: Vertragsübersicht, Dienstverträge, Mietverträge, Fristenchronologie oder eigene Spalten – jede Zelle mit Beleg und Fundstelle, Export nach Excel.', icon: 'table', run: () => chooseMatterForTable() },
+        { key: 'matter', title: 'Akte anlegen', desc: 'Dokumente einer Causa sammeln, analysieren lassen und Fragen im Kontext der Akte stellen – mit Wissensdatenbank und RIS-Prüfung.', icon: 'matter', run: () => openMatterWizard('matter') },
+      ]
+      function actionTile(w, onClick, alt) {
+        const b = el('button', 'action' + (alt ? ' alt' : ''))
+        const ico = el('div', 'ico'); ico.appendChild(svg(w.icon)); b.appendChild(ico)
+        b.appendChild(el('div', 't', w.title)); b.appendChild(el('div', 'd', w.desc))
+        b.addEventListener('click', onClick)
+        return b
+      }
       function renderActions() {
         const g = $('actionGrid'); g.innerHTML = ''
-        for (const [key, w] of Object.entries(WORKFLOWS)) {
-          const b = el('button', 'action'); b.dataset.wf = key
-          const ico = el('div', 'ico'); ico.appendChild(svg(w.icon)); b.appendChild(ico)
-          b.appendChild(el('div', 't', w.title)); b.appendChild(el('div', 'd', w.desc))
-          b.addEventListener('click', () => openTask(key))
-          g.appendChild(b)
-        }
+        for (const [key, w] of Object.entries(WORKFLOWS)) { const b = actionTile(w, () => openTask(key)); b.dataset.wf = key; g.appendChild(b) }
+        g.appendChild(actionTile(MATTER_WORKFLOWS[0], MATTER_WORKFLOWS[0].run, true))
+      }
+      function renderWorkflowsPage() {
+        const g = $('wfGrid'); g.innerHTML = ''
+        for (const [key, w] of Object.entries(WORKFLOWS)) g.appendChild(actionTile(w, () => openTask(key)))
+        const m = $('wfGridMatters'); m.innerHTML = ''
+        for (const w of MATTER_WORKFLOWS) m.appendChild(actionTile(w, w.run, true))
       }
 
       function openTask(key) {
@@ -626,7 +937,7 @@
           const refresh = () => {
             list.innerHTML = ''
             pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingFiles.splice(i, 1); renderAttachments(); refresh() }); c.appendChild(x); list.appendChild(c) })
-            pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingMs.splice(i, 1); renderAttachments(); renderMsMenu(); refresh() }); c.appendChild(x); list.appendChild(c) })
+            pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingMs.splice(i, 1); renderAttachments(); refresh() }); c.appendChild(x); list.appendChild(c) })
           }
           fb.addEventListener('click', () => { fileInput.onchange = async () => { await addFiles(fileInput.files); fileInput.value = ''; refresh(); fileInput.onchange = defaultFileChange }; fileInput.click() })
           refresh(); form.appendChild(fb)
@@ -661,7 +972,7 @@
       $('taskModal').addEventListener('click', (e) => { if (e.target === $('taskModal')) closeTask() })
 
       // ------------------------------------------------------------------
-      // Uploads
+      // Uploads (chat attachments)
       // ------------------------------------------------------------------
       function readAsBase64(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(file) }) }
       async function addFiles(fileList) {
@@ -675,18 +986,20 @@
       }
       function renderAttachments() {
         attachList.innerHTML = ''
+        if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, `Akte: ${current.matter.name}${current.matter.docIds?.length ? ` · ${current.matter.docIds.length} Dokument${current.matter.docIds.length > 1 ? 'e' : ''}` : ''}`)); const x = el('button', null, '×'); x.title = 'Aktenkontext entfernen'; x.addEventListener('click', () => { current.matter = null; persistCurrent(); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
         pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
-        pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsMenu() }); c.appendChild(x); attachList.appendChild(c) })
+        pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() }); c.appendChild(x); attachList.appendChild(c) })
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
         msBtn.classList.toggle('on', pendingMs.length > 0)
+        matterBtn.classList.toggle('on', Boolean(current?.matter))
         updateSend()
       }
       const defaultFileChange = async () => { await addFiles(fileInput.files); fileInput.value = '' }
       fileInput.onchange = defaultFileChange
       attachBtn.addEventListener('click', () => fileInput.click())
-      // drag & drop anywhere
+      // drag & drop onto the composer (matter pages have their own drop zones)
       document.addEventListener('dragover', (e) => { e.preventDefault() })
-      document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
+      document.addEventListener('drop', (e) => { e.preventDefault(); if (viewName === 'assistant' && e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
 
       // ------------------------------------------------------------------
       // Composer behaviour
@@ -695,52 +1008,63 @@
       input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
       sendBtn.addEventListener('click', submit)
-      $('swWeb').addEventListener('click', () => { settings.webSearch = !settings.webSearch; saveSettings(); $('swWeb').classList.toggle('on', settings.webSearch); $('swWeb').setAttribute('aria-checked', String(settings.webSearch)) })
+      matterBtn.addEventListener('click', () => chooseMatterForChat())
+      function submit() {
+        const text = input.value.trim()
+        if ((!text && !pendingFiles.length && !pendingMs.length) || busy) return
+        sendMessage({ text: text || 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.' })
+      }
 
       // ------------------------------------------------------------------
       // Microsoft 365 (OneDrive / SharePoint)
       // ------------------------------------------------------------------
       const MS_EXT = /\.(pdf|docx|txt|md|csv|json|html?|xlsx|rtf|xml)$/i
       function setSwitch(id, on) { $(id).classList.toggle('on', on); $(id).setAttribute('aria-checked', String(on)) }
-      function renderMsMenu() {
-        $('kvMsAccount').textContent = !msState.configured ? 'nicht konfiguriert' : msState.connected ? (msState.account?.email || msState.account?.name || 'verbunden') : 'nicht verbunden'
-        $('msConnectBtn').hidden = !msState.configured || msState.connected
-        $('msDisconnectBtn').hidden = !msState.connected
+      function renderMsUi() {
+        const connected = msState.connected
+        $('kvMsAccount').textContent = !msState.configured ? 'nicht konfiguriert' : connected ? (msState.account?.email || msState.account?.name || 'verbunden') : 'nicht verbunden'
+        $('msConnectBtn').hidden = !msState.configured || connected
+        $('msDisconnectBtn').hidden = !connected
         const t = current?.msTarget
         $('msTargetText').textContent = t ? `Ziel: ${t.name || 'gewählter Ordner'}` : 'Standard: Ordner der Quelldatei'
         $('msClearTargetBtn').hidden = !t
-        $('msPickTargetBtn').hidden = !msState.connected
+        $('msPickTargetBtn').hidden = !connected
         setSwitch('swMsSync', settings.msSync !== false); setSwitch('swMsAnswer', settings.msSaveAnswer !== false)
         msBtn.classList.toggle('on', pendingMs.length > 0)
-        syncNote.hidden = !(msState.connected && settings.msSync !== false && (pendingMs.length || t))
+        syncNote.hidden = !(connected && settings.msSync !== false && (pendingMs.length || t))
         syncNote.textContent = t ? `Ergebnisse werden nach „${t.name || 'Zielordner'}“ zurückgeschrieben.` : 'Ergebnisse werden in den Ordner der ausgewählten Datei zurückgeschrieben.'
+        const acc = $('sbAccount'); acc.innerHTML = ''
+        const av = el('span', 'av', connected ? (msState.account?.name || msState.account?.email || 'M').trim().slice(0, 1).toUpperCase() : 'M'); const who = el('span', 'who')
+        who.appendChild(el('b', null, connected ? (msState.account?.name || 'Microsoft 365') : 'Microsoft 365')); who.appendChild(el('span', null, connected ? (msState.account?.email || 'verbunden') : msState.configured ? 'nicht verbunden – anmelden' : 'nicht konfiguriert'))
+        acc.append(av, who); acc.style.cursor = 'pointer'; acc.onclick = () => { if (msState.configured && !connected) location.href = '/api/ms/login'; else navigate('#/settings') }
       }
       async function loadMsState() {
         try { msState = await (await fetch('/api/ms/me', { cache: 'no-store' })).json() } catch { msState = { configured: false, connected: false } }
-        renderMsMenu()
+        renderMsUi()
       }
       async function msApi(url) {
         const r = await fetch(url, { cache: 'no-store' })
         const j = await r.json().catch(() => ({}))
-        if (r.status === 401 || j.reauth) { msState.connected = false; renderMsMenu(); throw new Error('Microsoft-Anmeldung abgelaufen – bitte erneut anmelden.') }
+        if (r.status === 401 || j.reauth) { msState.connected = false; renderMsUi(); throw new Error('Microsoft-Anmeldung abgelaufen – bitte erneut anmelden.') }
         if (!r.ok) throw new Error(j.error || 'Microsoft 365: Anfrage fehlgeschlagen')
         return j
       }
       $('msConnectBtn').addEventListener('click', () => { location.href = '/api/ms/login' })
       $('msDisconnectBtn').addEventListener('click', async () => { await fetch('/api/ms/logout', { method: 'POST' }); pendingMs = []; renderAttachments(); await loadMsState(); toast('Microsoft 365 getrennt.') })
-      $('swMsSync').addEventListener('click', () => { settings.msSync = settings.msSync === false; saveSettings(); renderMsMenu() })
-      $('swMsAnswer').addEventListener('click', () => { settings.msSaveAnswer = settings.msSaveAnswer === false; saveSettings(); renderMsMenu() })
-      $('msPickTargetBtn').addEventListener('click', () => { closeDrawers(); openMsPicker({ pickFolder: true }) })
-      $('msClearTargetBtn').addEventListener('click', () => { if (current) { current.msTarget = null; persistCurrent() } renderMsMenu() })
+      $('swMsSync').addEventListener('click', () => { settings.msSync = settings.msSync === false; saveSettings(); renderMsUi() })
+      $('swMsAnswer').addEventListener('click', () => { settings.msSaveAnswer = settings.msSaveAnswer === false; saveSettings(); renderMsUi() })
+      $('msPickTargetBtn').addEventListener('click', () => openMsPicker({ mode: 'folder' }))
+      $('msClearTargetBtn').addEventListener('click', () => { if (current) { current.msTarget = null; persistCurrent() } renderMsUi() })
+      $('swWeb').addEventListener('click', () => { settings.webSearch = !settings.webSearch; saveSettings(); setSwitch('swWeb', settings.webSearch) })
       msBtn.addEventListener('click', () => {
         if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
         if (!msState.connected) { openMsConnect(); return }
-        openMsPicker({})
+        openMsPicker({ mode: 'attach' })
       })
       function openMsConnect() {
         const card = $('msCard'); card.innerHTML = ''
         card.appendChild(el('h2', null, 'Microsoft 365 verbinden'))
-        card.appendChild(el('div', 'md', 'Dokumente direkt aus OneDrive und SharePoint anhängen. Erzeugte Dateien und die Antwort als Word-Memo werden in den Aktenordner zurückgeschrieben – vorhandene Dateien werden nie überschrieben.'))
+        card.appendChild(el('div', 'md', 'Dokumente direkt aus OneDrive und SharePoint anhängen oder ganze Datenräume in eine Akte importieren. Erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben – vorhandene Dateien werden nie überschrieben.'))
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeMs); const go = el('button', 'btn', 'Mit Microsoft anmelden'); go.addEventListener('click', () => { location.href = '/api/ms/login' }); a.append(c, go); card.appendChild(a)
         $('msModal').classList.add('show')
       }
@@ -748,20 +1072,28 @@
       $('msModal').addEventListener('click', (e) => { if (e.target === $('msModal')) closeMs() })
 
       const msNav = { tab: 'onedrive', driveId: '', itemId: '', crumbs: [], siteQuery: '' }
-      function openMsPicker({ pickFolder = false }) {
+      /**
+       * mode 'attach'  – pick ≤ 5 files for the next chat message
+       * mode 'folder'  – choose the write-back folder of the conversation
+       * mode 'import'  – add files or a whole folder (data room) to a matter; onImport({items, folder})
+       * mode 'target'  – choose a folder; onPick({driveId,itemId,name})
+       */
+      function openMsPicker({ mode = 'attach', onImport = null, onPick = null } = {}) {
+        const pickFolder = mode === 'folder' || mode === 'target'
         const card = $('msCard'); card.innerHTML = ''
-        const head = el('div', 'ms-head'); head.appendChild(svg('cloud')); head.appendChild(el('h2', null, pickFolder ? 'Zielordner wählen' : 'Aus Microsoft 365 anhängen'))
-        const x = el('button', 'iconbtn', ''); x.style.color = 'var(--muted)'; x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'; x.addEventListener('click', closeMs); head.appendChild(x)
+        const head = el('div', 'ms-head'); head.appendChild(svg('cloud')); head.appendChild(el('h2', null, mode === 'import' ? 'Aus Microsoft 365 importieren' : pickFolder ? 'Zielordner wählen' : 'Aus Microsoft 365 anhängen'))
+        const x = el('button', 'iconbtn', ''); x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'; x.addEventListener('click', closeMs); head.appendChild(x)
         card.appendChild(head)
         const tabs = el('div', 'ms-tabs'); const tOne = el('button', 'ms-tab', 'OneDrive'); const tSp = el('button', 'ms-tab', 'SharePoint'); tabs.append(tOne, tSp); card.appendChild(tabs)
         const search = el('div', 'ms-search'); const si = el('input'); si.placeholder = 'SharePoint-Site suchen (z. B. Akten, Mandanten)…'; const sb = el('button', 'btn ghost', 'Suchen'); sb.style.padding = '7px 12px'; search.append(si, sb); card.appendChild(search)
         const crumbs = el('div', 'ms-crumbs'); card.appendChild(crumbs)
         const list = el('div', 'ms-list'); card.appendChild(list)
         const foot = el('div', 'ms-foot'); const sp = el('span', 'sp'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.addEventListener('click', closeMs)
-        const useFolder = el('button', 'btn ghost', 'Ergebnisse hierher speichern'); const attachB = el('button', 'btn', 'Anhängen'); attachB.disabled = true
+        const useFolder = el('button', 'btn ghost', mode === 'import' ? 'Ganzen Ordner importieren' : 'Ergebnisse hierher speichern'); const attachB = el('button', 'btn', 'Anhängen'); attachB.disabled = true
         foot.append(sp, cancel, useFolder, pickFolder ? el('span') : attachB); card.appendChild(foot)
-        const selected = new Map(pendingMs.map((f) => [f.driveId + '|' + f.itemId, f]))
-        const updateFoot = () => { attachB.textContent = `Anhängen (${selected.size})`; attachB.disabled = !selected.size; useFolder.disabled = !(msNav.driveId && msNav.itemId) }
+        const maxSel = mode === 'import' ? (ddConfig?.limits?.maxDocs || 300) : MAX_UPLOADS
+        const selected = new Map(mode === 'attach' ? pendingMs.map((f) => [f.driveId + '|' + f.itemId, f]) : [])
+        const updateFoot = () => { attachB.textContent = `${mode === 'import' ? 'Auswahl importieren' : 'Anhängen'} (${selected.size})`; attachB.disabled = !selected.size; useFolder.disabled = !(msNav.driveId && msNav.itemId); sp.textContent = mode === 'import' ? 'Unterordner werden mit importiert (PDF, Word, Text).' : '' }
         const setTab = (t) => { msNav.tab = t; tOne.classList.toggle('on', t === 'onedrive'); tSp.classList.toggle('on', t === 'sharepoint'); search.hidden = t !== 'sharepoint'; if (t === 'onedrive') browse('', '', [{ name: 'OneDrive' }]); else showSites(msNav.siteQuery) }
         tOne.addEventListener('click', () => setTab('onedrive')); tSp.addEventListener('click', () => setTab('sharepoint'))
         const renderCrumbs = () => { crumbs.innerHTML = ''; msNav.crumbs.forEach((c, i) => { if (i) crumbs.appendChild(el('span', null, '›')); const b = el('button', null, c.name); b.addEventListener('click', () => { if (c.sites) showSites(msNav.siteQuery); else if (c.drives) showDrives(c.siteId, c.name); else browse(c.driveId, c.itemId, msNav.crumbs.slice(0, i + 1)) }); crumbs.appendChild(b) }) }
@@ -778,10 +1110,10 @@
               const row = el('div', 'ms-row'); const ico = el('span', 'ico'); ico.appendChild(svg(it.isFolder ? 'folder' : 'upload')); row.appendChild(ico)
               row.appendChild(el('span', 'n', it.name)); row.appendChild(el('span', 'm', it.isFolder ? `${it.childCount ?? ''}`.trim() : fmtSize(it.size)))
               if (it.isFolder) row.addEventListener('click', () => browse(j.driveId, it.id, [...msNav.crumbs, { name: it.name, driveId: j.driveId, itemId: it.id }]))
-              else if (pickFolder || !MS_EXT.test(it.name) || it.size > MAX_UPLOAD_BYTES) row.classList.add('dim')
+              else if (pickFolder || !MS_EXT.test(it.name) || it.size > (mode === 'import' ? (ddConfig?.limits?.maxDocBytes || 30 * 1048576) : MAX_UPLOAD_BYTES)) row.classList.add('dim')
               else {
                 const key = j.driveId + '|' + it.id; const cb = el('input'); cb.type = 'checkbox'; cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked)
-                const toggle = () => { if (selected.has(key)) selected.delete(key); else { if (selected.size + pendingFiles.length >= MAX_UPLOADS) { toast(`Höchstens ${MAX_UPLOADS} Dateien pro Nachricht (lokal und Microsoft 365 zusammen).`); cb.checked = false; return } selected.set(key, { driveId: j.driveId, itemId: it.id, name: it.name, size: it.size }) } cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked); updateFoot() }
+                const toggle = () => { if (selected.has(key)) selected.delete(key); else { if (selected.size + (mode === 'attach' ? pendingFiles.length : 0) >= maxSel) { toast(mode === 'attach' ? `Höchstens ${MAX_UPLOADS} Dateien pro Nachricht (lokal und Microsoft 365 zusammen).` : `Höchstens ${maxSel} Dokumente.`); cb.checked = false; return } selected.set(key, { driveId: j.driveId, itemId: it.id, name: it.name, size: it.size }) } cb.checked = selected.has(key); row.classList.toggle('sel', cb.checked); updateFoot() }
                 cb.addEventListener('click', (e) => { e.stopPropagation(); toggle() }); row.addEventListener('click', toggle); row.appendChild(cb)
               }
               list.appendChild(row)
@@ -808,29 +1140,28 @@
           } catch (e) { busyList(e.message) }
         }
         sb.addEventListener('click', () => { msNav.siteQuery = si.value.trim(); showSites(msNav.siteQuery) }); si.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sb.click() } })
-        useFolder.addEventListener('click', () => { if (!current) newConversation(); current.msTarget = { driveId: msNav.driveId, itemId: msNav.itemId, name: msNav.crumbs.map((c) => c.name).join(' › ') }; persistCurrent(); renderMsMenu(); toast('Zielordner gesetzt.'); if (pickFolder) closeMs() })
-        attachB.addEventListener('click', () => { pendingMs = [...selected.values()]; renderAttachments(); renderMsMenu(); closeMs() })
+        const folderName = () => msNav.crumbs.map((c) => c.name).join(' › ')
+        useFolder.addEventListener('click', () => {
+          const f = { driveId: msNav.driveId, itemId: msNav.itemId, name: folderName() }
+          if (mode === 'import') { closeMs(); onImport?.({ items: [], folder: f }); return }
+          if (mode === 'target') { closeMs(); onPick?.(f); return }
+          if (!current) newConversation({ keepView: true }); current.msTarget = f; persistCurrent(); renderMsUi(); toast('Zielordner gesetzt.'); if (pickFolder) closeMs()
+        })
+        attachB.addEventListener('click', () => { if (mode === 'import') { closeMs(); onImport?.({ items: [...selected.values()], folder: null }); return } pendingMs = [...selected.values()]; renderAttachments(); renderMsUi(); closeMs() })
         $('msModal').classList.add('show')
         setTab(msNav.tab === 'sharepoint' ? 'sharepoint' : 'onedrive')
-      }
-
-      function submit() {
-        const text = input.value.trim()
-        if ((!text && !pendingFiles.length && !pendingMs.length) || busy) return
-        sendMessage({ text: text || 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.' })
       }
 
       // ------------------------------------------------------------------
       // Conversations / views
       // ------------------------------------------------------------------
-      function showHome() {
-        $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; topTitle.textContent = ''
-        renderRecent(); input.focus()
-      }
-      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; topTitle.textContent = current?.title || 'Neues Gespräch' }
-      function newConversation() {
-        current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
-        messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; pendingMs = []; renderAttachments(); renderMsMenu(); closeDrawers(); showHome()
+      function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; setTitle(['Assistent']); renderRecent(); if (window.innerWidth > 960) input.focus() }
+      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.matter ? ['Akte · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
+      function newConversation({ keepView = false, matterCtx = null } = {}) {
+        current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, matter: matterCtx, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
+        $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true
+        messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; pendingMs = []; renderAttachments(); renderMsUi()
+        if (!keepView) { if (location.hash === '#/assistant' || location.hash === '') { showView('assistant'); showHome() } else navigate('#/assistant') }
       }
       function persistCurrent() {
         if (!current || !current.messages.length) return
@@ -839,47 +1170,42 @@
         const stored = { ...current, messages: current.messages.map((m) => m.role === 'assistant' ? { ...m, data: { ...m.data, execution: { images: [], files: (m.data?.execution?.files || []).map((f) => ({ name: f.name, size: f.size, gone: true })) } } } : m) }
         if (idx >= 0) convos[idx] = stored; else convos.unshift(stored)
         convos.sort((a, b) => b.updatedAt - a.updatedAt)
-        saveConvos(); renderRecent(); renderHistory()
+        saveConvos(); renderRecent(); renderSidebarRecent(); if (viewName === 'history') renderHistory()
       }
-      function openConversation(id) {
-        const c = convos.find((x) => x.id === id); if (!c) return
-        current = { ...c, sessionId: c.sessionId || uid(), aissThreadId: c.aissThreadId || null, msTarget: c.msTarget || null, messages: [...c.messages], history: [...(c.history || [])] }
-        renderMsMenu()
+      function openConversation(id, { silent = false } = {}) {
+        const c = convos.find((x) => x.id === id); if (!c) { if (silent) navigate('#/assistant'); return }
+        current = { ...c, sessionId: c.sessionId || uid(), aissThreadId: c.aissThreadId || null, msTarget: c.msTarget || null, matter: c.matter || null, messages: [...c.messages], history: [...(c.history || [])] }
+        renderMsUi(); renderAttachments()
         messages.innerHTML = ''
         for (const m of current.messages) { if (m.role === 'user') renderUser(m); else renderAssistantFinal(createAssistantCard(), m.data, { restored: true }) }
-        closeDrawers(); showChat(); messages.scrollTop = messages.scrollHeight; window.scrollTo(0, document.body.scrollHeight)
+        showView('assistant'); showChat(); renderSidebarRecent(); window.scrollTo(0, document.body.scrollHeight)
+        if (!silent && location.hash !== '#/chat/' + id) history.replaceState(null, '', '#/chat/' + id)
       }
-      function deleteConversation(id) { convos = convos.filter((c) => c.id !== id); saveConvos(); renderRecent(); renderHistory(); if (current?.id === id) newConversation() }
+      function deleteConversation(id) { convos = convos.filter((c) => c.id !== id); saveConvos(); renderRecent(); renderSidebarRecent(); renderHistory(); if (current?.id === id) newConversation() }
       function renderRecent() {
         const list = $('recentList'); list.innerHTML = ''
-        const items = convos.slice(0, 6)
+        const items = convos.slice(0, 4)
         $('recentSec').hidden = !items.length
-        for (const c of items) { const b = el('button', 'recent-item'); b.appendChild(el('div', 't', c.title || 'Gespräch')); b.appendChild(el('div', 'd', `${fmtDate(c.updatedAt)} · ${c.messages.filter((m) => m.role === 'user').length} Frage${c.messages.filter((m) => m.role === 'user').length === 1 ? '' : 'n'}`)); b.addEventListener('click', () => openConversation(c.id)); list.appendChild(b) }
+        for (const c of items) { const b = el('button', 'recent-item'); b.appendChild(el('div', 't', c.title || 'Gespräch')); b.appendChild(el('div', 'd', `${fmtDate(c.updatedAt)} · ${c.messages.filter((m) => m.role === 'user').length} Frage${c.messages.filter((m) => m.role === 'user').length === 1 ? '' : 'n'}${c.matter ? ' · Akte ' + c.matter.name : ''}`)); b.addEventListener('click', () => navigate('#/chat/' + c.id)); list.appendChild(b) }
+      }
+      function renderSidebarRecent() {
+        const box = $('sbRecent'); box.innerHTML = ''
+        if (!convos.length) { box.appendChild(el('div', 'sb-empty', 'Noch keine Gespräche.')); return }
+        for (const c of convos.slice(0, 8)) { const a = el('a', 'nav-item' + (current?.id === c.id && viewName === 'assistant' ? ' active' : '')); a.href = '#/chat/' + c.id; a.appendChild(el('span', 't', c.title || 'Gespräch')); box.appendChild(a) }
       }
       function renderHistory() {
         const list = $('histList'); list.innerHTML = ''
-        if (!convos.length) { list.appendChild(el('div', 'recent-empty', 'Noch keine Gespräche.')); return }
+        if (!convos.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Gespräche')); e.appendChild(document.createTextNode('Stelle eine Frage im Assistenten – der Verlauf erscheint hier.')); list.appendChild(e); return }
         for (const c of convos) {
           const row = el('div', 'hist-item' + (current?.id === c.id ? ' active' : '')); row.role = 'button'
-          const t = el('div', 'ht', c.title || 'Gespräch'); const d = el('div', 'hd', fmtDate(c.updatedAt))
+          const t = el('div', 'ht', c.title || 'Gespräch'); const d = el('div', 'hd', `${fmtDate(c.updatedAt)}${c.matter ? ' · Akte' : ''}`)
           const x = el('button', 'hx', '×'); x.title = 'Löschen'; x.addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(c.id) })
-          row.append(t, d, x); row.addEventListener('click', () => openConversation(c.id)); list.appendChild(row)
+          row.append(t, d, x); row.addEventListener('click', () => navigate('#/chat/' + c.id)); list.appendChild(row)
         }
       }
-
-      // drawers
-      const overlay = $('overlay')
-      function openDrawer(id) { closeDrawers(); $(id).classList.add('show'); overlay.classList.add('show'); if (id === 'historyDrawer') renderHistory() }
-      function closeDrawers() { $('menuDrawer').classList.remove('show'); $('historyDrawer').classList.remove('show'); overlay.classList.remove('show') }
-      $('menuBtn').addEventListener('click', () => openDrawer('menuDrawer'))
-      $('historyBtn').addEventListener('click', () => openDrawer('historyDrawer'))
-      $('menuClose').addEventListener('click', closeDrawers); $('historyClose').addEventListener('click', closeDrawers); overlay.addEventListener('click', closeDrawers)
-      $('miNew').addEventListener('click', newConversation); $('histNew').addEventListener('click', newConversation)
-      $('miHistory').addEventListener('click', () => openDrawer('historyDrawer'))
-      $('miTour').addEventListener('click', () => { closeDrawers(); startTour() })
-      $('miClear').addEventListener('click', () => { if (confirm('Gesamten Verlauf in diesem Browser löschen?')) { convos = []; saveConvos(); newConversation(); toast('Verlauf gelöscht.') } })
-      costPill.addEventListener('click', () => openDrawer('menuDrawer'))
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDrawers(); closeTask(); endTour() } })
+      $('histNew').addEventListener('click', () => newConversation())
+      const clearHistory = async () => { if (await confirmDlg('Verlauf löschen', 'Gesamten Gesprächsverlauf in diesem Browser löschen? Akten auf dem Server bleiben erhalten.')) { convos = []; saveConvos(); renderSidebarRecent(); newConversation(); toast('Verlauf gelöscht.') } }
+      $('miClear').addEventListener('click', clearHistory); $('miClear2').addEventListener('click', clearHistory)
 
       // ------------------------------------------------------------------
       // Message rendering
@@ -887,6 +1213,7 @@
       function renderUser(m) {
         const b = el('div', 'msg-user')
         if (m.taskTitle) b.appendChild(el('div', 'tasklbl', 'Workflow · ' + m.taskTitle))
+        if (m.matterName) b.appendChild(el('div', 'tasklbl', 'Akte · ' + m.matterName))
         b.appendChild(document.createTextNode(m.text))
         if (m.files?.length) { const f = el('div', 'files'); m.files.forEach((n) => f.appendChild(el('span', null, n))); b.appendChild(f) }
         messages.appendChild(b)
@@ -931,7 +1258,7 @@
         const m = data?.models ? modelLabel(data.models.main || data.models.loop) : ''
         return `${ui.stepCount} Schritte${parts.length ? ' · ' + parts.join(' · ') : ''}${m ? ' · ' + m : ''}`
       }
-      function scrollBottom() { window.scrollTo({ top: document.body.scrollHeight }) }
+      function scrollBottom() { if (viewName === 'assistant') window.scrollTo({ top: document.body.scrollHeight }) }
 
       function renderFileInto(container, f) {
         if (f.gone) { container.appendChild(el('div', 'file-note', `${f.name} – Datei aus früherer Sitzung nicht mehr verfügbar.`)); return }
@@ -963,7 +1290,6 @@
         const p = el('div', 'panel'); const title = el('div', 'panel-title', 'Verifikation gegen das RIS')
         const sum = v?.summary
         if (sum && sum.checked) {
-          // All requests failed → infrastructure problem, not a verdict on the citations.
           const onlyErrors = sum.error && !sum.ok && !sum.warn && !sum.notFound && !sum.unsure
           const cls = onlyErrors ? '' : (sum.notFound || sum.error || sum.unsure) ? (sum.ok ? 'warn' : 'bad') : sum.warn ? 'warn' : 'good'
           const txt = onlyErrors
@@ -982,9 +1308,11 @@
           b.appendChild(n); r.appendChild(b); rows.appendChild(r)
         }
         p.appendChild(rows)
-        const re = el('button', 'more-toggle', 'Erneut prüfen')
-        re.addEventListener('click', async () => { re.textContent = 'Prüft…'; re.disabled = true; try { const r = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: answerText }) }); const nv = await r.json(); const np = renderVerification(container, nv, answerText); p.replaceWith(np) } catch { re.textContent = 'Prüfung fehlgeschlagen'; } })
-        p.appendChild(re)
+        if (answerText) {
+          const re = el('button', 'more-toggle', 'Erneut prüfen')
+          re.addEventListener('click', async () => { re.textContent = 'Prüft…'; re.disabled = true; try { const r = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: answerText }) }); const nv = await r.json(); const np = renderVerification(container, nv, answerText); p.replaceWith(np) } catch { re.textContent = 'Prüfung fehlgeschlagen'; } })
+          p.appendChild(re)
+        }
         return p
       }
 
@@ -1003,7 +1331,6 @@
         const cited = sources.filter((s) => s.cited), others = sources.filter((s) => !s.cited)
         if (sources.length) {
           const p = el('div', 'panel'); const t = el('div', 'panel-title', 'Quellen'); const nKb = sources.filter((s) => s.type === 'aissociate').length; t.appendChild(el('span', 'vsum', nKb ? `${nKb} aus der Wissensdatenbank${sources.length > nKb ? ` · ${sources.length - nKb} Web` : ''}` : `${sources.length} Web`)); p.appendChild(t)
-          // Keep the list short: five documents visible, the rest behind a toggle.
           const MAX_SHOWN = 5
           const shown = cited.slice(0, MAX_SHOWN), hidden = [...cited.slice(MAX_SHOWN), ...others]
           shown.forEach((s) => p.appendChild(sourceRow(s)))
@@ -1051,31 +1378,55 @@
       }
 
       // ------------------------------------------------------------------
+      // Resumable job streams (chat answers, DD runs, imports, tables)
+      // ------------------------------------------------------------------
+      async function readSse(resp, handle) {
+        const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
+        for (;;) { const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith('data: ')) { try { handle(JSON.parse(chunk.slice(6))) } catch {} } } }
+      }
+      /** Follow a server job until it ends; reconnects and replays missed events. */
+      async function followJob(jobId, onEvent, { lastSeq = 0 } = {}) {
+        if (followers.has(jobId)) return
+        const ctl = new AbortController(); followers.set(jobId, ctl)
+        let ended = false, seq = lastSeq
+        const handle = (ev) => { if (ev.seq) { if (ev.seq <= seq) return; seq = ev.seq } if (ev.event === 'end') ended = true; onEvent(ev) }
+        try {
+          for (let attempt = 0; !ended && attempt <= 10; attempt++) {
+            if (attempt) await new Promise((r) => setTimeout(r, Math.min(8000, 700 * 2 ** (attempt - 1))))
+            try {
+              const r = await fetch(`/api/jobs/${jobId}/stream?after=${seq}`, { signal: ctl.signal, cache: 'no-store' })
+              if (r.status === 404) { ended = true; onEvent({ event: 'end', lost: true }); break }
+              if (!r.ok || !r.body) continue
+              await readSse(r, handle)
+              if (!ended) { ended = true; onEvent({ event: 'end' }) } // stream closed normally
+            } catch (e) { if (ctl.signal.aborted) break }
+          }
+        } finally { followers.delete(jobId) }
+      }
+
+      // ------------------------------------------------------------------
       // Sending (SSE)
       // ------------------------------------------------------------------
       async function sendMessage({ text, task = null, taskTitle = null }) {
         if (busy) return
-        if (!current) newConversation()
-        // The Microsoft session may have ended since the page loaded: check before relying on it.
+        if (!current) newConversation({ keepView: true })
         if (msState.connected && (pendingMs.length || current.msTarget)) {
           await loadMsState()
-          if (!msState.connected) { toast('Microsoft-Anmeldung abgelaufen – bitte im Menü erneut anmelden.'); return }
+          if (!msState.connected) { toast('Microsoft-Anmeldung abgelaufen – bitte in den Einstellungen erneut anmelden.'); return }
         }
         const uploads = pendingFiles.slice(); pendingFiles = []
         const msFiles = pendingMs.slice(); pendingMs = []
-        renderAttachments(); renderMsMenu()
+        const matterCtx = current.matter ? { ...current.matter } : null
+        renderAttachments(); renderMsUi()
         input.value = ''; input.style.height = 'auto'
         busy = true; updateSend()
         if (!current.title) { current.title = taskTitle ? `${taskTitle}: ${text.split('\n')[0].replace(taskTitle + ': ', '').slice(0, 50)}` : text.slice(0, 60) }
-        showChat()
-        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle }
+        showView('assistant'); showChat(); if (location.hash !== '#/chat/' + current.id) history.replaceState(null, '', '#/chat/' + current.id)
+        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, matterName: matterCtx?.name || null }
         current.messages.push(um); renderUser(um)
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
         let ended = false, lastError = null
-        // Resumable job: the server keeps every event, so after a dropped connection
-        // (Safari "Load failed", proxy timeout, app in background) we reconnect and
-        // fetch only the events we have not seen yet.
         const jobId = uid()
         let lastSeq = 0
         const handle = (ev) => {
@@ -1083,25 +1434,20 @@
           if (ev.event === 'job') return
           if (ev.event === 'step') addStep(ui, ev)
           else if (ev.event === 'step_update') updateStep(ui, ev)
-          else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; topTitle.textContent = ev.title } renderModelTags(ui.models, ev.models) }
+          else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; showChat() } renderModelTags(ui.models, ev.models) }
           else if (ev.event === 'delta') { if (ui.live.hidden) { ui.live.hidden = false } ui.liveText = (ui.liveText || '') + (ev.text || ''); ui.live.innerHTML = renderMarkdown(ui.liveText); scrollBottom() }
           else if (ev.event === 'status') { ui.running.innerHTML = `<span class="spinner"></span><span>${esc(ev.message)}</span>` }
-          else if (ev.event === 'final') { finalData = ev; ended = true; if (ev.title && !current.titleLocked && !taskTitle) { current.title = ev.title; topTitle.textContent = ev.title } current.titleLocked = true; if ('aissThreadId' in ev) current.aissThreadId = ev.aissThreadId || null; renderAssistantFinal(ui, ev); addCost(ev.cost) }
+          else if (ev.event === 'final') { finalData = ev; ended = true; if (ev.title && !current.titleLocked && !taskTitle) { current.title = ev.title; showChat() } current.titleLocked = true; if ('aissThreadId' in ev) current.aissThreadId = ev.aissThreadId || null; renderAssistantFinal(ui, ev); addCost(ev.cost) }
           else if (ev.event === 'error') { ended = true; lastError = ev.message; ui.running.remove(); if (ui.live) { if (ui.liveText) ui.live.classList.remove('live'); else ui.live.remove() } ui.steps.classList.remove('open'); if (!ui.stepCount) ui.steps.remove(); ui.body.appendChild(el('div', 'err-box', 'Fehler: ' + ev.message)); if (ev.cost) addCost(ev.cost) }
         }
-        const readStream = async (resp) => {
-          const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
-          for (;;) { const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith('data: ')) { try { handle(JSON.parse(chunk.slice(6))) } catch {} } } }
-        }
         let firstError = null
-        let hardFail = false // the server rejected the request itself (4xx/5xx) → no job to resume
+        let hardFail = false
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [] }) })
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
-          await readStream(resp)
+          await readSse(resp, handle)
         } catch (err) { firstError = err }
-        // Reconnect and replay missing events until the job reports final/error.
         for (let attempt = 1; !ended && !hardFail && attempt <= 8; attempt++) {
           ui.running.innerHTML = `<span class="spinner"></span><span>Verbindung unterbrochen – wird wiederhergestellt (${attempt})…</span>`
           await new Promise((r) => setTimeout(r, Math.min(8000, 700 * 2 ** (attempt - 1))))
@@ -1110,38 +1456,543 @@
             const r = await fetch(`/api/chat/stream/${jobId}?after=${lastSeq}`, { signal: activeAbort.signal, cache: 'no-store' })
             if (r.status === 404) { hardFail = true; break }
             if (!r.ok || !r.body) continue
-            await readStream(r)
+            await readSse(r, handle)
           } catch {}
         }
         if (!ended) handle({ event: 'error', message: (firstError?.message ? firstError.message + ' – ' : '') + 'Verbindung konnte nicht wiederhergestellt werden. Bitte erneut senden.' })
         activeAbort = null
         {
-          busy = false; updateSend(); input.focus()
+          busy = false; updateSend(); if (window.innerWidth > 960) input.focus()
           current.history.push({ role: 'user', content: text })
           if (finalData?.answer) { current.history.push({ role: 'assistant', content: finalData.answer }); current.history = current.history.slice(-16) }
           current.messages.push({ role: 'assistant', data: finalData || { answer: '', error: true, message: lastError } })
           persistCurrent()
         }
       }
+      // ------------------------------------------------------------------
+      // Matters (Akten) & Due Diligence
+      // ------------------------------------------------------------------
+      const SEV_DE = { red: 'Rot', amber: 'Gelb', green: 'Grün', info: 'Hinweis' }
+      const SEV_RANK = { red: 0, amber: 1, green: 2, info: 3 }
+      const STAGES = [['extract', 'Text'], ['analyse', 'Analyse'], ['synthesize', 'Bereiche'], ['summary', 'Summary'], ['verify', 'RIS'], ['report', 'Bericht']]
+      const DOC_STATUS = { new: ['neu', ''], extracted: ['Text', 'teal'], analysed: ['analysiert', 'green'], error: ['Fehler', 'red'] }
+      const areaLabel = (k) => ddConfig?.areas.find((a) => a.key === k)?.label || (k === 'none' || !k ? 'Allgemein' : k)
+      async function loadDdConfig() { if (!ddConfig) { try { ddConfig = await api('/api/dd/config') } catch { ddConfig = { areas: [], presets: [], limits: {} } } } return ddConfig }
+      async function loadMatters() { try { mattersCache = (await api('/api/matters')).matters } catch (e) { mattersCache = []; toast(e.message) } updateMatterCounts(); return mattersCache }
+      function updateMatterCounts() { const n = mattersCache.length, d = mattersCache.filter((m) => m.kind === 'dd').length; $('cntMatters').hidden = !n; $('cntMatters').textContent = n; $('cntDd').hidden = !d; $('cntDd').textContent = d }
+
+      async function renderMatters(filter) {
+        const page = $('mattersPage'); page.innerHTML = ''
+        const isDd = filter === 'dd'
+        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, isDd ? 'Due Diligence' : 'Akten')); hl.appendChild(el('div', 'sub', isDd ? 'Datenraum analysieren, Red Flags mit Zitat und Fundstelle, Bericht als Word und Excel.' : 'Dokumente einer Causa sammeln, analysieren und Fragen im Kontext der Akte stellen.')); head.appendChild(hl)
+        const acts = el('div', 'acts'); const bNew = el('button', 'btn', isDd ? 'Neue Due Diligence' : 'Neue Akte'); bNew.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); acts.appendChild(bNew); if (!isDd) { const bDd = el('button', 'btn ghost', 'Neue Due Diligence'); bDd.addEventListener('click', () => openMatterWizard('dd')); acts.appendChild(bDd) } head.appendChild(acts); page.appendChild(head)
+        const grid = el('div', 'cards'); grid.appendChild(el('div', 'recent-empty', 'Lädt…')); page.appendChild(grid)
+        await loadDdConfig(); await loadMatters()
+        const items = mattersCache.filter((m) => !isDd || m.kind === 'dd')
+        grid.innerHTML = ''
+        if (!items.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, isDd ? 'Noch keine Due Diligence' : 'Noch keine Akten')); e.appendChild(document.createTextNode(isDd ? 'Lege eine Due Diligence an, lade den Datenraum hoch (oder importiere ihn aus SharePoint) und starte die Analyse.' : 'Lege eine Akte an und lade Dokumente hoch – Analyse, Review-Tabellen und Fragen zur Akte stehen dann bereit.')); const b = el('button', 'btn', isDd ? 'Due Diligence anlegen' : 'Akte anlegen'); b.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); e.appendChild(b); grid.appendChild(e); return }
+        for (const m of items) grid.appendChild(matterCard(m))
+      }
+      function matterCard(m) {
+        const c = el('div', 'card click'); c.addEventListener('click', () => navigate(`#/matter/${m.id}`))
+        const top = el('div', 'kinds'); top.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'Due Diligence' : 'Akte')); if (m.running) top.appendChild(el('span', 'pill run', m.runningKind === 'import' ? 'Import läuft' : m.runningKind === 'table' ? 'Tabelle läuft' : 'Analyse läuft')); else if (m.status === 'paused') top.appendChild(el('span', 'pill amber', 'pausiert')); else if (m.status === 'error') top.appendChild(el('span', 'pill red', 'Fehler')); c.appendChild(top)
+        c.appendChild(el('h3', null, m.name)); c.style.marginTop = '0'; c.querySelector('h3').style.marginTop = '8px'
+        const meta = el('div', 'meta'); if (m.client) meta.appendChild(el('span', null, m.client)); if (m.settings?.target) meta.appendChild(el('span', null, m.settings.target)); meta.appendChild(el('span', null, `${m.documents} Dokument${m.documents === 1 ? '' : 'e'}`)); meta.appendChild(el('span', null, fmtDate(m.updatedAt))); c.appendChild(meta)
+        const foot = el('div', 'foot')
+        if (m.red || m.amber) { foot.appendChild(el('span', 'pill red', `${m.red} rot`)); foot.appendChild(el('span', 'pill amber', `${m.amber} gelb`)) }
+        if (m.assessment) foot.appendChild(el('span', 'pill', m.assessment))
+        if (m.tables) foot.appendChild(el('span', 'pill', `${m.tables} Tabelle${m.tables > 1 ? 'n' : ''}`))
+        if (!foot.childElementCount) foot.appendChild(el('span', 'pill', m.analysed ? `${m.analysed} analysiert` : 'noch nicht analysiert'))
+        c.appendChild(foot)
+        return c
+      }
+
+      // ---- wizard ----
+      async function openMatterWizard(kind) {
+        await loadDdConfig()
+        const card = $('taskCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, kind === 'dd' ? 'Neue Due Diligence' : 'Neue Akte'))
+        card.appendChild(el('div', 'md', kind === 'dd' ? 'Feste Prüfbereiche, jeder Befund mit Zitat und Fundstelle, Normen gegen das RIS geprüft. Dokumente kommen im nächsten Schritt.' : 'Dokumente sammeln, Review-Tabellen erstellen und Fragen im Kontext der Akte stellen.'))
+        const form = el('form')
+        const field = (label, ctl, hint) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); f.appendChild(ctl); if (hint) f.appendChild(el('div', 'hint', hint)); return f }
+        const name = el('input'); name.placeholder = kind === 'dd' ? 'z. B. Projekt Alpha – Erwerb Muster GmbH' : 'z. B. Muster GmbH / Mietstreit'; name.required = true
+        const client = el('input'); client.placeholder = 'Mandant (optional)'
+        form.appendChild(field('Bezeichnung *', name)); form.appendChild(field('Mandant', client))
+        let target, trans, persp, mat, budget, areaBoxes = []
+        if (kind === 'dd') {
+          target = el('input'); target.placeholder = 'Zielunternehmen'
+          trans = el('select'); for (const [v, l] of [['share', 'Share Deal (Anteilskauf)'], ['asset', 'Asset Deal (Betriebserwerb)']]) { const o = el('option', null, l); o.value = v; trans.appendChild(o) }
+          persp = el('select'); for (const [v, l] of [['buyer', 'Käufer (Buyer DD)'], ['seller', 'Verkäufer (Vendor DD)']]) { const o = el('option', null, l); o.value = v; persp.appendChild(o) }
+          mat = el('input'); mat.type = 'number'; mat.value = '50000'; mat.min = '0'; mat.step = '1000'
+          budget = el('select'); for (const [v, l] of [['4000000', '4 Mio. Tokens (≈ 60–120 Dokumente)'], ['8000000', '8 Mio. Tokens (Standard)'], ['20000000', '20 Mio. Tokens (großer Datenraum)'], ['50000000', '50 Mio. Tokens']]) { const o = el('option', null, l); o.value = v; if (v === '8000000') o.selected = true; budget.appendChild(o) }
+          form.appendChild(field('Zielunternehmen', target))
+          const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); form.appendChild(row)
+          const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeitsschwelle (EUR)', mat, 'Beträge darunter werden höchstens als grün/Hinweis eingestuft.')); row2.appendChild(field('Token-Budget', budget, 'Die Analyse pausiert, wenn es erreicht ist; danach erhöhen und fortsetzen.')); form.appendChild(row2)
+          const ch = el('div', 'checks')
+          for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = true; cb.value = a.key; areaBoxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
+          form.appendChild(field('Prüfbereiche', ch, 'Rechts-DD und Tax-DD; abwählen, was nicht beauftragt ist.'))
+        }
+        const act = el('div', 'modal-actions'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.type = 'button'; cancel.addEventListener('click', closeTask); const go = el('button', 'btn', 'Anlegen'); go.type = 'submit'; act.append(cancel, go); form.appendChild(act)
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault()
+          if (!name.value.trim()) { name.focus(); return }
+          go.disabled = true
+          try {
+            const settings = kind === 'dd' ? { target: target.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, budgetTokens: Number(budget.value), areas: areaBoxes.filter((b) => b.checked).map((b) => b.value) } : {}
+            const r = await api('/api/matters', { method: 'POST', body: { name: name.value.trim(), kind, client: client.value.trim(), settings } })
+            closeTask(); toast(kind === 'dd' ? 'Due Diligence angelegt – jetzt Dokumente hinzufügen.' : 'Akte angelegt.')
+            await loadMatters(); navigate(`#/matter/${r.matter.id}/documents`)
+          } catch (err) { toast(err.message); go.disabled = false }
+        })
+        card.appendChild(form); $('taskModal').classList.add('show'); setTimeout(() => name.focus(), 40)
+      }
+
+      // ---- detail ----
+      async function openMatter(id, tab) {
+        await loadDdConfig()
+        matterTab = tab && ['overview', 'documents', 'findings', 'requests', 'tables', 'reports', 'log'].includes(tab) ? tab : 'overview'
+        if (matter?.id !== id) { $('matterPage').innerHTML = '<div class="recent-empty">Lädt…</div>'; matter = null }
+        showView('matter')
+        try { matter = (await api(`/api/matters/${id}`)).matter } catch (e) { $('matterPage').innerHTML = ''; const b = el('div', 'empty'); b.appendChild(el('b', null, 'Akte nicht gefunden')); b.appendChild(document.createTextNode(e.message)); $('matterPage').appendChild(b); setTitle(['Akten', 'Nicht gefunden']); return }
+        document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (matter.kind === 'dd' ? 'dd' : 'matters')))
+        renderMatter()
+        if (matter.job.running && matter.job.jobId) followMatterJob(matter.job.jobId)
+      }
+      async function reloadMatter() { if (!matter) return; try { matter = (await api(`/api/matters/${matter.id}`)).matter; renderMatter() } catch (e) { toast(e.message) } }
+      function setTab(t) { matterTab = t; history.replaceState(null, '', `#/matter/${matter.id}/${t}`); renderMatter() }
+
+      function renderMatter() {
+        const m = matter; if (!m || viewName !== 'matter') return
+        setTitle([m.kind === 'dd' ? 'Due Diligence' : 'Akten', m.name])
+        const page = $('matterPage'); page.innerHTML = ''
+        const back = el('a', 'back', '‹ ' + (m.kind === 'dd' ? 'Due Diligence' : 'Alle Akten')); back.href = m.kind === 'dd' ? '#/dd' : '#/matters'; page.appendChild(back)
+        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, m.name))
+        const sub = []; if (m.client) sub.push('Mandant: ' + m.client); if (m.settings?.target) sub.push('Ziel: ' + m.settings.target); if (m.kind === 'dd') sub.push(`${m.settings.transaction === 'asset' ? 'Asset Deal' : 'Share Deal'} · ${m.settings.perspective === 'seller' ? 'Verkäufersicht' : 'Käufersicht'} · Wesentlichkeit ${fmtEur(m.settings.materialityEur)}`); sub.push(`${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'}`)
+        hl.appendChild(el('div', 'sub', sub.join(' · '))); head.appendChild(hl)
+        const acts = el('div', 'acts')
+        const running = m.job.running
+        const bAsk = el('button', 'btn ghost sm', 'Frage zur Akte'); bAsk.addEventListener('click', () => askAboutMatter(m)); acts.appendChild(bAsk)
+        const bAdd = el('button', 'btn ghost sm', 'Dokumente hinzufügen'); bAdd.addEventListener('click', () => { setTab('documents'); setTimeout(() => $('matterFileInput').click(), 50) }); acts.appendChild(bAdd)
+        if (running) { const bP = el('button', 'btn orange sm', m.job.pauseRequested ? 'Wird pausiert…' : 'Pausieren'); bP.disabled = Boolean(m.job.pauseRequested); bP.addEventListener('click', pauseMatterJob); acts.appendChild(bP) }
+        else { const newDocs = m.documents.filter((d) => d.status === 'new' || d.status === 'extracted').length; const bR = el('button', 'btn sm', m.job.status === 'paused' ? 'Analyse fortsetzen' : m.findings.length || m.executive ? (newDocs ? `Analyse aktualisieren (${newDocs} neu)` : 'Analyse aktualisieren') : 'Analyse starten'); bR.disabled = !m.documents.length; bR.addEventListener('click', () => startDd({})); acts.appendChild(bR) }
+        const more = el('button', 'iconbtn', ''); more.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'; more.title = 'Mehr'; more.addEventListener('click', () => matterMenu(more)); acts.appendChild(more)
+        head.appendChild(acts); page.appendChild(head)
+
+        // run box (live progress) / status box
+        if (running || m.job.status === 'paused' || m.job.status === 'error') page.appendChild(renderRunBox(m))
+
+        // tabs
+        const tabs = el('div', 'tabs')
+        const red = m.findings.filter((f) => f.severity === 'red').length, amber = m.findings.filter((f) => f.severity === 'amber').length
+        const T = [['overview', 'Übersicht'], ['documents', 'Dokumente', m.documents.length], ['findings', 'Befunde', m.findings.length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['log', 'Protokoll']]
+        for (const [k, l, n] of T) { const b = el('button', 'tab' + (matterTab === k ? ' active' : ''), l); if (n) b.appendChild(el('span', 'cnt', String(n))); b.addEventListener('click', () => setTab(k)); tabs.appendChild(b) }
+        page.appendChild(tabs)
+        const body = el('div'); page.appendChild(body)
+        if (matterTab === 'overview') renderOverview(body, m, red, amber)
+        else if (matterTab === 'documents') renderDocuments(body, m)
+        else if (matterTab === 'findings') renderFindings(body, m)
+        else if (matterTab === 'requests') renderRequests(body, m)
+        else if (matterTab === 'tables') renderTables(body, m)
+        else if (matterTab === 'reports') renderReports(body, m)
+        else if (matterTab === 'log') renderLog(body, m)
+      }
+      function renderRunBox(m) {
+        const box = el('div', 'runbox'); box.id = 'runbox'
+        const rh = el('div', 'rh')
+        const kind = m.job.runningKind
+        if (m.job.running) { rh.innerHTML = '<span class="spinner"></span>'; rh.appendChild(el('span', null, kind === 'import' ? 'Import aus Microsoft 365' : kind === 'table' ? 'Review-Tabelle wird erstellt' : 'Due-Diligence-Analyse läuft')) }
+        else if (m.job.status === 'paused') rh.appendChild(el('span', 'pill amber', 'Pausiert'))
+        else rh.appendChild(el('span', 'pill red', 'Fehler'))
+        rh.appendChild(el('span', 'sp')); const pr = el('span', 'rp', ''); pr.style.fontSize = '12.5px'; pr.style.color = 'var(--muted)'; rh.appendChild(pr); box.appendChild(rh)
+        const msg = el('div', 'rm', m.job.error || (m.job.log?.length ? m.job.log[m.job.log.length - 1].message : 'Startet…')); box.appendChild(msg)
+        const bar = el('div', 'progress'); const i = el('i'); bar.appendChild(i); box.appendChild(bar)
+        if (kind !== 'import' && kind !== 'table') { const st = el('div', 'stages'); for (const [k, l] of STAGES) st.appendChild(el('span', 'stage', l)); box.appendChild(st) }
+        updateRunBox(m.job.stage, m.job.progress, null, m.job.running)
+        return box
+      }
+      function updateRunBox(stage, progress, message, running) {
+        const box = $('runbox'); if (!box) return
+        if (message) box.querySelector('.rm').textContent = message
+        const bar = box.querySelector('.progress'), i = bar.querySelector('i')
+        const total = progress?.total || 0, done = progress?.done || 0
+        bar.classList.toggle('indet', running && !total)
+        i.style.width = total ? Math.min(100, Math.round(100 * done / total)) + '%' : (running ? '30%' : '0')
+        box.querySelector('.rp').textContent = total ? `${done} / ${total}` : ''
+        const idx = STAGES.findIndex(([k]) => k === stage)
+        box.querySelectorAll('.stage').forEach((s, n) => { s.classList.toggle('done', n < idx || stage === 'done'); s.classList.toggle('now', n === idx && stage !== 'done') })
+      }
+      function followMatterJob(jobId) {
+        const mid = matter?.id
+        followJob(jobId, (ev) => {
+          if (matter?.id !== mid) return
+          if (ev.event === 'dd') { matter.job.stage = ev.stage; if (ev.progress) matter.job.progress = ev.progress; if (ev.message) { matter.job.log = [...(matter.job.log || []), { t: Date.now(), message: ev.message }].slice(-80); const lg = $('matterLog'); if (lg) { lg.appendChild(el('div', null, `${new Date().toLocaleTimeString('de-AT')}  ${ev.message}`)); lg.scrollTop = lg.scrollHeight } } updateRunBox(ev.stage, ev.progress, ev.message, true) }
+          else if (ev.event === 'table') { updateRunBox('table', { done: ev.done, total: ev.total }, ev.message || (ev.docName ? `Ausgewertet: ${ev.docName}` : ''), true) }
+          else if (ev.event === 'error') { toast('Vorgang fehlgeschlagen: ' + ev.message, 5000) }
+          else if (ev.event === 'end') { reloadMatter().then(() => { if (matter?.job?.status === 'done' && ev.kind === 'dd') toast('Analyse abgeschlossen – Bericht liegt unter „Berichte“.', 4000) }) }
+        })
+      }
+      async function startDd(opts) {
+        if (!matter) return
+        try { const r = await api(`/api/matters/${matter.id}/dd/run`, { method: 'POST', body: opts }); toast('Analyse gestartet.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) }
+      }
+      async function pauseMatterJob() { if (!matter) return; try { await api(`/api/matters/${matter.id}/dd/pause`, { method: 'POST', body: {} }); matter.job.pauseRequested = true; renderMatter(); toast('Wird nach dem aktuellen Dokument pausiert.') } catch (e) { toast(e.message) } }
+      function matterMenu(anchor) {
+        const m = matter
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, m.name)); card.appendChild(el('div', 'md', 'Aktionen für diese Akte'))
+        const list = el('div'); list.style.display = 'grid'; list.style.gap = '6px'
+        const item = (label, fn, danger) => { const b = el('button', 'btn ghost full' + (danger ? ' danger' : ''), label); if (danger) { b.style.color = 'var(--err)'; b.style.borderColor = 'rgba(217,45,32,0.35)' } b.addEventListener('click', () => { closeDlg(); fn() }); list.appendChild(b) }
+        item('Umbenennen', async () => { const v = await promptDlg('Akte umbenennen', '', { value: m.name }); if (v && v.trim()) { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { name: v.trim() } }); await reloadMatter(); loadMatters() } })
+        if (m.kind === 'dd') item('Einstellungen der DD', () => openMatterSettings())
+        if (m.findings.length || m.executive) item('Alles neu analysieren', async () => { if (await confirmDlg('Neu analysieren', 'Alle Befunde, Bereichszusammenfassungen und das Executive Summary werden verworfen und aus den Dokumenten neu erstellt (Token-Kosten!).', { ok: 'Neu analysieren' })) startDd({ reanalyse: true }) })
+        if (m.documents.some((d) => d.status === 'error')) item('Fehlgeschlagene Dokumente erneut lesen', () => startDd({ retryErrors: true }))
+        item('Akte löschen', async () => { if (await confirmDlg('Akte löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akte gelöscht.'); matter = null; await loadMatters(); navigate(m.kind === 'dd' ? '#/dd' : '#/matters') } catch (e) { toast(e.message) } } }, true)
+        card.appendChild(list)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', closeDlg); a.appendChild(c); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+      function openMatterSettings() {
+        const m = matter; const s = m.settings
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, 'Einstellungen der Due Diligence'))
+        const field = (label, ctl) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); f.appendChild(ctl); return f }
+        const target = el('input'); target.value = s.target || ''
+        const trans = el('select'); for (const [v, l] of [['share', 'Share Deal'], ['asset', 'Asset Deal']]) { const o = el('option', null, l); o.value = v; o.selected = s.transaction === v; trans.appendChild(o) }
+        const persp = el('select'); for (const [v, l] of [['buyer', 'Käufer'], ['seller', 'Verkäufer']]) { const o = el('option', null, l); o.value = v; o.selected = s.perspective === v; persp.appendChild(o) }
+        const mat = el('input'); mat.type = 'number'; mat.value = s.materialityEur
+        const budget = el('input'); budget.type = 'number'; budget.value = s.budgetTokens; budget.step = '1000000'
+        const ch = el('div', 'checks'); const boxes = []
+        for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = s.areas.includes(a.key); cb.value = a.key; boxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
+        card.appendChild(field('Zielunternehmen', target)); const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); card.appendChild(row)
+        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); row2.appendChild(field('Token-Budget', budget)); card.appendChild(row2); card.appendChild(field('Prüfbereiche', ch))
+        const hint = el('div', 'hint', `Bisher verbraucht: ${fmtTok(m.job.usage?.inTok || 0)} Eingabe-Tokens${m.job.cost ? ` ≈ ${fmtUsd(m.job.cost.totalUsd)}` : ''}. Änderungen wirken auf die nächste Analyse.`); hint.style.fontSize = '12px'; hint.style.color = 'var(--faint)'; card.appendChild(hint)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), budgetTokens: Number(budget.value), areas: boxes.filter((b) => b.checked).map((b) => b.value) } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+
+      // ---- overview ----
+      function renderOverview(body, m, red, amber) {
+        const analysed = m.documents.filter((d) => d.status === 'analysed').length
+        const stats = el('div', 'stats')
+        const stat = (k, v, cls, onClick) => { const s = el('div', 'stat' + (onClick ? ' click' : '')); s.appendChild(el('div', 'k', k)); s.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), String(v))); if (onClick) s.addEventListener('click', onClick); return s }
+        stats.appendChild(stat('Dokumente', `${analysed} / ${m.documents.length}`, '', () => setTab('documents')))
+        stats.appendChild(stat('Rote Befunde', red, 'red', () => { findingFilter.sev = 'red'; setTab('findings') }))
+        stats.appendChild(stat('Gelbe Befunde', amber, 'amber', () => { findingFilter.sev = 'amber'; setTab('findings') }))
+        stats.appendChild(stat('Nachfragen', requestList(m).length, '', () => setTab('requests')))
+        if (m.executive?.overall_assessment) stats.appendChild(stat('Gesamteinschätzung', m.executive.overall_assessment, 'sm'))
+        body.appendChild(stats)
+        if (!m.documents.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Dokumente')); e.appendChild(document.createTextNode('Lade den Datenraum hoch oder importiere ihn aus OneDrive/SharePoint – PDF, Word und Textdateien, auch ganze Ordner.')); const b = el('button', 'btn', 'Dokumente hinzufügen'); b.addEventListener('click', () => setTab('documents')); e.appendChild(b); body.appendChild(e); return }
+        if (!m.executive && !m.findings.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, m.job.running ? 'Analyse läuft' : 'Noch nicht analysiert')); e.appendChild(document.createTextNode(m.job.running ? 'Ergebnisse erscheinen hier, sobald die Analyse abgeschlossen ist. Du kannst die Seite verlassen – der Vorgang läuft auf dem Server weiter.' : `${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'} bereit. Die Analyse liest jedes Dokument, klassifiziert es, erfasst Befunde mit Zitat und Fundstelle, fasst je Prüfbereich zusammen und erstellt den Bericht.`)); if (!m.job.running) { const b = el('button', 'btn', 'Analyse starten'); b.addEventListener('click', () => startDd({})); e.appendChild(b) } body.appendChild(e); return }
+        const two = el('div', 'two')
+        const left = el('div')
+        if (m.executive) {
+          const c = el('div', 'card'); c.appendChild(el('h3', null, 'Executive Summary')); const p = el('div', 'prose'); p.innerHTML = renderMarkdown(m.executive.executive_summary || ''); c.appendChild(p)
+          if (m.executive.top_red_flags?.length) { c.appendChild(el('h3', null, 'Wichtigste Red Flags')).style.marginTop = '14px'; const ul = el('ul', 'prose'); m.executive.top_red_flags.forEach((t) => ul.appendChild(el('li', null, t))); c.appendChild(ul) }
+          if (m.executive.next_steps?.length) { c.appendChild(el('h3', null, 'Nächste Schritte')).style.marginTop = '14px'; const ul = el('ul', 'prose'); m.executive.next_steps.forEach((t) => ul.appendChild(el('li', null, t))); c.appendChild(ul) }
+          left.appendChild(c)
+        }
+        const top = [...m.findings].filter((f) => f.severity === 'red' || f.severity === 'amber').sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]).slice(0, 6)
+        if (top.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Top-Befunde')); top.forEach((f) => c.appendChild(findingCard(f, m))); const all = el('button', 'more-toggle', `Alle ${m.findings.length} Befunde`); all.addEventListener('click', () => { findingFilter.sev = 'all'; setTab('findings') }); c.appendChild(all); left.appendChild(c) }
+        two.appendChild(left)
+        const right = el('div')
+        const ac = el('div', 'card'); ac.appendChild(el('h3', null, 'Prüfbereiche'))
+        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const nF = m.findings.filter((f) => f.area === k), nR = nF.filter((f) => f.severity === 'red').length, nA = nF.filter((f) => f.severity === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (nF.length ? `${nF.length}` : '–'))); row.addEventListener('click', () => { findingFilter.area = k; findingFilter.sev = 'all'; setTab('findings') }); ac.appendChild(row) }
+        right.appendChild(ac)
+        if (m.verification) { const vc = el('div', 'card'); vc.style.marginTop = '14px'; vc.appendChild(el('h3', null, 'RIS-Prüfung der Normen')); const s = m.verification.summary; vc.appendChild(el('div', 'sub', s.checked ? `${s.ok} von ${s.checked} Normen bestätigt${s.warn ? `, ${s.warn} außer Kraft` : ''}${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}` : 'keine prüfbaren Normzitate')).style.cssText = 'font-size:13px;color:var(--muted)'; right.appendChild(vc) }
+        const cc = el('div', 'card'); cc.style.marginTop = '14px'; cc.appendChild(el('h3', null, 'Aufwand'))
+        cc.appendChild(el('div', 'kv')).append(el('span', null, 'Eingabe-Tokens'), el('b', null, fmtTok(m.job.usage?.inTok || 0) + ' / ' + fmtTok(m.settings.budgetTokens)))
+        cc.appendChild(el('div', 'kv')).append(el('span', null, 'Modellaufrufe'), el('b', null, String(m.job.usage?.calls || 0)))
+        if (m.job.cost) cc.appendChild(el('div', 'kv')).append(el('span', null, 'Kosten (geschätzt)'), el('b', null, fmtUsd(m.job.cost.totalUsd)))
+        right.appendChild(cc)
+        two.appendChild(right); body.appendChild(two)
+      }
+
+      // ---- documents ----
+      let docSelection = new Set()
+      function renderDocuments(body, m) {
+        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente hierher ziehen</b> oder klicken zum Auswählen · PDF, Word, Text · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akte'
+        dz.addEventListener('click', () => $('matterFileInput').click())
+        dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over') }); dz.addEventListener('dragleave', () => dz.classList.remove('over'))
+        dz.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('over'); if (e.dataTransfer?.files?.length) uploadToMatter(e.dataTransfer.files) })
+        body.appendChild(dz)
+        const tb = el('div', 'toolbar')
+        const bMs = el('button', 'btn ghost sm', ''); bMs.appendChild(svg('cloud')); bMs.appendChild(document.createTextNode('Aus OneDrive / SharePoint importieren')); bMs.addEventListener('click', () => importFromMs()); tb.appendChild(bMs)
+        tb.appendChild(el('span', 'sp'))
+        const sel = [...docSelection].filter((id) => m.documents.some((d) => d.id === id))
+        if (sel.length) { const bT = el('button', 'btn ghost sm', `Tabelle aus ${sel.length} Dok.`); bT.addEventListener('click', () => openTableWizard(sel)); tb.appendChild(bT); const bA = el('button', 'btn ghost sm', `Frage zu ${sel.length} Dok.`); bA.addEventListener('click', () => askAboutMatter(m, sel)); tb.appendChild(bA) }
+        const st = el('span', 'sub', ''); st.id = 'uploadStatus'; st.style.cssText = 'font-size:12.5px;color:var(--muted)'; tb.appendChild(st)
+        body.appendChild(tb)
+        if (!m.documents.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Dokumente')); e.appendChild(document.createTextNode('Ein Datenraum besteht typischerweise aus Gesellschaftsunterlagen, Verträgen, Dienstverträgen, Mietverträgen, Bescheiden, Steuerunterlagen und Verfahrensakten.')); body.appendChild(e); return }
+        const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl')
+        const th = el('tr'); const all = el('input'); all.type = 'checkbox'; all.checked = sel.length === m.documents.length; all.addEventListener('change', () => { docSelection = all.checked ? new Set(m.documents.map((d) => d.id)) : new Set(); renderMatter() }); const thc = el('th'); thc.appendChild(all); th.appendChild(thc)
+        for (const h of ['Dokument', 'Typ', 'Bereich', 'Status', 'Rot / Gelb', '']) th.appendChild(el('th', null, h))
+        t.appendChild(el('thead')).appendChild(th)
+        const tb2 = el('tbody')
+        for (const d of m.documents) {
+          const tr = el('tr'); const c0 = el('td'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = docSelection.has(d.id); cb.addEventListener('change', () => { if (cb.checked) docSelection.add(d.id); else docSelection.delete(d.id); renderMatter() }); c0.appendChild(cb); tr.appendChild(c0)
+          const n = el('td', 'n'); n.appendChild(document.createTextNode(d.title || d.name)); n.appendChild(el('span', 'sub', `${d.title ? d.name + ' · ' : ''}${fmtSize(d.size)}${d.pages ? ` · ${d.pages} S.` : ''}${d.source === 'ms' ? ' · Microsoft 365' : ''}${d.note ? ' · ' + d.note : ''}`)); tr.appendChild(n)
+          tr.appendChild(el('td', null, d.docType || '–')); tr.appendChild(el('td', null, d.area ? areaLabel(d.area) : '–'))
+          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); tr.appendChild(cs)
+          const cf = el('td', 'c'); if (d.flags?.red || d.flags?.amber) { if (d.flags.red) cf.appendChild(el('span', 'pill red', String(d.flags.red))); if (d.flags.amber) cf.appendChild(el('span', 'pill amber', String(d.flags.amber))) } else cf.textContent = d.status === 'analysed' ? '–' : ''; tr.appendChild(cf)
+          const ca = el('td'); const ra = el('div', 'rowacts')
+          if (d.summary) { const bI = el('button', null, 'Details'); bI.addEventListener('click', () => showDocDetails(d, m)); ra.appendChild(bI) }
+          if (d.textChars) { const bT = el('button', null, 'Text'); bT.addEventListener('click', () => showDocText(d, m)); ra.appendChild(bT) }
+          const bD = el('button', null, '⬇'); bD.title = 'Original herunterladen'; bD.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/documents/${d.id}/file`, d.name)); ra.appendChild(bD)
+          const bX = el('button', null, '×'); bX.title = 'Entfernen'; bX.addEventListener('click', async () => { if (await confirmDlg('Dokument entfernen', `„${d.name}“ samt zugehörigen Befunden aus der Akte entfernen?`, { ok: 'Entfernen' })) { try { await api(`/api/matters/${m.id}/documents/${d.id}`, { method: 'DELETE' }); docSelection.delete(d.id); await reloadMatter() } catch (e) { toast(e.message) } } }); ra.appendChild(bX)
+          ca.appendChild(ra); tr.appendChild(ca); tb2.appendChild(tr)
+        }
+        t.appendChild(tb2); wrap.appendChild(t); body.appendChild(wrap)
+      }
+      $('matterFileInput').addEventListener('change', async () => { await uploadToMatter($('matterFileInput').files); $('matterFileInput').value = '' })
+      async function uploadToMatter(fileList) {
+        if (!matter) return
+        const files = [...fileList].filter((f) => DOC_RE.test(f.name))
+        const skipped = fileList.length - files.length
+        const maxBytes = ddConfig?.limits?.maxDocBytes || 30 * 1048576
+        const st = () => $('uploadStatus')
+        let done = 0; const errors = []
+        for (const f of files) {
+          if (st()) st().textContent = `Lädt hoch: ${done + 1} / ${files.length} – ${f.name}`
+          if (f.size > maxBytes) { errors.push(`${f.name}: zu groß`); done++; continue }
+          try { const r = await api(`/api/matters/${matter.id}/documents`, { method: 'POST', body: { files: [{ name: f.name, base64: await readAsBase64(f) }] } }); errors.push(...(r.errors || [])) } catch (e) { errors.push(`${f.name}: ${e.message}`) }
+          done++
+        }
+        await reloadMatter(); await loadMatters()
+        if (skipped) errors.push(`${skipped} Datei${skipped > 1 ? 'en' : ''} übersprungen (nur PDF, Word, Text)`)
+        toast(errors.length ? `${files.length - errors.length} hochgeladen · ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? ' …' : ''}` : `${files.length} Dokument${files.length === 1 ? '' : 'e'} hochgeladen.`, 4000)
+      }
+      function importFromMs() {
+        if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
+        if (!msState.connected) { openMsConnect(); return }
+        openMsPicker({ mode: 'import', onImport: async ({ items, folder }) => { try { const r = await api(`/api/matters/${matter.id}/import-ms`, { method: 'POST', body: { items: items.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), folder } }); toast('Import gestartet.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) } } })
+      }
+      function showDocDetails(d, m) {
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, d.title || d.name)); card.appendChild(el('div', 'md', `${d.name} · ${d.docType || ''}${d.area ? ' · ' + areaLabel(d.area) : ''}`))
+        const p = el('div', 'prose'); p.appendChild(el('p', null, d.summary || '')); card.appendChild(p)
+        const kvs = el('div')
+        if (d.parties?.length) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Parteien'), el('b', null, d.parties.join('; ')))
+        for (const x of d.dates || []) kvs.appendChild(el('div', 'kv')).append(el('span', null, x.label), el('b', null, x.date))
+        for (const x of d.keyTerms || []) kvs.appendChild(el('div', 'kv')).append(el('span', null, x.term), el('b', null, x.value))
+        card.appendChild(kvs)
+        if (d.missing?.length) { card.appendChild(el('h3', null, 'Fehlend / unklar')).style.cssText = 'font-size:13px;margin:12px 0 4px'; const ul = el('ul', 'prose'); d.missing.forEach((t) => ul.appendChild(el('li', null, t))); card.appendChild(ul) }
+        if (d.questions?.length) { card.appendChild(el('h3', null, 'Nachfragen')).style.cssText = 'font-size:13px;margin:12px 0 4px'; const ul = el('ul', 'prose'); d.questions.forEach((t) => ul.appendChild(el('li', null, t))); card.appendChild(ul) }
+        const fs = m.findings.filter((f) => f.docId === d.id)
+        if (fs.length) { card.appendChild(el('h3', null, `Befunde (${fs.length})`)).style.cssText = 'font-size:13px;margin:12px 0 6px'; fs.forEach((f) => card.appendChild(findingCard(f, m))) }
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); a.appendChild(c); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+      async function showDocText(d, m) {
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, d.name)); const pre = el('pre'); pre.style.cssText = 'white-space:pre-wrap;font-family:inherit;font-size:13px;max-height:60vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px'; pre.textContent = 'Lädt…'; card.appendChild(pre)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); a.appendChild(c); card.appendChild(a)
+        $('dlg').classList.add('show')
+        try { const r = await api(`/api/matters/${m.id}/documents/${d.id}/text?limit=80000`); pre.textContent = r.text + (r.chars > r.text.length ? `\n\n… (${fmtTok(r.chars)} Zeichen insgesamt)` : '') } catch (e) { pre.textContent = e.message }
+      }
+
+      // ---- findings ----
+      const findingFilter = { sev: 'all', area: 'all', q: '' }
+      function findingCard(f, m) {
+        const c = el('div', 'finding')
+        const h = el('div', 'fh'); h.appendChild(el('span', 'dot ' + f.severity)); const t = el('div'); t.style.flex = '1'; t.style.minWidth = '0'; t.appendChild(el('div', 'ft', f.title)); t.appendChild(el('div', 'fm', `${SEV_DE[f.severity]} · ${areaLabel(f.area)} · ${f.docName}${f.location ? ' · ' + f.location : ''}`)); h.appendChild(t); h.appendChild(svg('chev')); h.addEventListener('click', () => c.classList.toggle('open')); c.appendChild(h)
+        const b = el('div', 'fb')
+        b.appendChild(el('p', null, f.description))
+        if (f.quote) { b.appendChild(el('div', 'lbl', 'Zitat')); b.appendChild(el('div', 'quote', `„${f.quote}“`)) }
+        if (f.recommendation) { b.appendChild(el('div', 'lbl', 'Empfehlung')); b.appendChild(el('p', null, f.recommendation)) }
+        if (f.norms?.length) { b.appendChild(el('div', 'lbl', 'Normen')); const ns = el('div', 'norms'); for (const n of f.norms) { const st = (f.normStatus || []).find((x) => x.norm === n); const a = el(st?.url ? 'a' : 'span', 'norm ' + (st?.status || ''), n + (st?.status === 'ok' ? ' ✓' : st?.status === 'expired' ? ' (außer Kraft)' : st?.status === 'not_found' ? ' (nicht gefunden)' : st?.status === 'unsure' ? ' (?)' : '')); if (st?.url) { a.href = st.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } b.appendChild(ns) }
+        const acts = el('div', 'actions'); acts.style.marginTop = '8px'
+        const d = m.documents.find((x) => x.id === f.docId)
+        if (d?.textChars) { const bt = el('button', 'mini', 'Dokumenttext'); bt.addEventListener('click', () => showDocText(d, m)); acts.appendChild(bt) }
+        const ask = el('button', 'mini', 'Nachfragen'); ask.addEventListener('click', () => askAboutMatter(m, d ? [d.id] : [], `Zum Befund „${f.title}“ (${f.docName}${f.location ? ', ' + f.location : ''}): `)); acts.appendChild(ask)
+        b.appendChild(acts); c.appendChild(b)
+        return c
+      }
+      function renderFindings(body, m) {
+        const tb = el('div', 'toolbar')
+        for (const [k, l] of [['all', 'Alle'], ['red', 'Rot'], ['amber', 'Gelb'], ['green', 'Grün'], ['info', 'Hinweis']]) { const b = el('button', 'fchip' + (findingFilter.sev === k ? ' on' : '')); if (k !== 'all') b.appendChild(el('span', 'dot ' + k)); b.appendChild(document.createTextNode(l + (k === 'all' ? ` (${m.findings.length})` : ` (${m.findings.filter((f) => f.severity === k).length})`))); b.addEventListener('click', () => { findingFilter.sev = k; renderMatter() }); tb.appendChild(b) }
+        const sel = el('select'); const o0 = el('option', null, 'Alle Bereiche'); o0.value = 'all'; sel.appendChild(o0); for (const k of [...new Set(m.findings.map((f) => f.area))]) { const o = el('option', null, areaLabel(k)); o.value = k; o.selected = findingFilter.area === k; sel.appendChild(o) } sel.addEventListener('change', () => { findingFilter.area = sel.value; renderMatter() }); tb.appendChild(sel)
+        const q = el('input'); q.type = 'search'; q.placeholder = 'Suchen (Titel, Dokument, Zitat)…'; q.value = findingFilter.q; q.addEventListener('input', () => { findingFilter.q = q.value; renderList() }); tb.appendChild(q)
+        body.appendChild(tb)
+        const list = el('div'); body.appendChild(list)
+        const renderList = () => {
+          list.innerHTML = ''
+          const needle = findingFilter.q.trim().toLowerCase()
+          const items = [...m.findings].filter((f) => (findingFilter.sev === 'all' || f.severity === findingFilter.sev) && (findingFilter.area === 'all' || f.area === findingFilter.area) && (!needle || `${f.title} ${f.docName} ${f.quote} ${f.description}`.toLowerCase().includes(needle))).sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || a.area.localeCompare(b.area))
+          if (!items.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, m.findings.length ? 'Keine Befunde für diesen Filter' : 'Noch keine Befunde')); e.appendChild(document.createTextNode(m.findings.length ? '' : 'Befunde entstehen bei der Analyse – jeder mit Schweregrad, Zitat, Fundstelle, Empfehlung und Normen.')); list.appendChild(e); return }
+          items.forEach((f) => list.appendChild(findingCard(f, m)))
+        }
+        renderList()
+      }
+
+      // ---- requests ----
+      function requestList(m) {
+        const out = []
+        for (const [key, as] of Object.entries(m.areaSummaries || {})) { for (const r of as.requests || []) out.push({ area: areaLabel(key), text: r, ref: '' }); for (const x of as.missing_documents || []) out.push({ area: areaLabel(key), text: 'Dokument nachreichen: ' + x, ref: '' }) }
+        for (const d of m.documents) for (const q of d.questions || []) out.push({ area: d.area ? areaLabel(d.area) : 'Allgemein', text: q, ref: d.name })
+        const seen = new Set(); return out.filter((r) => { const k = r.text.toLowerCase().slice(0, 80); if (seen.has(k)) return false; seen.add(k); return true })
+      }
+      function renderRequests(body, m) {
+        const items = requestList(m)
+        const tb = el('div', 'toolbar'); tb.appendChild(el('span', 'sub', `${items.length} offene Fragen und Nachforderungen an den Datenraum`)).style.cssText = 'font-size:13px;color:var(--muted)'; tb.appendChild(el('span', 'sp'))
+        const cp = el('button', 'mini', 'Als Text kopieren'); cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(items.map((r) => `- [${r.area}] ${r.text}${r.ref ? ' (' + r.ref + ')' : ''}`).join('\n')); toast('Kopiert.') } catch { toast('Kopieren nicht möglich.') } }); tb.appendChild(cp)
+        const xl = el('button', 'mini', 'Excel (im DD-Workbook)'); xl.addEventListener('click', () => setTab('reports')); tb.appendChild(xl); body.appendChild(tb)
+        if (!items.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Nachfragen')); e.appendChild(document.createTextNode('Die Request List entsteht aus fehlenden Anlagen, unklaren Stellen und Standard-Nachfragen je Prüfbereich.')); body.appendChild(e); return }
+        const groups = {}; for (const r of items) (groups[r.area] ||= []).push(r)
+        for (const [area, rs] of Object.entries(groups)) { const g = el('div', 'req-group card'); g.appendChild(el('h4', null, `${area} (${rs.length})`)); for (const r of rs) { const row = el('div', 'req'); row.appendChild(el('span', null, r.text)); if (r.ref) row.appendChild(el('span', 'rr', r.ref)); g.appendChild(row) } body.appendChild(g) }
+      }
+
+      // ---- log ----
+      function renderLog(body, m) {
+        const lg = el('div', 'log'); lg.id = 'matterLog'
+        for (const e of m.job.log || []) lg.appendChild(el('div', null, `${new Date(e.t).toLocaleTimeString('de-AT')}  ${e.message}`))
+        if (!(m.job.log || []).length) lg.appendChild(el('div', null, 'Noch keine Einträge.'))
+        body.appendChild(lg); lg.scrollTop = lg.scrollHeight
+        const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Ablauf der Analyse'))
+        const p = el('div', 'prose'); p.innerHTML = '<p>Jeder Schritt ist explizit programmiert und protokolliert – kein freier Agent entscheidet, was geprüft wird:</p><ol><li><b>Text</b> – PDF/Word/Text werden serverseitig gelesen; gescannte PDFs ohne Text werden als Fehler markiert (OCR nachliefern).</li><li><b>Analyse</b> – jedes Dokument einzeln (lange Dokumente in Teilen) nach festem Schema: Typ, Bereich, Parteien, Key Terms, Befunde mit Zitat/Fundstelle/Schweregrad/Empfehlung/Normen, Nachfragen.</li><li><b>Bereiche</b> – je Prüfbereich eine Synthese über alle Dokumente: Risiken, Widersprüche, fehlende Standarddokumente, Empfehlungen für Garantien/Freistellungen/CPs.</li><li><b>Summary</b> – Executive Summary mit Gesamteinschätzung.</li><li><b>RIS</b> – alle zitierten Normen deterministisch gegen das RIS geprüft.</li><li><b>Bericht</b> – Word (Red Flag Report) und Excel (Befunde, Dokumente, Nachfragen, Bereiche) aus festen Vorlagen.</li></ol><p>Pausieren ist jederzeit möglich; neue Dokumente werden beim nächsten Lauf ergänzt, bereits analysierte nicht erneut verrechnet.</p>'
+        c.appendChild(p); body.appendChild(c)
+      }
+      // ---- review tables ----
+      function renderTables(body, m) {
+        const tb = el('div', 'toolbar'); tb.appendChild(el('span', 'sub', 'Gleiche Fragen an viele Dokumente – jede Zelle mit Beleg und Fundstelle.')).style.cssText = 'font-size:13px;color:var(--muted)'; tb.appendChild(el('span', 'sp'))
+        const bN = el('button', 'btn sm', 'Neue Tabelle'); bN.disabled = !m.documents.length; bN.addEventListener('click', () => openTableWizard([])); tb.appendChild(bN); body.appendChild(tb)
+        const tables = m.tables || []
+        if (!tables.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Review-Tabelle')); e.appendChild(document.createTextNode('Vorlagen: Vertragsübersicht, Dienstverträge, Mietverträge, Fristenchronologie, Steuerbescheide – oder eigene Spalten.')); body.appendChild(e); return }
+        for (const t of [...tables].reverse()) body.appendChild(tableCard(t, m))
+      }
+      function tableCard(t, m) {
+        const c = el('div', 'card'); c.style.marginBottom = '14px'
+        const h = el('div', 'toolbar'); h.style.marginBottom = '8px'; h.appendChild(el('h3', null, t.name)).style.margin = '0'
+        h.appendChild(el('span', 'pill ' + (t.status === 'running' ? 'run' : t.status === 'done' ? 'green' : t.status === 'paused' ? 'amber' : ''), t.status === 'running' ? 'läuft' : t.status === 'done' ? `${(t.rows || []).length} Zeilen` : t.status === 'paused' ? 'pausiert' : 'neu')); h.appendChild(el('span', 'sp'))
+        if (t.status !== 'running' && (t.docIds?.length ? t.docIds : m.documents.map((d) => d.id)).some((id) => !(t.rows || []).some((r) => r.docId === id))) { const bR = el('button', 'mini', 'Fehlende Zeilen ergänzen'); bR.addEventListener('click', async () => { try { const r = await api(`/api/matters/${m.id}/tables/${t.id}/run`, { method: 'POST', body: {} }); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message) } }); h.appendChild(bR) }
+        const bX = el('button', 'mini', 'Excel'); bX.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/tables/${t.id}/xlsx`, `${t.name}.xlsx`)); h.appendChild(bX)
+        const bD = el('button', 'mini danger', '×'); bD.title = 'Tabelle löschen'; bD.addEventListener('click', async () => { if (await confirmDlg('Tabelle löschen', `„${t.name}“ löschen?`)) { try { await api(`/api/matters/${m.id}/tables/${t.id}`, { method: 'DELETE' }); await reloadMatter() } catch (e) { toast(e.message) } } }); h.appendChild(bD)
+        c.appendChild(h)
+        const wrap = el('div', 'tbl-wrap'); const tbl = el('table', 'tbl'); const th = el('tr'); th.appendChild(el('th', null, 'Dokument')); t.columns.forEach((col) => th.appendChild(el('th', null, col))); tbl.appendChild(el('thead')).appendChild(th)
+        const tbody = el('tbody')
+        for (const r of t.rows || []) {
+          const tr = el('tr'); tr.appendChild(el('td', 'n', r.docName))
+          for (const col of t.columns) { const cell = r.cells?.[col]; const td = el('td'); if (!cell) { td.textContent = r.error ? 'Fehler: ' + r.error : '–' } else { td.appendChild(el('div', 'v', cell.value || '–')); if (cell.quote || cell.location) { td.classList.add('hasq'); td.title = [cell.quote, cell.location].filter(Boolean).join(' · '); td.appendChild(el('div', 'cell-q', `${cell.quote ? '„' + cell.quote + '“' : ''}${cell.location ? ' – ' + cell.location : ''}`)); td.addEventListener('click', () => td.classList.toggle('open')) } } tr.appendChild(td) }
+          tbody.appendChild(tr)
+        }
+        if (!(t.rows || []).length) { const tr = el('tr'); const td = el('td'); td.colSpan = t.columns.length + 1; td.style.color = 'var(--faint)'; td.textContent = t.status === 'running' ? 'Wird erstellt…' : 'Noch keine Zeilen.'; tr.appendChild(td); tbody.appendChild(tr) }
+        tbl.appendChild(tbody); wrap.appendChild(tbl); c.appendChild(wrap)
+        return c
+      }
+      function openTableWizard(docIds) {
+        const m = matter; if (!m) return
+        const card = $('taskCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, 'Neue Review-Tabelle')); card.appendChild(el('div', 'md', docIds.length ? `${docIds.length} ausgewählte Dokumente werden ausgewertet.` : `Alle ${m.documents.length} Dokumente der Akte werden ausgewertet.`))
+        const field = (label, ctl, hint) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); f.appendChild(ctl); if (hint) f.appendChild(el('div', 'hint', hint)); return f }
+        const preset = el('select'); const o0 = el('option', null, 'Eigene Spalten'); o0.value = ''; preset.appendChild(o0); for (const p of ddConfig.presets) { const o = el('option', null, p.label); o.value = p.key; preset.appendChild(o) }
+        const name = el('input'); name.placeholder = 'Name der Tabelle'
+        const cols = el('textarea'); cols.placeholder = 'Eine Spalte je Zeile, z. B.\nVertragspartner\nLaufzeit / Ende\nChange-of-Control-Klausel'; cols.style.minHeight = '140px'
+        preset.addEventListener('change', () => { const p = ddConfig.presets.find((x) => x.key === preset.value); if (p) { cols.value = p.columns.join('\n'); if (!name.value) name.value = p.label } })
+        card.appendChild(field('Vorlage', preset)); card.appendChild(field('Name', name)); card.appendChild(field('Spalten (max. 16)', cols, 'Jede Zelle erhält Antwort, wörtlichen Beleg und Fundstelle; nicht Enthaltenes wird als „–“ markiert.'))
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeTask); const g = el('button', 'btn', 'Tabelle erstellen')
+        g.addEventListener('click', async () => {
+          const columns = cols.value.split('\n').map((s) => s.trim()).filter(Boolean)
+          if (!columns.length) { toast('Bitte Spalten angeben.'); cols.focus(); return }
+          g.disabled = true
+          try { const r = await api(`/api/matters/${m.id}/tables`, { method: 'POST', body: { name: name.value.trim() || preset.selectedOptions[0]?.textContent || 'Tabelle', columns, docIds, preset: preset.value || undefined } }); closeTask(); docSelection = new Set(); matterTab = 'tables'; await reloadMatter(); if (r.jobId) followMatterJob(r.jobId); else toast('Tabelle angelegt – ein anderer Vorgang läuft noch; danach „Fehlende Zeilen ergänzen“.', 5000) } catch (e) { toast(e.message, 4000); g.disabled = false }
+        })
+        a.append(c, g); card.appendChild(a); $('taskModal').classList.add('show'); setTimeout(() => preset.focus(), 30)
+      }
+      async function renderTablesPage() {
+        const page = $('tablesPage'); page.innerHTML = ''
+        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, 'Review-Tabellen')); hl.appendChild(el('div', 'sub', 'Strukturierte Auswertung vieler Dokumente nach gleichen Spalten – mit Beleg und Fundstelle je Zelle, Export nach Excel.')); head.appendChild(hl)
+        const acts = el('div', 'acts'); const b = el('button', 'btn', 'Neue Tabelle'); b.addEventListener('click', () => chooseMatterForTable()); acts.appendChild(b); head.appendChild(acts); page.appendChild(head)
+        const grid = el('div', 'cards'); grid.appendChild(el('div', 'recent-empty', 'Lädt…')); page.appendChild(grid)
+        await loadDdConfig(); await loadMatters()
+        const withTables = mattersCache.filter((m) => m.tables)
+        grid.innerHTML = ''
+        if (!withTables.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, 'Noch keine Tabellen')); e.appendChild(document.createTextNode('Tabellen gehören zu einer Akte: Akte wählen (oder anlegen), Dokumente hochladen, Spalten festlegen.')); grid.appendChild(e); return }
+        for (const m of withTables) { const c = matterCard(m); c.querySelector('.foot').prepend(el('span', 'pill teal', `${m.tables} Tabelle${m.tables > 1 ? 'n' : ''}`)); c.addEventListener('click', () => navigate(`#/matter/${m.id}/tables`), { capture: true }); grid.appendChild(c) }
+      }
+      async function chooseMatterForTable() {
+        await loadMatters()
+        if (!mattersCache.length) { openMatterWizard('matter'); return }
+        chooseMatter('Akte für die Tabelle wählen', (m) => navigate(`#/matter/${m.id}/tables`))
+      }
+      function chooseMatter(title, onPick) {
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, title))
+        const list = el('div'); list.style.cssText = 'display:grid;gap:6px;max-height:50vh;overflow:auto'
+        for (const m of mattersCache) { const b = el('button', 'btn ghost full', ''); b.style.justifyContent = 'flex-start'; b.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'DD' : 'Akte')); b.appendChild(document.createTextNode(` ${m.name} · ${m.documents} Dok.`)); b.addEventListener('click', () => { closeDlg(); onPick(m) }); list.appendChild(b) }
+        card.appendChild(list)
+        const a = el('div', 'modal-actions'); const n = el('button', 'btn ghost', 'Neue Akte'); n.addEventListener('click', () => { closeDlg(); openMatterWizard('matter') }); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); a.append(n, c); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+
+      // ---- reports ----
+      function renderReports(body, m) {
+        const tb = el('div', 'toolbar'); tb.appendChild(el('span', 'sub', 'Red Flag Report (Word) und DD-Workbook (Excel: Befunde, Dokumente, Nachfragen, Bereiche) aus festen Vorlagen.')).style.cssText = 'font-size:13px;color:var(--muted)'; tb.appendChild(el('span', 'sp'))
+        const bR = el('button', 'btn ghost sm', 'Bericht neu erstellen'); bR.disabled = m.job.running || !(m.findings.length || m.executive); bR.addEventListener('click', async () => { bR.disabled = true; try { await api(`/api/matters/${m.id}/report`, { method: 'POST', body: {} }); await reloadMatter(); toast('Bericht erstellt.') } catch (e) { toast(e.message); bR.disabled = false } }); tb.appendChild(bR)
+        const bS = el('button', 'btn sm', ''); bS.appendChild(svg('cloud')); bS.appendChild(document.createTextNode('Nach Microsoft 365 speichern')); bS.disabled = !(m.reports || []).length; bS.addEventListener('click', () => syncReports(m)); tb.appendChild(bS)
+        body.appendChild(tb)
+        if (!(m.reports || []).length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch kein Bericht')); e.appendChild(document.createTextNode('Der Bericht entsteht am Ende der Analyse und kann danach jederzeit neu erzeugt werden (z. B. nach Ergänzung von Dokumenten).')); body.appendChild(e); return }
+        const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl'); const th = el('tr'); for (const h of ['Datei', 'Typ', 'Größe', 'Erstellt', '']) th.appendChild(el('th', null, h)); t.appendChild(el('thead')).appendChild(th)
+        const tbody = el('tbody')
+        for (const r of m.reports) { const tr = el('tr'); tr.appendChild(el('td', 'n', r.name)); tr.appendChild(el('td', null, r.kind === 'docx' ? 'Word – Red Flag Report' : 'Excel – Befunde & Request List')); tr.appendChild(el('td', null, fmtSize(r.size))); tr.appendChild(el('td', null, fmtDate(r.createdAt))); const ca = el('td'); const ra = el('div', 'rowacts'); const b = el('button', null, '⬇ Download'); b.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/reports/${encodeURIComponent(r.name)}`, r.name)); ra.appendChild(b); ca.appendChild(ra); tr.appendChild(ca); tbody.appendChild(tr) }
+        t.appendChild(tbody); wrap.appendChild(t); body.appendChild(wrap)
+        if (m.sync?.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Zuletzt gespeichert')); for (const s of m.sync) { const row = el('div', 'sync-row'); row.appendChild(svg('cloud')); if (s.ok && s.webUrl) { const a = el('a', null, s.name); a.href = s.webUrl; a.target = '_blank'; a.rel = 'noopener noreferrer'; row.appendChild(a) } else row.appendChild(el('span', null, s.name)); if (!s.ok) row.appendChild(el('span', 'err', s.error || 'fehlgeschlagen')); c.appendChild(row) } body.appendChild(c) }
+      }
+      function syncReports(m) {
+        if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
+        if (!msState.connected) { openMsConnect(); return }
+        openMsPicker({ mode: 'target', onPick: async (f) => { toast('Speichert…'); try { const r = await api(`/api/matters/${m.id}/sync`, { method: 'POST', body: { driveId: f.driveId, itemId: f.itemId } }); m.sync = r.sync; renderMatter(); const ok = r.sync.filter((s) => s.ok).length; toast(`${ok}/${r.sync.length} Dateien nach „${f.name}“ gespeichert.`, 4000) } catch (e) { toast(e.message, 4000) } } })
+      }
+
+      // ---- questions about a matter ----
+      function askAboutMatter(m, docIds = [], prefill = '') {
+        const ctx = { id: m.id, name: m.name, docIds: docIds.slice(0, MAX_UPLOADS) }
+        if (current && !current.messages.length) { current.matter = ctx } else newConversation({ keepView: true, matterCtx: ctx })
+        docSelection = new Set()
+        navigate('#/assistant'); showView('assistant'); showHome(); renderAttachments()
+        input.value = prefill; input.dispatchEvent(new Event('input')); input.focus()
+        toast(`Fragen werden im Kontext der Akte „${m.name}“ beantwortet.`)
+      }
+      async function chooseMatterForChat() {
+        if (current?.matter) { current.matter = null; persistCurrent(); renderAttachments(); toast('Aktenkontext entfernt.'); return }
+        await loadMatters()
+        if (!mattersCache.length) { toast('Noch keine Akte vorhanden.'); openMatterWizard('matter'); return }
+        chooseMatter('Frage im Kontext einer Akte', (m) => { if (!current) newConversation({ keepView: true }); current.matter = { id: m.id, name: m.name, docIds: [] }; persistCurrent(); renderAttachments(); if (current.messages.length) showChat(); toast(`Aktenkontext: ${m.name}`) })
+      }
+
+      // ------------------------------------------------------------------
+      // Settings
+      // ------------------------------------------------------------------
+      function renderSettings() {
+        setSwitch('swWeb', settings.webSearch !== false); renderMsUi()
+        $('kvOwner').textContent = ownerKey
+        if (health) {
+          $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'; $('kvExtract').textContent = health.models?.extract || health.models?.main || '–'
+          $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
+          $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`
+        }
+      }
+      $('ownerCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(ownerKey); toast('Schlüssel kopiert.') } catch { toast('Kopieren nicht möglich.') } })
+      $('ownerSet').addEventListener('click', async () => { const v = await promptDlg('Arbeitsbereich-Schlüssel übernehmen', 'Den Schlüssel aus den Einstellungen des anderen Geräts eintragen. Akten dieses Browsers sind danach nur noch mit dem bisherigen Schlüssel erreichbar.', { placeholder: 'w_…' }); if (v == null) return; const k = v.trim(); if (!/^[\w-]{16,80}$/.test(k)) { toast('Ungültiger Schlüssel.'); return } ownerKey = k; try { localStorage.setItem(LS_OWNER, k) } catch {} $('kvOwner').textContent = k; matter = null; await loadMatters(); toast('Schlüssel übernommen.') })
+      $('miTour').addEventListener('click', () => startTour())
 
       // ------------------------------------------------------------------
       // Feature tour
       // ------------------------------------------------------------------
       const TOUR = [
-        { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. Sol wählt das Rechtsgebiet, die juristische Wissensdatenbank AI:ssociate recherchiert und antwortet; reicht das nicht, ergänzt Sol mit höchstens drei Websuchen.' },
-        { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente direkt aus OneDrive oder SharePoint anhängen. Erzeugte Dateien und die Antwort als Word-Memo werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
-        { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
-        { sel: '#actionsSec', title: 'Workflows', text: 'Geführte Aufgaben mit Formular statt Prompt-Vorlagen: Vertragsprüfung mit Kommentaren im Dokument, Versionsvergleich, Entwürfe, Fristen.' },
-        { sel: '#historyBtn', title: 'Verlauf', text: 'Alle Gespräche bleiben in diesem Browser gespeichert und können jederzeit fortgesetzt werden – mit Kontext.' },
-        { sel: '#menuBtn', title: 'Menü & Einstellungen', text: 'Websuche als Fallback, Datenschutz-Standard, eingesetzte Modelle (Sol, Wissensdatenbank AI:ssociate) und Sitzungskosten.' },
-        { sel: null, title: 'Schritte, Quellen, Verifikation', text: 'Jede Antwort zeigt die wenigen Arbeitsschritte (ohne Code), die Dokumente der Wissensdatenbank bzw. Web-Quellen und eine automatische Prüfung aller zitierten §§ und Geschäftszahlen gegen das RIS.' },
+        { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. Sol wählt das Rechtsgebiet, die juristische Wissensdatenbank AI:ssociate recherchiert und antwortet; reicht das nicht, ergänzt Sol mit höchstens drei Websuchen. Jede Fundstelle wird gegen das RIS geprüft.' },
+        { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
+        { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
+        { sel: '#matterBtn', title: 'Fragen zur Akte', text: 'Eine Frage im Kontext einer Akte stellen: die gespeicherte Analyse (Befunde, Zusammenfassungen) und ausgewählte Dokumente gehen als Kontext mit.' },
+        { sel: '#navDd', title: 'Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Request List, Red Flag Report als Word und Excel.', nav: true },
+        { sel: '#navTables', title: 'Review-Tabellen', text: 'Viele Dokumente, gleiche Spalten: Vertragsübersicht, Dienstverträge, Mietverträge, Fristen – jede Zelle mit Beleg. Export nach Excel.', nav: true },
+        { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Modelle, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
       ]
       let tourIdx = -1, tourCard = null, tourTarget = null
-      function startTour() { closeDrawers(); if (home.hidden) showHome(); tourIdx = 0; showTourStep() }
+      function startTour() { closeDlg(); if (viewName !== 'assistant') { navigate('#/assistant') } if (home.hidden) showHome(); tourIdx = 0; showTourStep() }
       function showTourStep() {
         if (tourTarget) tourTarget.classList.remove('tour-target')
         if (tourCard) tourCard.remove()
         const s = TOUR[tourIdx]; if (!s) return endTour()
+        if (s.nav && window.innerWidth <= 960) openSidebar(); else if (!s.nav) closeSidebar()
         tourTarget = s.sel ? document.querySelector(s.sel) : null
         if (tourTarget) { tourTarget.classList.add('tour-target'); tourTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }) }
         tourCard = el('div', 'tour-card')
@@ -1149,7 +2000,7 @@
         const a = el('div', 'ta'); const skip = el('button', 'btn ghost', 'Beenden'); skip.addEventListener('click', endTour); const next = el('button', 'btn', tourIdx === TOUR.length - 1 ? 'Fertig' : 'Weiter'); next.addEventListener('click', () => { tourIdx++; showTourStep() }); a.append(skip, next); tourCard.appendChild(a)
         document.body.appendChild(tourCard)
       }
-      function endTour() { if (tourTarget) tourTarget.classList.remove('tour-target'); if (tourCard) tourCard.remove(); tourTarget = null; tourCard = null; tourIdx = -1; try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true }
+      function endTour() { if (tourTarget) tourTarget.classList.remove('tour-target'); if (tourCard) tourCard.remove(); tourTarget = null; tourCard = null; if (tourIdx >= 0) closeSidebar(); tourIdx = -1; try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true }
       $('tourStart').addEventListener('click', startTour)
       $('tourSkip').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true })
 
@@ -1159,24 +2010,23 @@
       async function checkHealth() {
         try {
           health = await (await fetch('/api/health')).json()
-          $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'
-          $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
+          renderSettings()
           if (!health.aissociate) toast('Server: AISSOCIATE_API_KEY fehlt.')
-          $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`
           if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
         } catch { toast('Server nicht erreichbar.') }
       }
-      renderActions(); renderRecent()
+      renderActions(); renderRecent(); renderSidebarRecent()
       try {
         const q = new URLSearchParams(location.search)
         if (q.get('ms') === 'connected') toast('Microsoft 365 verbunden.')
-        if (q.get('ms') === 'error') toast('Microsoft-Anmeldung fehlgeschlagen: ' + (q.get('reason') || ''))
-        if (q.has('ms')) history.replaceState(null, '', location.pathname)
+        if (q.get('ms') === 'error') toast('Microsoft-Anmeldung fehlgeschlagen: ' + (q.get('reason') || ''), 5000)
+        if (q.has('ms')) history.replaceState(null, '', location.pathname + location.hash)
       } catch {}
-      $('swWeb').classList.toggle('on', settings.webSearch !== false); $('swWeb').setAttribute('aria-checked', String(settings.webSearch !== false))
-      newConversation()
+      setSwitch('swWeb', settings.webSearch !== false)
+      newConversation({ keepView: true })
+      router()
       try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
-      checkHealth(); loadMsState()
+      checkHealth(); loadMsState(); loadMatters()
     </script>
   </body>
 </html>

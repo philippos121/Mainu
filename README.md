@@ -57,6 +57,45 @@ Configure `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and optionally `MS_TENANT` /
 `GET /api/ms/browse`, `GET /api/ms/sites`, `GET /api/ms/site-drives`; the chat
 request takes `msFiles` and `msSync`.
 
+## App shell, Akten, Due Diligence, Review-Tabellen
+
+The UI is an app shell (sidebar: Assistent, Workflows, Alle Akten, Due
+Diligence, Review-Tabellen, Verlauf, Einstellungen; hash routes such as
+`#/matter/<id>/findings`). Matters ("Akten") hold documents (upload or import of
+files and whole folders from OneDrive/SharePoint), their extracted text, the
+analysis results, review tables and reports. Everything long-running is a
+server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),
+can be paused, and survives closed browser tabs.
+
+**Due diligence** (`lib/ddconfig.js`, `lib/dd.js`, `lib/report.js`) is an
+explicit pipeline, not an agent: Text → per-document analysis (strict JSON
+schema: type, area, parties, key terms, findings with quote + location +
+severity + recommendation + norms, questions) → synthesis per review area →
+executive summary → RIS verification of every cited norm → Word Red-Flag-Report
++ Excel workbook from fixed templates. Review areas, typical documents, red-flag
+catalogues and standard requests are versioned code. A token budget per matter
+stops the run cleanly ("pausiert"); new documents are added incrementally.
+
+**Review tables**: user-defined columns (presets: Vertragsübersicht,
+Dienstverträge, Mietverträge, Fristen, Steuerbescheide) extracted per document
+with `value / quote / location` per cell; Excel export.
+
+**Questions about a matter**: the stored analysis is passed as context (and
+selected documents as attachments) to the normal legal pipeline.
+
+Workspaces are separated by a browser-generated key sent as `X-Owner-Key`
+(shown in the settings so a workspace can be opened on another device). This is
+isolation, not authentication — see `docs/ARCHITEKTUR.md` for the critical
+review, the explicit-code-vs-code-generation trade-off and the roadmap
+(persistent disk/Postgres, Entra-bound identities, OCR, job queue).
+
+Matter routes: `GET/POST /api/matters`, `GET/PATCH/DELETE /api/matters/:id`,
+`POST /api/matters/:id/documents`, `POST /api/matters/:id/import-ms`,
+`POST /api/matters/:id/dd/run|pause`, `POST /api/matters/:id/report`,
+`GET /api/matters/:id/reports/:file`, `POST /api/matters/:id/tables`,
+`GET /api/matters/:id/tables/:tid/xlsx`, `POST /api/matters/:id/sync`,
+`GET /api/dd/config`; `POST /api/chat` accepts `matterId` + `matterDocIds`.
+
 ## Run locally
 
 ```bash
@@ -70,6 +109,8 @@ npm run dev            # http://localhost:3000
 The service builds from the `Dockerfile`. Set `OPENAI_API_KEY`,
 `AISSOCIATE_API_KEY` and `E2B_API_KEY` in the Render dashboard; everything else
 has defaults (see `.env.example`). `GET /api/health` reports the configuration.
+Matters are stored in `DATA_DIR` (`/data` in `render.yaml`): attach a persistent
+disk there, otherwise they are lost on every deploy.
 
 ## Endpoints
 

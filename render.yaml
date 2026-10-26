@@ -10,9 +10,15 @@ services:
         sync: false   # set the value in the Render dashboard
       - key: E2B_API_KEY
         sync: false   # set the value in the Render dashboard
-      - key: OPENAI_MODEL_FAST
-        value: gpt-6-luna
+      - key: AISSOCIATE_API_KEY
+        sync: false   # set the value in the Render dashboard
       - key: OPENAI_MODEL_MAIN
         value: gpt-6-sol
-      - key: ROUTING
-        value: auto
+      - key: DATA_DIR
+        value: /data
+    # Matters (Akten) and due-diligence results live in DATA_DIR. Uncomment the
+    # disk (paid plans) so they survive deploys; without it they are ephemeral.
+    # disk:
+    #   name: aissociate-data
+    #   mountPath: /data
+    #   sizeGB: 10
