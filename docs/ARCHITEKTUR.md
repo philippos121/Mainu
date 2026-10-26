@@ -8,10 +8,10 @@ eine Seite `public/index.html`, Render).
 
 | Bereich | Funktion | Umsetzung |
 |---|---|---|
-| Assistent | Rechtsfrage → Sol wählt Rechtsgebiet → AI:ssociate-Wissensdatenbank (agentisch) → Sol prüft, ergänzt ausnahmsweise mit ≤ 3 Websuchen → RIS-Verifikation aller §§/GZ → Links im Text | explizit |
+| Allgemeiner Agent (Assistent) | Rechtsfrage → Sol wählt Rechtsgebiet → AI:ssociate-Wissensdatenbank (agentisch, gestreamt) → Sol prüft, ergänzt ausnahmsweise mit ≤ 3 Websuchen → RIS-Verifikation aller §§/GZ → Links im Text. Dokumentaufgaben: Anhänge bis 80k Zeichen gehen als Volltext an Sol, genau eine AI:ssociate-Antwort (gestreamt), Sol arbeitet sie in das Deliverable ein | explizit |
 | Workflows | Rechtsrecherche, Vertrag prüfen (Kommentare im Word), Versionen vergleichen (Redline), Entwurf, Zusammenfassen, Fristen | explizit gesteuert, Deliverable per Code-Generierung in der Sandbox |
 | Akten | Dokumente je Causa (Upload, OneDrive/SharePoint-Import inkl. ganzer Ordner), Volltexte, Fragen im Kontext der Akte | explizit |
-| Due Diligence | Feste Prüfbereiche (Gesellschaft, Verträge, Arbeit, Immobilien, IP/IT/Datenschutz, Compliance, Verfahren, Finanzierung, Steuern), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Normen, Synthese je Bereich, Executive Summary, RIS-Prüfung, Request List, Red-Flag-Report (Word) und Workbook (Excel) | explizit |
+| Due Diligence (Spezialagent) | Feste Prüfbereiche mit Red-Flag-Katalog und Regel-IDs (GES-001 …), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Deal-Impact + Normen, **Evidenzbindung** (jedes Zitat wird im Dokumenttext gesucht: belegt / teilweise / unbelegt), eine gebündelte **AI:ssociate-Rechtsfrage je Prüfbereich**, Synthese je Bereich, Executive Summary, RIS-Prüfung, **Review-Status je Befund** (Freigabe, Grad, Vermerk, manuelle Befunde), Request List, Red-Flag-Report (Word) und Workbook (Excel) mit stabilen IDs; Kostenschätzung vor jedem Lauf | explizit |
 | Review-Tabellen | Gleiche Spalten über viele Dokumente (Vertragsübersicht, Dienstverträge, Mietverträge, Fristen, Steuerbescheide, eigene Spalten); jede Zelle mit Beleg und Fundstelle; Excel-Export | explizit |
 | Microsoft 365 | OAuth/PKCE, Browser für OneDrive/SharePoint, Anhängen, Import in Akten, Rückschreiben von Ergebnissen und Berichten (nie überschreiben) | explizit |
 | Lange Vorgänge | Server-Jobs mit Ereignisprotokoll, Wiederanbindung nach Verbindungsabbruch, Pausieren/Fortsetzen, Budget je Akte | explizit |
@@ -69,7 +69,7 @@ Prüfung, RIS). So bleiben die teuren Analyseergebnisse wiederverwendbar.
 
 ## 3. Kritische Punkte der Architektur und was daraus folgt
 
-1. **Persistenz.** Akten liegen als JSON + Dateien in `DATA_DIR`
+1. **Persistenz.** Akten (im UI „der Akt“) liegen als JSON + Dateien in `DATA_DIR`
    (`lib/store.js`). Auf Render ohne Persistent Disk verschwinden sie beim
    nächsten Deploy. Für den Produktivbetrieb: Render Disk (oder Volume) an
    `/data` mounten und `DATA_DIR=/data` setzen; mittelfristig Postgres für
@@ -100,10 +100,11 @@ Prüfung, RIS). So bleiben die teuren Analyseergebnisse wiederverwendbar.
    Deshalb: Befund nur mit wörtlichem Zitat, Wesentlichkeitsschwelle,
    Empfehlung immer als konkrete Transaktionsmaßnahme (Garantie, Freistellung,
    CP, Kaufpreis), und alle Berichte als „Entwurf, anwaltlich zu prüfen“.
-7. **AI:ssociate-API.** Sie ist die maßgebliche Rechtsquelle für Fragen; die
-   DD-Analyse nutzt sie heute nicht pro Dokument (zu teuer, zu langsam). Sinnvolle
-   Ergänzung: je Prüfbereich eine gebündelte Rechtsfrage an die Wissensdatenbank
-   mit den gefundenen Klauseln, deren Antwort in die Bereichssynthese einfließt.
+7. **AI:ssociate-API.** Sie ist die maßgebliche Rechtsquelle für Fragen und
+   wird in der DD je Prüfbereich einmal mit den roten/gelben Befunden befragt
+   (nicht pro Dokument – zu teuer, zu langsam); die Antwort fließt in die
+   Bereichssynthese und den Bericht ein und wird erneut geholt, wenn sich die
+   wesentlichen Befunde eines Bereichs ändern.
 
 ## 4. Was die großen Anbieter bieten und wie es hier abgebildet ist
 
@@ -117,6 +118,35 @@ Prüfung, RIS). So bleiben die teuren Analyseergebnisse wiederverwendbar.
 | Word-/Teams-Integration | Microsoft Graph: Lesen, Importieren, Rückschreiben |
 | Knowledge / Firmenwissen | noch nicht: Kanzleivorlagen und Musterklauseln als Wissensbasis wären der nächste Schritt |
 | Zitatnavigation ins Dokument | Zitat + Fundstelle je Befund, Dokumenttext im Dialog; Seitenverknüpfung in PDFs fehlt noch |
+
+## 4a. Ergebnis der Recherche zu Anbietern und Use Cases (Oktober 2026)
+
+Die Recherche (Harvey, Legora, CoCounsel, Lexis+ Protégé, Luminance, Kira,
+Noxtua u. a.; Use Cases österreichischer Rechtsanwälte und Steuerberater)
+bestätigt die Architekturentscheidung: alles Wiederkehrende ist explizit
+programmiert, Modellaufrufe sind schemagebundene Datenlieferanten,
+Code-Generierung bleibt die Ausnahme für Einzelstücke. Aus dem priorisierten
+Spezifikationsvorschlag wurden in dieser Iteration umgesetzt: App-Shell mit
+Agenten-Trennung, Akt-Workspace, Evidenzbindung, Review-Status mit manuellen
+Befunden, Deal-Impact, Regel-IDs im Katalog, AI:ssociate je Prüfbereich,
+Kostenschätzung vor dem Lauf, Retries und parallele Dokumentanalyse,
+stabile IDs in UI/Word/Excel. Noch offen (Reihenfolge nach Abhängigkeit):
+
+1. Identität und Mandantentrennung (Entra-ID-Login verpflichtend, Akten an
+   Benutzer/Kanzlei gebunden, Audit-Log) und dauerhafte Speicherung
+   (Persistent Disk, dann SQLite/Postgres) – Voraussetzung für Mehrbenutzer.
+2. Ingest in Skala (Multipart-Upload, SharePoint-Delta-Sync, ZIP, Dedupe) und
+   Extraktion mit Seitenindex + OCR für gescannte Datenräume.
+3. Worker-Prozess mit Chunk-Checkpoints, EUR-Budget und Nutzungs-Ledger.
+4. Regeltabelle in Code (Trigger auf typisierten Feldern, Materialität,
+   Kanzlei-Overrides), Faktenregister, Abdeckungsmatrix, Widerspruchsprüfung.
+5. Dokument-Viewer an der Fundstelle (PDF-Seitenanker), Request-Liste mit
+   Runden/Antworten, Berichtsversionen Executive/Full, Kanzlei-.dotx.
+6. Workflows ohne Sandbox: Playbook-Vertragsprüfung mit Word-Kommentaren,
+   deterministische Redline, Fristen-Engine (ZPO/AVG/VwGVG/BAO) mit
+   Feiertagen und ICS-Export.
+7. Kanzleiwissen (Vorlagen, Klauselbibliothek), Word-/Outlook-Add-in,
+   EU-Datenresidenz und Aufbewahrung als Konfiguration.
 
 ## 5. Nächste Schritte (empfohlen)
 

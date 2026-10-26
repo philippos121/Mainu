@@ -44,6 +44,10 @@
       .nav-item.active { background: var(--accent-soft); color: var(--accent); }
       .nav-item svg { width: 18px; height: 18px; flex: 0 0 auto; }
       .nav-item .cnt { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 1px 7px; }
+      .nav-item .cnt.soft { background: transparent; color: var(--faint); font-weight: 600; font-size: 10.5px; letter-spacing: .02em; }
+      .sb-sec.sb-hist { margin-top: 22px; opacity: .8; }
+      .sb-recent .nav-item { color: var(--faint); }
+      .sb-recent .nav-item.active { color: var(--accent); }
       .nav-item.active .cnt { background: rgba(14,124,138,0.16); color: var(--accent); }
       .sb-recent .nav-item { font-weight: 500; font-size: 13px; padding: 6px 10px; }
       .sb-recent .nav-item span.t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -101,6 +105,20 @@
       .action .ico svg { width: 20px; height: 20px; }
       .action .t { font-size: 14px; font-weight: 700; }
       .action .d { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+      /* agents */
+      .agent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .agent { position: relative; overflow: hidden; text-align: left; border: 1px solid var(--border); border-radius: 16px; padding: 16px 16px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; color: #fff; background: linear-gradient(135deg, #0e5c69 0%, #0e7c8a 100%); transition: transform .15s, box-shadow .15s; box-shadow: 0 6px 20px rgba(14,92,105,0.18); }
+      .agent:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(14,92,105,0.28); }
+      .agent.alt { background: linear-gradient(135deg, #b36a00 0%, #f39200 100%); box-shadow: 0 6px 20px rgba(243,146,0,0.2); }
+      .agent.alt:hover { box-shadow: 0 10px 28px rgba(243,146,0,0.3); }
+      .agent.gray { background: linear-gradient(135deg, #2b4650 0%, #566a73 100%); }
+      .agent .ico { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; }
+      .agent .ico svg { width: 19px; height: 19px; }
+      .agent .t { font-size: 14.5px; font-weight: 800; letter-spacing: -.01em; }
+      .agent .d { font-size: 12.5px; opacity: .9; line-height: 1.4; }
+      .agent .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; opacity: .75; }
+      .agent::after { content: ''; position: absolute; right: -30px; top: -30px; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.08); }
 
       /* ---------- composer ---------- */
       .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 12px 12px 10px; box-shadow: 0 4px 22px rgba(14,60,70,0.08); transition: border-color .15s, box-shadow .15s; }
@@ -413,6 +431,24 @@
       .finding.open .fb { display: block; }
       .finding .fb p { margin: 6px 0; }
       .finding .fb .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin-top: 10px; }
+      .finding.rejected { opacity: .55; }
+      .finding.rejected .ft { text-decoration: line-through; }
+      .fno { display: inline-block; font-size: 11px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 6px; margin-right: 8px; vertical-align: 1px; font-variant-numeric: tabular-nums; }
+      .fbadges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 40%; }
+      .review { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+      .review .lbl { margin: 0 4px 0 0; }
+      .review .mini.on { background: var(--accent-soft); color: var(--accent); border-color: rgba(14,124,138,0.3); }
+      .review .mini.danger.on { background: var(--red-bg); color: var(--red); border-color: rgba(217,45,32,0.3); }
+      .quote.bad { border-left-color: var(--err); background: rgba(217,45,32,0.06); }
+      td.unv .v::after { content: 'unbelegt'; background: var(--red-bg); color: var(--red); }
+      .check1 { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+      .check1 input { accent-color: var(--accent); width: 16px; height: 16px; margin-top: 2px; }
+      details.legal { border-top: 1px solid var(--border); padding: 8px 0; }
+      details.legal summary { cursor: pointer; font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 8px; list-style: none; }
+      details.legal summary::before { content: '›'; color: var(--faint); transition: transform .15s; }
+      details.legal[open] summary::before { transform: rotate(90deg); }
+      details.legal summary .as { margin-left: auto; font-size: 12px; color: var(--faint); font-weight: 500; }
+      details.legal .prose { margin-top: 8px; font-size: 13.5px; }
       .quote { border-left: 3px solid var(--orange); background: rgba(243,146,0,0.08); padding: 8px 12px; border-radius: 0 8px 8px 0; font-style: italic; margin: 6px 0; }
       .norms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
       .norm { font-size: 12px; font-weight: 600; border-radius: 7px; padding: 2px 8px; background: var(--surface-2); color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
@@ -469,7 +505,7 @@
       }
       @media (max-width: 640px) {
         .home-logo { height: 34px; margin: 30px 0 8px; }
-        .recent-list, .action-grid, .field-row, .checks { grid-template-columns: 1fr; }
+        .recent-list, .action-grid, .agent-grid, .field-row, .checks { grid-template-columns: 1fr; }
         .ctool .lbl { display: none; }
         .ctool { padding: 0 9px; }
         .ctool.on .lbl { display: inline; }
@@ -494,14 +530,15 @@
         </div>
         <button class="btn full sb-new" id="sbNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neue Frage</button>
         <nav class="sb-nav">
-          <div class="sb-sec">Arbeiten</div>
-          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent</a>
+          <div class="sb-sec">Allgemeiner Agent</div>
+          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent<span class="cnt soft">Sol + AI:ssociate</span></a>
+          <div class="sb-sec">Spezialagenten</div>
+          <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
+          <a class="nav-item" data-nav="tables" href="#/tables" id="navTables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>Review-Tabellen</a>
           <a class="nav-item" data-nav="workflows" href="#/workflows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Workflows</a>
           <div class="sb-sec">Akten</div>
           <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
-          <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
-          <a class="nav-item" data-nav="tables" href="#/tables" id="navTables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>Review-Tabellen</a>
-          <div class="sb-sec">Verlauf <a href="#/history">Alle</a></div>
+          <div class="sb-sec sb-hist" id="sbHistSec" hidden>Verlauf <a href="#/history">Alle</a></div>
           <div class="sb-recent" id="sbRecent"></div>
         </nav>
         <div class="sb-foot">
@@ -527,7 +564,7 @@
           <main id="home">
             <div class="home-inner">
               <img class="home-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-              <p class="home-claim">Rechtsfragen, Dokumente, Due Diligence – für österreichische Kanzleien und Steuerberater.</p>
+              <p class="home-claim">Allgemeiner Agent für Rechtsfragen und Dokumente – Spezialagenten für Due Diligence, Review-Tabellen und Workflows.</p>
               <div id="composerSlotHome" style="width:100%"></div>
               <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können fehlerhaft sein und müssen vor Verwendung juristisch geprüft werden. Fundstellen werden automatisch gegen das RIS geprüft.</p>
               <div class="tour-banner" id="tourBanner" hidden>
@@ -538,6 +575,10 @@
               <section class="section" id="recentSec">
                 <h3 class="section-title">Zuletzt <a href="#/history">Alle anzeigen</a></h3>
                 <div class="recent-list" id="recentList"></div>
+              </section>
+              <section class="section" id="agentsSec">
+                <h3 class="section-title">Spezialagenten <a href="#/workflows">Alle Workflows</a></h3>
+                <div class="agent-grid" id="agentGrid"></div>
               </section>
               <section class="section" id="actionsSec">
                 <h3 class="section-title">Workflows <a href="#/workflows">Alle</a></h3>
@@ -626,7 +667,7 @@
               <button class="mini" id="miTour">Feature-Tour</button>
               <button class="mini danger" id="miClear2">Verlauf in diesem Browser löschen</button>
             </div>
-            <p class="disclaimer" style="text-align:left;margin-top:14px">Gespräche werden nur in diesem Browser gespeichert. Hochgeladene Dateien einer Frage werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht. Dokumente in Akten bleiben auf dem Server, bis die Akte gelöscht wird.</p>
+            <p class="disclaimer" style="text-align:left;margin-top:14px">Gespräche werden nur in diesem Browser gespeichert. Hochgeladene Dateien einer Frage werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht. Dokumente in Akten bleiben auf dem Server, bis die Akt gelöscht wird.</p>
           </div>
         </div></section>
       </div>
@@ -646,9 +687,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
           <span class="lbl">Microsoft 365</span>
         </button>
-        <button class="ctool" id="matterBtn" title="Frage im Kontext einer Akte stellen">
+        <button class="ctool" id="matterBtn" title="Frage im Kontext eines Akts stellen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          <span class="lbl">Akte</span>
+          <span class="lbl">Akt</span>
         </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
@@ -849,7 +890,7 @@
       $('historyBtn').addEventListener('click', () => navigate('#/history'))
       costPill.addEventListener('click', () => navigate('#/settings'))
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
-      const VIEW_TITLES = { assistant: 'Assistent', workflows: 'Workflows', matters: 'Akten', dd: 'Due Diligence', tables: 'Review-Tabellen', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akte' }
+      const VIEW_TITLES = { assistant: 'Allgemeiner Agent', workflows: 'Workflows', matters: 'Akten', dd: 'Due Diligence', tables: 'Review-Tabellen', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt' }
       function navigate(hash) { if (location.hash === hash) router(); else location.hash = hash }
       function setTitle(parts) { mainTitle.innerHTML = ''; parts.forEach((p, i) => mainTitle.appendChild(el('span', i < parts.length - 1 ? 'crumb' : '', p))) }
       function showView(name, nav) {
@@ -904,7 +945,7 @@
       const MATTER_WORKFLOWS = [
         { key: 'dd', title: 'Due Diligence', desc: 'Datenraum hochladen oder aus SharePoint importieren, feste Prüfbereiche (Gesellschaft, Verträge, Arbeit, Immobilien, IP/IT, Compliance, Verfahren, Finanzierung, Steuern), jeder Befund mit Zitat und Fundstelle – Red Flag Report als Word und Excel.', icon: 'dd', run: () => openMatterWizard('dd') },
         { key: 'table', title: 'Review-Tabelle', desc: 'Viele Dokumente, gleiche Fragen: Vertragsübersicht, Dienstverträge, Mietverträge, Fristenchronologie oder eigene Spalten – jede Zelle mit Beleg und Fundstelle, Export nach Excel.', icon: 'table', run: () => chooseMatterForTable() },
-        { key: 'matter', title: 'Akte anlegen', desc: 'Dokumente einer Causa sammeln, analysieren lassen und Fragen im Kontext der Akte stellen – mit Wissensdatenbank und RIS-Prüfung.', icon: 'matter', run: () => openMatterWizard('matter') },
+        { key: 'matter', title: 'Akt anlegen', desc: 'Dokumente einer Causa sammeln, analysieren lassen und Fragen im Kontext des Akts stellen – mit Wissensdatenbank und RIS-Prüfung.', icon: 'matter', run: () => openMatterWizard('matter') },
       ]
       function actionTile(w, onClick, alt) {
         const b = el('button', 'action' + (alt ? ' alt' : ''))
@@ -913,10 +954,19 @@
         b.addEventListener('click', onClick)
         return b
       }
+      const AGENTS = [
+        { key: 'dd', cls: 'alt', kind: 'Spezialagent · Transaktionen', title: 'Due-Diligence-Agent', desc: 'Datenraum lesen, Befunde mit Zitat und Fundstelle, AI:ssociate je Prüfbereich, Red-Flag-Report als Word und Excel.', icon: 'dd', run: () => navigate('#/dd') },
+        { key: 'tables', cls: '', kind: 'Spezialagent · Dokumente', title: 'Review-Agent', desc: 'Viele Dokumente, gleiche Spalten – Vertragsübersichten, Dienst- und Mietverträge, Fristen, jede Zelle belegt.', icon: 'table', run: () => navigate('#/tables') },
+        { key: 'wf', cls: 'gray', kind: 'Spezialagenten · Workflows', title: 'Vertrag, Vergleich, Entwurf, Fristen', desc: 'Formulargeführte Spezialaufgaben mit festem Ablauf: eine AI:ssociate-Antwort, Ergebnis als Word, Excel oder Redline.', icon: 'contract', run: () => navigate('#/workflows') },
+      ]
+      function renderAgents() {
+        const g = $('agentGrid'); if (!g) return; g.innerHTML = ''
+        for (const a of AGENTS) { const b = el('button', 'agent ' + a.cls); const ico = el('div', 'ico'); ico.appendChild(svg(a.icon)); b.appendChild(ico); b.appendChild(el('div', 'k', a.kind)); b.appendChild(el('div', 't', a.title)); b.appendChild(el('div', 'd', a.desc)); b.addEventListener('click', a.run); g.appendChild(b) }
+      }
       function renderActions() {
+        renderAgents()
         const g = $('actionGrid'); g.innerHTML = ''
         for (const [key, w] of Object.entries(WORKFLOWS)) { const b = actionTile(w, () => openTask(key)); b.dataset.wf = key; g.appendChild(b) }
-        g.appendChild(actionTile(MATTER_WORKFLOWS[0], MATTER_WORKFLOWS[0].run, true))
       }
       function renderWorkflowsPage() {
         const g = $('wfGrid'); g.innerHTML = ''
@@ -986,7 +1036,7 @@
       }
       function renderAttachments() {
         attachList.innerHTML = ''
-        if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, `Akte: ${current.matter.name}${current.matter.docIds?.length ? ` · ${current.matter.docIds.length} Dokument${current.matter.docIds.length > 1 ? 'e' : ''}` : ''}`)); const x = el('button', null, '×'); x.title = 'Aktenkontext entfernen'; x.addEventListener('click', () => { current.matter = null; persistCurrent(); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
+        if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, `Akt: ${current.matter.name}${current.matter.docIds?.length ? ` · ${current.matter.docIds.length} Dokument${current.matter.docIds.length > 1 ? 'e' : ''}` : ''}`)); const x = el('button', null, '×'); x.title = 'Aktenkontext entfernen'; x.addEventListener('click', () => { current.matter = null; persistCurrent(); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
         pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
         pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() }); c.appendChild(x); attachList.appendChild(c) })
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
@@ -1064,7 +1114,7 @@
       function openMsConnect() {
         const card = $('msCard'); card.innerHTML = ''
         card.appendChild(el('h2', null, 'Microsoft 365 verbinden'))
-        card.appendChild(el('div', 'md', 'Dokumente direkt aus OneDrive und SharePoint anhängen oder ganze Datenräume in eine Akte importieren. Erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben – vorhandene Dateien werden nie überschrieben.'))
+        card.appendChild(el('div', 'md', 'Dokumente direkt aus OneDrive und SharePoint anhängen oder ganze Datenräume in einen Akt importieren. Erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben – vorhandene Dateien werden nie überschrieben.'))
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeMs); const go = el('button', 'btn', 'Mit Microsoft anmelden'); go.addEventListener('click', () => { location.href = '/api/ms/login' }); a.append(c, go); card.appendChild(a)
         $('msModal').classList.add('show')
       }
@@ -1155,8 +1205,8 @@
       // ------------------------------------------------------------------
       // Conversations / views
       // ------------------------------------------------------------------
-      function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; setTitle(['Assistent']); renderRecent(); if (window.innerWidth > 960) input.focus() }
-      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.matter ? ['Akte · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
+      function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; setTitle(['Allgemeiner Agent']); renderRecent(); if (window.innerWidth > 960) input.focus() }
+      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.matter ? ['Akt · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
       function newConversation({ keepView = false, matterCtx = null } = {}) {
         current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, matter: matterCtx, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
         $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true
@@ -1186,19 +1236,20 @@
         const list = $('recentList'); list.innerHTML = ''
         const items = convos.slice(0, 4)
         $('recentSec').hidden = !items.length
-        for (const c of items) { const b = el('button', 'recent-item'); b.appendChild(el('div', 't', c.title || 'Gespräch')); b.appendChild(el('div', 'd', `${fmtDate(c.updatedAt)} · ${c.messages.filter((m) => m.role === 'user').length} Frage${c.messages.filter((m) => m.role === 'user').length === 1 ? '' : 'n'}${c.matter ? ' · Akte ' + c.matter.name : ''}`)); b.addEventListener('click', () => navigate('#/chat/' + c.id)); list.appendChild(b) }
+        for (const c of items) { const b = el('button', 'recent-item'); b.appendChild(el('div', 't', c.title || 'Gespräch')); b.appendChild(el('div', 'd', `${fmtDate(c.updatedAt)} · ${c.messages.filter((m) => m.role === 'user').length} Frage${c.messages.filter((m) => m.role === 'user').length === 1 ? '' : 'n'}${c.matter ? ' · Akt ' + c.matter.name : ''}`)); b.addEventListener('click', () => navigate('#/chat/' + c.id)); list.appendChild(b) }
       }
       function renderSidebarRecent() {
         const box = $('sbRecent'); box.innerHTML = ''
-        if (!convos.length) { box.appendChild(el('div', 'sb-empty', 'Noch keine Gespräche.')); return }
-        for (const c of convos.slice(0, 8)) { const a = el('a', 'nav-item' + (current?.id === c.id && viewName === 'assistant' ? ' active' : '')); a.href = '#/chat/' + c.id; a.appendChild(el('span', 't', c.title || 'Gespräch')); box.appendChild(a) }
+        $('sbHistSec').hidden = !convos.length
+        if (!convos.length) return
+        for (const c of convos.slice(0, 5)) { const a = el('a', 'nav-item' + (current?.id === c.id && viewName === 'assistant' ? ' active' : '')); a.href = '#/chat/' + c.id; a.appendChild(el('span', 't', c.title || 'Gespräch')); box.appendChild(a) }
       }
       function renderHistory() {
         const list = $('histList'); list.innerHTML = ''
         if (!convos.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Gespräche')); e.appendChild(document.createTextNode('Stelle eine Frage im Assistenten – der Verlauf erscheint hier.')); list.appendChild(e); return }
         for (const c of convos) {
           const row = el('div', 'hist-item' + (current?.id === c.id ? ' active' : '')); row.role = 'button'
-          const t = el('div', 'ht', c.title || 'Gespräch'); const d = el('div', 'hd', `${fmtDate(c.updatedAt)}${c.matter ? ' · Akte' : ''}`)
+          const t = el('div', 'ht', c.title || 'Gespräch'); const d = el('div', 'hd', `${fmtDate(c.updatedAt)}${c.matter ? ' · Akt' : ''}`)
           const x = el('button', 'hx', '×'); x.title = 'Löschen'; x.addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(c.id) })
           row.append(t, d, x); row.addEventListener('click', () => navigate('#/chat/' + c.id)); list.appendChild(row)
         }
@@ -1213,7 +1264,7 @@
       function renderUser(m) {
         const b = el('div', 'msg-user')
         if (m.taskTitle) b.appendChild(el('div', 'tasklbl', 'Workflow · ' + m.taskTitle))
-        if (m.matterName) b.appendChild(el('div', 'tasklbl', 'Akte · ' + m.matterName))
+        if (m.matterName) b.appendChild(el('div', 'tasklbl', 'Akt · ' + m.matterName))
         b.appendChild(document.createTextNode(m.text))
         if (m.files?.length) { const f = el('div', 'files'); m.files.forEach((n) => f.appendChild(el('span', null, n))); b.appendChild(f) }
         messages.appendChild(b)
@@ -1473,6 +1524,11 @@
       // Matters (Akten) & Due Diligence
       // ------------------------------------------------------------------
       const SEV_DE = { red: 'Rot', amber: 'Gelb', green: 'Grün', info: 'Hinweis' }
+      const REV_DE = { open: 'offen', accepted: 'freigegeben', modified: 'geändert', rejected: 'verworfen' }
+      const IMPACT_DE = { CP: 'Condition Precedent', Garantie: 'Garantie', Freistellung: 'Freistellung', Kaufpreis: 'Kaufpreis / Escrow', Abbruch: 'Abbruchempfehlung', Nachfrage: 'Nachfrage', keine: '–' }
+      const EVID_DE = { verified: ['Zitat belegt', 'green'], partial: ['Zitat teilweise belegt', 'amber'], unverified: ['Zitat nicht im Text gefunden', 'red'] }
+      const sevOf = (f) => (f.review?.severity && SEV_RANK[f.review.severity] != null ? f.review.severity : f.severity)
+      const isRejected = (f) => f.review?.status === 'rejected'
       const SEV_RANK = { red: 0, amber: 1, green: 2, info: 3 }
       const STAGES = [['extract', 'Text'], ['analyse', 'Analyse'], ['synthesize', 'Bereiche'], ['summary', 'Summary'], ['verify', 'RIS'], ['report', 'Bericht']]
       const DOC_STATUS = { new: ['neu', ''], extracted: ['Text', 'teal'], analysed: ['analysiert', 'green'], error: ['Fehler', 'red'] }
@@ -1484,18 +1540,18 @@
       async function renderMatters(filter) {
         const page = $('mattersPage'); page.innerHTML = ''
         const isDd = filter === 'dd'
-        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, isDd ? 'Due Diligence' : 'Akten')); hl.appendChild(el('div', 'sub', isDd ? 'Datenraum analysieren, Red Flags mit Zitat und Fundstelle, Bericht als Word und Excel.' : 'Dokumente einer Causa sammeln, analysieren und Fragen im Kontext der Akte stellen.')); head.appendChild(hl)
-        const acts = el('div', 'acts'); const bNew = el('button', 'btn', isDd ? 'Neue Due Diligence' : 'Neue Akte'); bNew.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); acts.appendChild(bNew); if (!isDd) { const bDd = el('button', 'btn ghost', 'Neue Due Diligence'); bDd.addEventListener('click', () => openMatterWizard('dd')); acts.appendChild(bDd) } head.appendChild(acts); page.appendChild(head)
+        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, isDd ? 'Due Diligence' : 'Akten')); hl.appendChild(el('div', 'sub', isDd ? 'Datenraum analysieren, Red Flags mit Zitat und Fundstelle, Bericht als Word und Excel.' : 'Dokumente einer Causa sammeln, analysieren und Fragen im Kontext des Akts stellen.')); head.appendChild(hl)
+        const acts = el('div', 'acts'); const bNew = el('button', 'btn', isDd ? 'Neue Due Diligence' : 'Neuer Akt'); bNew.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); acts.appendChild(bNew); if (!isDd) { const bDd = el('button', 'btn ghost', 'Neue Due Diligence'); bDd.addEventListener('click', () => openMatterWizard('dd')); acts.appendChild(bDd) } head.appendChild(acts); page.appendChild(head)
         const grid = el('div', 'cards'); grid.appendChild(el('div', 'recent-empty', 'Lädt…')); page.appendChild(grid)
         await loadDdConfig(); await loadMatters()
         const items = mattersCache.filter((m) => !isDd || m.kind === 'dd')
         grid.innerHTML = ''
-        if (!items.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, isDd ? 'Noch keine Due Diligence' : 'Noch keine Akten')); e.appendChild(document.createTextNode(isDd ? 'Lege eine Due Diligence an, lade den Datenraum hoch (oder importiere ihn aus SharePoint) und starte die Analyse.' : 'Lege eine Akte an und lade Dokumente hoch – Analyse, Review-Tabellen und Fragen zur Akte stehen dann bereit.')); const b = el('button', 'btn', isDd ? 'Due Diligence anlegen' : 'Akte anlegen'); b.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); e.appendChild(b); grid.appendChild(e); return }
+        if (!items.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, isDd ? 'Noch keine Due Diligence' : 'Noch keine Akten')); e.appendChild(document.createTextNode(isDd ? 'Lege eine Due Diligence an, lade den Datenraum hoch (oder importiere ihn aus SharePoint) und starte die Analyse.' : 'Lege einen Akt an und lade Dokumente hoch – Analyse, Review-Tabellen und Fragen zum Akt stehen dann bereit.')); const b = el('button', 'btn', isDd ? 'Due Diligence anlegen' : 'Akt anlegen'); b.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); e.appendChild(b); grid.appendChild(e); return }
         for (const m of items) grid.appendChild(matterCard(m))
       }
       function matterCard(m) {
         const c = el('div', 'card click'); c.addEventListener('click', () => navigate(`#/matter/${m.id}`))
-        const top = el('div', 'kinds'); top.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'Due Diligence' : 'Akte')); if (m.running) top.appendChild(el('span', 'pill run', m.runningKind === 'import' ? 'Import läuft' : m.runningKind === 'table' ? 'Tabelle läuft' : 'Analyse läuft')); else if (m.status === 'paused') top.appendChild(el('span', 'pill amber', 'pausiert')); else if (m.status === 'error') top.appendChild(el('span', 'pill red', 'Fehler')); c.appendChild(top)
+        const top = el('div', 'kinds'); top.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'Due Diligence' : 'Akt')); if (m.running) top.appendChild(el('span', 'pill run', m.runningKind === 'import' ? 'Import läuft' : m.runningKind === 'table' ? 'Tabelle läuft' : 'Analyse läuft')); else if (m.status === 'paused') top.appendChild(el('span', 'pill amber', 'pausiert')); else if (m.status === 'error') top.appendChild(el('span', 'pill red', 'Fehler')); c.appendChild(top)
         c.appendChild(el('h3', null, m.name)); c.style.marginTop = '0'; c.querySelector('h3').style.marginTop = '8px'
         const meta = el('div', 'meta'); if (m.client) meta.appendChild(el('span', null, m.client)); if (m.settings?.target) meta.appendChild(el('span', null, m.settings.target)); meta.appendChild(el('span', null, `${m.documents} Dokument${m.documents === 1 ? '' : 'e'}`)); meta.appendChild(el('span', null, fmtDate(m.updatedAt))); c.appendChild(meta)
         const foot = el('div', 'foot')
@@ -1511,14 +1567,15 @@
       async function openMatterWizard(kind) {
         await loadDdConfig()
         const card = $('taskCard'); card.innerHTML = ''
-        card.appendChild(el('h2', null, kind === 'dd' ? 'Neue Due Diligence' : 'Neue Akte'))
-        card.appendChild(el('div', 'md', kind === 'dd' ? 'Feste Prüfbereiche, jeder Befund mit Zitat und Fundstelle, Normen gegen das RIS geprüft. Dokumente kommen im nächsten Schritt.' : 'Dokumente sammeln, Review-Tabellen erstellen und Fragen im Kontext der Akte stellen.'))
+        card.appendChild(el('h2', null, kind === 'dd' ? 'Neue Due Diligence' : 'Neuer Akt'))
+        card.appendChild(el('div', 'md', kind === 'dd' ? 'Feste Prüfbereiche, jeder Befund mit Zitat und Fundstelle, Normen gegen das RIS geprüft. Dokumente kommen im nächsten Schritt.' : 'Dokumente sammeln, Review-Tabellen erstellen und Fragen im Kontext des Akts stellen.'))
         const form = el('form')
         const field = (label, ctl, hint) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); f.appendChild(ctl); if (hint) f.appendChild(el('div', 'hint', hint)); return f }
         const name = el('input'); name.placeholder = kind === 'dd' ? 'z. B. Projekt Alpha – Erwerb Muster GmbH' : 'z. B. Muster GmbH / Mietstreit'; name.required = true
         const client = el('input'); client.placeholder = 'Mandant (optional)'
-        form.appendChild(field('Bezeichnung *', name)); form.appendChild(field('Mandant', client))
-        let target, trans, persp, mat, budget, areaBoxes = []
+        const reference = el('input'); reference.placeholder = 'z. B. 2026/0417'
+        form.appendChild(field('Bezeichnung *', name)); const r0 = el('div', 'field-row'); r0.appendChild(field('Mandant', client)); r0.appendChild(field('Aktenzeichen', reference)); form.appendChild(r0)
+        let target, trans, persp, mat, budget, kb, areaBoxes = []
         if (kind === 'dd') {
           target = el('input'); target.placeholder = 'Zielunternehmen'
           trans = el('select'); for (const [v, l] of [['share', 'Share Deal (Anteilskauf)'], ['asset', 'Asset Deal (Betriebserwerb)']]) { const o = el('option', null, l); o.value = v; trans.appendChild(o) }
@@ -1531,6 +1588,7 @@
           const ch = el('div', 'checks')
           for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = true; cb.value = a.key; areaBoxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
           form.appendChild(field('Prüfbereiche', ch, 'Rechts-DD und Tax-DD; abwählen, was nicht beauftragt ist.'))
+          kb = el('input'); kb.type = 'checkbox'; kb.checked = true; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtliche Einordnung je Prüfbereich durch die AI:ssociate-Wissensdatenbank (eine gebündelte Rechtsfrage je Bereich, ca. 1–3 Min.)')); form.appendChild(field('Wissensdatenbank', kbl))
         }
         const act = el('div', 'modal-actions'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.type = 'button'; cancel.addEventListener('click', closeTask); const go = el('button', 'btn', 'Anlegen'); go.type = 'submit'; act.append(cancel, go); form.appendChild(act)
         form.addEventListener('submit', async (e) => {
@@ -1538,9 +1596,9 @@
           if (!name.value.trim()) { name.focus(); return }
           go.disabled = true
           try {
-            const settings = kind === 'dd' ? { target: target.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, budgetTokens: Number(budget.value), areas: areaBoxes.filter((b) => b.checked).map((b) => b.value) } : {}
+            const settings = kind === 'dd' ? { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, budgetTokens: Number(budget.value), knowledgeBase: kb.checked, areas: areaBoxes.filter((b) => b.checked).map((b) => b.value) } : { reference: reference.value.trim() }
             const r = await api('/api/matters', { method: 'POST', body: { name: name.value.trim(), kind, client: client.value.trim(), settings } })
-            closeTask(); toast(kind === 'dd' ? 'Due Diligence angelegt – jetzt Dokumente hinzufügen.' : 'Akte angelegt.')
+            closeTask(); toast(kind === 'dd' ? 'Due Diligence angelegt – jetzt Dokumente hinzufügen.' : 'Akt angelegt.')
             await loadMatters(); navigate(`#/matter/${r.matter.id}/documents`)
           } catch (err) { toast(err.message); go.disabled = false }
         })
@@ -1553,7 +1611,7 @@
         matterTab = tab && ['overview', 'documents', 'findings', 'requests', 'tables', 'reports', 'log'].includes(tab) ? tab : 'overview'
         if (matter?.id !== id) { $('matterPage').innerHTML = '<div class="recent-empty">Lädt…</div>'; matter = null }
         showView('matter')
-        try { matter = (await api(`/api/matters/${id}`)).matter } catch (e) { $('matterPage').innerHTML = ''; const b = el('div', 'empty'); b.appendChild(el('b', null, 'Akte nicht gefunden')); b.appendChild(document.createTextNode(e.message)); $('matterPage').appendChild(b); setTitle(['Akten', 'Nicht gefunden']); return }
+        try { matter = (await api(`/api/matters/${id}`)).matter } catch (e) { $('matterPage').innerHTML = ''; const b = el('div', 'empty'); b.appendChild(el('b', null, 'Akt nicht gefunden')); b.appendChild(document.createTextNode(e.message)); $('matterPage').appendChild(b); setTitle(['Akten', 'Nicht gefunden']); return }
         document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (matter.kind === 'dd' ? 'dd' : 'matters')))
         renderMatter()
         if (matter.job.running && matter.job.jobId) followMatterJob(matter.job.jobId)
@@ -1563,15 +1621,15 @@
 
       function renderMatter() {
         const m = matter; if (!m || viewName !== 'matter') return
-        setTitle([m.kind === 'dd' ? 'Due Diligence' : 'Akten', m.name])
+        setTitle([m.kind === 'dd' ? 'Due-Diligence-Agent' : 'Akten', m.name])
         const page = $('matterPage'); page.innerHTML = ''
         const back = el('a', 'back', '‹ ' + (m.kind === 'dd' ? 'Due Diligence' : 'Alle Akten')); back.href = m.kind === 'dd' ? '#/dd' : '#/matters'; page.appendChild(back)
         const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, m.name))
-        const sub = []; if (m.client) sub.push('Mandant: ' + m.client); if (m.settings?.target) sub.push('Ziel: ' + m.settings.target); if (m.kind === 'dd') sub.push(`${m.settings.transaction === 'asset' ? 'Asset Deal' : 'Share Deal'} · ${m.settings.perspective === 'seller' ? 'Verkäufersicht' : 'Käufersicht'} · Wesentlichkeit ${fmtEur(m.settings.materialityEur)}`); sub.push(`${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'}`)
+        const sub = []; if (m.settings?.reference) sub.push('AZ ' + m.settings.reference); if (m.client) sub.push('Mandant: ' + m.client); if (m.settings?.target) sub.push('Ziel: ' + m.settings.target); if (m.kind === 'dd') sub.push(`${m.settings.transaction === 'asset' ? 'Asset Deal' : 'Share Deal'} · ${m.settings.perspective === 'seller' ? 'Verkäufersicht' : 'Käufersicht'} · Wesentlichkeit ${fmtEur(m.settings.materialityEur)}`); sub.push(`${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'}`)
         hl.appendChild(el('div', 'sub', sub.join(' · '))); head.appendChild(hl)
         const acts = el('div', 'acts')
         const running = m.job.running
-        const bAsk = el('button', 'btn ghost sm', 'Frage zur Akte'); bAsk.addEventListener('click', () => askAboutMatter(m)); acts.appendChild(bAsk)
+        const bAsk = el('button', 'btn ghost sm', 'Frage zum Akt'); bAsk.addEventListener('click', () => askAboutMatter(m)); acts.appendChild(bAsk)
         const bAdd = el('button', 'btn ghost sm', 'Dokumente hinzufügen'); bAdd.addEventListener('click', () => { setTab('documents'); setTimeout(() => $('matterFileInput').click(), 50) }); acts.appendChild(bAdd)
         if (running) { const bP = el('button', 'btn orange sm', m.job.pauseRequested ? 'Wird pausiert…' : 'Pausieren'); bP.disabled = Boolean(m.job.pauseRequested); bP.addEventListener('click', pauseMatterJob); acts.appendChild(bP) }
         else { const newDocs = m.documents.filter((d) => d.status === 'new' || d.status === 'extracted').length; const bR = el('button', 'btn sm', m.job.status === 'paused' ? 'Analyse fortsetzen' : m.findings.length || m.executive ? (newDocs ? `Analyse aktualisieren (${newDocs} neu)` : 'Analyse aktualisieren') : 'Analyse starten'); bR.disabled = !m.documents.length; bR.addEventListener('click', () => startDd({})); acts.appendChild(bR) }
@@ -1583,12 +1641,11 @@
 
         // tabs
         const tabs = el('div', 'tabs')
-        const red = m.findings.filter((f) => f.severity === 'red').length, amber = m.findings.filter((f) => f.severity === 'amber').length
-        const T = [['overview', 'Übersicht'], ['documents', 'Dokumente', m.documents.length], ['findings', 'Befunde', m.findings.length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['log', 'Protokoll']]
+        const T = [['overview', 'Übersicht'], ['documents', 'Dokumente', m.documents.length], ['findings', 'Befunde', m.findings.filter((f) => !isRejected(f)).length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['log', 'Protokoll']]
         for (const [k, l, n] of T) { const b = el('button', 'tab' + (matterTab === k ? ' active' : ''), l); if (n) b.appendChild(el('span', 'cnt', String(n))); b.addEventListener('click', () => setTab(k)); tabs.appendChild(b) }
         page.appendChild(tabs)
         const body = el('div'); page.appendChild(body)
-        if (matterTab === 'overview') renderOverview(body, m, red, amber)
+        if (matterTab === 'overview') renderOverview(body, m)
         else if (matterTab === 'documents') renderDocuments(body, m)
         else if (matterTab === 'findings') renderFindings(body, m)
         else if (matterTab === 'requests') renderRequests(body, m)
@@ -1633,20 +1690,28 @@
       }
       async function startDd(opts) {
         if (!matter) return
-        try { const r = await api(`/api/matters/${matter.id}/dd/run`, { method: 'POST', body: opts }); toast('Analyse gestartet.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) }
+        const m = matter
+        // Show the estimate first: a data room costs real money, so the professional confirms.
+        let est = null
+        try { est = (await api(`/api/matters/${m.id}/dd/estimate`)).estimate } catch {}
+        if (est && est.documents) {
+          const txt = `${est.documents} Dokument${est.documents === 1 ? '' : 'e'} (${est.chunks} Analyseabschnitte) · geschätzt ${fmtTok(est.inTok)} Eingabe-Tokens ≈ ${fmtUsd(est.usd)}${est.kbCalls ? ` · bis zu ${est.kbCalls} AI:ssociate-Anfragen` : ''} · Dauer grob ${est.minutes} Min. Die Analyse läuft auf dem Server weiter, auch wenn du die Seite verlässt; Pausieren ist jederzeit möglich.`
+          if (!(await confirmDlg(opts.reanalyse ? 'Alles neu analysieren?' : 'Analyse starten?', txt, { ok: 'Starten', danger: false }))) return
+        }
+        try { const r = await api(`/api/matters/${m.id}/dd/run`, { method: 'POST', body: opts }); toast('Analyse gestartet.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) }
       }
       async function pauseMatterJob() { if (!matter) return; try { await api(`/api/matters/${matter.id}/dd/pause`, { method: 'POST', body: {} }); matter.job.pauseRequested = true; renderMatter(); toast('Wird nach dem aktuellen Dokument pausiert.') } catch (e) { toast(e.message) } }
       function matterMenu(anchor) {
         const m = matter
         const card = $('dlgCard'); card.innerHTML = ''
-        card.appendChild(el('h2', null, m.name)); card.appendChild(el('div', 'md', 'Aktionen für diese Akte'))
+        card.appendChild(el('h2', null, m.name)); card.appendChild(el('div', 'md', 'Aktionen für diesen Akt'))
         const list = el('div'); list.style.display = 'grid'; list.style.gap = '6px'
         const item = (label, fn, danger) => { const b = el('button', 'btn ghost full' + (danger ? ' danger' : ''), label); if (danger) { b.style.color = 'var(--err)'; b.style.borderColor = 'rgba(217,45,32,0.35)' } b.addEventListener('click', () => { closeDlg(); fn() }); list.appendChild(b) }
-        item('Umbenennen', async () => { const v = await promptDlg('Akte umbenennen', '', { value: m.name }); if (v && v.trim()) { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { name: v.trim() } }); await reloadMatter(); loadMatters() } })
+        item('Umbenennen', async () => { const v = await promptDlg('Akt umbenennen', '', { value: m.name }); if (v && v.trim()) { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { name: v.trim() } }); await reloadMatter(); loadMatters() } })
         if (m.kind === 'dd') item('Einstellungen der DD', () => openMatterSettings())
         if (m.findings.length || m.executive) item('Alles neu analysieren', async () => { if (await confirmDlg('Neu analysieren', 'Alle Befunde, Bereichszusammenfassungen und das Executive Summary werden verworfen und aus den Dokumenten neu erstellt (Token-Kosten!).', { ok: 'Neu analysieren' })) startDd({ reanalyse: true }) })
         if (m.documents.some((d) => d.status === 'error')) item('Fehlgeschlagene Dokumente erneut lesen', () => startDd({ retryErrors: true }))
-        item('Akte löschen', async () => { if (await confirmDlg('Akte löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akte gelöscht.'); matter = null; await loadMatters(); navigate(m.kind === 'dd' ? '#/dd' : '#/matters') } catch (e) { toast(e.message) } } }, true)
+        item('Akt löschen', async () => { if (await confirmDlg('Akt löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akt gelöscht.'); matter = null; await loadMatters(); navigate(m.kind === 'dd' ? '#/dd' : '#/matters') } catch (e) { toast(e.message) } } }, true)
         card.appendChild(list)
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', closeDlg); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
@@ -1661,25 +1726,30 @@
         const persp = el('select'); for (const [v, l] of [['buyer', 'Käufer'], ['seller', 'Verkäufer']]) { const o = el('option', null, l); o.value = v; o.selected = s.perspective === v; persp.appendChild(o) }
         const mat = el('input'); mat.type = 'number'; mat.value = s.materialityEur
         const budget = el('input'); budget.type = 'number'; budget.value = s.budgetTokens; budget.step = '1000000'
+        const reference = el('input'); reference.value = s.reference || ''
+        const kb = el('input'); kb.type = 'checkbox'; kb.checked = s.knowledgeBase !== false; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtliche Einordnung je Prüfbereich durch AI:ssociate'))
         const ch = el('div', 'checks'); const boxes = []
         for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = s.areas.includes(a.key); cb.value = a.key; boxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
         card.appendChild(field('Zielunternehmen', target)); const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); card.appendChild(row)
-        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); row2.appendChild(field('Token-Budget', budget)); card.appendChild(row2); card.appendChild(field('Prüfbereiche', ch))
+        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); row2.appendChild(field('Token-Budget', budget)); card.appendChild(row2); card.appendChild(field('Aktenzeichen', reference)); card.appendChild(field('Prüfbereiche', ch)); card.appendChild(field('Wissensdatenbank', kbl))
         const hint = el('div', 'hint', `Bisher verbraucht: ${fmtTok(m.job.usage?.inTok || 0)} Eingabe-Tokens${m.job.cost ? ` ≈ ${fmtUsd(m.job.cost.totalUsd)}` : ''}. Änderungen wirken auf die nächste Analyse.`); hint.style.fontSize = '12px'; hint.style.color = 'var(--faint)'; card.appendChild(hint)
-        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), budgetTokens: Number(budget.value), areas: boxes.filter((b) => b.checked).map((b) => b.value) } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), budgetTokens: Number(budget.value), knowledgeBase: kb.checked, areas: boxes.filter((b) => b.checked).map((b) => b.value) } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
         $('dlg').classList.add('show')
       }
 
       // ---- overview ----
-      function renderOverview(body, m, red, amber) {
+      function renderOverview(body, m) {
+        const red = m.findings.filter((f) => !isRejected(f) && sevOf(f) === 'red').length, amber = m.findings.filter((f) => !isRejected(f) && sevOf(f) === 'amber').length
         const analysed = m.documents.filter((d) => d.status === 'analysed').length
         const stats = el('div', 'stats')
         const stat = (k, v, cls, onClick) => { const s = el('div', 'stat' + (onClick ? ' click' : '')); s.appendChild(el('div', 'k', k)); s.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), String(v))); if (onClick) s.addEventListener('click', onClick); return s }
+        const openRv = m.findings.filter((f) => !isRejected(f) && ['red', 'amber'].includes(sevOf(f)) && (f.review?.status || 'open') === 'open').length
         stats.appendChild(stat('Dokumente', `${analysed} / ${m.documents.length}`, '', () => setTab('documents')))
         stats.appendChild(stat('Rote Befunde', red, 'red', () => { findingFilter.sev = 'red'; setTab('findings') }))
         stats.appendChild(stat('Gelbe Befunde', amber, 'amber', () => { findingFilter.sev = 'amber'; setTab('findings') }))
         stats.appendChild(stat('Nachfragen', requestList(m).length, '', () => setTab('requests')))
         if (m.executive?.overall_assessment) stats.appendChild(stat('Gesamteinschätzung', m.executive.overall_assessment, 'sm'))
+        if (m.findings.length) stats.appendChild(stat('Review offen', openRv, openRv ? 'amber' : '', () => { findingFilter.review = 'open'; findingFilter.sev = 'all'; setTab('findings') }))
         body.appendChild(stats)
         if (!m.documents.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Dokumente')); e.appendChild(document.createTextNode('Lade den Datenraum hoch oder importiere ihn aus OneDrive/SharePoint – PDF, Word und Textdateien, auch ganze Ordner.')); const b = el('button', 'btn', 'Dokumente hinzufügen'); b.addEventListener('click', () => setTab('documents')); e.appendChild(b); body.appendChild(e); return }
         if (!m.executive && !m.findings.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, m.job.running ? 'Analyse läuft' : 'Noch nicht analysiert')); e.appendChild(document.createTextNode(m.job.running ? 'Ergebnisse erscheinen hier, sobald die Analyse abgeschlossen ist. Du kannst die Seite verlassen – der Vorgang läuft auf dem Server weiter.' : `${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'} bereit. Die Analyse liest jedes Dokument, klassifiziert es, erfasst Befunde mit Zitat und Fundstelle, fasst je Prüfbereich zusammen und erstellt den Bericht.`)); if (!m.job.running) { const b = el('button', 'btn', 'Analyse starten'); b.addEventListener('click', () => startDd({})); e.appendChild(b) } body.appendChild(e); return }
@@ -1691,13 +1761,19 @@
           if (m.executive.next_steps?.length) { c.appendChild(el('h3', null, 'Nächste Schritte')).style.marginTop = '14px'; const ul = el('ul', 'prose'); m.executive.next_steps.forEach((t) => ul.appendChild(el('li', null, t))); c.appendChild(ul) }
           left.appendChild(c)
         }
-        const top = [...m.findings].filter((f) => f.severity === 'red' || f.severity === 'amber').sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]).slice(0, 6)
+        const top = [...m.findings].filter((f) => !isRejected(f) && ['red', 'amber'].includes(sevOf(f))).sort((a, b) => SEV_RANK[sevOf(a)] - SEV_RANK[sevOf(b)]).slice(0, 6)
         if (top.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Top-Befunde')); top.forEach((f) => c.appendChild(findingCard(f, m))); const all = el('button', 'more-toggle', `Alle ${m.findings.length} Befunde`); all.addEventListener('click', () => { findingFilter.sev = 'all'; setTab('findings') }); c.appendChild(all); left.appendChild(c) }
         two.appendChild(left)
         const right = el('div')
         const ac = el('div', 'card'); ac.appendChild(el('h3', null, 'Prüfbereiche'))
-        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const nF = m.findings.filter((f) => f.area === k), nR = nF.filter((f) => f.severity === 'red').length, nA = nF.filter((f) => f.severity === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (nF.length ? `${nF.length}` : '–'))); row.addEventListener('click', () => { findingFilter.area = k; findingFilter.sev = 'all'; setTab('findings') }); ac.appendChild(row) }
+        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const nF = m.findings.filter((f) => f.area === k && !isRejected(f)), nR = nF.filter((f) => sevOf(f) === 'red').length, nA = nF.filter((f) => sevOf(f) === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (s?.legal?.answer) row.appendChild(el('span', 'pill teal', 'AI:ssociate')); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (nF.length ? `${nF.length}` : '–'))); row.addEventListener('click', () => { findingFilter.area = k; findingFilter.sev = 'all'; setTab('findings') }); ac.appendChild(row) }
         right.appendChild(ac)
+        const legalAreas = m.settings.areas.filter((k) => m.areaSummaries?.[k]?.legal?.answer)
+        if (legalAreas.length) {
+          const lc = el('div', 'card'); lc.style.marginTop = '14px'; lc.appendChild(el('h3', null, 'Rechtliche Einordnung (AI:ssociate)')); lc.appendChild(el('div', 'sub', 'Je Prüfbereich eine gebündelte Rechtsfrage mit den roten und gelben Befunden an die Wissensdatenbank.')).style.cssText = 'font-size:12.5px;color:var(--muted);margin-bottom:6px'
+          for (const k of legalAreas) { const L = m.areaSummaries[k].legal; const det = el('details', 'legal'); const sm = el('summary'); sm.appendChild(el('span', null, areaLabel(k))); sm.appendChild(el('span', 'as', `${L.sources?.length || 0} Dokumente`)); det.appendChild(sm); const body2 = el('div', 'prose'); body2.innerHTML = renderMarkdown(L.answer); det.appendChild(body2); if (L.sources?.length) { const ul = el('div', 'norms'); for (const src of L.sources.slice(0, 10)) { const a = el(src.url ? 'a' : 'span', 'norm', src.title || src.url); if (src.url) { a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ul.appendChild(a) } det.appendChild(ul) } lc.appendChild(det) }
+          left.appendChild(lc)
+        }
         if (m.verification) { const vc = el('div', 'card'); vc.style.marginTop = '14px'; vc.appendChild(el('h3', null, 'RIS-Prüfung der Normen')); const s = m.verification.summary; vc.appendChild(el('div', 'sub', s.checked ? `${s.ok} von ${s.checked} Normen bestätigt${s.warn ? `, ${s.warn} außer Kraft` : ''}${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}` : 'keine prüfbaren Normzitate')).style.cssText = 'font-size:13px;color:var(--muted)'; right.appendChild(vc) }
         const cc = el('div', 'card'); cc.style.marginTop = '14px'; cc.appendChild(el('h3', null, 'Aufwand'))
         cc.appendChild(el('div', 'kv')).append(el('span', null, 'Eingabe-Tokens'), el('b', null, fmtTok(m.job.usage?.inTok || 0) + ' / ' + fmtTok(m.settings.budgetTokens)))
@@ -1710,7 +1786,7 @@
       // ---- documents ----
       let docSelection = new Set()
       function renderDocuments(body, m) {
-        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente hierher ziehen</b> oder klicken zum Auswählen · PDF, Word, Text · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akte'
+        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente hierher ziehen</b> oder klicken zum Auswählen · PDF, Word, Text · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
         dz.addEventListener('click', () => $('matterFileInput').click())
         dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over') }); dz.addEventListener('dragleave', () => dz.classList.remove('over'))
         dz.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('over'); if (e.dataTransfer?.files?.length) uploadToMatter(e.dataTransfer.files) })
@@ -1738,7 +1814,7 @@
           if (d.summary) { const bI = el('button', null, 'Details'); bI.addEventListener('click', () => showDocDetails(d, m)); ra.appendChild(bI) }
           if (d.textChars) { const bT = el('button', null, 'Text'); bT.addEventListener('click', () => showDocText(d, m)); ra.appendChild(bT) }
           const bD = el('button', null, '⬇'); bD.title = 'Original herunterladen'; bD.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/documents/${d.id}/file`, d.name)); ra.appendChild(bD)
-          const bX = el('button', null, '×'); bX.title = 'Entfernen'; bX.addEventListener('click', async () => { if (await confirmDlg('Dokument entfernen', `„${d.name}“ samt zugehörigen Befunden aus der Akte entfernen?`, { ok: 'Entfernen' })) { try { await api(`/api/matters/${m.id}/documents/${d.id}`, { method: 'DELETE' }); docSelection.delete(d.id); await reloadMatter() } catch (e) { toast(e.message) } } }); ra.appendChild(bX)
+          const bX = el('button', null, '×'); bX.title = 'Entfernen'; bX.addEventListener('click', async () => { if (await confirmDlg('Dokument entfernen', `„${d.name}“ samt zugehörigen Befunden aus dem Akt entfernen?`, { ok: 'Entfernen' })) { try { await api(`/api/matters/${m.id}/documents/${d.id}`, { method: 'DELETE' }); docSelection.delete(d.id); await reloadMatter() } catch (e) { toast(e.message) } } }); ra.appendChild(bX)
           ca.appendChild(ra); tr.appendChild(ca); tb2.appendChild(tr)
         }
         t.appendChild(tb2); wrap.appendChild(t); body.appendChild(wrap)
@@ -1782,42 +1858,108 @@
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
       }
-      async function showDocText(d, m) {
+      async function showDocText(d, m, highlight = '') {
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
-        card.appendChild(el('h2', null, d.name)); const pre = el('pre'); pre.style.cssText = 'white-space:pre-wrap;font-family:inherit;font-size:13px;max-height:60vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px'; pre.textContent = 'Lädt…'; card.appendChild(pre)
+        card.appendChild(el('h2', null, `${d.no ? d.no + ' · ' : ''}${d.name}`)); const pre = el('pre'); pre.style.cssText = 'white-space:pre-wrap;font-family:inherit;font-size:13px;max-height:60vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px'; pre.textContent = 'Lädt…'; card.appendChild(pre)
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
-        try { const r = await api(`/api/matters/${m.id}/documents/${d.id}/text?limit=80000`); pre.textContent = r.text + (r.chars > r.text.length ? `\n\n… (${fmtTok(r.chars)} Zeichen insgesamt)` : '') } catch (e) { pre.textContent = e.message }
+        try {
+          const r = await api(`/api/matters/${m.id}/documents/${d.id}/text?limit=160000`)
+          const tail = r.chars > r.text.length ? `\n\n… (${fmtTok(r.chars)} Zeichen insgesamt)` : ''
+          const h = String(highlight || '').replace(/\s+/g, ' ').trim().slice(0, 80).toLowerCase()
+          const i = h.length >= 12 ? r.text.replace(/\s+/g, ' ').toLowerCase().indexOf(h) : -1
+          if (i < 0) { pre.textContent = r.text + tail; return }
+          // Map the hit back onto the original text (whitespace was collapsed for matching).
+          const flat = r.text.replace(/\s+/g, ' '); let pos = 0, k = 0; while (k < i && pos < r.text.length) { if (/\s/.test(r.text[pos])) { while (pos < r.text.length && /\s/.test(r.text[pos])) pos++; k++ } else { pos++; k++ } }
+          const before = r.text.slice(0, pos), hit = r.text.slice(pos, pos + h.length + 20), after = r.text.slice(pos + h.length + 20)
+          pre.textContent = ''; pre.appendChild(document.createTextNode(before)); const mk = el('mark', null, hit); mk.style.cssText = 'background:rgba(243,146,0,0.35);border-radius:3px'; pre.appendChild(mk); pre.appendChild(document.createTextNode(after + tail))
+          setTimeout(() => mk.scrollIntoView({ block: 'center' }), 50)
+        } catch (e) { pre.textContent = e.message }
       }
 
       // ---- findings ----
-      const findingFilter = { sev: 'all', area: 'all', q: '' }
+      const findingFilter = { sev: 'all', area: 'all', q: '', review: 'all' }
       function findingCard(f, m) {
-        const c = el('div', 'finding')
-        const h = el('div', 'fh'); h.appendChild(el('span', 'dot ' + f.severity)); const t = el('div'); t.style.flex = '1'; t.style.minWidth = '0'; t.appendChild(el('div', 'ft', f.title)); t.appendChild(el('div', 'fm', `${SEV_DE[f.severity]} · ${areaLabel(f.area)} · ${f.docName}${f.location ? ' · ' + f.location : ''}`)); h.appendChild(t); h.appendChild(svg('chev')); h.addEventListener('click', () => c.classList.toggle('open')); c.appendChild(h)
+        const sv = sevOf(f), rv = f.review?.status || 'open'
+        const c = el('div', 'finding' + (isRejected(f) ? ' rejected' : ''))
+        const h = el('div', 'fh'); h.appendChild(el('span', 'dot ' + sv)); const t = el('div'); t.style.flex = '1'; t.style.minWidth = '0'
+        const tt = el('div', 'ft'); if (f.no) tt.appendChild(el('span', 'fno', f.no)); tt.appendChild(document.createTextNode(f.title)); t.appendChild(tt)
+        const fm = el('div', 'fm', `${SEV_DE[sv]}${f.review?.severity && f.review.severity !== f.severity ? ' (vom Reviewer geändert)' : ''} · ${areaLabel(f.area)} · ${f.docNo ? f.docNo + ' ' : ''}${f.docName}${f.location ? ' · ' + f.location : ''}${f.rule ? ' · ' + f.rule : ''}${f.source === 'manual' ? ' · manuell' : ''}`); t.appendChild(fm); h.appendChild(t)
+        const badges = el('div', 'fbadges')
+        if (f.evidence && EVID_DE[f.evidence]) badges.appendChild(el('span', 'pill ' + EVID_DE[f.evidence][1], f.evidence === 'verified' ? 'belegt' : f.evidence === 'partial' ? 'teilw. belegt' : 'unbelegt'))
+        badges.appendChild(el('span', 'pill ' + (rv === 'accepted' ? 'green' : rv === 'rejected' ? 'red' : rv === 'modified' ? 'amber' : ''), REV_DE[rv]))
+        h.appendChild(badges); h.appendChild(svg('chev')); h.addEventListener('click', () => c.classList.toggle('open')); c.appendChild(h)
         const b = el('div', 'fb')
         b.appendChild(el('p', null, f.description))
-        if (f.quote) { b.appendChild(el('div', 'lbl', 'Zitat')); b.appendChild(el('div', 'quote', `„${f.quote}“`)) }
-        if (f.recommendation) { b.appendChild(el('div', 'lbl', 'Empfehlung')); b.appendChild(el('p', null, f.recommendation)) }
+        if (f.quote) { b.appendChild(el('div', 'lbl', 'Zitat' + (EVID_DE[f.evidence] ? ' · ' + EVID_DE[f.evidence][0] : ''))); b.appendChild(el('div', 'quote' + (f.evidence === 'unverified' ? ' bad' : ''), `„${f.quote}“`)) }
+        if (f.recommendation) { b.appendChild(el('div', 'lbl', 'Empfehlung' + (f.dealImpact && f.dealImpact !== 'keine' ? ' · ' + IMPACT_DE[f.dealImpact] : ''))); b.appendChild(el('p', null, f.recommendation)) }
         if (f.norms?.length) { b.appendChild(el('div', 'lbl', 'Normen')); const ns = el('div', 'norms'); for (const n of f.norms) { const st = (f.normStatus || []).find((x) => x.norm === n); const a = el(st?.url ? 'a' : 'span', 'norm ' + (st?.status || ''), n + (st?.status === 'ok' ? ' ✓' : st?.status === 'expired' ? ' (außer Kraft)' : st?.status === 'not_found' ? ' (nicht gefunden)' : st?.status === 'unsure' ? ' (?)' : '')); if (st?.url) { a.href = st.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } b.appendChild(ns) }
+        if (f.review?.note) { b.appendChild(el('div', 'lbl', 'Reviewer-Vermerk')); b.appendChild(el('p', null, f.review.note)) }
+        // Review: the professional decides; the report follows these decisions.
+        const rvBar = el('div', 'review'); rvBar.appendChild(el('span', 'lbl', 'Review'))
+        const patch = async (body) => { try { const r = await api(`/api/matters/${m.id}/findings/${f.id}`, { method: 'PATCH', body }); Object.assign(f, r.finding); renderMatter() } catch (e) { toast(e.message) } }
+        const bA = el('button', 'mini' + (rv === 'accepted' ? ' on' : ''), 'Freigeben'); bA.addEventListener('click', () => patch({ review: { status: 'accepted' } }))
+        const bR = el('button', 'mini danger' + (rv === 'rejected' ? ' on' : ''), isRejected(f) ? 'Wiederherstellen' : 'Verwerfen'); bR.addEventListener('click', () => patch({ review: { status: isRejected(f) ? 'open' : 'rejected' } }))
+        const sel = el('select', 'sel'); for (const k of ['red', 'amber', 'green', 'info']) { const o = el('option', null, 'Grad: ' + SEV_DE[k]); o.value = k; o.selected = sv === k; sel.appendChild(o) } sel.addEventListener('change', () => patch({ review: { status: rv === 'open' ? 'modified' : rv, severity: sel.value === f.severity ? null : sel.value } }))
+        const bN = el('button', 'mini', f.review?.note ? 'Vermerk ändern' : 'Vermerk'); bN.addEventListener('click', async () => { const v = await promptDlg('Reviewer-Vermerk', `${f.no || ''} ${f.title}`, { value: f.review?.note || '', ok: 'Speichern', placeholder: 'z. B. mit Mandanten besprochen, Garantie im SPA vorgesehen' }); if (v != null) patch({ review: { status: rv, note: v } }) })
+        const bE = el('button', 'mini', 'Bearbeiten'); bE.addEventListener('click', () => openFindingEditor(m, f))
+        rvBar.append(bA, bR, sel, bN, bE)
+        if (f.source === 'manual') { const bX = el('button', 'mini danger', 'Löschen'); bX.addEventListener('click', async () => { if (await confirmDlg('Befund löschen', `${f.no} „${f.title}“ endgültig löschen?`)) { try { await api(`/api/matters/${m.id}/findings/${f.id}`, { method: 'DELETE' }); await reloadMatter() } catch (e) { toast(e.message) } } }); rvBar.appendChild(bX) }
+        b.appendChild(rvBar)
         const acts = el('div', 'actions'); acts.style.marginTop = '8px'
         const d = m.documents.find((x) => x.id === f.docId)
-        if (d?.textChars) { const bt = el('button', 'mini', 'Dokumenttext'); bt.addEventListener('click', () => showDocText(d, m)); acts.appendChild(bt) }
-        const ask = el('button', 'mini', 'Nachfragen'); ask.addEventListener('click', () => askAboutMatter(m, d ? [d.id] : [], `Zum Befund „${f.title}“ (${f.docName}${f.location ? ', ' + f.location : ''}): `)); acts.appendChild(ask)
+        if (d?.textChars) { const bt = el('button', 'mini', 'Dokumenttext'); bt.addEventListener('click', () => showDocText(d, m, f.quote)); acts.appendChild(bt) }
+        const ask = el('button', 'mini', 'Nachfragen'); ask.addEventListener('click', () => askAboutMatter(m, d ? [d.id] : [], `Zum Befund ${f.no || ''} „${f.title}“ (${f.docName}${f.location ? ', ' + f.location : ''}): `)); acts.appendChild(ask)
         b.appendChild(acts); c.appendChild(b)
         return c
       }
+      function openFindingEditor(m, f) {
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        const isNew = !f
+        card.appendChild(el('h2', null, isNew ? 'Befund manuell erfassen' : `${f.no || ''} bearbeiten`)); card.appendChild(el('div', 'md', isNew ? 'Eigene Feststellung mit Zitat und Fundstelle – erscheint im Bericht wie ein Modellbefund, gekennzeichnet als manuell.' : 'Änderungen markieren den Befund als „geändert“; das Zitat wird erneut im Dokument gesucht.'))
+        const field = (label, ctl) => { const x = el('div', 'field'); x.appendChild(el('label', null, label)); x.appendChild(ctl); return x }
+        const doc = el('select'); for (const d of m.documents.filter((x) => ['extracted', 'analysed'].includes(x.status))) { const o = el('option', null, `${d.no ? d.no + ' ' : ''}${d.name}`); o.value = d.id; o.selected = f?.docId === d.id; doc.appendChild(o) }
+        const title = el('input'); title.value = f?.title || ''
+        const sev = el('select'); for (const k of ['red', 'amber', 'green', 'info']) { const o = el('option', null, SEV_DE[k]); o.value = k; o.selected = (f ? sevOf(f) : 'amber') === k; sev.appendChild(o) }
+        const area = el('select'); for (const a of ddConfig.areas) { const o = el('option', null, a.label); o.value = a.key; o.selected = f?.area === a.key; area.appendChild(o) }
+        const imp = el('select'); for (const [k, l] of Object.entries(IMPACT_DE)) { const o = el('option', null, k === 'keine' ? 'kein Deal-Impact' : l); o.value = k; o.selected = (f?.dealImpact || 'keine') === k; imp.appendChild(o) }
+        const desc = el('textarea'); desc.value = f?.description || ''
+        const quote = el('textarea'); quote.value = f?.quote || ''; quote.style.minHeight = '60px'
+        const loc = el('input'); loc.value = f?.location || ''; loc.placeholder = 'Punkt / § / Seite'
+        const rec = el('textarea'); rec.value = f?.recommendation || ''; rec.style.minHeight = '60px'
+        const norms = el('input'); norms.value = (f?.norms || []).join('; '); norms.placeholder = '§ 38 UGB; § 14 BAO'
+        if (isNew) card.appendChild(field('Dokument', doc))
+        card.appendChild(field('Titel', title))
+        const r1 = el('div', 'field-row'); r1.appendChild(field('Schweregrad', sev)); r1.appendChild(field('Prüfbereich', area)); card.appendChild(r1)
+        card.appendChild(field('Sachverhalt und rechtliche Einordnung', desc)); card.appendChild(field('Wörtliches Zitat', quote))
+        const r2 = el('div', 'field-row'); r2.appendChild(field('Fundstelle', loc)); r2.appendChild(field('Deal-Impact', imp)); card.appendChild(r2)
+        card.appendChild(field('Empfehlung', rec)); card.appendChild(field('Normen (mit ; getrennt)', norms))
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); const g = el('button', 'btn', isNew ? 'Erfassen' : 'Speichern')
+        g.addEventListener('click', async () => {
+          if (!title.value.trim()) { toast('Titel fehlt.'); return }
+          const body = { title: title.value.trim(), severity: sev.value, area: area.value, dealImpact: imp.value, description: desc.value.trim(), quote: quote.value.trim(), location: loc.value.trim(), recommendation: rec.value.trim(), norms: norms.value.split(/[;,]/).map((x) => x.trim()).filter(Boolean) }
+          g.disabled = true
+          try { if (isNew) await api(`/api/matters/${m.id}/findings`, { method: 'POST', body: { ...body, docId: doc.value } }); else await api(`/api/matters/${m.id}/findings/${f.id}`, { method: 'PATCH', body }); closeDlg(); card.classList.remove('wide'); await reloadMatter() } catch (e) { toast(e.message); g.disabled = false }
+        })
+        a.append(c, g); card.appendChild(a); $('dlg').classList.add('show'); setTimeout(() => title.focus(), 30)
+      }
       function renderFindings(body, m) {
         const tb = el('div', 'toolbar')
-        for (const [k, l] of [['all', 'Alle'], ['red', 'Rot'], ['amber', 'Gelb'], ['green', 'Grün'], ['info', 'Hinweis']]) { const b = el('button', 'fchip' + (findingFilter.sev === k ? ' on' : '')); if (k !== 'all') b.appendChild(el('span', 'dot ' + k)); b.appendChild(document.createTextNode(l + (k === 'all' ? ` (${m.findings.length})` : ` (${m.findings.filter((f) => f.severity === k).length})`))); b.addEventListener('click', () => { findingFilter.sev = k; renderMatter() }); tb.appendChild(b) }
+        const liveF = m.findings.filter((f) => !isRejected(f))
+        for (const [k, l] of [['all', 'Alle'], ['red', 'Rot'], ['amber', 'Gelb'], ['green', 'Grün'], ['info', 'Hinweis']]) { const b = el('button', 'fchip' + (findingFilter.sev === k ? ' on' : '')); if (k !== 'all') b.appendChild(el('span', 'dot ' + k)); b.appendChild(document.createTextNode(l + (k === 'all' ? ` (${liveF.length})` : ` (${liveF.filter((f) => sevOf(f) === k).length})`))); b.addEventListener('click', () => { findingFilter.sev = k; renderMatter() }); tb.appendChild(b) }
+        const rsel = el('select'); for (const [k, l] of [['all', 'Review: alle'], ['open', 'offen'], ['accepted', 'freigegeben'], ['modified', 'geändert'], ['rejected', 'verworfen'], ['unverified', 'Zitat unbelegt']]) { const o = el('option', null, l); o.value = k; o.selected = findingFilter.review === k; rsel.appendChild(o) } rsel.addEventListener('change', () => { findingFilter.review = rsel.value; renderMatter() }); tb.appendChild(rsel)
         const sel = el('select'); const o0 = el('option', null, 'Alle Bereiche'); o0.value = 'all'; sel.appendChild(o0); for (const k of [...new Set(m.findings.map((f) => f.area))]) { const o = el('option', null, areaLabel(k)); o.value = k; o.selected = findingFilter.area === k; sel.appendChild(o) } sel.addEventListener('change', () => { findingFilter.area = sel.value; renderMatter() }); tb.appendChild(sel)
         const q = el('input'); q.type = 'search'; q.placeholder = 'Suchen (Titel, Dokument, Zitat)…'; q.value = findingFilter.q; q.addEventListener('input', () => { findingFilter.q = q.value; renderList() }); tb.appendChild(q)
+        const bNew = el('button', 'btn ghost sm', '+ Befund'); bNew.disabled = !m.documents.some((d) => ['extracted', 'analysed'].includes(d.status)); bNew.addEventListener('click', () => openFindingEditor(m, null)); tb.appendChild(bNew)
         body.appendChild(tb)
+        const openRv = liveF.filter((f) => ['red', 'amber'].includes(sevOf(f)) && (f.review?.status || 'open') === 'open').length
+        if (openRv) body.appendChild(el('div', 'legend', `${openRv} rote/gelbe Befunde noch ohne Freigabe – der Bericht trägt bis dahin den Vermerk „Entwurf“.`))
         const list = el('div'); body.appendChild(list)
         const renderList = () => {
           list.innerHTML = ''
           const needle = findingFilter.q.trim().toLowerCase()
-          const items = [...m.findings].filter((f) => (findingFilter.sev === 'all' || f.severity === findingFilter.sev) && (findingFilter.area === 'all' || f.area === findingFilter.area) && (!needle || `${f.title} ${f.docName} ${f.quote} ${f.description}`.toLowerCase().includes(needle))).sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || a.area.localeCompare(b.area))
+          const rf = findingFilter.review
+          const items = [...m.findings].filter((f) => (rf === 'rejected' ? isRejected(f) : rf === 'all' ? !isRejected(f) : rf === 'unverified' ? f.evidence === 'unverified' && !isRejected(f) : (f.review?.status || 'open') === rf) && (findingFilter.sev === 'all' || sevOf(f) === findingFilter.sev) && (findingFilter.area === 'all' || f.area === findingFilter.area) && (!needle || `${f.no || ''} ${f.title} ${f.docName} ${f.quote} ${f.description}`.toLowerCase().includes(needle))).sort((a, b) => SEV_RANK[sevOf(a)] - SEV_RANK[sevOf(b)] || a.area.localeCompare(b.area))
           if (!items.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, m.findings.length ? 'Keine Befunde für diesen Filter' : 'Noch keine Befunde')); e.appendChild(document.createTextNode(m.findings.length ? '' : 'Befunde entstehen bei der Analyse – jeder mit Schweregrad, Zitat, Fundstelle, Empfehlung und Normen.')); list.appendChild(e); return }
           items.forEach((f) => list.appendChild(findingCard(f, m)))
         }
@@ -1871,7 +2013,7 @@
         const tbody = el('tbody')
         for (const r of t.rows || []) {
           const tr = el('tr'); tr.appendChild(el('td', 'n', r.docName))
-          for (const col of t.columns) { const cell = r.cells?.[col]; const td = el('td'); if (!cell) { td.textContent = r.error ? 'Fehler: ' + r.error : '–' } else { td.appendChild(el('div', 'v', cell.value || '–')); if (cell.quote || cell.location) { td.classList.add('hasq'); td.title = [cell.quote, cell.location].filter(Boolean).join(' · '); td.appendChild(el('div', 'cell-q', `${cell.quote ? '„' + cell.quote + '“' : ''}${cell.location ? ' – ' + cell.location : ''}`)); td.addEventListener('click', () => td.classList.toggle('open')) } } tr.appendChild(td) }
+          for (const col of t.columns) { const cell = r.cells?.[col]; const td = el('td'); if (!cell) { td.textContent = r.error ? 'Fehler: ' + r.error : '–' } else { td.appendChild(el('div', 'v', cell.value || '–')); if (cell.quote || cell.location) { td.classList.add('hasq'); if (cell.evidence === 'unverified') td.classList.add('unv'); td.title = [cell.quote, cell.location, cell.evidence === 'unverified' ? 'Zitat nicht im Text gefunden' : ''].filter(Boolean).join(' · '); td.appendChild(el('div', 'cell-q', `${cell.quote ? '„' + cell.quote + '“' : ''}${cell.location ? ' – ' + cell.location : ''}${cell.evidence === 'unverified' ? ' · nicht im Text gefunden' : ''}`)); td.addEventListener('click', () => td.classList.toggle('open')) } } tr.appendChild(td) }
           tbody.appendChild(tr)
         }
         if (!(t.rows || []).length) { const tr = el('tr'); const td = el('td'); td.colSpan = t.columns.length + 1; td.style.color = 'var(--faint)'; td.textContent = t.status === 'running' ? 'Wird erstellt…' : 'Noch keine Zeilen.'; tr.appendChild(td); tbody.appendChild(tr) }
@@ -1881,7 +2023,7 @@
       function openTableWizard(docIds) {
         const m = matter; if (!m) return
         const card = $('taskCard'); card.innerHTML = ''
-        card.appendChild(el('h2', null, 'Neue Review-Tabelle')); card.appendChild(el('div', 'md', docIds.length ? `${docIds.length} ausgewählte Dokumente werden ausgewertet.` : `Alle ${m.documents.length} Dokumente der Akte werden ausgewertet.`))
+        card.appendChild(el('h2', null, 'Neue Review-Tabelle')); card.appendChild(el('div', 'md', docIds.length ? `${docIds.length} ausgewählte Dokumente werden ausgewertet.` : `Alle ${m.documents.length} Dokumente des Akts werden ausgewertet.`))
         const field = (label, ctl, hint) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); f.appendChild(ctl); if (hint) f.appendChild(el('div', 'hint', hint)); return f }
         const preset = el('select'); const o0 = el('option', null, 'Eigene Spalten'); o0.value = ''; preset.appendChild(o0); for (const p of ddConfig.presets) { const o = el('option', null, p.label); o.value = p.key; preset.appendChild(o) }
         const name = el('input'); name.placeholder = 'Name der Tabelle'
@@ -1905,21 +2047,21 @@
         await loadDdConfig(); await loadMatters()
         const withTables = mattersCache.filter((m) => m.tables)
         grid.innerHTML = ''
-        if (!withTables.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, 'Noch keine Tabellen')); e.appendChild(document.createTextNode('Tabellen gehören zu einer Akte: Akte wählen (oder anlegen), Dokumente hochladen, Spalten festlegen.')); grid.appendChild(e); return }
+        if (!withTables.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, 'Noch keine Tabellen')); e.appendChild(document.createTextNode('Tabellen gehören zu einem Akt: Akt wählen (oder anlegen), Dokumente hochladen, Spalten festlegen.')); grid.appendChild(e); return }
         for (const m of withTables) { const c = matterCard(m); c.querySelector('.foot').prepend(el('span', 'pill teal', `${m.tables} Tabelle${m.tables > 1 ? 'n' : ''}`)); c.addEventListener('click', () => navigate(`#/matter/${m.id}/tables`), { capture: true }); grid.appendChild(c) }
       }
       async function chooseMatterForTable() {
         await loadMatters()
         if (!mattersCache.length) { openMatterWizard('matter'); return }
-        chooseMatter('Akte für die Tabelle wählen', (m) => navigate(`#/matter/${m.id}/tables`))
+        chooseMatter('Akt für die Tabelle wählen', (m) => navigate(`#/matter/${m.id}/tables`))
       }
       function chooseMatter(title, onPick) {
         const card = $('dlgCard'); card.innerHTML = ''
         card.appendChild(el('h2', null, title))
         const list = el('div'); list.style.cssText = 'display:grid;gap:6px;max-height:50vh;overflow:auto'
-        for (const m of mattersCache) { const b = el('button', 'btn ghost full', ''); b.style.justifyContent = 'flex-start'; b.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'DD' : 'Akte')); b.appendChild(document.createTextNode(` ${m.name} · ${m.documents} Dok.`)); b.addEventListener('click', () => { closeDlg(); onPick(m) }); list.appendChild(b) }
+        for (const m of mattersCache) { const b = el('button', 'btn ghost full', ''); b.style.justifyContent = 'flex-start'; b.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'DD' : 'Akt')); b.appendChild(document.createTextNode(` ${m.name} · ${m.documents} Dok.`)); b.addEventListener('click', () => { closeDlg(); onPick(m) }); list.appendChild(b) }
         card.appendChild(list)
-        const a = el('div', 'modal-actions'); const n = el('button', 'btn ghost', 'Neue Akte'); n.addEventListener('click', () => { closeDlg(); openMatterWizard('matter') }); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); a.append(n, c); card.appendChild(a)
+        const a = el('div', 'modal-actions'); const n = el('button', 'btn ghost', 'Neuer Akt'); n.addEventListener('click', () => { closeDlg(); openMatterWizard('matter') }); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); a.append(n, c); card.appendChild(a)
         $('dlg').classList.add('show')
       }
 
@@ -1949,13 +2091,13 @@
         docSelection = new Set()
         navigate('#/assistant'); showView('assistant'); showHome(); renderAttachments()
         input.value = prefill; input.dispatchEvent(new Event('input')); input.focus()
-        toast(`Fragen werden im Kontext der Akte „${m.name}“ beantwortet.`)
+        toast(`Fragen werden im Kontext des Akts „${m.name}“ beantwortet.`)
       }
       async function chooseMatterForChat() {
         if (current?.matter) { current.matter = null; persistCurrent(); renderAttachments(); toast('Aktenkontext entfernt.'); return }
         await loadMatters()
-        if (!mattersCache.length) { toast('Noch keine Akte vorhanden.'); openMatterWizard('matter'); return }
-        chooseMatter('Frage im Kontext einer Akte', (m) => { if (!current) newConversation({ keepView: true }); current.matter = { id: m.id, name: m.name, docIds: [] }; persistCurrent(); renderAttachments(); if (current.messages.length) showChat(); toast(`Aktenkontext: ${m.name}`) })
+        if (!mattersCache.length) { toast('Noch kein Akt vorhanden.'); openMatterWizard('matter'); return }
+        chooseMatter('Frage im Kontext eines Akts', (m) => { if (!current) newConversation({ keepView: true }); current.matter = { id: m.id, name: m.name, docIds: [] }; persistCurrent(); renderAttachments(); if (current.messages.length) showChat(); toast(`Aktenkontext: ${m.name}`) })
       }
 
       // ------------------------------------------------------------------
@@ -1981,7 +2123,7 @@
         { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. Sol wählt das Rechtsgebiet, die juristische Wissensdatenbank AI:ssociate recherchiert und antwortet; reicht das nicht, ergänzt Sol mit höchstens drei Websuchen. Jede Fundstelle wird gegen das RIS geprüft.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
         { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
-        { sel: '#matterBtn', title: 'Fragen zur Akte', text: 'Eine Frage im Kontext einer Akte stellen: die gespeicherte Analyse (Befunde, Zusammenfassungen) und ausgewählte Dokumente gehen als Kontext mit.' },
+        { sel: '#matterBtn', title: 'Fragen zum Akt', text: 'Eine Frage im Kontext eines Akts stellen: die gespeicherte Analyse (Befunde, Zusammenfassungen) und ausgewählte Dokumente gehen als Kontext mit.' },
         { sel: '#navDd', title: 'Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Request List, Red Flag Report als Word und Excel.', nav: true },
         { sel: '#navTables', title: 'Review-Tabellen', text: 'Viele Dokumente, gleiche Spalten: Vertragsübersicht, Dienstverträge, Mietverträge, Fristen – jede Zelle mit Beleg. Export nach Excel.', nav: true },
         { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Modelle, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },

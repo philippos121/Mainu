@@ -57,6 +57,15 @@ Configure `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and optionally `MS_TENANT` /
 `GET /api/ms/browse`, `GET /api/ms/sites`, `GET /api/ms/site-drives`; the chat
 request takes `msFiles` and `msSync`.
 
+## Agents
+
+The sidebar separates the **general agent** (Assistent: one question → Sol
+picks the legal area → one AI:ssociate call → review → RIS verification; for
+document tasks the attachment text goes to Sol directly, the single
+AI:ssociate answer is streamed and worked into the deliverable) from the
+**specialist agents** with fixed pipelines: Due Diligence, Review-Tabellen and
+the form-driven workflows. Each matter is "der Akt" in the UI.
+
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
 The UI is an app shell (sidebar: Assistent, Workflows, Alle Akten, Due
@@ -71,8 +80,16 @@ can be paused, and survives closed browser tabs.
 explicit pipeline, not an agent: Text → per-document analysis (strict JSON
 schema: type, area, parties, key terms, findings with quote + location +
 severity + recommendation + norms, questions) → synthesis per review area →
+one bundled AI:ssociate question per review area (the red/amber findings with
+their quotes, answered by the knowledge base and fed into the synthesis) →
 executive summary → RIS verification of every cited norm → Word Red-Flag-Report
-+ Excel workbook from fixed templates. Review areas, typical documents, red-flag
++ Excel workbook from fixed templates. Every finding has a stable id (F-001),
+a document id (D-001), a deal-impact instrument, an evidence status (the quote
+is located in the document text: belegt / teilweise / unbelegt) and a review
+state (offen / freigegeben / geändert / verworfen, grade override, note,
+manual findings). Rejected findings leave the report; the cover carries
+"Entwurf" until every red/amber finding is reviewed. A cost/time estimate is
+shown before every run; documents are analysed a few at a time with retries. Review areas, typical documents, red-flag
 catalogues and standard requests are versioned code. A token budget per matter
 stops the run cleanly ("pausiert"); new documents are added incrementally.
 
@@ -94,6 +111,7 @@ Matter routes: `GET/POST /api/matters`, `GET/PATCH/DELETE /api/matters/:id`,
 `POST /api/matters/:id/dd/run|pause`, `POST /api/matters/:id/report`,
 `GET /api/matters/:id/reports/:file`, `POST /api/matters/:id/tables`,
 `GET /api/matters/:id/tables/:tid/xlsx`, `POST /api/matters/:id/sync`,
+`PATCH/POST/DELETE /api/matters/:id/findings[/:fid]`, `GET /api/matters/:id/dd/estimate`,
 `GET /api/dd/config`; `POST /api/chat` accepts `matterId` + `matterDocIds`.
 
 ## Run locally

@@ -8,8 +8,8 @@ import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
-import { newMatter, newDocument, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
-import { DD_AREAS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL } from './lib/ddconfig.js'
+import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
+import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,6 +39,7 @@ const EFFORT_CODE = process.env.OPENAI_EFFORT_CODE || 'medium'
 const MAX_INPUT_TOKENS = Number(process.env.MAX_INPUT_TOKENS || 1_000_000)
 const MAX_OUTPUT_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS || 100_000)
 const MAX_OUTPUT_PER_CALL = Number(process.env.MAX_OUTPUT_PER_CALL || 16_000)
+const MODEL_RETRIES = Number(process.env.MODEL_RETRIES || 3)
 // Step limits: one knowledge-base call, at most 3 web searches, few tool steps.
 const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES || 3)
 const DOC_MAX_STEPS = Number(process.env.DOC_MAX_STEPS || 8)
@@ -167,7 +168,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
   // Per-question budgets by default; long-running matter jobs bring their own limits.
   const remainingOut = (ctx.limits?.outMax ?? MAX_OUTPUT_TOKENS) - ctx.usage.outTok
   const remainingIn = (ctx.limits?.inMax ?? MAX_INPUT_TOKENS) - ctx.usage.inTok
-  if (remainingOut < 800 || remainingIn < 2000) throw new BudgetExceeded(ctx.limits ? 'Token-Budget der Akte ausgeschöpft.' : 'Token-Budget für diese Frage ausgeschöpft.')
+  if (remainingOut < 800 || remainingIn < 2000) throw new BudgetExceeded(ctx.limits ? 'Token-Budget des Akts ausgeschöpft.' : 'Token-Budget für diese Frage ausgeschöpft.')
   const params = {
     model,
     instructions,
@@ -179,9 +180,22 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     ...(prevId ? { previous_response_id: prevId } : {}),
     ...(text ? { text } : {}),
   }
+  // Transient failures (429, 5xx, network) are retried with backoff – a data
+  // room of 300 documents must not lose a document to one rate-limit burst.
+  const create = async (p) => {
+    for (let attempt = 0; ; attempt++) {
+      try { return await getOpenAI().responses.create(p) }
+      catch (e) {
+        const st = e?.status
+        const transient = st === 429 || (st >= 500 && st < 600) || /ECONNRESET|ETIMEDOUT|ENOTFOUND|fetch failed|socket hang up|network/i.test(String(e?.message || e))
+        if (!transient || attempt >= MODEL_RETRIES) throw e
+        await new Promise((r) => setTimeout(r, Math.min(20_000, 1500 * 2 ** attempt)))
+      }
+    }
+  }
   let resp
   try {
-    resp = await getOpenAI().responses.create(params)
+    resp = await create(params)
   } catch (e) {
     const msg = String(e?.message || e)
     const isBad = e?.status === 400 || /400|unsupported|not supported|invalid|unknown parameter/i.test(msg)
@@ -194,7 +208,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     if (p2.text && /text|format|schema/i.test(msg)) { delete p2.text; changed = true }
     if (!changed && p2.reasoning) { delete p2.reasoning; changed = true }
     if (!changed) throw e
-    resp = await getOpenAI().responses.create(p2)
+    resp = await create(p2)
   }
   addUsage(ctx.usage, model, resp)
   if (resp?.status === 'incomplete') console.warn(`responses: incomplete (${resp.incomplete_details?.reason || '?'}) model=${model} max_output_tokens=${params.max_output_tokens}`)
@@ -282,7 +296,7 @@ function sourceFromDocumentEvent(text, meta) {
   const pick = (...keys) => { for (const k of keys) { const v = m[k] ?? m.document?.[k] ?? m.source?.[k]; if (typeof v === 'string' && v.trim()) return v.trim() } return '' }
   const url = pick('url', 'link', 'document_url', 'source_url', 'href', 'ris_url') || risLinkForDocNumber(pick('document_number', 'dokumentnummer', 'id') || text)
   const title = pick('title', 'name', 'kurztitel', 'citation', 'label', 'geschaeftszahl', 'document_number') || String(text || '').trim()
-  return { title: title || url || 'Dokument', url, raw: String(text || '').trim(), meta: Object.keys(m).length ? m : null }
+  return { title: title || url || 'Dokument der Wissensdatenbank', url, raw: String(text || '').trim(), meta: Object.keys(m).length ? m : null }
 }
 
 /**
@@ -751,12 +765,15 @@ const GENERAL_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreich
 const docInstructions = (web) => `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte, und bearbeitest eine Dokumentaufgabe mit wenigen, gezielten Schritten.
 
 WERKZEUGE
-- read_document: hochgeladene Dateien lesen (in Teilen; lies so viel wie nötig, nicht mehr).
-- ask_aissociate: EIN Aufruf an die juristische Wissensdatenbank (österreichisches Recht, agentisch, mit Normen und Judikatur) für die rechtliche Beurteilung. Formuliere die Frage vollständig und eigenständig, mit den relevanten Fakten/Klauseln aus dem Dokument. Nur einmal verfügbar – bündle alle Rechtsfragen.
+- read_document: nur für Dateien, deren Text NICHT bereits unten im Volltext enthalten ist (in Teilen; lies so viel wie nötig, nicht mehr).
+- ask_aissociate: EIN Aufruf an die juristische Wissensdatenbank (österreichisches Recht, agentisch, mit Normen und Judikatur) für die rechtliche Beurteilung – die einzige Rechtsquelle dieser Aufgabe. Formuliere die Frage vollständig und eigenständig, mit den relevanten Fakten/Klauseln aus dem Dokument. Nur einmal verfügbar – bündle alle Rechtsfragen. Übernimm die Antwort inhaltlich in das Deliverable, soweit sie einschlägig ist.
 ${web ? `- web_search: nur falls die Wissensdatenbank nicht ausreicht (höchstens ${MAX_WEB_SEARCHES} Suchen).` : '- Eine Websuche ist NICHT verfügbar; Unsicheres ausdrücklich kennzeichnen.'}
 - create_or_edit_file: erzeugt/bearbeitet Dateien (Word/Excel/PDF/HTML). Ein Aufruf je Deliverable. Die gesamte juristische Arbeit (welche Klausel, welcher Kommentar, welche Formulierung) machst DU vorher und gibst sie wörtlich in task mit. Niemals generische oder identische Kommentare für mehrere Absätze; jeder Kommentar nennt das konkrete Problem der konkreten Klausel.
 
-ABLAUF: lesen → (eine) Rechtsfrage an die Wissensdatenbank → Deliverable erzeugen → kurze Antwort. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
+ABLAUF (so kurz wie möglich): Liegt der Dokumenttext unten vor, NICHT zuerst lesen, sondern sofort die eine Rechtsfrage stellen (ask_aissociate) → mit der Antwort das Deliverable erzeugen → kurze Antwort. Rein redaktionelle Aufgaben ohne Rechtsfrage kommen ohne Wissensdatenbank aus. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
+// Documents up to this many characters (all attachments together) are handed to
+// Sol directly, which saves the read_document round trip on typical contracts.
+const INLINE_DOC_CHARS = Number(process.env.INLINE_DOC_CHARS || 80_000)
 
 // Task presets: real workflows with structured inputs.
 const TASK_PRESETS = {
@@ -1209,10 +1226,16 @@ async function loadMatter(req, res) {
   if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
   let m = null
   try { m = await store.getMatter(String(req.params.id || '')) } catch {}
-  if (!m || m.ownerKey !== owner) { res.status(404).json({ error: 'Akte nicht gefunden.' }); return null }
+  if (!m || m.ownerKey !== owner) { res.status(404).json({ error: 'Akt nicht gefunden.' }); return null }
   return m
 }
-const ddDeps = (send) => ({ store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send })
+const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 2)
+const ddDeps = (send) => ({
+  store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY,
+  verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send,
+  // One bundled legal question per review area to the AI:ssociate knowledge base (the DD's only legal source).
+  askKnowledgeBase: AISSOCIATE_API_KEY ? async ({ question, legalArea }) => { const r = await askAissociate({ question, legalArea: LEGAL_AREAS[legalArea] ? legalArea : 'civil', scope: '', threadId: null }); return { answer: r.answer, sources: r.sources } } : null,
+})
 
 /** Run a long task of a matter as a resumable job (one per matter, few per instance). */
 function startMatterJob(m, kind, runner) {
@@ -1230,19 +1253,77 @@ function startMatterJob(m, kind, runner) {
   return job.id
 }
 async function addDocumentFromBuffer(m, { name, buf, source, ms }) {
-  if (m.documents.length >= DD_MAX_DOCS) throw new Error(`Höchstens ${DD_MAX_DOCS} Dokumente je Akte.`)
+  if (m.documents.length >= DD_MAX_DOCS) throw new Error(`Höchstens ${DD_MAX_DOCS} Dokumente je Akt.`)
   if (buf.length > DD_MAX_DOC_BYTES) throw new Error(`überschreitet ${Math.round(DD_MAX_DOC_BYTES / 1048576)} MB`)
   const safe = path.basename(String(name)).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 200)
   if (!DOC_EXT.test(safe)) throw new Error('Dateityp nicht unterstützt (PDF, Word, Text)')
   const dup = m.documents.find((d) => d.name === safe && d.size === buf.length)
   if (dup) return { doc: dup, duplicate: true }
-  const d = newDocument({ name: safe, size: buf.length, source, ms })
+  const d = newDocument({ name: safe, size: buf.length, source, ms, no: nextNo(m, 'doc') })
   d.file = await store.putFile(m.id, d.id, safe.split('.').pop(), buf)
   m.documents.push(d)
   return { doc: d, duplicate: false }
 }
+const FINDING_FIELDS = ['title', 'description', 'quote', 'location', 'recommendation', 'severity', 'area', 'dealImpact', 'norms', 'docId']
+const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
-app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents }) => ({ key, label, profession, documents })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT } }))
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
+
+// ---- findings: reviewer decisions and manual findings ----
+app.patch('/api/matters/:id/findings/:fid', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const f = m.findings.find((x) => x.id === req.params.fid)
+  if (!f) return res.status(404).json({ error: 'Befund nicht gefunden.' })
+  const b = req.body || {}
+  f.review ||= { status: 'open', severity: null, note: '', ts: null }
+  if (b.review && typeof b.review === 'object') {
+    if (REVIEW_STATUS.includes(b.review.status)) f.review.status = b.review.status
+    if ('severity' in b.review) f.review.severity = sevOk(b.review.severity) ? b.review.severity : null
+    if (typeof b.review.note === 'string') f.review.note = b.review.note.slice(0, 1000)
+    f.review.ts = Date.now()
+  }
+  // Content edits by the reviewer mark the finding as modified.
+  let edited = false
+  for (const k of FINDING_FIELDS) {
+    if (!(k in b) || k === 'docId') continue
+    if (k === 'severity' && !sevOk(b[k])) continue
+    if (k === 'area' && !DD_AREA_KEYS.includes(b[k]) && b[k] !== 'none') continue
+    if (k === 'dealImpact' && !DEAL_IMPACTS.includes(b[k])) continue
+    if (k === 'norms') { if (!Array.isArray(b[k])) continue; f.norms = b[k].map(String).slice(0, 8); f.normStatus = []; edited = true; continue }
+    if (typeof b[k] !== 'string') continue
+    f[k] = b[k].slice(0, k === 'description' || k === 'recommendation' ? 4000 : 600); edited = true
+  }
+  if (edited) { if (f.review.status === 'open' || f.review.status === 'accepted') f.review.status = 'modified'; f.review.ts = Date.now(); const d = m.documents.find((x) => x.id === f.docId); if (d && f.quote) f.evidence = locateQuote(await store.getText(m.id, d.id), f.quote).status }
+  await store.saveMatter(m)
+  res.json({ finding: f })
+})
+app.post('/api/matters/:id/findings', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const b = req.body || {}
+  const d = m.documents.find((x) => x.id === b.docId)
+  if (!d) return res.status(400).json({ error: 'Dokument wählen.' })
+  if (!String(b.title || '').trim()) return res.status(400).json({ error: 'Titel fehlt.' })
+  const f = newFinding(m, d, { ...b, severity: sevOk(b.severity) ? b.severity : 'amber', area: DD_AREA_KEYS.includes(b.area) ? b.area : d.area, deal_impact: b.dealImpact, norms: Array.isArray(b.norms) ? b.norms : String(b.norms || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean), source: 'manual' })
+  f.review = { status: 'accepted', severity: null, note: String(b.note || '').slice(0, 1000), ts: Date.now() }
+  f.evidence = f.quote ? locateQuote(await store.getText(m.id, d.id), f.quote).status : 'unverified'
+  m.findings.push(f)
+  await store.saveMatter(m)
+  res.json({ finding: f })
+})
+app.delete('/api/matters/:id/findings/:fid', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const i = m.findings.findIndex((x) => x.id === req.params.fid)
+  if (i < 0) return res.status(404).json({ error: 'Befund nicht gefunden.' })
+  if (m.findings[i].source !== 'manual') return res.status(400).json({ error: 'Modellbefunde werden verworfen, nicht gelöscht.' })
+  m.findings.splice(i, 1)
+  await store.saveMatter(m)
+  res.json({ ok: true })
+})
+app.get('/api/matters/:id/dd/estimate', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const p = priceFor(MODEL_EXTRACT)
+  res.json({ estimate: estimateRun(m, p.in, p.out), usage: m.job.usage, budgetTokens: m.settings.budgetTokens })
+})
 
 app.get('/api/matters', async (req, res) => {
   const owner = ownerOf(req)
@@ -1253,7 +1334,7 @@ app.post('/api/matters', async (req, res) => {
   const owner = ownerOf(req)
   if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
   const b = req.body || {}
-  if (!String(b.name || '').trim()) return res.status(400).json({ error: 'Bitte einen Namen für die Akte angeben.' })
+  if (!String(b.name || '').trim()) return res.status(400).json({ error: 'Bitte einen Namen für den Akt angeben.' })
   try {
     const m = newMatter({ ownerKey: owner, name: String(b.name).trim(), kind: b.kind, client: b.client, settings: b.settings && typeof b.settings === 'object' ? b.settings : {} })
     await store.saveMatter(m)
@@ -1272,7 +1353,7 @@ app.patch('/api/matters/:id', async (req, res) => {
 })
 app.delete('/api/matters/:id', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
-  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Für diese Akte läuft gerade ein Vorgang – zuerst pausieren.' })
+  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Für diesen Akt läuft gerade ein Vorgang – zuerst pausieren.' })
   await store.deleteMatter(m.id)
   res.json({ ok: true })
 })
@@ -1288,7 +1369,7 @@ app.post('/api/matters/:id/documents', async (req, res) => {
       const buf = Buffer.from(f.base64, 'base64')
       if (!buf.length) throw new Error('leere Datei')
       const r = await addDocumentFromBuffer(m, { name: f.name, buf, source: 'upload' })
-      if (r.duplicate) errors.push(`${f.name}: bereits in der Akte`); else added.push(r.doc)
+      if (r.duplicate) errors.push(`${f.name}: bereits im Akt`); else added.push(r.doc)
     } catch (e) { errors.push(`${f.name}: ${e.message}`) }
   }
   await store.saveMatter(m)
@@ -1380,14 +1461,14 @@ app.post('/api/matters/:id/import-ms', async (req, res) => {
       send('dd', { matterId: m.id, stage: 'import', progress: m.job.progress, status: 'done', message: `${added} Dokument${added === 1 ? '' : 'e'} importiert${failed ? `, ${failed} fehlgeschlagen` : ''}` })
     })
   } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
-  if (!jobId) return res.status(409).json({ error: 'Für diese Akte läuft bereits ein Vorgang.' })
+  if (!jobId) return res.status(409).json({ error: 'Für diesen Akt läuft bereits ein Vorgang.' })
   res.json({ jobId })
 })
 
 // ---- due diligence run / pause / report ----
 app.post('/api/matters/:id/dd/run', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
-  if (!m.documents.length) return res.status(400).json({ error: 'Die Akte enthält noch keine Dokumente.' })
+  if (!m.documents.length) return res.status(400).json({ error: 'Der Akt enthält noch keine Dokumente.' })
   if (req.body?.reanalyse && !ddRuns.has(m.id)) {
     for (const d of m.documents) if (d.status === 'analysed') d.status = 'extracted'
     m.findings = []; m.areaSummaries = {}; m.executive = null; m.verification = null
@@ -1395,7 +1476,7 @@ app.post('/api/matters/:id/dd/run', async (req, res) => {
   if (req.body?.retryErrors && !ddRuns.has(m.id)) for (const d of m.documents) if (d.status === 'error') { d.status = 'new'; d.note = '' }
   let jobId
   try { jobId = startMatterJob(m, 'dd', (deps) => runDd(m, deps)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
-  if (!jobId) return res.status(409).json({ error: 'Für diese Akte läuft bereits ein Vorgang.' })
+  if (!jobId) return res.status(409).json({ error: 'Für diesen Akt läuft bereits ein Vorgang.' })
   res.json({ jobId })
 })
 app.post('/api/matters/:id/dd/pause', async (req, res) => {
@@ -1438,7 +1519,7 @@ app.post('/api/matters/:id/tables/:tid/run', async (req, res) => {
   if (!t) return res.status(404).json({ error: 'Tabelle nicht gefunden.' })
   let jobId
   try { jobId = startMatterJob(m, 'table', (deps) => runReviewTable(m, t, deps)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
-  if (!jobId) return res.status(409).json({ error: 'Für diese Akte läuft bereits ein Vorgang.' })
+  if (!jobId) return res.status(409).json({ error: 'Für diesen Akt läuft bereits ein Vorgang.' })
   res.json({ jobId })
 })
 app.delete('/api/matters/:id/tables/:tid', async (req, res) => {
@@ -1491,7 +1572,7 @@ app.post('/api/chat', async (req, res) => {
   if (typeof body.matterId === 'string' && body.matterId) {
     const owner = ownerOf(req)
     try { matterReq = owner ? await store.getMatter(body.matterId) : null } catch {}
-    if (!matterReq || matterReq.ownerKey !== owner) return res.status(404).json({ error: 'Akte nicht gefunden.' })
+    if (!matterReq || matterReq.ownerKey !== owner) return res.status(404).json({ error: 'Akt nicht gefunden.' })
     const ids = new Set((Array.isArray(body.matterDocIds) ? body.matterDocIds : []).map(String))
     matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
   }
@@ -1647,7 +1728,8 @@ app.post('/api/chat', async (req, res) => {
   }
   async function toolAskAissociate(args) {
     if (aissCalls >= 1) return { text: `Limit erreicht: Die Wissensdatenbank wurde in dieser Aufgabe bereits befragt. Arbeite mit der vorliegenden Antwort weiter${useWeb ? ` (ggf. web_search, insgesamt höchstens ${MAX_WEB_SEARCHES} Suchen)` : ''}.`, detail: 'Limit (1 Aufruf)' }
-    const r = await runAissociate({ question: String(args.question || ''), legalArea: LEGAL_AREAS[args.legal_area] ? args.legal_area : 'civil', scope: args.scope && SCOPES.includes(args.scope) ? args.scope : '', stream: false })
+    // Streamed, so the user watches the knowledge base answer arrive while the document task waits for it.
+    const r = await runAissociate({ question: String(args.question || ''), legalArea: LEGAL_AREAS[args.legal_area] ? args.legal_area : 'civil', scope: args.scope && SCOPES.includes(args.scope) ? args.scope : '', stream: true })
     const srcLines = r.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')
     return { text: `ANTWORT DER WISSENSDATENBANK:\n${r.answer}\n${srcLines ? `\nQUELLEN:\n${srcLines}` : ''}`, detail: 'Antwort erhalten', skipStep: true }
   }
@@ -1777,7 +1859,7 @@ app.post('/api/chat', async (req, res) => {
     // ---- 0b. matter context: the stored analysis (findings, summaries) and chosen documents ----
     let matterCtx = ''
     if (matterReq) {
-      const sid = step('read', `Akte „${matterReq.name}“ wird eingebunden`)
+      const sid = step('read', `Akt „${matterReq.name}“ wird eingebunden`)
       matterCtx = matterContext(matterReq, 60_000)
       for (const d of matterDocs) {
         if (uploads.length >= MAX_UPLOADS || uploads.some((u) => u.name === d.name)) continue
@@ -1795,11 +1877,14 @@ app.post('/api/chat', async (req, res) => {
       .slice(-8)
       .map((m) => ({ role: m.role, content: m.content.slice(0, 12_000) }))
 
+    // Short attachments go in as full text (one Sol turn less); long ones via read_document.
+    const inlineAll = uploads.length > 0 && uploads.every((u) => !uploadTexts.get(u.name).unsupported) && uploads.reduce((n, u) => n + uploadTexts.get(u.name).text.length, 0) <= INLINE_DOC_CHARS
     const uploadLine = uploads.length
-      ? `HOCHGELADENE DATEIEN (mit read_document lesen; für Dateiausgaben liegen sie in /home/user): ${uploads.map((u) => { const t = uploadTexts.get(u.name); return `${u.name} (${t.unsupported ? 'Typ nur per create_or_edit_file lesbar' : `${t.text.length} Zeichen Text, ${Math.max(1, Math.ceil(t.text.length / UPLOAD_PART_CHARS))} Teil(e)`})` }).join('; ')}\n\n`
+      ? `HOCHGELADENE DATEIEN (${inlineAll ? 'Volltext unten enthalten – nicht erneut lesen' : 'mit read_document lesen'}; für Dateiausgaben liegen sie in /home/user): ${uploads.map((u) => { const t = uploadTexts.get(u.name); return `${u.name} (${t.unsupported ? 'Typ nur per create_or_edit_file lesbar' : `${t.text.length} Zeichen Text, ${Math.max(1, Math.ceil(t.text.length / UPLOAD_PART_CHARS))} Teil(e)`})` }).join('; ')}\n\n`
       : ''
-    const matterLine = matterCtx ? `AKTENKONTEXT (gespeicherte Analyse der Akte; Befunde mit Zitat und Fundstelle sind belegt, alles andere ist Zusammenfassung):\n${matterCtx}\n\n` : ''
-    const userContent = (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + prompt
+    const inlineDocs = inlineAll ? uploads.map((u) => `=== DOKUMENT: ${u.name}${uploadTexts.get(u.name).pages ? ` (${uploadTexts.get(u.name).pages} Seiten)` : ''} ===\n${uploadTexts.get(u.name).text}\n=== ENDE ${u.name} ===`).join('\n\n') + '\n\n' : ''
+    const matterLine = matterCtx ? `AKTENKONTEXT (gespeicherte Analyse des Akts; Befunde mit Zitat und Fundstelle sind belegt, alles andere ist Zusammenfassung):\n${matterCtx}\n\n` : ''
+    const userContent = (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + inlineDocs + prompt
 
     // ---- 1. plan (Sol decides mode + legal area) ----
     const pid = step('triage', 'Sol analysiert die Anfrage', { model: MODEL_MAIN })
