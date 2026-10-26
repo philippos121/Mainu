@@ -11,11 +11,11 @@ single tool call executed in an **E2B sandbox** (never shown to the user).
 ## How a question is processed
 
 ```
-question ──▶ Luna: mode, legal area, 1–3 compact questions (1 call)
-               ├▶ legal    → AI:ssociate (one streamed call, or parallel calls, short answers) → shown as is
-               ├▶ document → AI:ssociate answers Luna's questions → Sol builds the deliverable
-               │              (document text inline, create_or_edit_file in the sandbox) or answers
-               └▶ general  → Luna answers directly
+question ──▶ fast model: mode, legal area, difficulty, 0–3 compact questions (1 call)
+               ├▶ legal easy  → fast model + ≤ 3 web searches
+               ├▶ legal hard  → AI:ssociate, ONE streamed request (questions numbered), shown as is
+               ├▶ document    → easy: fast model; hard: AI:ssociate (one request) → main model builds the file
+               └▶ general     → easy: fast model; hard: main model
                      │
    RIS verification of §§ / GZ (deterministic) → citations in the answer linked to RIS
 ```
@@ -24,10 +24,10 @@ question ──▶ Luna: mode, legal area, 1–3 compact questions (1 call)
   (header `x-api-key`, SSE stream; legal areas civil / criminal / tax / public,
   optional Bundesland scope; `thread_id` keeps follow-ups in one thread). The
   documents it consults are shown live as research steps.
-* **Models:** `gpt-6-luna` (`OPENAI_MODEL_FAST`) for planning, question
-  formulation, general tasks and the per-document due-diligence analysis;
-  `gpt-6-sol` (`OPENAI_MODEL_MAIN`) for deliverables and the DD synthesis; the
-  code model defaults to Sol.
+* **Models:** `gpt-6-luna` (`OPENAI_MODEL_FAST`) for everything easy, planning,
+  question formulation and the per-document due-diligence analysis;
+  `gpt-6-sol` (`OPENAI_MODEL_MAIN`) only for hard tasks and the DD synthesis; the
+  code model follows the task's difficulty unless `OPENAI_MODEL_CODE` is set.
 * **Verification:** each cited § / Art is looked up in RIS BrKons via
   `Abschnitt.Typ/Von/Bis` + `Fassung.FassungVom=today`, each Geschäftszahl via
   the Judikatur endpoint; confirmed citations become links in the answer.
@@ -61,17 +61,20 @@ request takes `msFiles` and `msSync`.
 ## Agents
 
 Two agents, one sidebar. The **general agent** (Assistent) can ultimately do
-everything: **Luna** (fast, cheap) decides the mode and the legal area and
-formulates one to three *compact* questions, the **AI:ssociate knowledge base**
-answers each briefly with references (several questions run in parallel), and
-only at the end does **Sol** act when a deliverable is needed: it builds Word,
-Excel, PDF or a redline from the document and the answers (code generation in
-the sandbox), otherwise the knowledge-base answer is shown as is. Every cited
-§ / Geschäftszahl is verified against the RIS. The optional Sol review with web
-searches is off by default (`REVIEW_ANSWERS=on` re-enables it). The
+everything and routes by difficulty, decided by the fast model in one call
+together with the mode, the legal area and up to three compact questions:
+
+| | easy | hard |
+|---|---|---|
+| legal question | fast model answers directly, ≤ 3 web searches for references | **AI:ssociate** knowledge base, **one** request (several numbered questions inside if needed), answer shown as is |
+| document / other task | fast model (document text inline, file generation in the sandbox) | AI:ssociate first (one request) when legal questions are involved, then the main model builds the deliverable |
+
+Every cited § / Geschäftszahl is verified against the RIS. The optional
+review of knowledge-base answers is off by default (`REVIEW_ANSWERS=on`). The
 **specialist agent** Due Diligence runs the fixed pipeline below; review tables
-and the form-driven workflows live inside it (tabs of the Akt) and under the
-composer ("Vorlagen"). Each matter is "der Akt".
+and the form-driven templates live inside it (tabs of the Akt) and under the
+composer ("Vorlagen"). Each matter is "der Akt". Model names are not shown in
+the UI.
 
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
@@ -87,8 +90,8 @@ can be paused, and survives closed browser tabs.
 explicit pipeline, not an agent: Text → per-document analysis (strict JSON
 schema: type, area, parties, key terms, findings with quote + location +
 severity + recommendation + norms, questions) → synthesis per review area →
-per review area Luna formulates 1–3 compact questions from the red/amber findings,
-AI:ssociate answers each briefly (fed into the synthesis and the report) →
+per review area the fast model formulates 1–3 compact questions from the red/amber
+findings and AI:ssociate answers them in one request (fed into the synthesis and the report) →
 executive summary → RIS verification of every cited norm → Word Red-Flag-Report
 + Excel workbook from fixed templates. Every finding has a stable id (F-001),
 a document id (D-001), a deal-impact instrument, an evidence status (the quote

@@ -34,7 +34,7 @@ const MODEL_MAIN = process.env.OPENAI_MODEL_MAIN || process.env.OPENAI_MODEL || 
 // general tasks and reads documents in the due diligence; Sol only assembles
 // deliverables at the end (code generation, document tasks, DD synthesis).
 const MODEL_FAST = process.env.OPENAI_MODEL_FAST || 'gpt-6-luna'
-const MODEL_CODE = process.env.OPENAI_MODEL_CODE || MODEL_MAIN
+const MODEL_CODE = process.env.OPENAI_MODEL_CODE || '' // empty: follows the task's difficulty (Luna, Sol when hard)
 // Optional second pass: Sol reviews the knowledge-base answer (≤ 3 web searches). Off by default – the answer is shown as is.
 const REVIEW_ANSWERS = process.env.REVIEW_ANSWERS === 'on'
 const KB_MAX_QUESTIONS = Number(process.env.KB_MAX_QUESTIONS || 3)
@@ -736,15 +736,17 @@ const PLAN_SCHEMA = {
     legal_area: { type: 'string', enum: ['civil', 'criminal', 'tax', 'public', 'none'] },
     scope: { type: 'string', enum: ['', ...SCOPES] },
     questions: { type: 'array', items: { type: 'string' } },
+    difficulty: { type: 'string', enum: ['easy', 'hard'] },
     title: { type: 'string' },
   },
-  required: ['mode', 'legal_area', 'scope', 'questions', 'title'],
+  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'title'],
 }
-const PLAN_INSTRUCTIONS = `Du bist AI:ssociate (Modell Luna), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Analysiere die Anfrage (inkl. Gesprächsverlauf und ggf. Dokumenttext) und entscheide als JSON:
+const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Analysiere die Anfrage (inkl. Gesprächsverlauf und ggf. Dokumenttext) und entscheide als JSON:
 - mode: "legal" = Rechtsfrage, Rechtsauskunft, Recherche, Prüfung eines Sachverhalts (→ juristische Wissensdatenbank). "document" = hochgeladene Dateien analysieren/bearbeiten, Dateien (Word/Excel/PDF) erzeugen, Dokumente vergleichen, Entwürfe als Datei. "general" = ohne Rechtsrecherche lösbar: Umformulieren, Übersetzen, Zusammenfassen von eingefügtem Text, Small Talk, Rückfrage, Folgefrage, die allein aus dem Verlauf beantwortbar ist.
 - legal_area: Rechtsgebiet der Wissensdatenbank. "civil" = Zivilrecht im weiten Sinn (ABGB, Schadenersatz, Vertrags-, Miet-, Familien-, Erb-, Arbeits-, Unternehmens-, Gesellschafts-, Insolvenz-, Zivilverfahrens-, Exekutionsrecht, Konsumentenschutz; OGH-Judikatur). "criminal" = Straf- und Strafverfahrensrecht. "tax" = Steuer- und Abgabenrecht (BAO, EStG, UStG, KStG, Finanzstrafrecht). "public" = öffentliches Recht (Verfassungs- und Verwaltungsrecht, Verwaltungsverfahren, Gewerbe-, Bau-, Raumordnungs-, Fremden-, Asyl-, Vergabe-, Datenschutzrecht, Landesrecht; VwGH/VfGH/BVwG). "none" nur bei mode general/document ohne Rechtsfrage.
 - scope: nur bei "public": "Bund" oder ein Bundesland (Wien, Niederösterreich, Oberösterreich, Salzburg, Steiermark, Tirol, Vorarlberg, Kärnten, Burgenland), wenn Landesrecht einschlägig ist; sonst leer "".
 - questions: 1 bis ${KB_MAX_QUESTIONS} KONKRETE, KOMPAKTE Fragen an die juristische Wissensdatenbank (je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten; eigenständig, keine Verweise wie "siehe oben"; auf Deutsch). Zerlege die Anfrage nur dann in mehrere Fragen, wenn sie wirklich mehrere Rechtsfragen enthält – sonst genau eine. Bei mode "document": die Rechtsfragen, die für die Bearbeitung des Dokuments geklärt sein müssen (z. B. Zulässigkeit einer konkreten Klausel, Rechtsfolge, Frist); rein redaktionelle Dokumentaufgaben (Zusammenfassen, Vergleichen, Formatieren) → leere Liste. Bei mode "general": leere Liste.
+- difficulty: "hard" = schwere Aufgabe. Bei Rechtsfragen: Recherche in Normen und Judikatur nötig (Spezialmaterie, Judikaturlage, mehrere verschränkte Rechtsfragen, Rechtsfolgen/Fristen im Detail, Sachverhalt mit Dokumenten) → geht an die juristische Wissensdatenbank. Bei Dokument-/sonstigen Aufgaben: umfangreiche Dokumentbearbeitung (klauselweise Kommentierung, Vertragsentwurf, Redline, komplexe Excel-Auswertung), mehrschichtige Argumentation, lange Texte, mehrere große Dokumente. "easy" = einfache Rechtsfrage, die mit gesichertem Grundwissen und einer kurzen Websuche beantwortbar ist, bzw. kurze Entwürfe, Zusammenfassungen, Umformulierungen, einfache Dateien.
 - title: prägnanter Titel (max. 6 Wörter) für die Verlaufsliste.`
 // Asked of the knowledge base in front of every question: short answers, with references.
 const KB_BRIEF = 'Bitte knapp und präzise antworten (Kurzantwort, dann die Rechtsgrundlagen mit § / Gesetz bzw. Gericht / Datum / Geschäftszahl und eine kurze Begründung; keine Wiederholungen, keine allgemeinen Einleitungen).\n\n'
@@ -755,7 +757,7 @@ const webClause = (web) => web
   ? `nutze die Websuche, höchstens ${MAX_WEB_SEARCHES} Suchen (${WEB_SOURCES})`
   : 'eine Websuche ist NICHT verfügbar – ergänze nur aus gesichertem Wissen und kennzeichne Unsicheres ausdrücklich als nicht verifiziert'
 
-const reviewInstructions = (web) => `Du bist AI:ssociate (Modell Sol) und prüfst die Antwort der juristischen Wissensdatenbank (AI:ssociate, österreichisches Recht; sie recherchiert selbst agentisch in Normen und Judikatur und ist die maßgebliche Quelle). Du bekommst die Nutzerfrage und diese Antwort.
+const reviewInstructions = (web) => `Du bist AI:ssociate und prüfst die Antwort der juristischen Wissensdatenbank (AI:ssociate, österreichisches Recht; sie recherchiert selbst agentisch in Normen und Judikatur und ist die maßgebliche Quelle). Du bekommst die Nutzerfrage und diese Antwort.
 
 REGELFALL: Die Antwort ist ausreichend → erste Zeile exakt "VERDICT: AUSREICHEND", danach nichts (oder höchstens ein Satz mit einem wirklich wichtigen Hinweis). Keine Wiederholung, keine Abrundung, keine Bestätigungssuche.
 
@@ -767,18 +769,20 @@ AUSNAHMEFALL – nur wenn mindestens eines zutrifft:
 Dann ${webClause(web)}, und antworte mit erster Zeile exakt "VERDICT: ERGAENZT", danach eine knappe Ergänzung in Markdown: nur das Fehlende, mit Fundstellen (§, Gesetz; Gericht, Datum, Geschäftszahl)${web ? ' und Links' : ''}.
 Nie Normen, Entscheidungen oder Fundstellen erfinden. Sprache: wie die Nutzerfrage.`
 
-const directInstructions = (web) => `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Die juristische Wissensdatenbank ist gerade nicht verfügbar. Beantworte die Rechtsfrage selbst: ${webClause(web)}. Antworte strukturiert in Markdown: **Kurzantwort**, **Rechtliche Grundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Beurteilung**, **Ergebnis / Empfehlung**. ${web ? 'Belege mit Links. ' : ''}Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
+const easyLegalInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Beantworte die einfache Rechtsfrage direkt und knapp nach österreichischem Recht; ${webClause(web)} und belege die Fundstellen${web ? ' mit Links' : ''}. Struktur in Markdown: **Kurzantwort**, **Rechtsgrundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Begründung** (kurz). Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
+
+const directInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Die juristische Wissensdatenbank ist gerade nicht verfügbar. Beantworte die Rechtsfrage selbst: ${webClause(web)}. Antworte strukturiert in Markdown: **Kurzantwort**, **Rechtliche Grundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Beurteilung**, **Ergebnis / Empfehlung**. ${web ? 'Belege mit Links. ' : ''}Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
 
 const GENERAL_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Erledige die Aufgabe direkt, präzise und in der Sprache der Nutzerin (Markdown, keine Floskeln). Keine Rechtsrecherche nötig; falls doch eine Rechtsfrage enthalten ist, beantworte sie nach bestem Wissen und weise darauf hin, dass dafür keine Datenbankrecherche erfolgte.`
 
-const docInstructions = (web) => `Du bist AI:ssociate (Modell Sol), KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte, und bearbeitest eine Dokumentaufgabe mit wenigen, gezielten Schritten.
+const docInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte, und bearbeitest eine Dokumentaufgabe mit wenigen, gezielten Schritten.
 
 WERKZEUGE
 - read_document: nur für Dateien, deren Text NICHT bereits unten im Volltext enthalten ist (in Teilen; lies so viel wie nötig, nicht mehr).
-${web ? `- web_search: nur falls die Wissensdatenbank nicht ausreicht (höchstens ${MAX_WEB_SEARCHES} Suchen).` : '- Eine Websuche ist NICHT verfügbar; Unsicheres ausdrücklich kennzeichnen.'}
+${web ? `- web_search: für Fundstellen zu einfachen Rechtsfragen bzw. nur falls die Wissensdatenbank nicht ausreicht (höchstens ${MAX_WEB_SEARCHES} Suchen).` : '- Eine Websuche ist NICHT verfügbar; Unsicheres ausdrücklich kennzeichnen.'}
 - create_or_edit_file: erzeugt/bearbeitet Dateien (Word/Excel/PDF/HTML). Ein Aufruf je Deliverable. Die gesamte juristische Arbeit (welche Klausel, welcher Kommentar, welche Formulierung) machst DU vorher und gibst sie wörtlich in task mit. Niemals generische oder identische Kommentare für mehrere Absätze; jeder Kommentar nennt das konkrete Problem der konkreten Klausel.
 
-RECHTSQUELLE: Die rechtliche Beurteilung hat die juristische Wissensdatenbank AI:ssociate bereits geliefert (Abschnitt „ANTWORTEN DER WISSENSDATENBANK“ unten, mit Fundstellen) – sie ist die einzige Rechtsquelle dieser Aufgabe. Übernimm sie inhaltlich in das Deliverable, soweit einschlägig; erfinde keine weiteren Normen oder Entscheidungen. Fehlt sie, ist die Aufgabe redaktionell.
+RECHTSQUELLE: Liegt unten ein Abschnitt „ANTWORTEN DER WISSENSDATENBANK“ vor, ist er die maßgebliche Rechtsquelle – übernimm ihn inhaltlich in das Deliverable, soweit einschlägig, und erfinde keine weiteren Normen oder Entscheidungen. Fehlt er, beantworte einfache Rechtsfragen aus gesichertem Grundwissen${web ? ' mit einer kurzen Websuche für die Fundstellen' : ''} und kennzeichne Unsicheres.
 
 ABLAUF (so kurz wie möglich): Liegt der Dokumenttext unten vor, NICHT zuerst lesen → Deliverable erzeugen (create_or_edit_file), wenn eine Datei verlangt oder sinnvoll ist; sonst direkt antworten → kurze Antwort. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
 // Documents up to this many characters (all attachments together) are handed to
@@ -1132,7 +1136,7 @@ app.get('/api/ms/browse', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   let storeStats = null
   try { storeStats = await store.stats() } catch {}
-  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
+  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -1660,7 +1664,8 @@ app.post('/api/chat', async (req, res) => {
   const images = []
   const filesOut = []
   const uploadTexts = new Map()
-  let inlineAll = false // attachments handed to Sol as full text (set once they are extracted)
+  let inlineAll = false // attachments handed to the model as full text (set once they are extracted)
+  let heavy = false, workModel = MODEL_FAST // everything runs on the fast model; hard tasks switch to the main model
   let aissThreadOut = threadIn
   let aissCalls = 0 // attempts (enforces the one-call limit)
   let aissOk = false // at least one successful knowledge-base answer
@@ -1727,15 +1732,12 @@ app.post('/api/chat', async (req, res) => {
       throw e
     } finally { clearInterval(ticker) }
   }
-  /** Luna's questions (1–3) to the knowledge base: one streamed call, or parallel calls joined into sections. */
+  /** The planned questions (1–3) go to the knowledge base in ONE streamed request, numbered. */
   async function runAissociateMany({ questions, legalArea, scope }) {
     const qs = questions.slice(0, KB_MAX_QUESTIONS)
-    if (qs.length <= 1) { const r = await runAissociate({ question: qs[0], legalArea, scope, stream: true }); return { answer: r.answer.trim(), evidence: r.evidence, questions: qs } }
-    const results = await Promise.all(qs.map((q, i) => runAissociate({ question: q, legalArea, scope, stream: false, label: `Frage ${i + 1}/${qs.length}` }).then((r) => ({ ok: true, r })).catch((e) => ({ ok: false, e }))))
-    const okRes = results.filter((x) => x.ok)
-    if (!okRes.length) throw results[0].e
-    const answer = results.map((x, i) => `### ${i + 1}. ${qs[i]}\n\n${x.ok ? x.r.answer.trim() : '_Für diese Frage war die Wissensdatenbank nicht erreichbar._'}`).join('\n\n')
-    return { answer, evidence: okRes.flatMap((x) => x.r.evidence), questions: qs, partial: okRes.length < qs.length }
+    const question = qs.length <= 1 ? qs[0] : `Beantworte die folgenden ${qs.length} Fragen getrennt und nummeriert:\n${qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
+    const r = await runAissociate({ question, legalArea, scope, stream: true, label: qs.length > 1 ? `${qs.length} Fragen` : '' })
+    return { answer: r.answer.trim(), evidence: r.evidence, questions: qs }
   }
 
   // ---- document-mode tool implementations ----
@@ -1768,7 +1770,7 @@ app.post('/api/chat', async (req, res) => {
     let newFiles = []
     for (let attempt = 1; attempt <= 4; attempt++) {
       send('step_update', { id: stepId, status: 'running', detail: attempt === 1 ? 'Programm wird geschrieben…' : `Korrektur (Versuch ${attempt})…` })
-      const resp = await callModel(ctx, { model: MODEL_CODE, instructions: CODE_SYSTEM, input, effort: EFFORT_CODE, prevId, maxOut: 12_000 })
+      const resp = await callModel(ctx, { model: MODEL_CODE || workModel, instructions: CODE_SYSTEM, input, effort: heavy ? EFFORT_CODE : EFFORT_PLAN, prevId, maxOut: 12_000 })
       prevId = resp.id
       const code = (resp.output_text || '').match(/```(?:python|py)?\s*\n([\s\S]*?)```/i)?.[1]?.trim() || (resp.output_text || '').trim()
       if (!code) { input = [{ role: 'user', content: 'Es kam kein Code zurück. Bitte das vollständige Python-Skript in einem ```python Block.' }]; continue }
@@ -1833,9 +1835,9 @@ app.post('/api/chat', async (req, res) => {
       // only the web budget that is still left over the whole task.
       const remainingWeb = useWeb ? Math.max(0, MAX_WEB_SEARCHES - ctx.usage.webSearchCalls) : 0
       const tools = remainingWeb > 0 ? [...baseTools, WEB_SEARCH_TOOL] : baseTools
-      const sid = step('think', i === 1 ? 'Ergebnis wird erstellt' : 'Zwischenergebnis wird ausgewertet', { model: MODEL_MAIN })
+      const sid = step('think', i === 1 ? 'Ergebnis wird erstellt' : 'Zwischenergebnis wird ausgewertet', { model: workModel })
       let resp
-      try { resp = await callModel(ctx, { model: MODEL_MAIN, instructions: docInstructions(useWeb), input, tools, effort: EFFORT_MAIN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
+      try { resp = await callModel(ctx, { model: workModel, instructions: docInstructions(useWeb), input, tools, effort: heavy ? EFFORT_MAIN : EFFORT_PLAN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
       prevId = resp.id
       input = [] // everything sent so far is now part of the chain (previous_response_id)
       collectWebCitations(resp)
@@ -1847,8 +1849,8 @@ app.post('/api/chat', async (req, res) => {
     }
     if (!text && prevId) {
       // Only unsent tool outputs (if any) plus the wrap-up request go into the chain.
-      const sid = step('think', 'Zusammenfassung (Schrittlimit)', { model: MODEL_MAIN })
-      const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: docInstructions(useWeb), input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
+      const sid = step('think', 'Zusammenfassung (Schrittlimit)', { model: workModel })
+      const resp = await callModel(ctx, { model: workModel, instructions: docInstructions(useWeb), input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
       collectWebCitations(resp)
       text = resp.output_text || ''
       stepDone(sid)
@@ -1933,18 +1935,29 @@ app.post('/api/chat', async (req, res) => {
     if (!SCOPES.includes(plan.scope)) plan.scope = ''
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]
     if (plan.mode === 'general') plan.questions = []
+    heavy = plan.difficulty === 'hard'
+    workModel = heavy ? MODEL_MAIN : MODEL_FAST
     const areaLabel = LEGAL_AREA_LABEL[plan.legal_area] || 'allgemein'
-    stepDone(pid, { detail: `${plan.mode === 'legal' ? `Rechtsfrage · ${areaLabel}${plan.scope ? ' (' + plan.scope + ')' : ''}` : plan.mode === 'document' ? 'Dokumentaufgabe' : 'Allgemeine Aufgabe'}${plan.questions.length ? ` · ${plan.questions.length} Frage${plan.questions.length > 1 ? 'n' : ''} an AI:ssociate` : ''}` })
+    stepDone(pid, { detail: `${plan.mode === 'legal' ? `Rechtsfrage · ${areaLabel}${plan.scope ? ' (' + plan.scope + ')' : ''}` : plan.mode === 'document' ? 'Dokumentaufgabe' : 'Allgemeine Aufgabe'}${plan.questions.length ? ` · ${plan.questions.length} Frage${plan.questions.length > 1 ? 'n' : ''} an AI:ssociate` : ''}${heavy ? ' · komplexe Aufgabe' : ''}` })
     for (const [i, q] of plan.questions.entries()) { const qs = step('question', `Frage ${plan.questions.length > 1 ? i + 1 + ': ' : ''}${q.slice(0, 220)}`, { model: MODEL_FAST }); stepDone(qs) }
     const usedModels = () => Object.keys(ctx.usage.byModel)
-    send('route', { route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, title: plan.title, questions: plan.questions, models: { main: MODEL_FAST, used: usedModels(), code: MODEL_CODE, knowledgeBase: plan.questions.length ? 'AI:ssociate' : null } })
+    send('route', { route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, title: plan.title, questions: plan.questions, difficulty: plan.difficulty, models: { main: workModel, used: usedModels(), code: MODEL_CODE || workModel, knowledgeBase: heavy && plan.questions.length ? 'AI:ssociate' : null } })
     assertAlive()
 
     // ---- 2. answer ----
     let answer = ''
     let verdict = null
     try {
-      if (plan.mode === 'legal') {
+      if (plan.mode === 'legal' && !heavy) {
+        // Easy legal question: answered directly on the fast model with a short web search.
+        const sid = step('think', 'Antwort wird formuliert', { model: workModel })
+        const resp = await callModel(ctx, { model: workModel, instructions: easyLegalInstructions(useWeb), effort: EFFORT_PLAN, maxOut: 6000, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
+        collectWebCitations(resp)
+        emitWebSteps(resp)
+        stepDone(sid, { detail: ctx.usage.webSearchCalls ? `${ctx.usage.webSearchCalls} Websuche${ctx.usage.webSearchCalls > 1 ? 'n' : ''}` : 'ohne Websuche' })
+        verdict = 'web'
+        answer = (resp.output_text || '').trim()
+      } else if (plan.mode === 'legal') {
         let kb = null
         try {
           kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope })
@@ -1984,8 +1997,8 @@ app.post('/api/chat', async (req, res) => {
         } else {
           // Knowledge base unavailable → Sol answers directly with ≤3 web searches.
           assertAlive()
-          const sid = step('think', 'Antwort ohne Wissensdatenbank (nicht erreichbar)', { model: MODEL_MAIN })
-          const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: directInstructions(useWeb), effort: EFFORT_MAIN, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
+          const sid = step('think', 'Antwort ohne Wissensdatenbank (nicht erreichbar)', { model: workModel })
+          const resp = await callModel(ctx, { model: workModel, instructions: directInstructions(useWeb), effort: heavy ? EFFORT_MAIN : EFFORT_PLAN, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
           collectWebCitations(resp)
           emitWebSteps(resp)
           stepDone(sid, { detail: ctx.usage.webSearchCalls ? `${ctx.usage.webSearchCalls} Websuche${ctx.usage.webSearchCalls > 1 ? 'n' : ''}` : 'ohne Websuche' })
@@ -1997,14 +2010,14 @@ app.post('/api/chat', async (req, res) => {
         // First pass: the knowledge base answers Luna's questions (short); then Sol
         // builds the deliverable from document + answers, or just answers.
         let kbBlock = ''
-        if (plan.questions.length && plan.legal_area !== 'none') {
+        if (heavy && plan.questions.length && plan.legal_area !== 'none') {
           try { const kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope }); kbBlock = `ANTWORTEN DER WISSENSDATENBANK (AI:ssociate, ${areaLabel}):\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}\n\n` }
           catch (e) { console.error('aissociate (document) failed:', e?.message); kbBlock = 'HINWEIS: Die Wissensdatenbank war nicht erreichbar – rechtliche Aussagen ausdrücklich als nicht verifiziert kennzeichnen.\n\n' }
         }
         answer = await documentLoop({ input: [...histInput, { role: 'user', content: kbBlock + userContent }] })
       } else {
-        const sid = step('think', 'Antwort wird formuliert', { model: MODEL_FAST })
-        const resp = await callModel(ctx, { model: MODEL_FAST, instructions: GENERAL_INSTRUCTIONS, effort: EFFORT_PLAN, input: [...histInput, { role: 'user', content: userContent }] })
+        const sid = step('think', 'Antwort wird formuliert', { model: workModel })
+        const resp = await callModel(ctx, { model: workModel, instructions: GENERAL_INSTRUCTIONS, effort: heavy ? EFFORT_MAIN : EFFORT_PLAN, input: [...histInput, { role: 'user', content: userContent }] })
         answer = (resp.output_text || '').trim()
         stepDone(sid)
       }
@@ -2094,7 +2107,7 @@ app.post('/api/chat', async (req, res) => {
 
     send('final', {
       answer, sources, verification, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
-      models: { main: MODEL_FAST, used: Object.keys(ctx.usage.byModel), code: MODEL_CODE, knowledgeBase: aissOk ? 'AI:ssociate' : null }, questions: plan.questions,
+      models: { main: workModel, used: Object.keys(ctx.usage.byModel), code: MODEL_CODE || workModel, knowledgeBase: aissOk ? 'AI:ssociate' : null }, questions: plan.questions, difficulty: plan.difficulty,
       aissThreadId: aissThreadOut,
       sync, syncTarget: target,
       execution: { images, files: filesOut },
@@ -2112,7 +2125,7 @@ app.post('/api/chat', async (req, res) => {
 
 if (process.env.NO_LISTEN !== '1') {
   app.listen(PORT, () => {
-    console.log(`AI:ssociate Playground listening on http://localhost:${PORT} (main=${MODEL_MAIN}, code=${MODEL_CODE}, kb=${AISSOCIATE_BASE_URL})`)
+    console.log(`AI:ssociate Playground listening on http://localhost:${PORT} (fast=${MODEL_FAST}, main=${MODEL_MAIN}, kb=${AISSOCIATE_BASE_URL})`)
   })
 }
 
