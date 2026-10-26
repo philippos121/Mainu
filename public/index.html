@@ -119,6 +119,25 @@
       .agent .d { font-size: 12.5px; opacity: .9; line-height: 1.4; }
       .agent .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; opacity: .75; }
       .agent::after { content: ''; position: absolute; right: -30px; top: -30px; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+      .agent-hero { position: relative; overflow: hidden; width: 100%; border-radius: 22px; padding: 22px 22px 18px; color: #fff; background: linear-gradient(135deg, #0e5c69 0%, #0e7c8a 70%, #139aab 100%); box-shadow: 0 12px 36px rgba(14,92,105,0.24); display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+      .agent-hero::after { content: ''; position: absolute; right: -60px; top: -70px; width: 240px; height: 240px; border-radius: 50%; background: rgba(255,255,255,0.07); pointer-events: none; }
+      .agent-hero::before { content: ''; position: absolute; left: -40px; bottom: -90px; width: 200px; height: 200px; border-radius: 50%; background: rgba(243,146,0,0.14); pointer-events: none; }
+      .hero-head { display: flex; gap: 14px; align-items: flex-start; position: relative; z-index: 1; }
+      .hero-head .ico, .agent.wide .ico { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+      .hero-head .ico svg, .agent.wide .ico svg { width: 22px; height: 22px; }
+      .hero-text { min-width: 0; flex: 1; }
+      .hero-text .k { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; opacity: .8; }
+      .hero-text .t { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0 4px; line-height: 1.15; }
+      .hero-text .d { font-size: 13.5px; opacity: .92; line-height: 1.5; max-width: 640px; }
+      .agent-hero .composer { position: relative; z-index: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.18); border-color: transparent; }
+      .hero-chips { display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 1; }
+      .hero-chips button { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.28); color: #fff; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+      .hero-chips button:hover { background: rgba(255,255,255,0.26); }
+      .hero-chips .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; opacity: .75; align-self: center; margin-right: 4px; }
+      .agent.wide { width: 100%; flex-direction: row; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 20px; margin-top: 22px; }
+      .agent.wide .hero-text .t { font-size: 18px; }
+      .agent.wide .cta { white-space: nowrap; font-weight: 800; font-size: 13.5px; background: rgba(255,255,255,0.18); border-radius: 999px; padding: 8px 14px; position: relative; z-index: 1; }
+      @media (max-width: 640px) { .agent.wide { flex-direction: column; align-items: flex-start; } .agent-hero { padding: 16px 14px 14px; border-radius: 18px; } .hero-text .t { font-size: 19px; } }
 
       /* ---------- composer ---------- */
       .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 12px 12px 10px; box-shadow: 0 4px 22px rgba(14,60,70,0.08); transition: border-color .15s, box-shadow .15s; }
@@ -531,11 +550,9 @@
         <button class="btn full sb-new" id="sbNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neue Frage</button>
         <nav class="sb-nav">
           <div class="sb-sec">Allgemeiner Agent</div>
-          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent<span class="cnt soft">Sol + AI:ssociate</span></a>
-          <div class="sb-sec">Spezialagenten</div>
+          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent</a>
+          <div class="sb-sec">Spezialagent</div>
           <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
-          <a class="nav-item" data-nav="tables" href="#/tables" id="navTables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>Review-Tabellen</a>
-          <a class="nav-item" data-nav="workflows" href="#/workflows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Workflows</a>
           <div class="sb-sec">Akten</div>
           <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
           <div class="sb-sec sb-hist" id="sbHistSec" hidden>Verlauf <a href="#/history">Alle</a></div>
@@ -564,26 +581,33 @@
           <main id="home">
             <div class="home-inner">
               <img class="home-logo" src="/aissociate-logo.png" alt="AI:ssociate" />
-              <p class="home-claim">Allgemeiner Agent für Rechtsfragen und Dokumente – Spezialagenten für Due Diligence, Review-Tabellen und Workflows.</p>
-              <div id="composerSlotHome" style="width:100%"></div>
+              <div class="agent-hero" id="agentHero">
+                <div class="hero-head">
+                  <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg></div>
+                  <div class="hero-text">
+                    <div class="k">Allgemeiner Agent · Luna + AI:ssociate + Sol</div>
+                    <div class="t">Assistent</div>
+                    <div class="d">Rechtsfragen mit verifizierten Fundstellen, Verträge prüfen und kommentieren, Entwürfe, Versionsvergleiche, Fristen, Zusammenfassungen – als Antwort oder als Word, Excel und PDF. Letztlich ist alles möglich: Luna formuliert kompakte Fragen, AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf das Dokument.</div>
+                  </div>
+                </div>
+                <div id="composerSlotHome" style="width:100%"></div>
+                <div class="hero-chips" id="heroChips"></div>
+              </div>
               <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können fehlerhaft sein und müssen vor Verwendung juristisch geprüft werden. Fundstellen werden automatisch gegen das RIS geprüft.</p>
+              <button class="agent alt wide" id="ddCard">
+                <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg></div>
+                <div class="hero-text">
+                  <div class="k">Spezialagent · Transaktionen</div>
+                  <div class="t">Due-Diligence-Agent</div>
+                  <div class="d">Datenraum hochladen oder aus SharePoint importieren, feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, AI:ssociate je Prüfbereich, Review durch die Anwältin, Red-Flag-Report als Word und Excel.</div>
+                </div>
+                <span class="cta">Zur Due Diligence ›</span>
+              </button>
               <div class="tour-banner" id="tourBanner" hidden>
                 <span class="sp"><b>Neu hier?</b> In 60 Sekunden durch die Funktionen.</span>
                 <button class="btn ghost" id="tourStart">Tour starten</button>
                 <button class="mini" id="tourSkip">Später</button>
               </div>
-              <section class="section" id="recentSec">
-                <h3 class="section-title">Zuletzt <a href="#/history">Alle anzeigen</a></h3>
-                <div class="recent-list" id="recentList"></div>
-              </section>
-              <section class="section" id="agentsSec">
-                <h3 class="section-title">Spezialagenten <a href="#/workflows">Alle Workflows</a></h3>
-                <div class="agent-grid" id="agentGrid"></div>
-              </section>
-              <section class="section" id="actionsSec">
-                <h3 class="section-title">Workflows <a href="#/workflows">Alle</a></h3>
-                <div class="action-grid" id="actionGrid"></div>
-              </section>
             </div>
           </main>
           <main id="chat" hidden>
@@ -597,23 +621,11 @@
           </main>
         </section>
 
-        <!-- ---------- workflows ---------- -->
-        <section class="view" data-view="workflows"><div class="page">
-          <div class="page-head"><div><h1>Workflows</h1><div class="sub">Geführte Aufgaben mit Formular – explizit programmiert, mit festen Ergebnisformaten.</div></div></div>
-          <h3 class="section-title">Dokumente &amp; Recherche</h3>
-          <div class="action-grid" id="wfGrid"></div>
-          <h3 class="section-title" style="margin-top:28px">Akten &amp; Transaktionen</h3>
-          <div class="action-grid" id="wfGridMatters"></div>
-        </div></section>
-
         <!-- ---------- matters list ---------- -->
         <section class="view" data-view="matters"><div class="page" id="mattersPage"></div></section>
 
         <!-- ---------- matter detail ---------- -->
         <section class="view" data-view="matter"><div class="page" id="matterPage"></div></section>
-
-        <!-- ---------- tables ---------- -->
-        <section class="view" data-view="tables"><div class="page" id="tablesPage"></div></section>
 
         <!-- ---------- history ---------- -->
         <section class="view" data-view="history"><div class="page" style="max-width:760px">
@@ -644,7 +656,8 @@
           </div>
           <div class="card" style="margin-bottom:14px">
             <h3>Modelle &amp; Budget</h3>
-            <div class="kv"><span>Rechtsgebiet, Prüfung, Antwort</span><b id="kvMain">–</b></div>
+            <div class="kv"><span>Planung, Fragen, allgemeine Aufgaben (Luna)</span><b id="kvFast">–</b></div>
+            <div class="kv"><span>Deliverables, DD-Synthese (Sol)</span><b id="kvMain">–</b></div>
             <div class="kv"><span>Dokumentanalyse (Due Diligence)</span><b id="kvExtract">–</b></div>
             <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
             <div class="kv"><span>Websuche (Fallback)</span><b id="kvWeb">–</b></div>
@@ -759,8 +772,11 @@
       function renderModelTags(container, models) {
         container.innerHTML = ''
         if (!models) return
-        container.appendChild(modelTag(models.main || models.loop))
-        if (models.knowledgeBase) { container.appendChild(document.createTextNode(' + ')); container.appendChild(modelTag('aissociate')) }
+        const used = Array.isArray(models.used) && models.used.length ? models.used : [models.main || models.loop]
+        const order = (m) => /luna/i.test(m) ? 0 : /sol/i.test(m) ? 2 : 1
+        const list = [...new Set(used.filter(Boolean))].sort((a, b) => order(a) - order(b))
+        if (models.knowledgeBase) list.splice(1, 0, 'aissociate')
+        list.forEach((m, i) => { if (i) container.appendChild(document.createTextNode(' + ')); container.appendChild(modelTag(m)) })
       }
       let toastT
       function toast(msg, ms = 2400) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms) }
@@ -820,6 +836,7 @@
         dd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>',
         table: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
         matter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+        question: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/></svg>',
         chev: '<svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
       }
       const svg = (name) => { const s = document.createElement('span'); s.innerHTML = ICONS[name] || ICONS.tool; return s.firstChild }
@@ -890,7 +907,7 @@
       $('historyBtn').addEventListener('click', () => navigate('#/history'))
       costPill.addEventListener('click', () => navigate('#/settings'))
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
-      const VIEW_TITLES = { assistant: 'Allgemeiner Agent', workflows: 'Workflows', matters: 'Akten', dd: 'Due Diligence', tables: 'Review-Tabellen', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt' }
+      const VIEW_TITLES = { assistant: 'Allgemeiner Agent', matters: 'Akten', dd: 'Due Diligence', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt' }
       function navigate(hash) { if (location.hash === hash) router(); else location.hash = hash }
       function setTitle(parts) { mainTitle.innerHTML = ''; parts.forEach((p, i) => mainTitle.appendChild(el('span', i < parts.length - 1 ? 'crumb' : '', p))) }
       function showView(name, nav) {
@@ -906,14 +923,14 @@
         const v = seg[0] || 'assistant'
         if (v === 'chat' && seg[1]) { openConversation(seg[1], { silent: true }); return }
         if (v === 'matter' && seg[1]) { await openMatter(seg[1], seg[2] || matterTab); return }
+        if (v === 'workflows') { location.hash = '#/assistant'; return }
+        if (v === 'tables') { location.hash = '#/matters'; return }
         if (!(v in VIEW_TITLES) || v === 'matter') { location.hash = '#/assistant'; return }
         showView(v === 'dd' ? 'matters' : v, v)
         if (v === 'assistant') { if (current?.messages.length) showChat(); else showHome() }
         else setTitle([VIEW_TITLES[v]])
-        if (v === 'workflows') renderWorkflowsPage()
         if (v === 'matters') renderMatters('all')
         if (v === 'dd') renderMatters('dd')
-        if (v === 'tables') renderTablesPage()
         if (v === 'history') renderHistory()
         if (v === 'settings') renderSettings()
       }
@@ -942,37 +959,12 @@
           { k: 'question', label: 'Schwerpunkt (optional)', type: 'text', ph: 'z. B. Haftungsfragen, Zahlungsmodalitäten' } ] },
         deadlines: { title: 'Fristen erkennen', desc: 'Alle Fristen mit Auslöser, Berechnung und Rechtsfolge – als Tabelle und Excel-Datei.', icon: 'deadline', needsFiles: true, fields: [ { k: 'reference_date', label: 'Stichtag (optional)', type: 'date' } ] },
       }
-      const MATTER_WORKFLOWS = [
-        { key: 'dd', title: 'Due Diligence', desc: 'Datenraum hochladen oder aus SharePoint importieren, feste Prüfbereiche (Gesellschaft, Verträge, Arbeit, Immobilien, IP/IT, Compliance, Verfahren, Finanzierung, Steuern), jeder Befund mit Zitat und Fundstelle – Red Flag Report als Word und Excel.', icon: 'dd', run: () => openMatterWizard('dd') },
-        { key: 'table', title: 'Review-Tabelle', desc: 'Viele Dokumente, gleiche Fragen: Vertragsübersicht, Dienstverträge, Mietverträge, Fristenchronologie oder eigene Spalten – jede Zelle mit Beleg und Fundstelle, Export nach Excel.', icon: 'table', run: () => chooseMatterForTable() },
-        { key: 'matter', title: 'Akt anlegen', desc: 'Dokumente einer Causa sammeln, analysieren lassen und Fragen im Kontext des Akts stellen – mit Wissensdatenbank und RIS-Prüfung.', icon: 'matter', run: () => openMatterWizard('matter') },
-      ]
-      function actionTile(w, onClick, alt) {
-        const b = el('button', 'action' + (alt ? ' alt' : ''))
-        const ico = el('div', 'ico'); ico.appendChild(svg(w.icon)); b.appendChild(ico)
-        b.appendChild(el('div', 't', w.title)); b.appendChild(el('div', 'd', w.desc))
-        b.addEventListener('click', onClick)
-        return b
-      }
-      const AGENTS = [
-        { key: 'dd', cls: 'alt', kind: 'Spezialagent · Transaktionen', title: 'Due-Diligence-Agent', desc: 'Datenraum lesen, Befunde mit Zitat und Fundstelle, AI:ssociate je Prüfbereich, Red-Flag-Report als Word und Excel.', icon: 'dd', run: () => navigate('#/dd') },
-        { key: 'tables', cls: '', kind: 'Spezialagent · Dokumente', title: 'Review-Agent', desc: 'Viele Dokumente, gleiche Spalten – Vertragsübersichten, Dienst- und Mietverträge, Fristen, jede Zelle belegt.', icon: 'table', run: () => navigate('#/tables') },
-        { key: 'wf', cls: 'gray', kind: 'Spezialagenten · Workflows', title: 'Vertrag, Vergleich, Entwurf, Fristen', desc: 'Formulargeführte Spezialaufgaben mit festem Ablauf: eine AI:ssociate-Antwort, Ergebnis als Word, Excel oder Redline.', icon: 'contract', run: () => navigate('#/workflows') },
-      ]
-      function renderAgents() {
-        const g = $('agentGrid'); if (!g) return; g.innerHTML = ''
-        for (const a of AGENTS) { const b = el('button', 'agent ' + a.cls); const ico = el('div', 'ico'); ico.appendChild(svg(a.icon)); b.appendChild(ico); b.appendChild(el('div', 'k', a.kind)); b.appendChild(el('div', 't', a.title)); b.appendChild(el('div', 'd', a.desc)); b.addEventListener('click', a.run); g.appendChild(b) }
-      }
+      // The workflow forms live behind the chips under the composer (structured inputs, fixed outputs).
       function renderActions() {
-        renderAgents()
-        const g = $('actionGrid'); g.innerHTML = ''
-        for (const [key, w] of Object.entries(WORKFLOWS)) { const b = actionTile(w, () => openTask(key)); b.dataset.wf = key; g.appendChild(b) }
-      }
-      function renderWorkflowsPage() {
-        const g = $('wfGrid'); g.innerHTML = ''
-        for (const [key, w] of Object.entries(WORKFLOWS)) g.appendChild(actionTile(w, () => openTask(key)))
-        const m = $('wfGridMatters'); m.innerHTML = ''
-        for (const w of MATTER_WORKFLOWS) m.appendChild(actionTile(w, w.run, true))
+        const c = $('heroChips'); if (!c) return; c.innerHTML = ''
+        c.appendChild(el('span', 'lbl', 'Vorlagen'))
+        for (const [key, w] of Object.entries(WORKFLOWS)) { const b = el('button', null, w.title); b.dataset.wf = key; b.title = w.desc; b.addEventListener('click', () => openTask(key)); c.appendChild(b) }
+        $('ddCard').onclick = () => navigate('#/dd')
       }
 
       function openTask(key) {
@@ -1232,12 +1224,7 @@
         if (!silent && location.hash !== '#/chat/' + id) history.replaceState(null, '', '#/chat/' + id)
       }
       function deleteConversation(id) { convos = convos.filter((c) => c.id !== id); saveConvos(); renderRecent(); renderSidebarRecent(); renderHistory(); if (current?.id === id) newConversation() }
-      function renderRecent() {
-        const list = $('recentList'); list.innerHTML = ''
-        const items = convos.slice(0, 4)
-        $('recentSec').hidden = !items.length
-        for (const c of items) { const b = el('button', 'recent-item'); b.appendChild(el('div', 't', c.title || 'Gespräch')); b.appendChild(el('div', 'd', `${fmtDate(c.updatedAt)} · ${c.messages.filter((m) => m.role === 'user').length} Frage${c.messages.filter((m) => m.role === 'user').length === 1 ? '' : 'n'}${c.matter ? ' · Akt ' + c.matter.name : ''}`)); b.addEventListener('click', () => navigate('#/chat/' + c.id)); list.appendChild(b) }
-      }
+      function renderRecent() {}
       function renderSidebarRecent() {
         const box = $('sbRecent'); box.innerHTML = ''
         $('sbHistSec').hidden = !convos.length
@@ -2039,17 +2026,6 @@
         })
         a.append(c, g); card.appendChild(a); $('taskModal').classList.add('show'); setTimeout(() => preset.focus(), 30)
       }
-      async function renderTablesPage() {
-        const page = $('tablesPage'); page.innerHTML = ''
-        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, 'Review-Tabellen')); hl.appendChild(el('div', 'sub', 'Strukturierte Auswertung vieler Dokumente nach gleichen Spalten – mit Beleg und Fundstelle je Zelle, Export nach Excel.')); head.appendChild(hl)
-        const acts = el('div', 'acts'); const b = el('button', 'btn', 'Neue Tabelle'); b.addEventListener('click', () => chooseMatterForTable()); acts.appendChild(b); head.appendChild(acts); page.appendChild(head)
-        const grid = el('div', 'cards'); grid.appendChild(el('div', 'recent-empty', 'Lädt…')); page.appendChild(grid)
-        await loadDdConfig(); await loadMatters()
-        const withTables = mattersCache.filter((m) => m.tables)
-        grid.innerHTML = ''
-        if (!withTables.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, 'Noch keine Tabellen')); e.appendChild(document.createTextNode('Tabellen gehören zu einem Akt: Akt wählen (oder anlegen), Dokumente hochladen, Spalten festlegen.')); grid.appendChild(e); return }
-        for (const m of withTables) { const c = matterCard(m); c.querySelector('.foot').prepend(el('span', 'pill teal', `${m.tables} Tabelle${m.tables > 1 ? 'n' : ''}`)); c.addEventListener('click', () => navigate(`#/matter/${m.id}/tables`), { capture: true }); grid.appendChild(c) }
-      }
       async function chooseMatterForTable() {
         await loadMatters()
         if (!mattersCache.length) { openMatterWizard('matter'); return }
@@ -2107,7 +2083,7 @@
         setSwitch('swWeb', settings.webSearch !== false); renderMsUi()
         $('kvOwner').textContent = ownerKey
         if (health) {
-          $('kvMain').textContent = health.models?.main || '–'; $('kvCode').textContent = health.models?.code || '–'; $('kvExtract').textContent = health.models?.extract || health.models?.main || '–'
+          $('kvMain').textContent = health.models?.main || '–'; $('kvFast').textContent = health.models?.fast || '–'; $('kvCode').textContent = health.models?.code || '–'; $('kvExtract').textContent = health.models?.extract || health.models?.main || '–'
           $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
           $('kvBudget').textContent = `${(health.budget?.inMax / 1e6).toFixed(0)} Mio in / ${(health.budget?.outMax / 1e3).toFixed(0)}k out`
         }
@@ -2120,12 +2096,11 @@
       // Feature tour
       // ------------------------------------------------------------------
       const TOUR = [
-        { sel: '#composer', title: 'Fragen stellen', text: 'Rechtsfragen in natürlicher Sprache. Sol wählt das Rechtsgebiet, die juristische Wissensdatenbank AI:ssociate recherchiert und antwortet; reicht das nicht, ergänzt Sol mit höchstens drei Websuchen. Jede Fundstelle wird gegen das RIS geprüft.' },
+        { sel: '#agentHero', title: 'Allgemeiner Agent', text: 'Rechtsfragen und Dokumentaufgaben in natürlicher Sprache. Luna wählt das Rechtsgebiet und formuliert kompakte Fragen, die Wissensdatenbank AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf Word, Excel oder PDF. Jede Fundstelle wird gegen das RIS geprüft.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
         { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
         { sel: '#matterBtn', title: 'Fragen zum Akt', text: 'Eine Frage im Kontext eines Akts stellen: die gespeicherte Analyse (Befunde, Zusammenfassungen) und ausgewählte Dokumente gehen als Kontext mit.' },
-        { sel: '#navDd', title: 'Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Request List, Red Flag Report als Word und Excel.', nav: true },
-        { sel: '#navTables', title: 'Review-Tabellen', text: 'Viele Dokumente, gleiche Spalten: Vertragsübersicht, Dienstverträge, Mietverträge, Fristen – jede Zelle mit Beleg. Export nach Excel.', nav: true },
+        { sel: '#navDd', title: 'Spezialagent Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Review-Tabellen im Akt, Request List, Red-Flag-Report als Word und Excel.', nav: true },
         { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Modelle, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
       ]
       let tourIdx = -1, tourCard = null, tourTarget = null
@@ -2157,7 +2132,7 @@
           if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
         } catch { toast('Server nicht erreichbar.') }
       }
-      renderActions(); renderRecent(); renderSidebarRecent()
+      renderActions(); renderSidebarRecent()
       try {
         const q = new URLSearchParams(location.search)
         if (q.get('ms') === 'connected') toast('Microsoft 365 verbunden.')

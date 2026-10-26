@@ -8,10 +8,10 @@ eine Seite `public/index.html`, Render).
 
 | Bereich | Funktion | Umsetzung |
 |---|---|---|
-| Allgemeiner Agent (Assistent) | Rechtsfrage → Sol wählt Rechtsgebiet → AI:ssociate-Wissensdatenbank (agentisch, gestreamt) → Sol prüft, ergänzt ausnahmsweise mit ≤ 3 Websuchen → RIS-Verifikation aller §§/GZ → Links im Text. Dokumentaufgaben: Anhänge bis 80k Zeichen gehen als Volltext an Sol, genau eine AI:ssociate-Antwort (gestreamt), Sol arbeitet sie in das Deliverable ein | explizit |
+| Allgemeiner Agent (Assistent) | Luna wählt Modus und Rechtsgebiet und formuliert 1–3 kompakte Fragen → AI:ssociate antwortet kurz mit Fundstellen (eine gestreamte Anfrage oder parallele Anfragen) → Antwort wird direkt angezeigt; RIS-Verifikation aller §§/GZ → Links im Text. Dokumentaufgaben: AI:ssociate beantwortet Lunas Fragen zuerst, dann erstellt Sol aus Dokumenttext (bis 80k Zeichen inline) und Antworten das Deliverable per Code-Generierung oder antwortet direkt. Allgemeine Aufgaben: Luna. Sol-Nachprüfung mit Websuche nur optional (`REVIEW_ANSWERS=on`) | explizit |
 | Workflows | Rechtsrecherche, Vertrag prüfen (Kommentare im Word), Versionen vergleichen (Redline), Entwurf, Zusammenfassen, Fristen | explizit gesteuert, Deliverable per Code-Generierung in der Sandbox |
 | Akten | Dokumente je Causa (Upload, OneDrive/SharePoint-Import inkl. ganzer Ordner), Volltexte, Fragen im Kontext der Akte | explizit |
-| Due Diligence (Spezialagent) | Feste Prüfbereiche mit Red-Flag-Katalog und Regel-IDs (GES-001 …), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Deal-Impact + Normen, **Evidenzbindung** (jedes Zitat wird im Dokumenttext gesucht: belegt / teilweise / unbelegt), eine gebündelte **AI:ssociate-Rechtsfrage je Prüfbereich**, Synthese je Bereich, Executive Summary, RIS-Prüfung, **Review-Status je Befund** (Freigabe, Grad, Vermerk, manuelle Befunde), Request List, Red-Flag-Report (Word) und Workbook (Excel) mit stabilen IDs; Kostenschätzung vor jedem Lauf | explizit |
+| Due Diligence (Spezialagent) | Feste Prüfbereiche mit Red-Flag-Katalog und Regel-IDs (GES-001 …), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Deal-Impact + Normen, **Evidenzbindung** (jedes Zitat wird im Dokumenttext gesucht: belegt / teilweise / unbelegt), **je Prüfbereich 1–3 von Luna formulierte kompakte AI:ssociate-Fragen** (kurze Antworten), Synthese je Bereich, Executive Summary, RIS-Prüfung, **Review-Status je Befund** (Freigabe, Grad, Vermerk, manuelle Befunde), Request List, Red-Flag-Report (Word) und Workbook (Excel) mit stabilen IDs; Kostenschätzung vor jedem Lauf | explizit |
 | Review-Tabellen | Gleiche Spalten über viele Dokumente (Vertragsübersicht, Dienstverträge, Mietverträge, Fristen, Steuerbescheide, eigene Spalten); jede Zelle mit Beleg und Fundstelle; Excel-Export | explizit |
 | Microsoft 365 | OAuth/PKCE, Browser für OneDrive/SharePoint, Anhängen, Import in Akten, Rückschreiben von Ergebnissen und Berichten (nie überschreiben) | explizit |
 | Lange Vorgänge | Server-Jobs mit Ereignisprotokoll, Wiederanbindung nach Verbindungsabbruch, Pausieren/Fortsetzen, Budget je Akte | explizit |
@@ -46,8 +46,9 @@ nicht in einem freien Agentenlauf mit unbekannt vielen Schritten enden).
 * **Verifikation**: Normzitate und Geschäftszahlen werden deterministisch
   gegen die RIS-API geprüft (BrKons mit Abschnitt + Fassung, Judikatur mit
   Geschäftszahl). Das ist bewusst kein Modell-Urteil.
-* **Rechtsfragen**: genau ein Aufruf der Wissensdatenbank, höchstens drei
-  Websuchen, keine offenen Agentenschleifen.
+* **Rechtsfragen**: ein Luna-Aufruf für Planung und Fragen, höchstens drei
+  Wissensdatenbank-Anfragen (parallel), keine offenen Agentenschleifen; Sol nur,
+  wenn ein Dokument zu erzeugen ist.
 
 ### 2.2 Code-Generierung in der Sandbox (Ausnahme für das Unvorhersehbare)
 

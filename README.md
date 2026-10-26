@@ -8,25 +8,26 @@ Every cited § / Geschäftszahl is then **verified against the RIS**. Documents 
 be uploaded, analysed and returned as Word/Excel/PDF — the code for that is a
 single tool call executed in an **E2B sandbox** (never shown to the user).
 
-## How a question is processed (≈ 5 steps)
+## How a question is processed
 
 ```
-question ──▶ Sol: mode + legal area (1 call) ──▶ legal    → AI:ssociate API (1 call, streamed)
-                                                            → Sol review: sufficient | ≤ 3 web searches + supplement
-                                               ├▶ document → short Sol tool loop (read_document, create_or_edit_file,
-                                               │              ask_aissociate ×1, web_search ≤ 3)
-                                               └▶ general  → Sol answers directly
-                                                     │
-                   RIS verification of §§ / GZ (deterministic) → citations in the answer linked to RIS
+question ──▶ Luna: mode, legal area, 1–3 compact questions (1 call)
+               ├▶ legal    → AI:ssociate (one streamed call, or parallel calls, short answers) → shown as is
+               ├▶ document → AI:ssociate answers Luna's questions → Sol builds the deliverable
+               │              (document text inline, create_or_edit_file in the sandbox) or answers
+               └▶ general  → Luna answers directly
+                     │
+   RIS verification of §§ / GZ (deterministic) → citations in the answer linked to RIS
 ```
 
 * **Knowledge base:** `POST /api/public/v1/chat/ask` on app.aissociate.at
   (header `x-api-key`, SSE stream; legal areas civil / criminal / tax / public,
   optional Bundesland scope; `thread_id` keeps follow-ups in one thread). The
   documents it consults are shown live as research steps.
-* **Models:** `gpt-6-sol` for the legal-area decision, review, document tasks
-  and final answers; the code model defaults to Sol (set `OPENAI_MODEL_CODE` if
-  you have another id).
+* **Models:** `gpt-6-luna` (`OPENAI_MODEL_FAST`) for planning, question
+  formulation, general tasks and the per-document due-diligence analysis;
+  `gpt-6-sol` (`OPENAI_MODEL_MAIN`) for deliverables and the DD synthesis; the
+  code model defaults to Sol.
 * **Verification:** each cited § / Art is looked up in RIS BrKons via
   `Abschnitt.Typ/Von/Bis` + `Fassung.FassungVom=today`, each Geschäftszahl via
   the Judikatur endpoint; confirmed citations become links in the answer.
@@ -59,12 +60,18 @@ request takes `msFiles` and `msSync`.
 
 ## Agents
 
-The sidebar separates the **general agent** (Assistent: one question → Sol
-picks the legal area → one AI:ssociate call → review → RIS verification; for
-document tasks the attachment text goes to Sol directly, the single
-AI:ssociate answer is streamed and worked into the deliverable) from the
-**specialist agents** with fixed pipelines: Due Diligence, Review-Tabellen and
-the form-driven workflows. Each matter is "der Akt" in the UI.
+Two agents, one sidebar. The **general agent** (Assistent) can ultimately do
+everything: **Luna** (fast, cheap) decides the mode and the legal area and
+formulates one to three *compact* questions, the **AI:ssociate knowledge base**
+answers each briefly with references (several questions run in parallel), and
+only at the end does **Sol** act when a deliverable is needed: it builds Word,
+Excel, PDF or a redline from the document and the answers (code generation in
+the sandbox), otherwise the knowledge-base answer is shown as is. Every cited
+§ / Geschäftszahl is verified against the RIS. The optional Sol review with web
+searches is off by default (`REVIEW_ANSWERS=on` re-enables it). The
+**specialist agent** Due Diligence runs the fixed pipeline below; review tables
+and the form-driven workflows live inside it (tabs of the Akt) and under the
+composer ("Vorlagen"). Each matter is "der Akt".
 
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
@@ -80,8 +87,8 @@ can be paused, and survives closed browser tabs.
 explicit pipeline, not an agent: Text → per-document analysis (strict JSON
 schema: type, area, parties, key terms, findings with quote + location +
 severity + recommendation + norms, questions) → synthesis per review area →
-one bundled AI:ssociate question per review area (the red/amber findings with
-their quotes, answered by the knowledge base and fed into the synthesis) →
+per review area Luna formulates 1–3 compact questions from the red/amber findings,
+AI:ssociate answers each briefly (fed into the synthesis and the report) →
 executive summary → RIS verification of every cited norm → Word Red-Flag-Report
 + Excel workbook from fixed templates. Every finding has a stable id (F-001),
 a document id (D-001), a deal-impact instrument, an evidence status (the quote
