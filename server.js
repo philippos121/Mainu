@@ -271,6 +271,7 @@ function htmlToText(html) {
 // document_number, anonymization_meta, qa_metadata, evaluation_metadata).
 // ---------------------------------------------------------------------------
 const LEGAL_AREAS = { civil: 'zivilrechtogh', criminal: 'strafrecht', tax: 'steuerrecht', public: 'publiclaw' }
+const isLegalArea = (x) => typeof x === 'string' && Object.hasOwn(LEGAL_AREAS, x)
 const LEGAL_AREA_LABEL = { civil: 'Zivilrecht', criminal: 'Strafrecht', tax: 'Steuerrecht', public: 'Öffentliches Recht', none: 'allgemein' }
 const SCOPES = ['Bund', 'Steiermark', 'Tirol', 'Wien', 'Kärnten', 'Niederösterreich', 'Oberösterreich', 'Vorarlberg', 'Burgenland', 'Salzburg']
 
@@ -1603,8 +1604,10 @@ app.post('/api/chat', async (req, res) => {
 
   const { history = [], files: rawUploads = [], sessionId, webSearch = true, task = null, aissThreadId = null, msFiles: rawMsFiles = [], msSync = null } = body
   // Knowledge base picked in the UI ("Automatisch" sends nothing): pins the legal area, the planner still decides the mode.
-  const pickedArea = typeof body.legalArea === 'string' && LEGAL_AREAS[body.legalArea] ? body.legalArea : null
+  const pickedArea = isLegalArea(body.legalArea) ? body.legalArea : null
   const pickedScope = pickedArea === 'public' && typeof body.scope === 'string' && SCOPES.includes(body.scope) ? body.scope : null
+  // Also told to the model that answers directly (easy legal questions, document tasks, fallback without knowledge base).
+  const areaHint = pickedArea ? `GEWÄHLTE WISSENSDATENBANK: ${LEGAL_AREA_LABEL[pickedArea]}${pickedScope ? ` (${pickedScope})` : ''} – Rechtsfragen nach österreichischem Recht in diesem Rechtsgebiet beantworten.\n\n` : ''
   let prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   let taskExtra = ''
   let forceMode = null
@@ -1760,7 +1763,7 @@ app.post('/api/chat', async (req, res) => {
   async function toolAskAissociate(args) {
     if (aissCalls >= 1) return { text: `Limit erreicht: Die Wissensdatenbank wurde in dieser Aufgabe bereits befragt. Arbeite mit der vorliegenden Antwort weiter${useWeb ? ` (ggf. web_search, insgesamt höchstens ${MAX_WEB_SEARCHES} Suchen)` : ''}.`, detail: 'Limit (1 Aufruf)' }
     // Streamed, so the user watches the knowledge base answer arrive while the document task waits for it.
-    const r = await runAissociate({ question: String(args.question || ''), legalArea: LEGAL_AREAS[args.legal_area] ? args.legal_area : 'civil', scope: args.scope && SCOPES.includes(args.scope) ? args.scope : '', stream: true })
+    const r = await runAissociate({ question: String(args.question || ''), legalArea: isLegalArea(args.legal_area) ? args.legal_area : 'civil', scope: args.scope && SCOPES.includes(args.scope) ? args.scope : '', stream: true })
     const srcLines = r.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')
     return { text: `ANTWORT DER WISSENSDATENBANK:\n${r.answer}\n${srcLines ? `\nQUELLEN:\n${srcLines}` : ''}`, detail: 'Antwort erhalten', skipStep: true }
   }
@@ -1915,7 +1918,7 @@ app.post('/api/chat', async (req, res) => {
       : ''
     const inlineDocs = inlineAll ? uploads.map((u) => `=== DOKUMENT: ${u.name}${uploadTexts.get(u.name).pages ? ` (${uploadTexts.get(u.name).pages} Seiten)` : ''} ===\n${uploadTexts.get(u.name).text}\n=== ENDE ${u.name} ===`).join('\n\n') + '\n\n' : ''
     const matterLine = matterCtx ? `AKTENKONTEXT (gespeicherte Analyse des Akts; Befunde mit Zitat und Fundstelle sind belegt, alles andere ist Zusammenfassung):\n${matterCtx}\n\n` : ''
-    const userContent = (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + inlineDocs + prompt
+    const userContent = areaHint + (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + inlineDocs + prompt
 
     // ---- 1. plan: Luna decides the mode and formulates compact questions for the knowledge base ----
     const pid = step('triage', 'Anfrage wird analysiert', { model: MODEL_FAST })
@@ -1936,7 +1939,7 @@ app.post('/api/chat', async (req, res) => {
     if (uploads.length) plan.mode = 'document'
     // A preset decides the mode, except that attached documents must not be ignored.
     if (forceMode && !(uploads.length && forceMode === 'legal')) plan.mode = forceMode
-    if (!LEGAL_AREAS[plan.legal_area]) plan.legal_area = plan.mode === 'legal' ? 'civil' : 'none'
+    if (!isLegalArea(plan.legal_area)) plan.legal_area = plan.mode === 'legal' ? 'civil' : 'none'
     if (!SCOPES.includes(plan.scope)) plan.scope = ''
     if (pickedArea && plan.mode !== 'general') { plan.legal_area = pickedArea; if (pickedArea === 'public') plan.scope = pickedScope || plan.scope; else plan.scope = '' }
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]

@@ -98,6 +98,7 @@
       .kb-row:hover, .kb-row:focus-visible { background: var(--surface); color: var(--text); }
       .kb-row:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
       .kb-row.on { background: var(--surface); color: var(--text); font-weight: 700; box-shadow: inset 4px 0 0 var(--orange); }
+      .kb-row.on:focus-visible { box-shadow: inset 4px 0 0 var(--orange), inset 0 0 0 2px var(--accent); }
       .kb-row .kt { flex: 1; min-width: 0; }
       .kb-row .ks { display: block; font-size: 12.5px; font-weight: 400; color: var(--faint); margin-top: 1px; }
       .kb-row select { flex: 0 0 auto; font-family: inherit; font-size: 14.5px; font-weight: 500; color: var(--text); background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2344555e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 14px; border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 30px 7px 12px; appearance: none; -webkit-appearance: none; cursor: pointer; max-width: 168px; }
@@ -114,6 +115,7 @@
       #home .composer textarea { font-size: 19px; padding: 6px 6px 12px; min-height: 42px; }
       #home .composer textarea::placeholder { color: #5b6b73; }
       .disclaimer { color: var(--muted); font-size: 12.5px; text-align: center; line-height: 1.5; margin: 14px auto 0; max-width: 560px; }
+      .recent-empty { font-size: 13px; color: var(--faint); }
 
       /* ---------- composer ---------- */
       .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 12px 12px 10px; box-shadow: 0 4px 22px rgba(14,60,70,0.08); transition: border-color .15s, box-shadow .15s; }
@@ -506,7 +508,10 @@
       @media (max-width: 640px) {
         .home-logo { height: 38px; margin: 36px 0 32px; }
         .kb-row { padding: 14px 16px; font-size: 16px; }
-        .kb-row select { max-width: 150px; font-size: 14px; }
+        .kb-row select { max-width: 166px; font-size: 14px; padding: 7px 26px 7px 10px; background-position: right 8px center; }
+        .composer-bar { min-width: 0; }
+        .ctool.kb { min-width: 0; flex: 0 1 auto; }
+        .ctool.kb .klbl { max-width: 92px; }
         .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
         .chips::-webkit-scrollbar { display: none; }
         .chips button { flex: 0 0 auto; }
@@ -947,35 +952,43 @@
         if (scope !== undefined) settings.scope = SCOPES.includes(scope) ? scope : ''
         saveSettings(); renderKb()
       }
-      function renderKbList(container, onPick) {
+      // Builds a list once; later changes only toggle classes/values (keeps focus and keyboard navigation intact).
+      function buildKbList(container) {
         container.innerHTML = ''
         for (const it of KB_ITEMS) {
-          const on = settings.kb === it.k
-          const row = el('div', 'kb-row' + (on ? ' on' : '')); row.setAttribute('role', 'radio'); row.setAttribute('aria-checked', String(on)); row.tabIndex = 0; row.dataset.kb = it.k
+          const row = el('div', 'kb-row'); row.setAttribute('role', 'radio'); row.tabIndex = 0; row.dataset.kb = it.k
           const t = el('span', 'kt', it.label); if (it.sub) t.appendChild(el('span', 'ks', it.sub)); row.appendChild(t)
           if (it.scope) {
             const s = el('select'); s.setAttribute('aria-label', 'Bundesland')
             const o0 = el('option', null, 'Bundesland'); o0.value = ''; s.appendChild(o0)
             for (const sc of SCOPES) { const o = el('option', null, sc); o.value = sc; s.appendChild(o) }
-            s.value = settings.scope || ''
-            s.addEventListener('click', (e) => e.stopPropagation()); s.addEventListener('keydown', (e) => e.stopPropagation())
-            s.addEventListener('change', () => { setKb(it.k, s.value); onPick?.() })
+            s.addEventListener('click', (e) => e.stopPropagation())
+            s.addEventListener('change', () => setKb(it.k, s.value))
             row.appendChild(s)
           }
-          const pick = () => { setKb(it.k); onPick?.() }
-          row.addEventListener('click', pick)
-          row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick() } })
+          row.addEventListener('click', () => setKb(it.k))
+          // Enter/Space select the row; keys inside the <select> (arrows, Enter, Escape) are left to the select and the document.
+          row.addEventListener('keydown', (e) => { if (e.target.tagName === 'SELECT') return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setKb(it.k) } })
           container.appendChild(row)
         }
+        syncKbList(container)
       }
-      function renderKb() { renderKbList($('kbList')); $('kbBtnLbl').textContent = kbLabel(); $('kbBtn').classList.toggle('on', settings.kb !== 'auto') }
+      function syncKbList(container) {
+        for (const row of container.querySelectorAll('.kb-row')) {
+          const on = row.dataset.kb === settings.kb
+          row.classList.toggle('on', on); row.setAttribute('aria-checked', String(on))
+          const s = row.querySelector('select'); if (s && s.value !== (settings.scope || '')) s.value = settings.scope || ''
+        }
+      }
+      function renderKb() { document.querySelectorAll('.kb-list').forEach(syncKbList); $('kbBtnLbl').textContent = kbLabel(); $('kbBtn').title = 'Wissensdatenbank: ' + kbLabel(); $('kbBtn').classList.toggle('on', settings.kb !== 'auto') }
       function openKbDialog() {
         const card = $('dlgCard'); card.innerHTML = ''
         card.appendChild(el('h2', null, 'Wissensdatenbank'))
         card.appendChild(el('div', 'md', 'Legt fest, welche juristische Wissensdatenbank bei Rechtsfragen antwortet. „Automatisch“ erkennt das Rechtsgebiet aus der Frage.'))
-        const list = el('div', 'kb-list'); const refresh = () => renderKbList(list, refresh); refresh(); card.appendChild(list)
-        const a = el('div', 'modal-actions'); const g = el('button', 'btn', 'Fertig'); g.addEventListener('click', closeDlg); a.appendChild(g); card.appendChild(a)
+        const list = el('div', 'kb-list'); buildKbList(list); card.appendChild(list)
+        const a = el('div', 'modal-actions'); const g = el('button', 'btn', 'Fertig'); g.addEventListener('click', () => { closeDlg(); $('kbBtn').focus() }); a.appendChild(g); card.appendChild(a)
         $('dlg').classList.add('show')
+        setTimeout(() => (list.querySelector('.kb-row.on') || list.firstChild)?.focus(), 30)
       }
       $('kbBtn').addEventListener('click', openKbDialog)
 
@@ -2142,7 +2155,7 @@
           if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
         } catch { toast('Server nicht erreichbar.') }
       }
-      renderActions(); renderKb(); renderSidebarRecent()
+      renderActions(); buildKbList($('kbList')); renderKb(); renderSidebarRecent()
       try {
         const q = new URLSearchParams(location.search)
         if (q.get('ms') === 'connected') toast('Microsoft 365 verbunden.')
