@@ -1558,14 +1558,14 @@
           trans = el('select'); for (const [v, l] of [['share', 'Share Deal (Anteilskauf)'], ['asset', 'Asset Deal (Betriebserwerb)']]) { const o = el('option', null, l); o.value = v; trans.appendChild(o) }
           persp = el('select'); for (const [v, l] of [['buyer', 'Käufer (Buyer DD)'], ['seller', 'Verkäufer (Vendor DD)']]) { const o = el('option', null, l); o.value = v; persp.appendChild(o) }
           mat = el('input'); mat.type = 'number'; mat.value = '50000'; mat.min = '0'; mat.step = '1000'
-          budget = el('select'); for (const [v, l] of [['4000000', '4 Mio. Tokens (≈ 60–120 Dokumente)'], ['8000000', '8 Mio. Tokens (Standard)'], ['20000000', '20 Mio. Tokens (großer Datenraum)'], ['50000000', '50 Mio. Tokens']]) { const o = el('option', null, l); o.value = v; if (v === '8000000') o.selected = true; budget.appendChild(o) }
+          budget = el('select'); for (const [v, l] of [['5000000', '5 Mio. Eingabe / 0,5 Mio. Ausgabe'], ['10000000', '10 Mio. Eingabe / 1 Mio. Ausgabe (Standard)'], ['20000000', '20 Mio. Eingabe / 2 Mio. Ausgabe (großer Datenraum)'], ['50000000', '50 Mio. Eingabe / 5 Mio. Ausgabe']]) { const o = el('option', null, l); o.value = v; if (v === '10000000') o.selected = true; budget.appendChild(o) }
           form.appendChild(field('Zielunternehmen', target))
           const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); form.appendChild(row)
-          const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeitsschwelle (EUR)', mat, 'Beträge darunter werden höchstens als grün/Hinweis eingestuft.')); row2.appendChild(field('Token-Budget', budget, 'Die Analyse pausiert, wenn es erreicht ist; danach erhöhen und fortsetzen.')); form.appendChild(row2)
+          const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeitsschwelle (EUR)', mat, 'Beträge darunter werden höchstens als grün/Hinweis eingestuft.')); row2.appendChild(field('Token-Budget je Due Diligence', budget, 'Inklusive geschätzter AI:ssociate-Tokens. Die Analyse pausiert, wenn es erreicht ist; danach erhöhen und fortsetzen.')); form.appendChild(row2)
           const ch = el('div', 'checks')
           for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = true; cb.value = a.key; areaBoxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
           form.appendChild(field('Prüfbereiche', ch, 'Rechts-DD und Tax-DD; abwählen, was nicht beauftragt ist.'))
-          kb = el('input'); kb.type = 'checkbox'; kb.checked = true; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtliche Einordnung je Prüfbereich durch die AI:ssociate-Wissensdatenbank (eine gebündelte Rechtsfrage je Bereich, ca. 1–3 Min.)')); form.appendChild(field('Wissensdatenbank', kbl))
+          kb = el('input'); kb.type = 'checkbox'; kb.checked = true; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtsfragen je Dokument klären: schwierige durch die AI:ssociate-Wissensdatenbank (eine Anfrage je Dokument), einfache per Websuche')); form.appendChild(field('Wissensdatenbank', kbl))
         }
         const act = el('div', 'modal-actions'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.type = 'button'; cancel.addEventListener('click', closeTask); const go = el('button', 'btn', 'Anlegen'); go.type = 'submit'; act.append(cancel, go); form.appendChild(act)
         form.addEventListener('submit', async (e) => {
@@ -1573,7 +1573,7 @@
           if (!name.value.trim()) { name.focus(); return }
           go.disabled = true
           try {
-            const settings = kind === 'dd' ? { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, budgetTokens: Number(budget.value), knowledgeBase: kb.checked, areas: areaBoxes.filter((b) => b.checked).map((b) => b.value) } : { reference: reference.value.trim() }
+            const settings = kind === 'dd' ? { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, budgetTokens: Number(budget.value), budgetOutTokens: Math.round(Number(budget.value) / 10), knowledgeBase: kb.checked, areas: areaBoxes.filter((b) => b.checked).map((b) => b.value) } : { reference: reference.value.trim() }
             const r = await api('/api/matters', { method: 'POST', body: { name: name.value.trim(), kind, client: client.value.trim(), settings } })
             closeTask(); toast(kind === 'dd' ? 'Due Diligence angelegt – jetzt Dokumente hinzufügen.' : 'Akt angelegt.')
             await loadMatters(); navigate(`#/matter/${r.matter.id}/documents`)
@@ -1672,7 +1672,7 @@
         let est = null
         try { est = (await api(`/api/matters/${m.id}/dd/estimate`)).estimate } catch {}
         if (est && est.documents) {
-          const txt = `${est.documents} Dokument${est.documents === 1 ? '' : 'e'} (${est.chunks} Analyseabschnitte) · geschätzt ${fmtTok(est.inTok)} Eingabe-Tokens ≈ ${fmtUsd(est.usd)}${est.kbCalls ? ` · bis zu ${est.kbCalls} AI:ssociate-Anfragen` : ''} · Dauer grob ${est.minutes} Min. Die Analyse läuft auf dem Server weiter, auch wenn du die Seite verlässt; Pausieren ist jederzeit möglich.`
+          const txt = `${est.documents} Dokument${est.documents === 1 ? '' : 'e'} (${est.chunks} Analyseabschnitte) · geschätzt ${fmtTok(est.inTok)} Eingabe- / ${fmtTok(est.outTok)} Ausgabe-Tokens ≈ ${fmtUsd(est.usd)}${est.kbCalls ? ` · bis zu ${est.kbCalls} AI:ssociate-Anfragen (eine je Dokument mit schwierigen Rechtsfragen)` : ''} · Dauer grob ${est.minutes} Min. bei paralleler Verarbeitung. Die Analyse läuft auf dem Server weiter, auch wenn du die Seite verlässt; Pausieren ist jederzeit möglich.`
           if (!(await confirmDlg(opts.reanalyse ? 'Alles neu analysieren?' : 'Analyse starten?', txt, { ok: 'Starten', danger: false }))) return
         }
         try { const r = await api(`/api/matters/${m.id}/dd/run`, { method: 'POST', body: opts }); toast('Analyse gestartet.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) }
@@ -1703,14 +1703,15 @@
         const persp = el('select'); for (const [v, l] of [['buyer', 'Käufer'], ['seller', 'Verkäufer']]) { const o = el('option', null, l); o.value = v; o.selected = s.perspective === v; persp.appendChild(o) }
         const mat = el('input'); mat.type = 'number'; mat.value = s.materialityEur
         const budget = el('input'); budget.type = 'number'; budget.value = s.budgetTokens; budget.step = '1000000'
+        const budgetOut = el('input'); budgetOut.type = 'number'; budgetOut.value = s.budgetOutTokens || Math.round(s.budgetTokens / 10); budgetOut.step = '100000'
         const reference = el('input'); reference.value = s.reference || ''
-        const kb = el('input'); kb.type = 'checkbox'; kb.checked = s.knowledgeBase !== false; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtliche Einordnung je Prüfbereich durch AI:ssociate'))
+        const kb = el('input'); kb.type = 'checkbox'; kb.checked = s.knowledgeBase !== false; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtsfragen je Dokument klären (AI:ssociate bzw. Websuche)'))
         const ch = el('div', 'checks'); const boxes = []
         for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = s.areas.includes(a.key); cb.value = a.key; boxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
         card.appendChild(field('Zielunternehmen', target)); const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); card.appendChild(row)
-        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); row2.appendChild(field('Token-Budget', budget)); card.appendChild(row2); card.appendChild(field('Aktenzeichen', reference)); card.appendChild(field('Prüfbereiche', ch)); card.appendChild(field('Wissensdatenbank', kbl))
-        const hint = el('div', 'hint', `Bisher verbraucht: ${fmtTok(m.job.usage?.inTok || 0)} Eingabe-Tokens${m.job.cost ? ` ≈ ${fmtUsd(m.job.cost.totalUsd)}` : ''}. Änderungen wirken auf die nächste Analyse.`); hint.style.fontSize = '12px'; hint.style.color = 'var(--faint)'; card.appendChild(hint)
-        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), budgetTokens: Number(budget.value), knowledgeBase: kb.checked, areas: boxes.filter((b) => b.checked).map((b) => b.value) } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
+        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); row2.appendChild(field('Budget Eingabe-Tokens', budget)); card.appendChild(row2); const row3 = el('div', 'field-row'); row3.appendChild(field('Budget Ausgabe-Tokens', budgetOut)); card.appendChild(row3); card.appendChild(field('Aktenzeichen', reference)); card.appendChild(field('Prüfbereiche', ch)); card.appendChild(field('Wissensdatenbank', kbl))
+        const hint = el('div', 'hint', `Bisher verbraucht: ${fmtTok(m.job.usage?.inTok || 0)} Eingabe- / ${fmtTok(m.job.usage?.outTok || 0)} Ausgabe-Tokens (inkl. geschätzter AI:ssociate-Tokens)${m.job.cost ? ` ≈ ${fmtUsd(m.job.cost.totalUsd)}` : ''}. Änderungen wirken auf die nächste Analyse.`); hint.style.fontSize = '12px'; hint.style.color = 'var(--faint)'; card.appendChild(hint)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), budgetTokens: Number(budget.value), budgetOutTokens: Number(budgetOut.value), knowledgeBase: kb.checked, areas: boxes.filter((b) => b.checked).map((b) => b.value) } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
         $('dlg').classList.add('show')
       }
 
@@ -1743,17 +1744,19 @@
         two.appendChild(left)
         const right = el('div')
         const ac = el('div', 'card'); ac.appendChild(el('h3', null, 'Prüfbereiche'))
-        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const nF = m.findings.filter((f) => f.area === k && !isRejected(f)), nR = nF.filter((f) => sevOf(f) === 'red').length, nA = nF.filter((f) => sevOf(f) === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (s?.legal?.answer) row.appendChild(el('span', 'pill teal', 'AI:ssociate')); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (nF.length ? `${nF.length}` : '–'))); row.addEventListener('click', () => { findingFilter.area = k; findingFilter.sev = 'all'; setTab('findings') }); ac.appendChild(row) }
+        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const nF = m.findings.filter((f) => f.area === k && !isRejected(f)), nR = nF.filter((f) => sevOf(f) === 'red').length, nA = nF.filter((f) => sevOf(f) === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (s?.legal?.answer) row.appendChild(el('span', 'pill teal', s.legal.via === 'web' ? 'Websuche' : 'AI:ssociate')); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (nF.length ? `${nF.length}` : '–'))); row.addEventListener('click', () => { findingFilter.area = k; findingFilter.sev = 'all'; setTab('findings') }); ac.appendChild(row) }
         right.appendChild(ac)
         const legalAreas = m.settings.areas.filter((k) => m.areaSummaries?.[k]?.legal?.answer)
         if (legalAreas.length) {
-          const lc = el('div', 'card'); lc.style.marginTop = '14px'; lc.appendChild(el('h3', null, 'Rechtliche Einordnung (AI:ssociate)')); lc.appendChild(el('div', 'sub', 'Je Prüfbereich eine gebündelte Rechtsfrage mit den roten und gelben Befunden an die Wissensdatenbank.')).style.cssText = 'font-size:12.5px;color:var(--muted);margin-bottom:6px'
+          const lc = el('div', 'card'); lc.style.marginTop = '14px'; lc.appendChild(el('h3', null, 'Rechtliche Einordnung')); lc.appendChild(el('div', 'sub', 'Je Dokument: schwierige Rechtsfragen durch die AI:ssociate-Wissensdatenbank (eine Anfrage), einfache per Websuche.')).style.cssText = 'font-size:12.5px;color:var(--muted);margin-bottom:6px'
           for (const k of legalAreas) { const L = m.areaSummaries[k].legal; const det = el('details', 'legal'); const sm = el('summary'); sm.appendChild(el('span', null, areaLabel(k))); sm.appendChild(el('span', 'as', `${L.sources?.length || 0} Dokumente`)); det.appendChild(sm); const body2 = el('div', 'prose'); body2.innerHTML = renderMarkdown(L.answer); det.appendChild(body2); if (L.sources?.length) { const ul = el('div', 'norms'); for (const src of L.sources.slice(0, 10)) { const a = el(src.url ? 'a' : 'span', 'norm', src.title || src.url); if (src.url) { a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ul.appendChild(a) } det.appendChild(ul) } lc.appendChild(det) }
           left.appendChild(lc)
         }
         if (m.verification) { const vc = el('div', 'card'); vc.style.marginTop = '14px'; vc.appendChild(el('h3', null, 'RIS-Prüfung der Normen')); const s = m.verification.summary; vc.appendChild(el('div', 'sub', s.checked ? `${s.ok} von ${s.checked} Normen bestätigt${s.warn ? `, ${s.warn} außer Kraft` : ''}${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}` : 'keine prüfbaren Normzitate')).style.cssText = 'font-size:13px;color:var(--muted)'; right.appendChild(vc) }
         const cc = el('div', 'card'); cc.style.marginTop = '14px'; cc.appendChild(el('h3', null, 'Aufwand'))
         cc.appendChild(el('div', 'kv')).append(el('span', null, 'Eingabe-Tokens'), el('b', null, fmtTok(m.job.usage?.inTok || 0) + ' / ' + fmtTok(m.settings.budgetTokens)))
+        cc.appendChild(el('div', 'kv')).append(el('span', null, 'Ausgabe-Tokens'), el('b', null, fmtTok(m.job.usage?.outTok || 0) + ' / ' + fmtTok(m.settings.budgetOutTokens || Math.round(m.settings.budgetTokens / 10))))
+        if (m.job.usage?.aissociateCalls) cc.appendChild(el('div', 'kv')).append(el('span', null, 'AI:ssociate-Anfragen'), el('b', null, String(m.job.usage.aissociateCalls)))
         cc.appendChild(el('div', 'kv')).append(el('span', null, 'Analyseaufrufe'), el('b', null, String(m.job.usage?.calls || 0)))
         if (m.job.cost) cc.appendChild(el('div', 'kv')).append(el('span', null, 'Kosten (geschätzt)'), el('b', null, fmtUsd(m.job.cost.totalUsd)))
         right.appendChild(cc)
@@ -1785,7 +1788,7 @@
           const tr = el('tr'); const c0 = el('td'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = docSelection.has(d.id); cb.addEventListener('change', () => { if (cb.checked) docSelection.add(d.id); else docSelection.delete(d.id); renderMatter() }); c0.appendChild(cb); tr.appendChild(c0)
           const n = el('td', 'n'); n.appendChild(document.createTextNode(d.title || d.name)); n.appendChild(el('span', 'sub', `${d.title ? d.name + ' · ' : ''}${fmtSize(d.size)}${d.pages ? ` · ${d.pages} S.` : ''}${d.source === 'ms' ? ' · Microsoft 365' : ''}${d.note ? ' · ' + d.note : ''}`)); tr.appendChild(n)
           tr.appendChild(el('td', null, d.docType || '–')); tr.appendChild(el('td', null, d.area ? areaLabel(d.area) : '–'))
-          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); tr.appendChild(cs)
+          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.difficulty === 'hard') cs.appendChild(el('span', 'pill orange', 'komplex')); if (d.legal) cs.appendChild(el('span', 'pill teal', d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche')); tr.appendChild(cs)
           const cf = el('td', 'c'); if (d.flags?.red || d.flags?.amber) { if (d.flags.red) cf.appendChild(el('span', 'pill red', String(d.flags.red))); if (d.flags.amber) cf.appendChild(el('span', 'pill amber', String(d.flags.amber))) } else cf.textContent = d.status === 'analysed' ? '–' : ''; tr.appendChild(cf)
           const ca = el('td'); const ra = el('div', 'rowacts')
           if (d.summary) { const bI = el('button', null, 'Details'); bI.addEventListener('click', () => showDocDetails(d, m)); ra.appendChild(bI) }
@@ -1824,6 +1827,7 @@
         card.appendChild(el('h2', null, d.title || d.name)); card.appendChild(el('div', 'md', `${d.name} · ${d.docType || ''}${d.area ? ' · ' + areaLabel(d.area) : ''}`))
         const p = el('div', 'prose'); p.appendChild(el('p', null, d.summary || '')); card.appendChild(p)
         const kvs = el('div')
+        if (d.difficulty) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Einstufung'), el('b', null, d.difficulty === 'hard' ? 'komplex (Hauptmodell)' : 'einfach'))
         if (d.parties?.length) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Parteien'), el('b', null, d.parties.join('; ')))
         for (const x of d.dates || []) kvs.appendChild(el('div', 'kv')).append(el('span', null, x.label), el('b', null, x.date))
         for (const x of d.keyTerms || []) kvs.appendChild(el('div', 'kv')).append(el('span', null, x.term), el('b', null, x.value))
@@ -1832,6 +1836,7 @@
         if (d.questions?.length) { card.appendChild(el('h3', null, 'Nachfragen')).style.cssText = 'font-size:13px;margin:12px 0 4px'; const ul = el('ul', 'prose'); d.questions.forEach((t) => ul.appendChild(el('li', null, t))); card.appendChild(ul) }
         const fs = m.findings.filter((f) => f.docId === d.id)
         if (fs.length) { card.appendChild(el('h3', null, `Befunde (${fs.length})`)).style.cssText = 'font-size:13px;margin:12px 0 6px'; fs.forEach((f) => card.appendChild(findingCard(f, m))) }
+        if (d.legal?.answer) { card.appendChild(el('h3', null, `Rechtliche Einordnung (${d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche'})`)).style.cssText = 'font-size:13px;margin:14px 0 4px'; const ql = el('ul', 'prose'); (d.legal.questions || []).forEach((q) => ql.appendChild(el('li', null, q))); card.appendChild(ql); const la = el('div', 'prose'); la.innerHTML = renderMarkdown(d.legal.answer); card.appendChild(la); if (d.legal.sources?.length) { const ns = el('div', 'norms'); for (const src of d.legal.sources.slice(0, 10)) { const a = el(src.url ? 'a' : 'span', 'norm', src.title || src.url); if (src.url) { a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } card.appendChild(ns) } }
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
       }

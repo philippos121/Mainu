@@ -87,13 +87,20 @@ server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),
 can be paused, and survives closed browser tabs.
 
 **Due diligence** (`lib/ddconfig.js`, `lib/dd.js`, `lib/report.js`) is an
-explicit pipeline, not an agent: Text → per-document analysis (strict JSON
-schema: type, area, parties, key terms, findings with quote + location +
-severity + recommendation + norms, questions) → synthesis per review area →
-per review area the fast model formulates 1–3 compact questions from the red/amber
-findings and AI:ssociate answers them in one request (fed into the synthesis and the report) →
+explicit pipeline, not an agent: Text → per-document triage on the fast model
+(type, area, difficulty) → per-document analysis (easy: fast model, hard: main
+model; strict JSON schema: type, area, parties, key terms, findings with quote +
+location + severity + recommendation + norms, questions, and 0–3 compact legal
+questions with their difficulty) → per document the same legal routing as the
+assistant: easy legal questions → fast model with web search, hard ones →
+AI:ssociate in **one** request per document (questions numbered inside) →
+synthesis per review area (the per-document legal answers are combined) →
 executive summary → RIS verification of every cited norm → Word Red-Flag-Report
-+ Excel workbook from fixed templates. Every finding has a stable id (F-001),
++ Excel workbook from fixed templates. Documents are analysed in parallel (2 / 4 /
+6 workers for up to 5 / 20 / more documents, cap `DD_CONCURRENCY`); the budget
+per due diligence is 10,000,000 input and 1,000,000 output tokens by default
+(selectable per matter), counted over all model calls plus an estimate for the
+knowledge-base requests. Every finding has a stable id (F-001),
 a document id (D-001), a deal-impact instrument, an evidence status (the quote
 is located in the document text: belegt / teilweise / unbelegt) and a review
 state (offen / freigegeben / geändert / verworfen, grade override, note,

@@ -11,7 +11,7 @@ eine Seite `public/index.html`, Render).
 | Allgemeiner Agent (Assistent) | Das schnelle Modell wählt in einem Aufruf Modus, Rechtsgebiet, Schwierigkeit und 0–3 kompakte Fragen. Leichte Rechtsfrage → schnelles Modell mit ≤ 3 Websuchen; schwere Rechtsfrage → AI:ssociate in genau einer Anfrage (mehrere Fragen nummeriert darin), Antwort wird direkt angezeigt; leichte Dokument-/sonstige Aufgabe → schnelles Modell; schwere → bei Rechtsfragen zuerst AI:ssociate (eine Anfrage), dann das Hauptmodell für das Deliverable (Dokumenttext bis 80k Zeichen inline, Code-Generierung in der Sandbox). RIS-Verifikation aller §§/GZ → Links im Text. Nachprüfung mit Websuche nur optional (`REVIEW_ANSWERS=on`) | explizit |
 | Workflows | Rechtsrecherche, Vertrag prüfen (Kommentare im Word), Versionen vergleichen (Redline), Entwurf, Zusammenfassen, Fristen | explizit gesteuert, Deliverable per Code-Generierung in der Sandbox |
 | Akten | Dokumente je Causa (Upload, OneDrive/SharePoint-Import inkl. ganzer Ordner), Volltexte, Fragen im Kontext der Akte | explizit |
-| Due Diligence (Spezialagent) | Feste Prüfbereiche mit Red-Flag-Katalog und Regel-IDs (GES-001 …), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Deal-Impact + Normen, **Evidenzbindung** (jedes Zitat wird im Dokumenttext gesucht: belegt / teilweise / unbelegt), **je Prüfbereich eine AI:ssociate-Anfrage mit 1–3 kompakt formulierten Fragen** (kurze Antworten), Synthese je Bereich, Executive Summary, RIS-Prüfung, **Review-Status je Befund** (Freigabe, Grad, Vermerk, manuelle Befunde), Request List, Red-Flag-Report (Word) und Workbook (Excel) mit stabilen IDs; Kostenschätzung vor jedem Lauf | explizit |
+| Due Diligence (Spezialagent) | Feste Prüfbereiche mit Red-Flag-Katalog und Regel-IDs (GES-001 …), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Deal-Impact + Normen, **Evidenzbindung** (jedes Zitat wird im Dokumenttext gesucht: belegt / teilweise / unbelegt), **Routing je Dokument wie beim Assistenten**: Triage auf dem schnellen Modell (Typ, Bereich, Schwierigkeit), Analyse leicht → schnelles Modell, schwer → Hauptmodell; 0–3 kompakte Rechtsfragen je Dokument, leicht → schnelles Modell mit Websuche, schwer → **AI:ssociate in genau einer Anfrage je Dokument** (Fragen nummeriert, kurze Antworten); Dokumente parallel (2/4/6 Worker nach Anzahl), Synthese je Bereich aus den Dokumentantworten, Executive Summary, RIS-Prüfung, **Review-Status je Befund** (Freigabe, Grad, Vermerk, manuelle Befunde), Request List, Red-Flag-Report (Word) und Workbook (Excel) mit stabilen IDs; Budget je DD 10 Mio. Eingabe- / 1 Mio. Ausgabe-Tokens inkl. geschätzter AI:ssociate-Tokens, Kostenschätzung vor jedem Lauf | explizit |
 | Review-Tabellen | Gleiche Spalten über viele Dokumente (Vertragsübersicht, Dienstverträge, Mietverträge, Fristen, Steuerbescheide, eigene Spalten); jede Zelle mit Beleg und Fundstelle; Excel-Export | explizit |
 | Microsoft 365 | OAuth/PKCE, Browser für OneDrive/SharePoint, Anhängen, Import in Akten, Rückschreiben von Ergebnissen und Berichten (nie überschreiben) | explizit |
 | Lange Vorgänge | Server-Jobs mit Ereignisprotokoll, Wiederanbindung nach Verbindungsabbruch, Pausieren/Fortsetzen, Budget je Akte | explizit |
@@ -93,19 +93,24 @@ Prüfung, RIS). So bleiben die teuren Analyseergebnisse wiederverwendbar.
    explizit im Pipeline-Stadium „Text“ läuft, nicht in die Sandbox.
 5. **Kosten.** Eine DD über 200 Dokumente à 40.000 Zeichen kostet in der
    Größenordnung von 2–4 Mio. Eingabe-Tokens für die Dokumentanalyse plus
-   Synthese; das Budget je Akte (`budgetTokens`) stoppt den Lauf sauber
-   („pausiert“) und zeigt Verbrauch und Schätzung an. Ein günstigeres
-   Extraktionsmodell (`OPENAI_MODEL_EXTRACT`) ist dafür vorgesehen.
+   Synthese; dazu kommen die Rechtsfragen je Dokument (Websuche oder eine
+   AI:ssociate-Anfrage). Das Budget je DD (`budgetTokens` 10 Mio. Eingabe,
+   `budgetOutTokens` 1 Mio. Ausgabe, inkl. geschätzter AI:ssociate-Tokens)
+   stoppt den Lauf sauber („pausiert“) und zeigt Verbrauch und Schätzung an.
+   Weil leichte Dokumente auf dem schnellen Modell laufen und nur schwere auf
+   dem Hauptmodell, bleibt der Großteil der Analyse günstig.
 6. **Qualität der Befunde.** Die größte Gefahr ist nicht Halluzination der
    Normen (die prüft das RIS), sondern **Überinterpretation** von Klauseln.
    Deshalb: Befund nur mit wörtlichem Zitat, Wesentlichkeitsschwelle,
    Empfehlung immer als konkrete Transaktionsmaßnahme (Garantie, Freistellung,
    CP, Kaufpreis), und alle Berichte als „Entwurf, anwaltlich zu prüfen“.
-7. **AI:ssociate-API.** Sie ist die maßgebliche Rechtsquelle für Fragen und
-   wird in der DD je Prüfbereich einmal mit den roten/gelben Befunden befragt
-   (nicht pro Dokument – zu teuer, zu langsam); die Antwort fließt in die
-   Bereichssynthese und den Bericht ein und wird erneut geholt, wenn sich die
-   wesentlichen Befunde eines Bereichs ändern.
+7. **AI:ssociate-API.** Sie ist die maßgebliche Rechtsquelle für schwere
+   Rechtsfragen und wird in der DD **je Dokument höchstens einmal** befragt
+   (mehrere nummerierte Fragen in einer Anfrage); leichte Rechtsfragen eines
+   Dokuments beantwortet das schnelle Modell mit Websuche. Bei vielen Dokumenten
+   laufen die Anfragen parallel zu den Analysen. Die Antwort wird am Dokument
+   gespeichert, fließt in die Bereichssynthese und den Bericht ein und wird nur
+   bei erneuter Analyse des Dokuments neu geholt.
 
 ## 4. Was die großen Anbieter bieten und wie es hier abgebildet ist
 
@@ -129,7 +134,8 @@ programmiert, Modellaufrufe sind schemagebundene Datenlieferanten,
 Code-Generierung bleibt die Ausnahme für Einzelstücke. Aus dem priorisierten
 Spezifikationsvorschlag wurden in dieser Iteration umgesetzt: App-Shell mit
 Agenten-Trennung, Akt-Workspace, Evidenzbindung, Review-Status mit manuellen
-Befunden, Deal-Impact, Regel-IDs im Katalog, AI:ssociate je Prüfbereich,
+Befunden, Deal-Impact, Regel-IDs im Katalog, Schwierigkeits-Routing und
+AI:ssociate je Dokument (eine Anfrage), Budget 10 Mio./1 Mio. Tokens je DD,
 Kostenschätzung vor dem Lauf, Retries und parallele Dokumentanalyse,
 stabile IDs in UI/Word/Excel. Noch offen (Reihenfolge nach Abhängigkeit):
 

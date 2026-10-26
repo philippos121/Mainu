@@ -1238,16 +1238,18 @@ async function loadMatter(req, res) {
   if (!m || m.ownerKey !== owner) { res.status(404).json({ error: 'Akt nicht gefunden.' }); return null }
   return m
 }
-const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 2)
+const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 6) // upper bound; the run scales workers with the number of documents
 const ddDeps = (send) => ({
   store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY,
   verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send,
-  // Luna turns the material findings of an area into 1–3 compact questions; AI:ssociate answers each briefly.
+  // Per document: hard legal questions go to the knowledge base in one request; easy ones are
+  // answered on the fast model with a short web search (same routing as the general agent).
   askKnowledgeBase: AISSOCIATE_API_KEY ? async ({ question, legalArea }) => { const r = await askAissociate({ question: KB_BRIEF + question, legalArea: LEGAL_AREAS[legalArea] ? legalArea : 'civil', scope: '', threadId: null }); return { answer: r.answer, sources: r.sources } } : null,
-  formulateQuestions: async (ctx, { context, max = KB_MAX_QUESTIONS }) => {
-    const resp = await callModel(ctx, { model: MODEL_FAST, effort: EFFORT_PLAN, maxOut: 3000, instructions: `Du bist AI:ssociate (Modell Luna). Formuliere aus den Befunden einer Due Diligence 1 bis ${max} KONKRETE, KOMPAKTE Rechtsfragen an die juristische Wissensdatenbank (österreichisches Recht): je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten (Klausel, Betrag, Konstellation), eigenständig verständlich, auf Deutsch. Bündle gleichartige Befunde in einer Frage; frage nach Rechtsfolge, Risiko und üblicher Absicherung im Kaufvertrag. Antworte als JSON.`, input: [{ role: 'user', content: context }], text: { format: { type: 'json_schema', name: 'kb_questions', schema: { type: 'object', additionalProperties: false, properties: { questions: { type: 'array', items: { type: 'string' } } }, required: ['questions'] }, strict: true } } })
-    const parsed = parseJsonLoose(resp.output_text || '')
-    return Array.isArray(parsed?.questions) ? parsed.questions.map((q) => String(q).trim()).filter(Boolean).slice(0, max) : []
+  answerEasyLegal: async (ctx, { question }) => {
+    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(WEB_SEARCH_ENABLED), effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: WEB_SEARCH_ENABLED ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: WEB_SEARCH_ENABLED ? MAX_WEB_SEARCHES : undefined })
+    const sources = []
+    for (const o of resp.output || []) if (o.type === 'message') for (const part of o.content || []) for (const ann of part.annotations || []) if (ann.type === 'url_citation' && ann.url && !sources.some((x) => x.url === ann.url)) sources.push({ title: ann.title || ann.url, url: ann.url })
+    return { answer: resp.output_text || '', sources }
   },
   modelFast: MODEL_FAST,
 })
@@ -1337,7 +1339,7 @@ app.delete('/api/matters/:id/findings/:fid', async (req, res) => {
 app.get('/api/matters/:id/dd/estimate', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
   const p = priceFor(MODEL_EXTRACT)
-  res.json({ estimate: estimateRun(m, p.in, p.out), usage: m.job.usage, budgetTokens: m.settings.budgetTokens })
+  res.json({ estimate: estimateRun(m, p.in, p.out), usage: m.job.usage, budgetTokens: m.settings.budgetTokens, budgetOutTokens: m.settings.budgetOutTokens })
 })
 
 app.get('/api/matters', async (req, res) => {
