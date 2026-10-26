@@ -1602,6 +1602,9 @@ app.post('/api/chat', async (req, res) => {
   if (!OPENAI_API_KEY) { send('error', { message: 'Server: OPENAI_API_KEY fehlt.' }); return finish() }
 
   const { history = [], files: rawUploads = [], sessionId, webSearch = true, task = null, aissThreadId = null, msFiles: rawMsFiles = [], msSync = null } = body
+  // Knowledge base picked in the UI ("Automatisch" sends nothing): pins the legal area, the planner still decides the mode.
+  const pickedArea = typeof body.legalArea === 'string' && LEGAL_AREAS[body.legalArea] ? body.legalArea : null
+  const pickedScope = pickedArea === 'public' && typeof body.scope === 'string' && SCOPES.includes(body.scope) ? body.scope : null
   let prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   let taskExtra = ''
   let forceMode = null
@@ -1918,7 +1921,7 @@ app.post('/api/chat', async (req, res) => {
     const pid = step('triage', 'Anfrage wird analysiert', { model: MODEL_FAST })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', questions: [], title: prompt.slice(0, 60) }
     try {
-      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
+      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${pickedArea ? `Gewählte Wissensdatenbank: ${LEGAL_AREA_LABEL[pickedArea]}${pickedScope ? ` (${pickedScope})` : ''} – Rechtsfragen in diesem Rechtsgebiet beantworten.\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
       const planFormat = { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } }
       // max_output_tokens includes reasoning tokens: retry once with more room if truncated.
       let pr = await callModel(ctx, { model: MODEL_FAST, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 6000, input: planInput, text: planFormat })
@@ -1935,6 +1938,7 @@ app.post('/api/chat', async (req, res) => {
     if (forceMode && !(uploads.length && forceMode === 'legal')) plan.mode = forceMode
     if (!LEGAL_AREAS[plan.legal_area]) plan.legal_area = plan.mode === 'legal' ? 'civil' : 'none'
     if (!SCOPES.includes(plan.scope)) plan.scope = ''
+    if (pickedArea && plan.mode !== 'general') { plan.legal_area = pickedArea; if (pickedArea === 'public') plan.scope = pickedScope || plan.scope; else plan.scope = '' }
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]
     if (plan.mode === 'general') plan.questions = []
     heavy = plan.difficulty === 'hard'

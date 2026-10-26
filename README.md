@@ -34,12 +34,16 @@ question ──▶ fast model: mode, legal area, difficulty, 0–3 compact quest
 * **Budgets:** hard caps per question — 1,000,000 input and 100,000 output
   tokens summed over all model calls (`MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`);
   `MAX_WEB_SEARCHES` (3) and `DOC_MAX_STEPS` (8) bound the step count.
-* **UI:** app.aissociate.at look (teal bar, centred logo, "Frage AI:ssociate."
-  card), no Rechtsgebiet selection. Workflows with
-  forms (Rechtsrecherche, Vertrag prüfen, Versionen vergleichen, Entwurf,
-  Zusammenfassen, Fristen), conversation history (browser-local), feature tour,
-  agent steps without code, sources with "Volltext geprüft" status, RIS
-  verification panel, Word/Markdown export, exact cost per answer.
+* **UI:** app.aissociate.at look – teal app bar (hamburger and history icon on
+  mobile, wordmark on desktop), centred logo, "Wählen Sie eine Wissensdatenbank"
+  list (Automatisch / Zivilrecht / Strafrecht / Steuerrecht / Öffentliches Recht
+  with Bundesland; the choice pins the legal area, "Automatisch" lets the planner
+  detect it), template chips with forms (Rechtsrecherche, Vertrag prüfen,
+  Versionen vergleichen, Entwurf, Zusammenfassen), the "Frage AI:ssociate."
+  composer with the chosen knowledge base as a chip, disclaimer. Conversation
+  history (browser-local), feature tour, agent steps without code, sources with
+  "Volltext geprüft" status, RIS verification panel, Word/Markdown export, exact
+  cost per answer. No model names anywhere in the UI.
 
 ## Microsoft 365 (OneDrive / SharePoint)
 
@@ -58,11 +62,14 @@ Configure `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and optionally `MS_TENANT` /
 `GET /api/ms/browse`, `GET /api/ms/sites`, `GET /api/ms/site-drives`; the chat
 request takes `msFiles` and `msSync`.
 
-## Agents
+## Assistant and Due Diligence
 
-Two agents, one sidebar. The **general agent** (Assistent) can ultimately do
-everything and routes by difficulty, decided by the fast model in one call
-together with the mode, the legal area and up to three compact questions:
+The **assistant** (home page) can ultimately do everything and routes by
+difficulty, decided by the fast model in one call together with the mode, the
+legal area and up to three compact questions. A knowledge base picked on the
+home page (`legalArea` / `scope` in the chat request) pins the legal area; the
+planner still decides whether the request is a legal question, a document task
+or something general:
 
 | | easy | hard |
 |---|---|---|
@@ -70,17 +77,16 @@ together with the mode, the legal area and up to three compact questions:
 | document / other task | fast model (document text inline, file generation in the sandbox) | AI:ssociate first (one request) when legal questions are involved, then the main model builds the deliverable |
 
 Every cited § / Geschäftszahl is verified against the RIS. The optional
-review of knowledge-base answers is off by default (`REVIEW_ANSWERS=on`). The
-**specialist agent** Due Diligence runs the fixed pipeline below; review tables
-and the form-driven templates live inside it (tabs of the Akt) and under the
-composer ("Vorlagen"). Each matter is "der Akt". Model names are not shown in
-the UI.
+review of knowledge-base answers is off by default (`REVIEW_ANSWERS=on`).
+**Due Diligence** (menu) runs the fixed pipeline below; review tables live
+inside the Akt (tabs), the form-driven templates above the composer
+("Vorlagen"). Each matter is "der Akt". Model names are not shown in the UI.
 
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
-The UI is an app shell (sidebar: Assistent, Workflows, Alle Akten, Due
-Diligence, Review-Tabellen, Verlauf, Einstellungen; hash routes such as
-`#/matter/<id>/findings`). Matters ("Akten") hold documents (upload or import of
+The UI is an app shell: teal app bar plus a sidebar (drawer behind the
+hamburger on mobile) with Assistent, Due Diligence, Alle Akten, Verlauf and
+Einstellungen; hash routes such as `#/matter/<id>/findings`. Matters ("Akten") hold documents (upload or import of
 files and whole folders from OneDrive/SharePoint), their extracted text, the
 analysis results, review tables and reports. Everything long-running is a
 server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),
