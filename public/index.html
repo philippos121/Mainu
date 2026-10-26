@@ -35,7 +35,7 @@
       .sb-brand img { height: 26px; width: auto; }
       .sb-brand .tag { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--orange); margin-left: 2px; }
       .sb-brand .iconbtn { margin-left: auto; color: var(--muted); display: none; }
-      .sb-new { margin: 8px 14px 6px; }
+      .btn.full.sb-new { margin: 8px 14px 6px; width: calc(100% - 28px); }
       .sb-nav { flex: 1; overflow-y: auto; padding: 4px 10px 10px; }
       .sb-sec { display: flex; align-items: center; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 800; margin: 14px 8px 4px; }
       .sb-sec a { margin-left: auto; font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 700; text-decoration: none; }
@@ -128,7 +128,10 @@
       .hero-text { min-width: 0; flex: 1; }
       .hero-text .k { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; opacity: .8; }
       .hero-text .t { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0 4px; line-height: 1.15; }
-      .hero-text .d { font-size: 13.5px; opacity: .92; line-height: 1.5; max-width: 640px; }
+      .hero-text .d { font-size: 13.5px; opacity: .92; line-height: 1.5; max-width: 640px; margin-top: 4px; }
+      .qbtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: 800; cursor: pointer; vertical-align: 3px; margin-left: 6px; padding: 0; line-height: 1; }
+      .qbtn:hover, .qbtn.on { background: #fff; color: var(--header); }
+      .agent-hero { gap: 10px; }
       .agent-hero .composer { position: relative; z-index: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.18); border-color: transparent; }
       .hero-chips { display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 1; }
       .hero-chips button { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.28); color: #fff; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
@@ -585,9 +588,9 @@
                 <div class="hero-head">
                   <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg></div>
                   <div class="hero-text">
-                    <div class="k">Allgemeiner Agent · Luna + AI:ssociate + Sol</div>
-                    <div class="t">Assistent</div>
-                    <div class="d">Rechtsfragen mit verifizierten Fundstellen, Verträge prüfen und kommentieren, Entwürfe, Versionsvergleiche, Fristen, Zusammenfassungen – als Antwort oder als Word, Excel und PDF. Letztlich ist alles möglich: Luna formuliert kompakte Fragen, AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf das Dokument.</div>
+                    <div class="k">Allgemeiner Agent</div>
+                    <div class="t">Assistent <button class="qbtn" id="heroInfo" aria-label="Was kann der Assistent?" title="Was kann der Assistent?">?</button></div>
+                    <div class="d" id="heroDesc" hidden>Rechtsfragen mit verifizierten Fundstellen, Verträge prüfen und kommentieren, Entwürfe, Versionsvergleiche, Fristen, Zusammenfassungen – als Antwort oder als Word, Excel und PDF. Letztlich ist alles möglich: Luna formuliert kompakte Fragen, AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf das Dokument.</div>
                   </div>
                 </div>
                 <div id="composerSlotHome" style="width:100%"></div>
@@ -597,9 +600,9 @@
               <button class="agent alt wide" id="ddCard">
                 <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg></div>
                 <div class="hero-text">
-                  <div class="k">Spezialagent · Transaktionen</div>
-                  <div class="t">Due-Diligence-Agent</div>
-                  <div class="d">Datenraum hochladen oder aus SharePoint importieren, feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, AI:ssociate je Prüfbereich, Review durch die Anwältin, Red-Flag-Report als Word und Excel.</div>
+                  <div class="k">Spezialagent</div>
+                  <div class="t">Due Diligence</div>
+                  <div class="d">Datenraum, Befunde mit Zitat und Fundstelle, Review, Red-Flag-Report als Word und Excel.</div>
                 </div>
                 <span class="cta">Zur Due Diligence ›</span>
               </button>
@@ -700,10 +703,6 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
           <span class="lbl">Microsoft 365</span>
         </button>
-        <button class="ctool" id="matterBtn" title="Frage im Kontext eines Akts stellen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          <span class="lbl">Akt</span>
-        </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
@@ -723,7 +722,7 @@
       const $ = (id) => document.getElementById(id)
       const home = $('home'), chatView = $('chat'), messages = $('messages'), composer = $('composer')
       const input = $('input'), sendBtn = $('sendBtn'), attachBtn = $('attachBtn'), fileInput = $('fileInput'), attachList = $('attachList')
-      const msBtn = $('msBtn'), matterBtn = $('matterBtn'), syncNote = $('syncNote')
+      const msBtn = $('msBtn'), syncNote = $('syncNote')
       const costPill = $('costPill'), mainTitle = $('mainTitle')
 
       const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v3', LS_OWNER = 'aiss.owner.v1'
@@ -965,6 +964,7 @@
         c.appendChild(el('span', 'lbl', 'Vorlagen'))
         for (const [key, w] of Object.entries(WORKFLOWS)) { const b = el('button', null, w.title); b.dataset.wf = key; b.title = w.desc; b.addEventListener('click', () => openTask(key)); c.appendChild(b) }
         $('ddCard').onclick = () => navigate('#/dd')
+        $('heroInfo').onclick = (e) => { e.stopPropagation(); const d = $('heroDesc'); d.hidden = !d.hidden; $('heroInfo').classList.toggle('on', !d.hidden) }
       }
 
       function openTask(key) {
@@ -1033,7 +1033,6 @@
         pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() }); c.appendChild(x); attachList.appendChild(c) })
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
         msBtn.classList.toggle('on', pendingMs.length > 0)
-        matterBtn.classList.toggle('on', Boolean(current?.matter))
         updateSend()
       }
       const defaultFileChange = async () => { await addFiles(fileInput.files); fileInput.value = '' }
@@ -1050,7 +1049,6 @@
       input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
       sendBtn.addEventListener('click', submit)
-      matterBtn.addEventListener('click', () => chooseMatterForChat())
       function submit() {
         const text = input.value.trim()
         if ((!text && !pendingFiles.length && !pendingMs.length) || busy) return
@@ -2099,7 +2097,6 @@
         { sel: '#agentHero', title: 'Allgemeiner Agent', text: 'Rechtsfragen und Dokumentaufgaben in natürlicher Sprache. Luna wählt das Rechtsgebiet und formuliert kompakte Fragen, die Wissensdatenbank AI:ssociate antwortet kurz mit Fundstellen, Sol erstellt bei Bedarf Word, Excel oder PDF. Jede Fundstelle wird gegen das RIS geprüft.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
         { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
-        { sel: '#matterBtn', title: 'Fragen zum Akt', text: 'Eine Frage im Kontext eines Akts stellen: die gespeicherte Analyse (Befunde, Zusammenfassungen) und ausgewählte Dokumente gehen als Kontext mit.' },
         { sel: '#navDd', title: 'Spezialagent Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Review-Tabellen im Akt, Request List, Red-Flag-Report als Word und Excel.', nav: true },
         { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Modelle, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
       ]
