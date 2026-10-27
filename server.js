@@ -27,15 +27,21 @@ const AISSOCIATE_API_KEY = process.env.AISSOCIATE_API_KEY || 'ck:77bac49b-a3ab-4
 const AISSOCIATE_BASE_URL = (process.env.AISSOCIATE_BASE_URL || 'https://app.aissociate.at').replace(/\/+$/, '')
 const AISSOCIATE_TIMEOUT_MS = Number(process.env.AISSOCIATE_TIMEOUT_MS || 240_000)
 
-// Models: Sol decides the legal area, reviews the knowledge-base answer, writes
-// the final answer and runs document tasks. The code model writes the Python
-// for file generation.
-const MODEL_MAIN = process.env.OPENAI_MODEL_MAIN || process.env.OPENAI_MODEL || 'gpt-6-sol'
-// Luna (fast, cheap) plans, formulates the knowledge-base questions, answers
-// general tasks and reads documents in the due diligence; Sol only assembles
-// deliverables at the end (code generation, document tasks, DD synthesis).
-const MODEL_FAST = process.env.OPENAI_MODEL_FAST || 'gpt-6-luna'
-const MODEL_CODE = process.env.OPENAI_MODEL_CODE || '' // empty: follows the task's difficulty (Luna, Sol when hard)
+// Model provider. With AZURE_OPENAI_API_KEY every model call goes to the Azure
+// OpenAI resource (EU deployment) and ONE deployment does everything (default
+// gpt-6.1-terra); the OPENAI_MODEL_* variables are ignored there, so an old
+// OPENAI_MODEL_MAIN=gpt-6-sol cannot route data to a global deployment.
+// Without it: OpenAI with the fast/main pair (Luna plans and handles easy tasks,
+// Sol hard ones).
+const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || ''
+const AZURE_OPENAI_ENDPOINT = (process.env.AZURE_OPENAI_ENDPOINT || 'https://aissociate-evaluation-azure-openai-ressource.openai.azure.com').replace(/\/+$/, '')
+const AZURE_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-6.1-terra'
+const USE_AZURE = Boolean(AZURE_OPENAI_API_KEY)
+const LLM_API_KEY = USE_AZURE ? AZURE_OPENAI_API_KEY : OPENAI_API_KEY
+const LLM_PROVIDER = USE_AZURE ? 'Azure OpenAI' : 'OpenAI'
+const MODEL_MAIN = USE_AZURE ? (process.env.AZURE_OPENAI_MODEL_MAIN || AZURE_DEPLOYMENT) : (process.env.OPENAI_MODEL_MAIN || process.env.OPENAI_MODEL || 'gpt-6-sol')
+const MODEL_FAST = USE_AZURE ? (process.env.AZURE_OPENAI_MODEL_FAST || AZURE_DEPLOYMENT) : (process.env.OPENAI_MODEL_FAST || 'gpt-6-luna')
+const MODEL_CODE = USE_AZURE ? (process.env.AZURE_OPENAI_MODEL_CODE || '') : (process.env.OPENAI_MODEL_CODE || '') // empty: follows the task's difficulty
 // Optional second pass: Sol reviews the knowledge-base answer (≤ 3 web searches). Off by default – the answer is shown as is.
 const REVIEW_ANSWERS = process.env.REVIEW_ANSWERS === 'on'
 const KB_MAX_QUESTIONS = Number(process.env.KB_MAX_QUESTIONS || 3)
@@ -60,7 +66,7 @@ const WEB_SEARCH_TOOL = { type: process.env.OPENAI_WEB_SEARCH_TOOL || 'web_searc
 // persistent disk on Render), a separate extraction model for the per-document
 // pass, and a cap on concurrent long-running analyses per instance.
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
-const MODEL_EXTRACT = process.env.OPENAI_MODEL_EXTRACT || MODEL_FAST
+const MODEL_EXTRACT = USE_AZURE ? MODEL_FAST : (process.env.OPENAI_MODEL_EXTRACT || MODEL_FAST)
 const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
 const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
 const DD_MAX_DOC_BYTES = Number(process.env.DD_MAX_DOC_BYTES || 30 * 1024 * 1024)
@@ -174,9 +180,16 @@ function computeCost(acc, seconds) {
 // ---------------------------------------------------------------------------
 let _openai
 function getOpenAI() {
-  if (!_openai) _openai = new OpenAI({ apiKey: OPENAI_API_KEY, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
+  if (!_openai) {
+    // Azure OpenAI v1 API: the standard client against <resource>/openai/v1/, key as api-key header; model = deployment name.
+    _openai = USE_AZURE
+      ? new OpenAI({ apiKey: AZURE_OPENAI_API_KEY, baseURL: `${AZURE_OPENAI_ENDPOINT}/openai/v1/`, defaultHeaders: { 'api-key': AZURE_OPENAI_API_KEY } })
+      : new OpenAI({ apiKey: OPENAI_API_KEY, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
+  }
   return _openai
 }
+// A deployment that rejects the hosted web search once is not offered it again (saves a failing round trip per call).
+let webSearchRejected = false
 
 class BudgetExceeded extends Error {}
 
@@ -190,6 +203,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
   const remainingOut = (ctx.limits?.outMax ?? MAX_OUTPUT_TOKENS) - ctx.usage.outTok
   const remainingIn = (ctx.limits?.inMax ?? MAX_INPUT_TOKENS) - ctx.usage.inTok
   if (remainingOut < 800 || remainingIn < 2000) throw new BudgetExceeded(ctx.limits ? 'Token-Budget des Akts ausgeschöpft.' : 'Token-Budget für diese Frage ausgeschöpft.')
+  if (webSearchRejected && tools?.length) tools = tools.filter((t) => !String(t.type).startsWith('web_search'))
   const params = {
     model,
     instructions,
@@ -225,7 +239,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     let changed = false
     if (p2.max_tool_calls && /max_tool_calls/i.test(msg)) { delete p2.max_tool_calls; changed = true }
     if (p2.reasoning && /reasoning/i.test(msg)) { delete p2.reasoning; changed = true }
-    if (p2.tools && /web_search/i.test(msg)) { p2.tools = p2.tools.filter((t) => !String(t.type).startsWith('web_search')); if (!p2.tools.length) { delete p2.tools; delete p2.tool_choice; delete p2.max_tool_calls }; changed = true }
+    if (p2.tools && /web_search/i.test(msg)) { webSearchRejected = true; console.warn(`web search rejected by ${model}: disabled for this process`); p2.tools = p2.tools.filter((t) => !String(t.type).startsWith('web_search')); if (!p2.tools.length) { delete p2.tools; delete p2.tool_choice; delete p2.max_tool_calls }; changed = true }
     if (p2.text && /text|format|schema/i.test(msg)) { delete p2.text; changed = true }
     if (!changed && p2.reasoning) { delete p2.reasoning; changed = true }
     if (!changed) throw e
@@ -1200,7 +1214,7 @@ app.get('/api/ms/browse', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   let storeStats = null
   try { storeStats = await store.stats() } catch {}
-  res.json({ ok: true, openai: Boolean(OPENAI_API_KEY), e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
+  res.json({ ok: true, openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -1354,7 +1368,8 @@ const ddDeps = (send) => ({
   // answered on the fast model with a short web search (same routing as the general agent).
   askKnowledgeBase: AISSOCIATE_API_KEY ? async ({ question, legalArea }) => { const r = await askAissociate({ question: KB_BRIEF + question, legalArea: LEGAL_AREAS[legalArea] ? legalArea : 'civil', scope: '', threadId: null }); return { answer: r.answer, sources: r.sources } } : null,
   answerEasyLegal: async (ctx, { question }) => {
-    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(WEB_SEARCH_ENABLED), effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: WEB_SEARCH_ENABLED ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: WEB_SEARCH_ENABLED ? MAX_WEB_SEARCHES : undefined })
+    const web = WEB_SEARCH_ENABLED && !webSearchRejected
+    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(web), effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? MAX_WEB_SEARCHES : undefined })
     const sources = []
     for (const o of resp.output || []) if (o.type === 'message') for (const part of o.content || []) for (const ann of part.annotations || []) if (ann.type === 'url_citation' && ann.url && !sources.some((x) => x.url === ann.url)) sources.push({ title: ann.title || ann.url, url: ann.url })
     return { answer: resp.output_text || '', sources }
@@ -1707,7 +1722,7 @@ app.post('/api/chat', async (req, res) => {
   send('job', { id: jobId })
   const finish = () => job.finish()
 
-  if (!OPENAI_API_KEY) { send('error', { message: 'Server: OPENAI_API_KEY fehlt.' }); return finish() }
+  if (!LLM_API_KEY) { send('error', { message: 'Server: AZURE_OPENAI_API_KEY bzw. OPENAI_API_KEY fehlt.' }); return finish() }
 
   const { history = [], files: rawUploads = [], sessionId, webSearch = true, task = null, aissThreadId = null, msFiles: rawMsFiles = [], msSync = null } = body
   // Knowledge base picked in the UI ("Automatisch" sends nothing): pins the legal area, the planner still decides the mode.
@@ -1741,7 +1756,7 @@ app.post('/api/chat', async (req, res) => {
   const folderReq = lf && typeof lf.name === 'string' && lf.name ? { name: lf.name.slice(0, 200), count: Math.max(0, Math.min(1e6, Number(lf.count) || 0)), sample: (Array.isArray(lf.sample) ? lf.sample : []).slice(0, 150).map((x) => String(x).slice(0, 300)) } : null
 
   const persistent = typeof sessionId === 'string' && sessionId.length > 0
-  const useWeb = WEB_SEARCH_ENABLED && webSearch !== false
+  const useWeb = WEB_SEARCH_ENABLED && !webSearchRejected && webSearch !== false
   const threadIn = typeof aissThreadId === 'string' && aissThreadId.length < 200 ? aissThreadId : null
 
   // --- uploads: validate + extract text server-side ---
@@ -2445,7 +2460,7 @@ app.post('/api/chat', async (req, res) => {
 
 if (process.env.NO_LISTEN !== '1') {
   app.listen(PORT, () => {
-    console.log(`AI:ssociate Playground listening on http://localhost:${PORT} (fast=${MODEL_FAST}, main=${MODEL_MAIN}, kb=${AISSOCIATE_BASE_URL})`)
+    console.log(`AI:ssociate Playground listening on http://localhost:${PORT} (${LLM_PROVIDER}${USE_AZURE ? ' ' + AZURE_OPENAI_ENDPOINT : ''}, fast=${MODEL_FAST}, main=${MODEL_MAIN}, kb=${AISSOCIATE_BASE_URL})`)
   })
 }
 

@@ -24,7 +24,15 @@ question ──▶ fast model: mode, legal area, difficulty, 0–3 compact quest
   (header `x-api-key`, SSE stream; legal areas civil / criminal / tax / public,
   optional Bundesland scope; `thread_id` keeps follow-ups in one thread). The
   documents it consults are shown live as research steps.
-* **Models:** `gpt-6-luna` (`OPENAI_MODEL_FAST`) for everything easy, planning,
+* **Azure OpenAI (EU):** with `AZURE_OPENAI_API_KEY` every model call goes to the
+  Azure resource (`AZURE_OPENAI_ENDPOINT`, v1 API `/openai/v1/responses`) and one
+  deployment does everything (`AZURE_OPENAI_DEPLOYMENT`, default `gpt-6.1-terra`).
+  The routing by difficulty stays (knowledge base for hard legal questions, higher
+  reasoning effort for hard tasks). If the deployment rejects the hosted web
+  search, the call is repeated without it and web search stays off for the
+  process. Outside Azure: web search (if used), the E2B sandbox for file
+  generation and the Render region decide where else data is processed.
+* **Models (OpenAI):** `gpt-6-luna` (`OPENAI_MODEL_FAST`) for everything easy, planning,
   question formulation and the per-document due-diligence analysis;
   `gpt-6-sol` (`OPENAI_MODEL_MAIN`) only for hard tasks and the DD synthesis; the
   code model follows the task's difficulty unless `OPENAI_MODEL_CODE` is set.
@@ -203,7 +211,7 @@ npm run dev            # http://localhost:3000
 
 ## Deploy on Render
 
-The service builds from the `Dockerfile`. Set `OPENAI_API_KEY`,
+The service builds from the `Dockerfile`. Set `AZURE_OPENAI_API_KEY` (or `OPENAI_API_KEY`),
 `AISSOCIATE_API_KEY` and `E2B_API_KEY` in the Render dashboard; everything else
 has defaults (see `.env.example`). `GET /api/health` reports the configuration.
 Matters are stored in `DATA_DIR` (`/data` in `render.yaml`): attach a persistent

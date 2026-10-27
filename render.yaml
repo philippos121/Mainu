@@ -6,8 +6,14 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
+      - key: AZURE_OPENAI_API_KEY
+        sync: false   # set in the Render dashboard; when set, every model call goes to Azure OpenAI (one deployment)
+      - key: AZURE_OPENAI_ENDPOINT
+        value: https://aissociate-evaluation-azure-openai-ressource.openai.azure.com
+      - key: AZURE_OPENAI_DEPLOYMENT
+        value: gpt-6.1-terra
       - key: OPENAI_API_KEY
-        sync: false   # set the value in the Render dashboard
+        sync: false   # only used without AZURE_OPENAI_API_KEY
       - key: E2B_API_KEY
         sync: false   # set the value in the Render dashboard
       - key: AISSOCIATE_API_KEY
