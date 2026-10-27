@@ -69,7 +69,14 @@ the server forwards to the browser (`client_tool` event, answer via
 pdf.js served from `/vendor/pdfjs`, Word and Excel by unzipping, text formats) and
 sends only what the agent reads; `files_attach` hands single originals to the
 sandbox when a file must be edited. Alternatives in the folder dialog: attach up
-to five files to the message, or upload the whole folder into an Akt. A question
+to five files to the message, or upload the whole folder into an Akt. Generated files
+(Word, Excel, PDF) are saved back into the folder in Chrome and Edge: next to the
+source file (attached, picked or read by the agent), otherwise in the subfolder
+`AIssociate`; existing files are never overwritten (`Name (2).docx`). Write access
+is requested once right after picking the folder; automatic saving can be
+switched off in the settings ("Ergebnisse im Ordner speichern"), then a button
+"Im Ordner speichern" appears under the files. Browsers without the API (Safari,
+Firefox, mobile) keep the download. A question
 in the context of an Akt without picked documents lets the agent search all of
 its documents on the server with the same tools (text extracted lazily). Hard
 legal questions in these flows go to AI:ssociate once, after reading, with the

@@ -1977,6 +1977,7 @@ app.post('/api/chat', async (req, res) => {
 
   // ---- folder tools: a local folder (executed in the browser) or the documents of an Akt ----
   const folderReads = new Map() // path -> text parts read (kept for follow-up questions)
+  const folderAttached = [] // folder paths whose originals went to the sandbox (results are saved next to them)
   const sanitizeName = (n) => path.basename(String(n || 'datei')).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 180) || 'datei'
   async function addAttachment(name, buf, srcPath) {
     let n = sanitizeName(name)
@@ -2040,7 +2041,7 @@ app.post('/api/chat', async (req, res) => {
       if (name === 'files_read' && r.text) { const k = String(args.path || ''); folderReads.set(k, [...(folderReads.get(k) || []), r.text].slice(-6)) }
       if (name === 'files_attach') {
         const done = [], errs = []
-        for (const f of r.files || []) { try { done.push(await addAttachment(f.name, Buffer.from(f.base64, 'base64'), f.path)) } catch (e) { errs.push(`${f.path}: ${e.message}`) } }
+        for (const f of r.files || []) { try { done.push(await addAttachment(f.name, Buffer.from(f.base64, 'base64'), f.path)); folderAttached.push(f.path) } catch (e) { errs.push(`${f.path}: ${e.message}`) } }
         return { text: `${done.length ? `Übernommen: ${done.join('; ')}` : 'Nichts übernommen.'}${errs.length ? `\nFehler: ${errs.join('; ')}` : ''}${r.text ? `\n${r.text}` : ''}`, detail: done.length ? `${done.length} Datei${done.length > 1 ? 'en' : ''}` : 'keine', failed: !done.length }
       }
       const m = r.text.match(/^(\d+) Treffer/)
@@ -2425,7 +2426,7 @@ app.post('/api/chat', async (req, res) => {
     send('final', {
       answer, sources, verification, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
       agent: agentRun ? { key: agentRun.agent, title: agentRun.title, phase: agentRun.phase, next: agentRun.next } : null,
-      folder: filesSrc ? { kind: filesSrc.kind, name: filesSrc.name, read: [...folderReads.keys()] } : null,
+      folder: filesSrc ? { kind: filesSrc.kind, name: filesSrc.name, read: [...folderReads.keys()], attached: folderAttached } : null,
       models: { main: workModel, used: Object.keys(ctx.usage.byModel), code: MODEL_CODE || workModel, knowledgeBase: aissOk ? 'AI:ssociate' : null }, questions: plan.questions, difficulty: plan.difficulty,
       aissThreadId: aissThreadOut,
       sync, syncTarget: target,
