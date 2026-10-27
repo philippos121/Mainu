@@ -535,6 +535,31 @@
       @media (max-width: 960px) { .agent-cols { grid-template-columns: minmax(0, 1fr); } }
       @media (max-width: 640px) { .wf { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agent-head h1 { font-size: 20px; } .agent-head .ico { width: 42px; height: 42px; } }
 
+      /* ---------- skills ---------- */
+      .chip.skill { background: rgba(243,146,0,0.12); border-color: rgba(243,146,0,0.4); color: #8a5300; font-weight: 600; cursor: pointer; }
+      .chip.skill svg { color: #b36a00; }
+      .skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-bottom: 26px; }
+      .skill-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+      .skill-card .sh { display: flex; gap: 10px; align-items: center; }
+      .skill-card .ico { width: 34px; height: 34px; border-radius: 10px; background: rgba(243,146,0,0.12); color: #b36a00; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+      .skill-card.own .ico { background: var(--accent-soft); color: var(--accent); }
+      .skill-card .ico svg { width: 18px; height: 18px; }
+      .skill-card b { font-size: 14.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .skill-card .d { font-size: 12.5px; color: var(--muted); line-height: 1.45; flex: 1; }
+      .skill-card .pills { display: flex; gap: 4px; flex-wrap: wrap; }
+      .skill-card .acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+      .sec-h { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 800; margin: 4px 0 10px; }
+      .skill-pick { display: grid; gap: 6px; max-height: 52vh; overflow-y: auto; margin-top: 8px; }
+      .field-rows { display: grid; gap: 6px; }
+      .field-rows .fr { display: grid; grid-template-columns: minmax(0, 1.4fr) 110px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
+      .field-rows input, .field-rows select { width: 100%; font-family: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; background: var(--surface); color: var(--text); }
+      .field-rows label { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); white-space: nowrap; }
+      .field-rows .x { background: none; border: none; color: var(--faint); font-size: 17px; cursor: pointer; padding: 0 4px; }
+      .field-rows .x:hover { color: var(--err); }
+      .modal-card textarea.tall { min-height: 220px; font-size: 13.5px; line-height: 1.5; }
+      .ai-head .pill { margin-left: 4px; }
+      @media (max-width: 640px) { .field-rows .fr { grid-template-columns: 1fr 1fr; } }
+
       /* ---------- tour / toast ---------- */
       .tour-target { position: relative; z-index: 71 !important; box-shadow: 0 0 0 4px rgba(243,146,0,0.9), 0 0 0 9999px rgba(14,37,46,0.55) !important; border-radius: 14px; }
       .tour-card { position: fixed; z-index: 72; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom)); width: min(420px, calc(100vw - 32px)); background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: 0 16px 50px rgba(14,37,46,0.35); }
@@ -613,6 +638,7 @@
           <a class="nav-item" data-nav="agent:contract_review" href="#/agent/contract_review" id="navAgentReview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>Vertragsprüfung</a>
           <a class="nav-item" data-nav="agent:contract_draft" href="#/agent/contract_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>Vertrag entwerfen</a>
           <a class="nav-item" data-nav="agent:brief_draft" href="#/agent/brief_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/></svg>Schriftsatz entwerfen</a>
+          <a class="nav-item" data-nav="skills" href="#/skills" id="navSkills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Skills<span class="cnt" id="cntSkills" hidden></span></a>
           <div class="sb-sec">Akten</div>
           <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
           <div class="sb-sec sb-hist" id="sbHistSec" hidden>Verlauf <a href="#/history">Alle</a></div>
@@ -657,6 +683,9 @@
 
         <!-- ---------- specialist agent (contract review, contract drafting, pleadings) ---------- -->
         <section class="view" data-view="agent"><div class="page" id="agentPage"></div></section>
+
+        <!-- ---------- skills library ---------- -->
+        <section class="view" data-view="skills"><div class="page" id="skillsPage"></div></section>
 
         <!-- ---------- matters list ---------- -->
         <section class="view" data-view="matters"><div class="page" id="mattersPage"></div></section>
@@ -741,6 +770,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
           <span class="lbl">Microsoft 365</span>
         </button>
+        <button class="ctool" id="skillBtn" title="Skill anwenden (oder „/“ tippen)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+          <span class="lbl">Skills</span>
+        </button>
         <button class="ctool" id="folderBtn" title="Lokalen Ordner verbinden – der Assistent durchsucht ihn selbst, nichts wird vorab hochgeladen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg>
           <span class="lbl">Ordner</span>
@@ -754,6 +787,8 @@
 
     <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
     <input type="file" id="folderInput" multiple hidden webkitdirectory />
+    <input type="file" id="skillFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.rtf,.html,.htm,.xlsx" />
+    <input type="file" id="skillImportInput" hidden accept=".json,application/json" />
     <div class="modal" id="msModal"><div class="modal-card ms-card" id="msCard"></div></div>
     <div class="modal" id="taskModal"><div class="modal-card" id="taskCard"></div></div>
     <div class="modal" id="dlg"><div class="modal-card" id="dlgCard"></div></div>
@@ -894,6 +929,8 @@
         brief: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/></svg>',
         localfolder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg>',
         server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
+        skill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>',
+        mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
         attach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>',
       }
       const svg = (name) => { const s = document.createElement('span'); s.innerHTML = ICONS[name] || ICONS.tool; return s.firstChild }
@@ -964,7 +1001,7 @@
       $('historyBtn').addEventListener('click', () => navigate('#/history'))
       costPill.addEventListener('click', () => navigate('#/settings'))
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
-      const VIEW_TITLES = { assistant: 'Assistent', matters: 'Akten', dd: 'Due Diligence', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt' }
+      const VIEW_TITLES = { assistant: 'Assistent', matters: 'Akten', dd: 'Due Diligence', skills: 'Skills', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt' }
       function navigate(hash) { if (location.hash === hash) router(); else location.hash = hash }
       function setTitle(parts) { mainTitle.innerHTML = ''; parts.forEach((p, i) => mainTitle.appendChild(el('span', i < parts.length - 1 ? 'crumb' : '', p))) }
       function showView(name, nav) {
@@ -990,6 +1027,7 @@
         if (v === 'matters') renderMatters('all')
         if (v === 'dd') renderMatters('dd')
         if (v === 'history') renderHistory()
+        if (v === 'skills') renderSkills()
         if (v === 'settings') renderSettings()
       }
       window.addEventListener('hashchange', router)
@@ -1018,6 +1056,7 @@
           else { const [t, ic, d] = AGENT_CHIPS[key]; b.dataset.agent = key; b.title = d; b.appendChild(svg(ic)); b.appendChild(el('span', null, t)); b.addEventListener('click', () => navigate('#/agent/' + key)) }
           c.appendChild(b)
         }
+        const sb = el('button'); sb.dataset.skills = '1'; sb.title = 'Skills: Muster, Playbooks und Kanzleistil'; sb.appendChild(svg('skill')); sb.appendChild(el('span', null, 'Skills')); sb.addEventListener('click', () => openSkillPicker()); c.appendChild(sb)
       }
       // Knowledge-base selection (home list + composer chip + dialog), persisted with the settings.
       function kbItem() { return KB_ITEMS.find((x) => x.k === settings.kb) || KB_ITEMS[0] }
@@ -1110,7 +1149,7 @@
         $('taskModal').classList.add('show')
         setTimeout(() => (inputs[w.fields[0]?.k] || {}).focus?.(), 50)
       }
-      function closeTask() { $('taskModal').classList.remove('show') }
+      function closeTask() { $('taskModal').classList.remove('show'); $('taskCard').classList.remove('wide') }
       $('taskModal').addEventListener('click', (e) => { if (e.target === $('taskModal')) closeTask() })
 
       // ------------------------------------------------------------------
@@ -1132,6 +1171,8 @@
         pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
         pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() }); c.appendChild(x); attachList.appendChild(c) })
         if (localFolder) attachList.appendChild(folderChip())
+        if (pendingSkill) { const c = el('span', 'chip skill'); c.title = 'Skill für die nächste Nachricht'; c.appendChild(svg('skill')); c.appendChild(el('span', null, 'Skill: ' + pendingSkill.name)); c.addEventListener('click', () => { const sk = skillsCache.find((x) => x.id === pendingSkill.id); if (sk?.fields?.length) skillParamsForm(sk, pendingSkill.params) }); const x = el('button', null, '×'); x.title = 'Skill entfernen'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingSkill = null; renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
+        $('skillBtn').classList.toggle('on', Boolean(pendingSkill))
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
         msBtn.classList.toggle('on', pendingMs.length > 0)
         $('folderBtn').classList.toggle('on', Boolean(localFolder))
@@ -1155,14 +1196,14 @@
       // ------------------------------------------------------------------
       // Composer behaviour
       // ------------------------------------------------------------------
-      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0 || pendingMs.length > 0) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
-      input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
+      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0 || pendingMs.length > 0 || Boolean(pendingSkill)) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
+      input.addEventListener('input', () => { if (input.value === '/') { input.value = ''; openSkillPicker(); return } input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
       sendBtn.addEventListener('click', submit)
       function submit() {
         const text = input.value.trim()
-        if ((!text && !pendingFiles.length && !pendingMs.length) || busy) return
-        sendMessage({ text: text || 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.' })
+        if ((!text && !pendingFiles.length && !pendingMs.length && !pendingSkill) || busy) return
+        sendMessage({ text: text || (pendingSkill && !pendingFiles.length && !pendingMs.length ? `Skill „${pendingSkill.name}“ anwenden.` : 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.') })
       }
 
       // ------------------------------------------------------------------
@@ -1362,6 +1403,7 @@
         if (m.taskTitle) b.appendChild(el('div', 'tasklbl', (m.agent ? 'Agent · ' : 'Workflow · ') + m.taskTitle))
         if (m.matterName) b.appendChild(el('div', 'tasklbl', 'Akt · ' + m.matterName))
         if (m.folder) b.appendChild(el('div', 'tasklbl', 'Ordner · ' + m.folder))
+        if (m.skill) b.appendChild(el('div', 'tasklbl', 'Skill · ' + m.skill))
         b.appendChild(document.createTextNode(m.text))
         if (m.files?.length) { const f = el('div', 'files'); m.files.forEach((n) => f.appendChild(el('span', null, n))); b.appendChild(f) }
         messages.appendChild(b)
@@ -1468,6 +1510,7 @@
         ui.steps.classList.remove('open')
         if (opts.restored || !ui.stepCount) { ui.steps.remove() } else ui.sum.textContent = stepsSummary(ui, data)
         renderModelTags(ui.models, data.models)
+        if (data.skill && !ui.head.querySelector('.pill')) { const pl = el('span', 'pill orange', `Skill: ${data.skill.name}${data.skill.auto ? ' · automatisch' : ''}`); pl.title = data.skill.auto ? 'Der Assistent hat diesen Skill passend zur Anfrage gewählt.' : 'Für diese Nachricht gewählter Skill'; ui.head.insertBefore(pl, ui.models) }
         const body = ui.body; body.innerHTML = ''
         const ans = el('div', 'answer'); ans.innerHTML = renderMarkdown(data.answer || '')
         body.appendChild(ans)
@@ -1580,8 +1623,9 @@
         busy = true; updateSend()
         if (!current.title) { current.title = taskTitle ? `${taskTitle}: ${text.split('\n')[0].replace(taskTitle + ': ', '').slice(0, 50)}` : text.slice(0, 60) }
         showView('assistant'); showChat(); if (location.hash !== '#/chat/' + current.id) history.replaceState(null, '', '#/chat/' + current.id)
+        const skillReq = pendingSkill ? { id: pendingSkill.id, params: pendingSkill.params || {} } : null; const skillName = pendingSkill?.name || null; if (pendingSkill) { pendingSkill = null; renderAttachments() }
         const folderMeta = localFolder ? { name: localFolder.name, count: localFolder.entries.length, sample: localFolder.entries.slice(0, 150).map((e) => e.path) } : null
-        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, agent, matterName: matterCtx?.name || null, folder: folderMeta?.name || null }
+        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, agent, matterName: matterCtx?.name || null, folder: folderMeta?.name || null, skill: skillName }
         current.messages.push(um); renderUser(um)
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
@@ -1604,7 +1648,7 @@
         let hardFail = false
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta, skill: skillReq }) })
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readSse(resp, handle)
         } catch (err) { firstError = err }
@@ -1938,7 +1982,7 @@
         if (!localFolder) return
         const f = localFolder
         const card = $('dlgCard'); card.innerHTML = ''
-        card.parentElement.classList.add('wide')
+        card.classList.add('wide')
         card.appendChild(el('h2', null, `Ordner „${f.name}“`))
         const readable = f.entries.filter((e) => LOCAL_TEXT_EXT.test(e.path))
         const st = el('div', 'fold-stats')
@@ -2031,7 +2075,203 @@
       }
       // The folder dialog uses the wide card; other dialogs keep the default width.
       const _closeDlg = closeDlg
-      closeDlg = function () { _closeDlg(); $('dlgCard').parentElement?.classList.remove('wide') }
+      closeDlg = function () { _closeDlg(); $('dlgCard').classList.remove('wide') }
+
+      // ------------------------------------------------------------------
+      // Skills: reusable instruction packages (standard skills + the workspace's own).
+      // Picked per message (button, "/" or library), or chosen by the planner.
+      // ------------------------------------------------------------------
+      let skillsCache = [], skillOptions = null
+      let pendingSkill = null // { id, name, params } for the next message
+      async function loadSkills() {
+        try { const r = await api('/api/skills'); skillsCache = r.skills || []; skillOptions = r.options || null } catch (e) { if (!skillsCache.length) toast('Skills nicht ladbar: ' + e.message) }
+        const own = skillsCache.filter((x) => !x.builtin).length
+        $('cntSkills').hidden = !own; $('cntSkills').textContent = own
+        return skillsCache
+      }
+      const OUT_DE = { auto: 'Ergebnis automatisch', answer: 'Antwort', docx: 'Word', xlsx: 'Excel' }
+      const KB_DE = { auto: 'Wissensdatenbank nach Bedarf', always: 'immer Wissensdatenbank', never: 'ohne Wissensdatenbank' }
+      const AREA_DE = { civil: 'Zivilrecht', criminal: 'Strafrecht', tax: 'Steuerrecht', public: 'Öffentliches Recht' }
+      function useSkill(sk, params = {}) {
+        pendingSkill = { id: sk.id, name: sk.name, params }
+        if (viewName !== 'assistant' && viewName !== 'agent') navigate('#/assistant')
+        renderAttachments(); setTimeout(() => input.focus(), 50)
+        toast(`Skill „${sk.name}“ gilt für die nächste Nachricht.`)
+      }
+      function pickSkill(sk) { if (sk.fields?.length) skillParamsForm(sk, {}); else { closeDlg(); useSkill(sk) } }
+      async function openSkillPicker(filter = '') {
+        await loadSkills()
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, 'Skill wählen'))
+        card.appendChild(el('div', 'md', 'Ein Skill gilt für die nächste Nachricht: Anweisungen, Muster und Kanzleistil. Passende Skills wählt der Assistent auch selbst.'))
+        const q = el('input'); q.type = 'search'; q.placeholder = 'Skills durchsuchen…'; q.value = filter; q.style.cssText = 'width:100%;font-family:inherit;font-size:14px;border:1px solid var(--border);border-radius:10px;padding:8px 11px'
+        card.appendChild(q)
+        const list = el('div', 'skill-pick'); card.appendChild(list)
+        const draw = () => {
+          list.innerHTML = ''
+          const nq = normQ(q.value.trim())
+          const items = skillsCache.filter((x) => !nq || normQ(x.name + ' ' + x.description).includes(nq))
+          if (!items.length) list.appendChild(el('div', 'ms-empty', 'Kein Skill gefunden.'))
+          for (const sk of items) {
+            const b = el('button', 'fold-opt'); b.dataset.skill = sk.id
+            const i = el('span', 'ico'); i.appendChild(svg(sk.icon || 'skill')); const t = el('span'); t.appendChild(el('b', null, sk.name)); t.appendChild(el('span', 'd', sk.description || '')); b.append(i, t)
+            const tag = el('span', 'pill ' + (sk.builtin ? '' : 'teal'), sk.builtin ? 'Standard' : 'Kanzlei'); tag.style.marginLeft = 'auto'; tag.style.flex = '0 0 auto'; b.appendChild(tag)
+            b.addEventListener('click', () => pickSkill(sk)); list.appendChild(b)
+          }
+        }
+        q.addEventListener('input', draw); q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const first = list.querySelector('.fold-opt'); if (first) { e.preventDefault(); first.click() } } })
+        const a = el('div', 'modal-actions'); const lib = el('button', 'btn ghost', 'Bibliothek verwalten'); lib.addEventListener('click', () => { closeDlg(); navigate('#/skills') })
+        const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg)
+        a.append(lib, el('span', 'sp'), c); card.appendChild(a)
+        draw(); $('dlg').classList.add('show'); setTimeout(() => { if (!card.contains(document.activeElement)) q.focus() }, 30)
+      }
+      function skillParamsForm(sk, values = {}) {
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, sk.name)); card.appendChild(el('div', 'md', sk.description || ''))
+        const inputs = {}
+        for (const f of sk.fields) {
+          const fld = el('div', 'field'); fld.appendChild(el('label', null, f.label + (f.required ? ' *' : '')))
+          let c
+          if (f.type === 'select') { c = el('select'); for (const o of f.opts || []) { const op = el('option', null, o); op.value = o; c.appendChild(op) } }
+          else if (f.type === 'textarea') { c = el('textarea'); c.placeholder = f.ph || '' }
+          else { c = el('input'); c.type = 'text'; c.placeholder = f.ph || '' }
+          if (values[f.k]) c.value = values[f.k]
+          c.dataset.skillField = f.k; inputs[f.k] = c; fld.appendChild(c); card.appendChild(fld)
+        }
+        const a = el('div', 'modal-actions'); const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', () => openSkillPicker())
+        const ok = el('button', 'btn', 'Übernehmen')
+        ok.addEventListener('click', () => {
+          const params = {}
+          for (const f of sk.fields) { const v = String(inputs[f.k].value || '').trim(); if (f.required && !v) { toast(`Bitte „${f.label}“ ausfüllen.`); inputs[f.k].focus(); return } if (v) params[f.k] = v }
+          closeDlg(); useSkill(sk, params)
+        })
+        a.append(back, el('span', 'sp'), ok); card.appendChild(a)
+        $('dlg').classList.add('show'); setTimeout(() => { if (!card.contains(document.activeElement)) Object.values(inputs)[0]?.focus() }, 30)
+      }
+      async function renderSkills() {
+        setTitle(['Skills'])
+        const page = $('skillsPage'); page.innerHTML = ''
+        const head = el('div', 'page-head'); const ht = el('div'); ht.appendChild(el('h1', null, 'Skills')); ht.appendChild(el('div', 'sub', 'Wiederverwendbare Arbeitsanweisungen: Muster, Playbooks und Kanzleistil. Im Chat über „Skills“ oder „/“ wählen – passende Skills wendet der Assistent auch selbst an.')); head.appendChild(ht)
+        const acts = el('div', 'acts')
+        const imp = el('button', 'btn ghost sm', 'Importieren'); imp.addEventListener('click', () => $('skillImportInput').click())
+        const nw = el('button', 'btn sm', 'Neuer Skill'); nw.id = 'skillNew'; nw.addEventListener('click', () => openSkillEditor(null))
+        acts.append(imp, nw); head.appendChild(acts); page.appendChild(head)
+        const tb = el('div', 'toolbar'); const q = el('input'); q.type = 'search'; q.placeholder = 'Skills durchsuchen…'; tb.appendChild(q); page.appendChild(tb)
+        const body = el('div'); page.appendChild(body)
+        await loadSkills()
+        const draw = () => {
+          body.innerHTML = ''
+          const nq = normQ(q.value.trim())
+          const match = (x) => !nq || normQ(x.name + ' ' + x.description + ' ' + x.instructions).includes(nq)
+          const own = skillsCache.filter((x) => !x.builtin && match(x)), std = skillsCache.filter((x) => x.builtin && match(x))
+          body.appendChild(el('div', 'sec-h', `Kanzlei-Skills (${own.length})`))
+          if (!own.length && !nq) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine eigenen Skills')); e.appendChild(document.createTextNode('Einen Standard-Skill mit „Anpassen“ übernehmen oder mit „Neuer Skill“ eigene Anweisungen, Muster und Playbooks hinterlegen. Skills gelten für diesen Arbeitsbereich.')); e.style.marginBottom = '26px'; body.appendChild(e) }
+          else { const g = el('div', 'skill-grid'); own.forEach((x) => g.appendChild(skillCard(x))); body.appendChild(g) }
+          body.appendChild(el('div', 'sec-h', `Standard-Skills (${std.length})`))
+          const g2 = el('div', 'skill-grid'); std.forEach((x) => g2.appendChild(skillCard(x))); body.appendChild(g2)
+        }
+        q.addEventListener('input', draw); draw()
+      }
+      function skillCard(sk) {
+        const c = el('div', 'skill-card' + (sk.builtin ? '' : ' own')); c.dataset.skill = sk.id
+        const h = el('div', 'sh'); const i = el('span', 'ico'); i.appendChild(svg(sk.icon || 'skill')); h.append(i, el('b', null, sk.name)); c.appendChild(h)
+        c.appendChild(el('div', 'd', sk.description || ''))
+        const pills = el('div', 'pills')
+        pills.appendChild(el('span', 'pill', OUT_DE[sk.output] || 'Antwort'))
+        if (sk.kb !== 'auto') pills.appendChild(el('span', 'pill', KB_DE[sk.kb]))
+        if (AREA_DE[sk.legalArea]) pills.appendChild(el('span', 'pill', AREA_DE[sk.legalArea]))
+        if (sk.auto) pills.appendChild(el('span', 'pill teal', 'automatisch'))
+        if (sk.files?.length) pills.appendChild(el('span', 'pill orange', `${sk.files.length} Referenzdokument${sk.files.length > 1 ? 'e' : ''}`))
+        if (sk.fields?.length) pills.appendChild(el('span', 'pill', `${sk.fields.length} Eingabe${sk.fields.length > 1 ? 'n' : ''}`))
+        if (sk.uses) pills.appendChild(el('span', 'pill', `${sk.uses}× verwendet`))
+        c.appendChild(pills)
+        const a = el('div', 'acts')
+        const use = el('button', 'btn sm', 'Verwenden'); use.addEventListener('click', () => pickSkill(sk)); a.appendChild(use)
+        if (sk.builtin) { const ad = el('button', 'btn ghost sm', 'Anpassen'); ad.title = 'Eigene Kopie anlegen und bearbeiten'; ad.addEventListener('click', async () => { try { const r = await api(`/api/skills/${sk.id}/duplicate`, { method: 'POST', body: {} }); await loadSkills(); openSkillEditor(r.skill); renderSkills() } catch (e) { toast(e.message) } }); a.appendChild(ad) }
+        else { const ed = el('button', 'btn ghost sm', 'Bearbeiten'); ed.addEventListener('click', () => openSkillEditor(sk)); a.appendChild(ed) }
+        const ex = el('button', 'mini', 'Export'); ex.title = 'Als Datei speichern (zum Weitergeben)'; ex.addEventListener('click', () => downloadApi(`/api/skills/${sk.id}/export`, `skill_${sk.name.replace(/[^\wäöüÄÖÜß-]+/g, '_')}.json`)); a.appendChild(ex)
+        if (!sk.builtin) {
+          const cp = el('button', 'mini', 'Duplizieren'); cp.addEventListener('click', async () => { try { await api(`/api/skills/${sk.id}/duplicate`, { method: 'POST', body: {} }); renderSkills(); toast('Kopie angelegt.') } catch (e) { toast(e.message) } }); a.appendChild(cp)
+          const del = el('button', 'mini danger', 'Löschen'); del.addEventListener('click', async () => { if (!(await confirmDlg('Skill löschen?', `„${sk.name}“ und seine Referenzdokumente werden gelöscht.`))) return; try { await api(`/api/skills/${sk.id}`, { method: 'DELETE' }); renderSkills(); toast('Gelöscht.') } catch (e) { toast(e.message) } }); a.appendChild(del)
+        }
+        c.appendChild(a)
+        return c
+      }
+      function openSkillEditor(sk) {
+        const isNew = !sk
+        const s0 = sk || { name: '', description: '', instructions: '', output: 'auto', kb: 'auto', legalArea: 'auto', auto: true, fields: [], files: [] }
+        const queued = [] // reference documents chosen before the first save
+        let fields = (s0.fields || []).map((f) => ({ ...f, opts: Array.isArray(f.opts) ? f.opts.join(', ') : f.opts || '' }))
+        const card = $('taskCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, isNew ? 'Neuer Skill' : 'Skill bearbeiten'))
+        card.appendChild(el('div', 'md', 'Beschreibe die Arbeitsweise so, wie du sie einer neuen Kollegin erklären würdest: Aufbau, Prüfpunkte, Stil, was zu vermeiden ist. Muster und Playbooks als Referenzdokumente anhängen.'))
+        const fld = (label, c, hint) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); f.appendChild(c); if (hint) f.appendChild(el('div', 'hint', hint)); card.appendChild(f); return c }
+        const name = fld('Name *', el('input')); name.value = s0.name; name.id = 'skName'; name.maxLength = 80
+        const desc = fld('Wann einsetzen?', el('textarea'), 'Danach entscheidet der Assistent, ob er den Skill selbst anwendet.'); desc.value = s0.description; desc.id = 'skDesc'; desc.style.minHeight = '60px'
+        const instr = fld('Anweisungen *', el('textarea')); instr.className = 'tall'; instr.value = s0.instructions; instr.id = 'skInstr'; instr.placeholder = 'z. B.\n- Aufbau: …\n- Immer prüfen: …\n- Stil: …\n- Nicht: …'
+        const row = el('div', 'field-row'); row.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))'; card.appendChild(row)
+        const sel = (label, map, v, id) => { const f = el('div', 'field'); f.appendChild(el('label', null, label)); const c = el('select'); c.id = id; for (const [k, t] of Object.entries(map)) { const o = el('option', null, t); o.value = k; c.appendChild(o) } c.value = v; f.appendChild(c); row.appendChild(f); return c }
+        const out = sel('Ergebnis', skillOptions?.outputs || { auto: 'Automatisch', answer: 'Antwort im Chat', docx: 'Word-Datei', xlsx: 'Excel-Datei' }, s0.output, 'skOut')
+        const kb = sel('Wissensdatenbank', skillOptions?.kb || { auto: 'nach Schwierigkeit', always: 'immer', never: 'nie' }, s0.kb, 'skKb')
+        const area = sel('Rechtsgebiet', skillOptions?.areas || { auto: 'automatisch' }, s0.legalArea, 'skArea')
+        const autoL = el('label', 'check1'); const auto = el('input'); auto.type = 'checkbox'; auto.checked = s0.auto !== false; auto.id = 'skAuto'; autoL.append(auto, document.createTextNode('Der Assistent darf diesen Skill selbst anwenden, wenn eine Anfrage dazu passt')); card.appendChild(autoL)
+        // input fields
+        const ff = el('div', 'field'); ff.style.marginTop = '12px'; ff.appendChild(el('label', null, 'Eingabefelder (optional)')); const rows = el('div', 'field-rows'); ff.appendChild(rows)
+        const addF = el('button', 'mini', '+ Feld'); addF.type = 'button'; addF.style.marginTop = '6px'; ff.appendChild(addF); card.appendChild(ff)
+        const drawFields = () => {
+          rows.innerHTML = ''
+          fields.forEach((f, i) => {
+            const r = el('div', 'fr')
+            const l = el('input'); l.placeholder = 'Bezeichnung'; l.value = f.label || ''; l.addEventListener('input', () => { f.label = l.value })
+            const t = el('select'); for (const [k, v] of [['text', 'Text'], ['textarea', 'Langtext'], ['select', 'Auswahl']]) { const o = el('option', null, v); o.value = k; t.appendChild(o) } t.value = f.type || 'text'; t.addEventListener('change', () => { f.type = t.value; drawFields() })
+            const o = el('input'); o.placeholder = f.type === 'select' ? 'Optionen, mit Komma' : 'Beispiel (optional)'; o.value = f.type === 'select' ? f.opts || '' : f.ph || ''; o.addEventListener('input', () => { if (f.type === 'select') f.opts = o.value; else f.ph = o.value })
+            const rl = el('label'); const rq = el('input'); rq.type = 'checkbox'; rq.checked = Boolean(f.required); rq.addEventListener('change', () => { f.required = rq.checked }); rl.append(rq, document.createTextNode('Pflicht'))
+            const x = el('button', 'x', '×'); x.type = 'button'; x.title = 'Feld entfernen'; x.addEventListener('click', () => { fields.splice(i, 1); drawFields() })
+            r.append(l, t, o, rl, x); rows.appendChild(r)
+          })
+        }
+        addF.addEventListener('click', () => { if (fields.length >= 12) return; fields.push({ label: '', type: 'text', required: false }); drawFields() }); drawFields()
+        // reference documents
+        const rf = el('div', 'field'); rf.appendChild(el('label', null, 'Referenzdokumente (Muster, Playbook, Vorgaben)')); const flist = el('div', 'docs-box'); rf.appendChild(flist)
+        const addD = el('button', 'mini', '+ Dokument'); addD.type = 'button'; rf.appendChild(addD); rf.appendChild(el('div', 'hint', 'PDF, Word oder Text, bis 15 MB. Word- bzw. Excel-Dokumente dienen bei passendem Ergebnis auch als Vorlage.')); card.appendChild(rf)
+        let current = sk
+        const drawFiles = () => {
+          flist.innerHTML = ''
+          for (const f of current?.files || []) { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.addEventListener('click', async () => { try { current = (await api(`/api/skills/${current.id}/files/${f.id}`, { method: 'DELETE' })).skill; drawFiles() } catch (e) { toast(e.message) } }); c.appendChild(x); flist.appendChild(c) }
+          queued.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)} (wird mit gespeichert)`)); const x = el('button', null, '×'); x.addEventListener('click', () => { queued.splice(i, 1); drawFiles() }); c.appendChild(x); flist.appendChild(c) })
+        }
+        drawFiles()
+        addD.addEventListener('click', () => {
+          $('skillFileInput').onchange = async () => {
+            const files = [...$('skillFileInput').files]; $('skillFileInput').value = ''
+            const payload = []
+            for (const f of files) { if (f.size > 15 * 1048576) { toast(`„${f.name}“ ist größer als 15 MB.`); continue } payload.push({ name: f.name, size: f.size, base64: await readAsBase64(f) }) }
+            if (!current) { queued.push(...payload); drawFiles(); return }
+            try { const r = await api(`/api/skills/${current.id}/files`, { method: 'POST', body: { files: payload } }); current = r.skill; if (r.errors?.length) toast(r.errors.join(' · '), 5000); drawFiles() } catch (e) { toast(e.message) }
+          }
+          $('skillFileInput').click()
+        })
+        const a = el('div', 'modal-actions'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.addEventListener('click', () => { closeTask(); if (viewName === 'skills') renderSkills() })
+        const save = el('button', 'btn', 'Speichern'); save.id = 'skSave'
+        save.addEventListener('click', async () => {
+          const bodyS = { name: name.value, description: desc.value, instructions: instr.value, output: out.value, kb: kb.value, legalArea: area.value, auto: auto.checked, fields: fields.filter((f) => String(f.label || '').trim()).map((f) => ({ k: f.k || normQ(f.label).replace(/[^a-z0-9]+/g, '_').slice(0, 30), label: f.label, type: f.type || 'text', required: Boolean(f.required), ph: f.ph || '', ...(f.type === 'select' ? { opts: String(f.opts || '').split(',').map((x) => x.trim()).filter(Boolean) } : {}) })) }
+          save.disabled = true
+          try {
+            const r = current ? await api(`/api/skills/${current.id}`, { method: 'PATCH', body: bodyS }) : await api('/api/skills', { method: 'POST', body: bodyS })
+            current = r.skill
+            if (queued.length) { const fr = await api(`/api/skills/${current.id}/files`, { method: 'POST', body: { files: queued.splice(0) } }); if (fr.errors?.length) toast(fr.errors.join(' · '), 5000) }
+            closeTask(); await loadSkills(); if (viewName === 'skills') renderSkills(); toast('Skill gespeichert.')
+          } catch (e) { toast(e.message, 4000); save.disabled = false }
+        })
+        a.append(cancel, save); card.appendChild(a)
+        $('taskModal').classList.add('show'); setTimeout(() => { if (!card.contains(document.activeElement)) name.focus() }, 30)
+      }
+      $('skillBtn').addEventListener('click', () => openSkillPicker())
+      $('skillImportInput').addEventListener('change', async () => {
+        const f = $('skillImportInput').files[0]; $('skillImportInput').value = ''
+        if (!f) return
+        try { const j = JSON.parse(await f.text()); const r = await api('/api/skills/import', { method: 'POST', body: j }); await loadSkills(); renderSkills(); toast(`Skill „${r.skill.name}“ importiert${r.errors?.length ? ` (${r.errors.length} Dokument${r.errors.length > 1 ? 'e' : ''} übersprungen)` : ''}.`) } catch (e) { toast('Import fehlgeschlagen: ' + e.message, 5000) }
+      })
 
       // ------------------------------------------------------------------
       // Specialist agents: Vertragsprüfung, Vertrag entwerfen, Schriftsatz entwerfen
@@ -2758,7 +2998,7 @@
       newConversation({ keepView: true })
       router()
       try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
-      checkHealth(); loadMsState(); loadMatters()
+      checkHealth(); loadMsState(); loadMatters(); loadSkills()
     </script>
   </body>
 </html>

@@ -11,6 +11,7 @@ import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
 import { agentsForClient, buildAgentTask } from './lib/agents.js'
+import { BUILTIN_SKILLS, SKILL_OUTPUTS, SKILL_KB, SKILL_AREAS, SKILL_LIMITS, normalizeSkill, skillBlock, skillView } from './lib/skills.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -767,9 +768,10 @@ const PLAN_SCHEMA = {
     questions: { type: 'array', items: { type: 'string' } },
     difficulty: { type: 'string', enum: ['easy', 'hard'] },
     needs_document_context: { type: 'boolean' },
+    skill: { type: 'string' },
     title: { type: 'string' },
   },
-  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'needs_document_context', 'title'],
+  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'needs_document_context', 'skill', 'title'],
 }
 const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Analysiere die Anfrage (inkl. Gesprächsverlauf und ggf. Dokumenttext) und entscheide als JSON:
 - mode: "legal" = Rechtsfrage, Rechtsauskunft, Recherche, Prüfung eines Sachverhalts (→ juristische Wissensdatenbank). "document" = hochgeladene Dateien analysieren/bearbeiten, Dateien (Word/Excel/PDF) erzeugen, Dokumente vergleichen, Entwürfe als Datei. "general" = ohne Rechtsrecherche lösbar: Umformulieren, Übersetzen, Zusammenfassen von eingefügtem Text, Small Talk, Rückfrage, Folgefrage, die allein aus dem Verlauf beantwortbar ist.
@@ -778,6 +780,7 @@ const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichisc
 - questions: 1 bis ${KB_MAX_QUESTIONS} KONKRETE, KOMPAKTE Fragen an die juristische Wissensdatenbank (je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten; eigenständig, keine Verweise wie "siehe oben"; auf Deutsch). Zerlege die Anfrage nur dann in mehrere Fragen, wenn sie wirklich mehrere Rechtsfragen enthält – sonst genau eine. Bei mode "document": die Rechtsfragen, die für die Bearbeitung des Dokuments geklärt sein müssen (z. B. Zulässigkeit einer konkreten Klausel, Rechtsfolge, Frist); rein redaktionelle Dokumentaufgaben (Zusammenfassen, Vergleichen, Formatieren) → leere Liste. Bei mode "general": leere Liste.
 - needs_document_context: true, sobald sich eine Frage an die Wissensdatenbank auf den Inhalt eines Dokuments oder Akts bezieht (hochgeladen, früher im Gespräch hochgeladen, aus einem Ordner oder Akt), z. B. „Ist diese Klausel wirksam?“, „Was gilt nach Punkt 7?“, „Ist der Vertrag kündbar?“. Die Wissensdatenbank sieht die Dokumente NICHT – bei true wird ihr der einschlägige Wortlaut automatisch mitgeschickt. Formuliere die Fragen trotzdem eigenständig (Klausel kurz benennen, z. B. „die Haftungsbeschränkung in Punkt 9“). false bei abstrakten Rechtsfragen ohne Dokumentbezug.
 - difficulty: "hard" = schwere Aufgabe. Bei Rechtsfragen: Recherche in Normen und Judikatur nötig (Spezialmaterie, Judikaturlage, mehrere verschränkte Rechtsfragen, Rechtsfolgen/Fristen im Detail, Sachverhalt mit Dokumenten) → geht an die juristische Wissensdatenbank. Bei Dokument-/sonstigen Aufgaben: umfangreiche Dokumentbearbeitung (klauselweise Kommentierung, Vertragsentwurf, Redline, komplexe Excel-Auswertung), mehrschichtige Argumentation, lange Texte, mehrere große Dokumente. "easy" = einfache Rechtsfrage, die mit gesichertem Grundwissen und einer kurzen Websuche beantwortbar ist, bzw. kurze Entwürfe, Zusammenfassungen, Umformulierungen, einfache Dateien.
+- skill: die id eines unten angebotenen Skills, wenn die Anfrage EINDEUTIG dessen Einsatzzweck entspricht (z. B. „mach daraus einen Brief an die Mandantin“ → Mandantenbrief); sonst "". Ohne angebotene Skills immer "".
 - title: prägnanter Titel (max. 6 Wörter) für die Verlaufsliste.`
 // The fast model picks the verbatim passages the knowledge base needs (it never sees the documents itself).
 const KB_CONTEXT_SCHEMA = {
@@ -1409,6 +1412,97 @@ const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
 app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
 
+// ---- skills: reusable instruction packages of the workspace (plus the standard skills) ----
+async function findSkill(owner, id) {
+  const b = BUILTIN_SKILLS.find((x) => x.id === id)
+  if (b) return b
+  if (!owner || !/^sk_[\w-]{6,60}$/.test(String(id))) return null
+  try { const sk = await store.getSkill(id); return sk && sk.ownerKey === owner ? sk : null } catch { return null }
+}
+async function ownSkill(req, res) {
+  const owner = ownerOf(req)
+  if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
+  const sk = await findSkill(owner, String(req.params.id || ''))
+  if (!sk) { res.status(404).json({ error: 'Skill nicht gefunden.' }); return null }
+  if (sk.builtin) { res.status(403).json({ error: 'Standard-Skills sind schreibgeschützt – „Anpassen“ legt eine eigene Kopie an.' }); return null }
+  return sk
+}
+async function addSkillFiles(sk, files) {
+  const added = [], errors = []
+  for (const f of files) {
+    if (!f || typeof f.name !== 'string' || typeof f.base64 !== 'string') continue
+    try {
+      if ((sk.files || []).length >= SKILL_LIMITS.files) throw new Error(`höchstens ${SKILL_LIMITS.files} Referenzdokumente`)
+      const buf = Buffer.from(f.base64, 'base64')
+      if (!buf.length) throw new Error('leere Datei')
+      if (buf.length > SKILL_LIMITS.fileBytes) throw new Error(`größer als ${SKILL_LIMITS.fileBytes / 1048576} MB`)
+      const name = path.basename(f.name).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 160)
+      const r = await extractText(name, buf)
+      if (r.unsupported || !r.text.trim()) throw new Error('kein lesbarer Text (PDF, Word oder Text verwenden)')
+      const id = JsonStore.newId('f')
+      await store.putText(sk.id, id, r.text)
+      const file = await store.putFile(sk.id, id, name.split('.').pop(), buf)
+      const entry = { id, name, size: buf.length, chars: r.text.length, file }
+      ;(sk.files ||= []).push(entry); added.push(entry)
+    } catch (e) { errors.push(`${f.name}: ${e.message}`) }
+  }
+  return { added, errors }
+}
+app.get('/api/skills', async (req, res) => {
+  const owner = ownerOf(req)
+  let own = []
+  try { own = owner ? await store.listSkills(owner) : [] } catch {}
+  res.json({ skills: [...own.map(skillView), ...BUILTIN_SKILLS.map(skillView)], options: { outputs: SKILL_OUTPUTS, kb: SKILL_KB, areas: SKILL_AREAS, limits: SKILL_LIMITS } })
+})
+app.post('/api/skills', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
+  try { const sk = { id: JsonStore.newId('sk'), ownerKey: owner, ...normalizeSkill(req.body), files: [], uses: 0, createdAt: Date.now() }; await store.saveSkill(sk); res.json({ skill: skillView(sk) }) }
+  catch (e) { res.status(400).json({ error: e.message }) }
+})
+app.patch('/api/skills/:id', async (req, res) => {
+  const sk = await ownSkill(req, res); if (!sk) return
+  try { Object.assign(sk, normalizeSkill({ ...skillView(sk), ...(req.body || {}) }, sk)); await store.saveSkill(sk); res.json({ skill: skillView(sk) }) }
+  catch (e) { res.status(400).json({ error: e.message }) }
+})
+app.delete('/api/skills/:id', async (req, res) => { const sk = await ownSkill(req, res); if (!sk) return; await store.deleteSkill(sk.id); res.json({ ok: true }) })
+app.post('/api/skills/:id/duplicate', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
+  const src = await findSkill(owner, String(req.params.id || '')); if (!src) return res.status(404).json({ error: 'Skill nicht gefunden.' })
+  const sk = { id: JsonStore.newId('sk'), ownerKey: owner, ...normalizeSkill({ ...skillView(src), name: src.builtin ? src.name : `${src.name} (Kopie)`.slice(0, SKILL_LIMITS.name) }), files: [], uses: 0, createdAt: Date.now(), copiedFrom: src.id }
+  for (const f of src.files || []) { const buf = await store.getFile(src.id, f.file); if (buf) await addSkillFiles(sk, [{ name: f.name, base64: buf.toString('base64') }]) }
+  await store.saveSkill(sk); res.json({ skill: skillView(sk) })
+})
+app.post('/api/skills/:id/files', async (req, res) => {
+  const sk = await ownSkill(req, res); if (!sk) return
+  const r = await addSkillFiles(sk, Array.isArray(req.body?.files) ? req.body.files.slice(0, SKILL_LIMITS.files) : [])
+  await store.saveSkill(sk); res.json({ ...r, skill: skillView(sk) })
+})
+app.delete('/api/skills/:id/files/:fid', async (req, res) => {
+  const sk = await ownSkill(req, res); if (!sk) return
+  const i = (sk.files || []).findIndex((f) => f.id === req.params.fid); if (i < 0) return res.status(404).json({ error: 'Referenzdokument nicht gefunden.' })
+  const [f] = sk.files.splice(i, 1); try { await store.deleteDocument(sk.id, f.id, f.file) } catch {}
+  await store.saveSkill(sk); res.json({ skill: skillView(sk) })
+})
+// Export/import as a portable JSON file (with reference documents), e.g. to share a skill with colleagues.
+app.get('/api/skills/:id/export', async (req, res) => {
+  const sk = await findSkill(ownerOf(req), String(req.params.id || '')); if (!sk) return res.status(404).json({ error: 'Skill nicht gefunden.' })
+  const files = []
+  for (const f of sk.files || []) { const buf = await store.getFile(sk.id, f.file); if (buf) files.push({ name: f.name, base64: buf.toString('base64') }) }
+  const { name, description, instructions, output, kb, legalArea, auto, icon, fields } = skillView(sk)
+  res.setHeader('Content-Disposition', `attachment; filename="skill_${name.replace(/[^\w-]+/g, '_').slice(0, 50)}.json"`)
+  res.json({ format: 'aissociate-skill', version: 1, skill: { name, description, instructions, output, kb, legalArea, auto, icon, fields }, files })
+})
+app.post('/api/skills/import', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
+  const b = req.body || {}
+  if (b.format !== 'aissociate-skill' || !b.skill) return res.status(400).json({ error: 'Keine Skill-Datei (format „aissociate-skill“ erwartet).' })
+  try {
+    const sk = { id: JsonStore.newId('sk'), ownerKey: owner, ...normalizeSkill(b.skill), files: [], uses: 0, createdAt: Date.now() }
+    const r = await addSkillFiles(sk, Array.isArray(b.files) ? b.files.slice(0, SKILL_LIMITS.files) : [])
+    await store.saveSkill(sk); res.json({ skill: skillView(sk), errors: r.errors })
+  } catch (e) { res.status(400).json({ error: e.message }) }
+})
+
 // ---- findings: reviewer decisions and manual findings ----
 app.patch('/api/matters/:id/findings/:fid', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
@@ -1750,6 +1844,18 @@ app.post('/api/chat', async (req, res) => {
     taskExtra = t.extra
     forceMode = t.forceMode
   }
+  // A skill picked for this message (standard or of the workspace): binding instructions, inputs, reference documents.
+  const owner = ownerOf(req)
+  let skillRun = null // { skill, params, auto, block }
+  if (body.skill && typeof body.skill === 'object' && typeof body.skill.id === 'string') {
+    const sk = await findSkill(owner, body.skill.id)
+    if (!sk) { send('error', { message: 'Skill nicht gefunden (anderer Arbeitsbereich?).' }); return finish() }
+    const params = body.skill.params && typeof body.skill.params === 'object' ? body.skill.params : {}
+    const missing = (sk.fields || []).filter((f) => f.required && !String(params[f.k] || '').trim())
+    if (missing.length) { send('error', { message: `Skill „${sk.name}“: bitte ${missing.map((f) => `„${f.label}“`).join(', ')} angeben.` }); return finish() }
+    skillRun = { skill: sk, params, auto: false }
+    prompt = prompt || `Skill „${sk.name}“ anwenden.`
+  }
   if (!prompt) { send('error', { message: 'Bitte eine Frage oder Aufgabe eingeben.' }); return finish() }
   // A local folder picked in the browser: the browser runs the file tools (nothing is uploaded up front).
   const lf = body.localFolder && typeof body.localFolder === 'object' ? body.localFolder : null
@@ -1894,7 +2000,7 @@ app.post('/api/chat', async (req, res) => {
    */
   async function kbContextFor(questions) {
     const sources = []
-    for (const [name, t] of uploadTexts) if (!t.unsupported && t.text && t.text.trim()) sources.push({ name, text: t.text })
+    for (const [name, t] of uploadTexts) if (!t.unsupported && !t.template && t.text && t.text.trim()) sources.push({ name, text: t.text })
     if (matterCtx && !sources.length) sources.push({ name: `Akt ${matterReq.name} (gespeicherte Analyse)`, text: matterCtx })
     if (!sources.length || !questions.length) return ''
     const total = sources.reduce((n, x) => n + x.text.length, 0)
@@ -2128,6 +2234,26 @@ app.post('/api/chat', async (req, res) => {
     }
   }
 
+  /** Loads a skill's reference documents, hands matching templates to the sandbox and builds its prompt block. */
+  async function prepareSkill(run) {
+    const sk = run.skill
+    const sid = step('skill', `Skill: ${sk.name}${run.auto ? ' (automatisch gewählt)' : ''}`)
+    const refs = []
+    for (const f of sk.files || []) {
+      const text = await store.getText(sk.id, f.id)
+      refs.push({ name: f.name, text })
+      // A Word/Excel reference of a skill that produces that format is a template: it goes to the sandbox.
+      const ext = (f.name.split('.').pop() || '').toLowerCase()
+      if ((sk.output === 'docx' && ext === 'docx') || (sk.output === 'xlsx' && ext === 'xlsx')) {
+        const buf = await store.getFile(sk.id, f.file)
+        if (buf && uploads.length < MAX_UPLOADS) { const n = sanitizeName('Vorlage_' + f.name); if (!uploads.some((u) => u.name === n)) { uploads.push({ name: n, buf }); uploadTexts.set(n, { text, template: true }); if (sandboxReady) { await sandbox.files.write(`${WORKDIR}/${n}`, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)); try { for (const e of await sandbox.files.list(WORKDIR)) if (e.name === n) before.set(e.path, e.size) } catch {} } } }
+      }
+    }
+    run.block = skillBlock(sk, run.params, refs)
+    stepDone(sid, { detail: [sk.builtin ? 'Standard-Skill' : 'Kanzlei-Skill', refs.length ? `${refs.length} Referenzdokument${refs.length > 1 ? 'e' : ''}` : '', { docx: 'Ergebnis: Word', xlsx: 'Ergebnis: Excel', answer: 'Ergebnis: Antwort' }[sk.output] || ''].filter(Boolean).join(' · ') })
+    if (!sk.builtin) { sk.uses = (sk.uses || 0) + 1; store.saveSkill(sk).catch(() => {}) }
+  }
+
   /** Document-mode agent loop: few steps, one knowledge-base call, ≤3 web searches. */
   async function documentLoop({ input }) {
     let prevId
@@ -2211,6 +2337,14 @@ app.post('/api/chat', async (req, res) => {
     // A folder the agent searches itself: the local folder of the browser, else all documents of the Akt (none picked).
     if (folderReq) filesSrc = { kind: 'local', name: folderReq.name, count: folderReq.count }
     else if (matterReq && !matterDocs.length && matterReq.documents.length) filesSrc = { kind: 'akt', name: matterReq.name, count: matterReq.documents.length }
+    if (skillRun) { await prepareSkill(skillRun); taskExtra = skillRun.block + (taskExtra ? '\n\n' + taskExtra : '') }
+    // Skills the planner may choose by itself (only when nothing else steers this message).
+    let skillCandidates = []
+    if (!skillRun && !agentRun && !task) {
+      let own = []
+      try { own = owner ? await store.listSkills(owner) : [] } catch {}
+      skillCandidates = [...own, ...BUILTIN_SKILLS].filter((x) => x.auto !== false).slice(0, 40)
+    }
 
     const histInput = (Array.isArray(history) ? history : [])
       .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
@@ -2226,13 +2360,13 @@ app.post('/api/chat', async (req, res) => {
     const matterLine = matterCtx ? `AKTENKONTEXT (gespeicherte Analyse des Akts; Befunde mit Zitat und Fundstelle sind belegt, alles andere ist Zusammenfassung):\n${matterCtx}\n\n` : ''
     const priorLine = priorNames.length ? `FRÜHER IN DIESEM GESPRÄCH HOCHGELADEN (mit read_document lesbar; die Originale liegen ggf. noch in /home/user): ${priorNames.map((n) => `${n} (${uploadTexts.get(n).text.length} Zeichen)`).join('; ')}\n\n` : ''
     const folderLine = folderReq ? `VERBUNDENER LOKALER ORDNER „${folderReq.name}“ (${folderReq.count} Dateien; mit files_search / files_read durchsuchen). Beispiele: ${folderReq.sample.slice(0, 40).join(', ')}\n\n` : filesSrc?.kind === 'akt' ? `ALLE ${filesSrc.count} DOKUMENTE DES AKTS sind mit files_search / files_read durchsuchbar.\n\n` : ''
-    const userContent = areaHint + (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + priorLine + folderLine + inlineDocs + prompt
+    let userContent = areaHint + (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + priorLine + folderLine + inlineDocs + prompt
 
     // ---- 1. plan: Luna decides the mode and formulates compact questions for the knowledge base ----
     const pid = step('triage', 'Anfrage wird analysiert', { model: MODEL_FAST })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', questions: [], title: prompt.slice(0, 60) }
     try {
-      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${priorNames.length ? `Früher im Gespräch hochgeladen (Text liegt vor): ${priorNames.join(', ')}\n` : ''}${folderReq ? `Verbundener lokaler Ordner: ${folderReq.name} (${folderReq.count} Dateien, z. B. ${folderReq.sample.slice(0, 12).join(', ')})\n` : filesSrc?.kind === 'akt' ? `Alle ${filesSrc.count} Dokumente des Akts sind durchsuchbar.\n` : ''}${agentRun ? `Agent: ${agentRun.title} – ${agentRun.phaseLabel}\n` : task?.type ? `Workflow: ${task.type}\n` : ''}${pickedArea ? `Gewählte Wissensdatenbank: ${LEGAL_AREA_LABEL[pickedArea]}${pickedScope ? ` (${pickedScope})` : ''} – Rechtsfragen in diesem Rechtsgebiet beantworten.\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}${priorNames.length && !uploads.length ? `FRÜHERES DOKUMENT (Anfang):\n${priorNames.slice(-2).map((n) => `--- ${n} ---\n${uploadTexts.get(n).text.slice(0, 4000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
+      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${priorNames.length ? `Früher im Gespräch hochgeladen (Text liegt vor): ${priorNames.join(', ')}\n` : ''}${folderReq ? `Verbundener lokaler Ordner: ${folderReq.name} (${folderReq.count} Dateien, z. B. ${folderReq.sample.slice(0, 12).join(', ')})\n` : filesSrc?.kind === 'akt' ? `Alle ${filesSrc.count} Dokumente des Akts sind durchsuchbar.\n` : ''}${agentRun ? `Agent: ${agentRun.title} – ${agentRun.phaseLabel}\n` : task?.type ? `Workflow: ${task.type}\n` : ''}${skillRun ? `Skill: ${skillRun.skill.name}\n` : ''}${skillCandidates.length ? `VERFÜGBARE SKILLS (nur wählen, wenn die Anfrage eindeutig dazu passt):\n${skillCandidates.map((x) => `- ${x.id}: ${x.name} – ${x.description}`).join('\n')}\n` : ''}${pickedArea ? `Gewählte Wissensdatenbank: ${LEGAL_AREA_LABEL[pickedArea]}${pickedScope ? ` (${pickedScope})` : ''} – Rechtsfragen in diesem Rechtsgebiet beantworten.\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}${priorNames.length && !uploads.length ? `FRÜHERES DOKUMENT (Anfang):\n${priorNames.slice(-2).map((n) => `--- ${n} ---\n${uploadTexts.get(n).text.slice(0, 4000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
       const planFormat = { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } }
       // max_output_tokens includes reasoning tokens: retry once with more room if truncated.
       let pr = await callModel(ctx, { model: MODEL_FAST, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 6000, input: planInput, text: planFormat })
@@ -2252,7 +2386,22 @@ app.post('/api/chat', async (req, res) => {
     if (pickedArea && plan.mode !== 'general') { plan.legal_area = pickedArea; if (pickedArea === 'public') plan.scope = pickedScope || plan.scope; else plan.scope = '' }
     // A folder only helps in document mode (the agent searches it there); questions about its contents go there.
     if (filesSrc && plan.mode === 'legal' && plan.needs_document_context) plan.mode = 'document'
+    // A skill the planner chose: its instructions join the request like an explicitly picked one.
+    if (!skillRun && plan.skill && skillCandidates.some((x) => x.id === plan.skill)) {
+      skillRun = { skill: skillCandidates.find((x) => x.id === plan.skill), params: {}, auto: true }
+      await prepareSkill(skillRun)
+      userContent = skillRun.block + '\n\n' + userContent
+    }
+    if (skillRun) {
+      const sk = skillRun.skill
+      if (sk.output === 'docx' || sk.output === 'xlsx') plan.mode = 'document'
+      if (sk.kb === 'never') kbAllowed = false
+      if (sk.kb === 'always' && plan.mode !== 'general') { plan.difficulty = 'hard'; if (!plan.questions.length) plan.questions = [prompt.slice(0, 1200)] }
+      if (sk.legalArea && sk.legalArea !== 'auto' && !pickedArea) { plan.legal_area = sk.legalArea; if (sk.legalArea !== 'public') plan.scope = '' }
+    }
     if (forceDifficulty) plan.difficulty = forceDifficulty
+    // Without the knowledge base a legal question is answered directly (as an easy one).
+    if (!kbAllowed && plan.mode === 'legal') plan.difficulty = 'easy'
     if (!kbAllowed) plan.questions = []
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]
     if (plan.mode === 'general') plan.questions = []
@@ -2334,7 +2483,7 @@ app.post('/api/chat', async (req, res) => {
         // builds the deliverable from document + answers, or just answers.
         let kbBlock = ''
         // With a folder and no document at hand yet, the agent asks the knowledge base itself after reading (ask_aissociate with context).
-        const docsAtHand = [...uploadTexts.values()].some((t) => t.text && t.text.trim())
+        const docsAtHand = [...uploadTexts.values()].some((t) => !t.template && t.text && t.text.trim())
         if (heavy && kbAllowed && plan.questions.length && plan.legal_area !== 'none' && (docsAtHand || !filesSrc)) {
           try { const context = docsAtHand || plan.needs_document_context ? await kbContextFor(plan.questions) : ''; const kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope, context }); kbBlock =`ANTWORTEN DER WISSENSDATENBANK (AI:ssociate, ${areaLabel}):\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}\n\n` }
           catch (e) { if (e instanceof BudgetExceeded) throw e; console.error('aissociate (document) failed:', e?.message); kbBlock ='HINWEIS: Die Wissensdatenbank war nicht erreichbar – rechtliche Aussagen ausdrücklich als nicht verifiziert kennzeichnen.\n\n' }
@@ -2432,7 +2581,7 @@ app.post('/api/chat', async (req, res) => {
 
     // Keep this turn's documents (uploads, Akt documents, parts read from a folder) for follow-up questions.
     if (persistent) {
-      const keep = [...uploadTexts.entries()].filter(([, t]) => !t.prior && !t.unsupported && t.text && t.text.trim()).map(([name, t]) => ({ name, text: t.text, pages: t.pages }))
+      const keep = [...uploadTexts.entries()].filter(([, t]) => !t.prior && !t.template && !t.unsupported && t.text && t.text.trim()).map(([name, t]) => ({ name, text: t.text, pages: t.pages }))
       for (const [p, parts] of folderReads) keep.push({ name: p, text: parts.join('\n\n[…]\n\n'), source: 'ordner' })
       rememberSessionDocs(sessionId, keep)
     }
@@ -2441,6 +2590,7 @@ app.post('/api/chat', async (req, res) => {
     send('final', {
       answer, sources, verification, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
       agent: agentRun ? { key: agentRun.agent, title: agentRun.title, phase: agentRun.phase, next: agentRun.next } : null,
+      skill: skillRun ? { id: skillRun.skill.id, name: skillRun.skill.name, auto: skillRun.auto } : null,
       folder: filesSrc ? { kind: filesSrc.kind, name: filesSrc.name, read: [...folderReads.keys()], attached: folderAttached } : null,
       models: { main: workModel, used: Object.keys(ctx.usage.byModel), code: MODEL_CODE || workModel, knowledgeBase: aissOk ? 'AI:ssociate' : null }, questions: plan.questions, difficulty: plan.difficulty,
       aissThreadId: aissThreadOut,

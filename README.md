@@ -109,6 +109,28 @@ conversation. Later phases do not ask the knowledge base again, drafting phases
 run on the main model. `GET /api/agents` serves the configuration;
 `POST /api/chat` takes `task: { type: 'agent', agent, phase, params }`.
 
+## Skills
+
+Reusable instruction packages like playbooks or custom workflows in other legal AI
+tools (`lib/skills.js`, library under `#/skills`). A skill has a name, a
+description ("wann einsetzen"), instructions, optional input fields, reference
+documents (templates, playbooks, house style; a Word/Excel reference doubles as
+the template when the skill produces that format) and routing preferences:
+result (answer, Word, Excel), knowledge base (by difficulty, always, never) and
+legal area. It applies to one message: picked with the "Skills" button or by
+typing "/" in the composer (with a form for its inputs), or chosen by the
+planner when a request clearly matches a skill marked "automatisch" (shown as
+"Skill: … · automatisch" on the answer). Eleven standard skills ship with the
+app (Mandantenbrief, Aktenvermerk, Sachverhaltschronologie, Rechtsgutachten,
+Playbook-Abgleich, Gegenargumente, Übersetzung Rechtsenglisch, Bescheidanalyse,
+Steuerliche Erstbeurteilung, Schreiben an die Gegenseite, Executive Summary);
+they are read-only and can be adapted as a copy. Own skills belong to the
+workspace key, can be exported as JSON (with their reference documents) and
+imported elsewhere. Routes: `GET/POST /api/skills`, `PATCH/DELETE /api/skills/:id`,
+`POST /api/skills/:id/duplicate`, `POST/DELETE /api/skills/:id/files[/:fid]`,
+`GET /api/skills/:id/export`, `POST /api/skills/import`; `POST /api/chat` takes
+`skill: { id, params }`.
+
 ## Microsoft 365 (OneDrive / SharePoint)
 
 Users sign in with their Microsoft account (OAuth 2.0 + PKCE against Entra ID,
