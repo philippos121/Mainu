@@ -38,12 +38,61 @@ question ──▶ fast model: mode, legal area, difficulty, 0–3 compact quest
   mobile, wordmark on desktop), centred logo, "Wählen Sie eine Wissensdatenbank"
   list (Automatisch / Zivilrecht / Strafrecht / Steuerrecht / Öffentliches Recht
   with Bundesland; the choice pins the legal area, "Automatisch" lets the planner
-  detect it), template chips with forms (Rechtsrecherche, Vertrag prüfen,
-  Versionen vergleichen, Entwurf, Zusammenfassen), the "Frage AI:ssociate."
-  composer with the chosen knowledge base as a chip, disclaimer. Conversation
+  detect it), template chips (Rechtsrecherche, Versionen vergleichen,
+  Zusammenfassen as forms; Vertragsprüfung, Vertrag entwerfen, Schriftsatz
+  entwerfen open their agents), the "Frage AI:ssociate." composer with the chosen
+  knowledge base as a chip and the buttons Dokumente, Microsoft 365 and Ordner,
+  disclaimer. Conversation
   history (browser-local), feature tour, agent steps without code, sources with
   "Volltext geprüft" status, RIS verification panel, Word/Markdown export, exact
   cost per answer. No model names anywhere in the UI.
+
+## Documents and the knowledge base
+
+AI:ssociate never sees our documents on its own. Every request about a document
+carries its wording: short documents go in whole, longer ones as verbatim
+passages that the fast model picks and the server checks against the text
+(invented passages are dropped). The planner decides per question whether the
+wording is needed (`needs_document_context`). Documents of a conversation stay
+available as text for follow-up questions ("Ist die Klausel wirksam?" in the next
+turn still reaches the knowledge base with the clause). In the due diligence the
+per-document request carries the full text (short documents) or the quotes of
+the red/amber findings.
+
+## Local folders and Akten as searchable sources
+
+The composer's "Ordner" button connects a local folder (File System Access API;
+Safari/Firefox: folder or file selection). Nothing is uploaded up front: the agent
+calls file tools (`files_search`, `files_list`, `files_read`, `files_attach`) that
+the server forwards to the browser (`client_tool` event, answer via
+`POST /api/jobs/:id/tool-result`). The browser extracts text locally (PDF with
+pdf.js served from `/vendor/pdfjs`, Word and Excel by unzipping, text formats) and
+sends only what the agent reads; `files_attach` hands single originals to the
+sandbox when a file must be edited. Alternatives in the folder dialog: attach up
+to five files to the message, or upload the whole folder into an Akt. A question
+in the context of an Akt without picked documents lets the agent search all of
+its documents on the server with the same tools (text extracted lazily). Hard
+legal questions in these flows go to AI:ssociate once, after reading, with the
+wording in `context`.
+
+## Specialist agents
+
+Next to the due diligence: **Vertragsprüfung**, **Vertrag entwerfen** and
+**Schriftsatz entwerfen** (`lib/agents.js`, versioned like the DD catalogue). Each
+has a guided page (`#/agent/<key>`) with the typical Austrian workflow, a form,
+documents (upload, folder, Microsoft 365, Akt) and its reference material: the
+review grid of 16 points (parties and representation, Gewährleistung, Haftung,
+§ 879 ABGB / § 6 KSchG, Pönale § 1336 ABGB, Laufzeit, § 1396a ABGB, DSGVO, KartG,
+Form and Gebühren nach § 33 GebG, Rechtswahl and Gerichtsstand), 17 contract types
+with their mandatory law, form and fee notes, and 14 kinds of pleadings (Klage
+§ 226 ZPO, Mahnklage, Einspruch, Klagebeantwortung, Berufung, Rekurs, Revision,
+einstweilige Verfügung, Exekutionsantrag, Bescheidbeschwerde § 9 VwGVG, Revision
+an den VwGH, Privatbeteiligung). A run has phases (review → redline; outline →
+draft → self-check; legal analysis and outline → draft → counter-arguments); the
+answer shows the next step as a button, and the next phase builds on the
+conversation. Later phases do not ask the knowledge base again, drafting phases
+run on the main model. `GET /api/agents` serves the configuration;
+`POST /api/chat` takes `task: { type: 'agent', agent, phase, params }`.
 
 ## Microsoft 365 (OneDrive / SharePoint)
 
@@ -80,13 +129,13 @@ Every cited § / Geschäftszahl is verified against the RIS. The optional
 review of knowledge-base answers is off by default (`REVIEW_ANSWERS=on`).
 **Due Diligence** (menu) runs the fixed pipeline below; review tables live
 inside the Akt (tabs), the form-driven templates above the composer
-("Vorlagen"). Each matter is "der Akt". Model names are not shown in the UI.
+("Vorlagen"). The specialist agents are described above. Each matter is "der Akt". Model names are not shown in the UI.
 
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
 The UI is an app shell: teal app bar plus a sidebar (drawer behind the
-hamburger on mobile) with Assistent, Due Diligence, Alle Akten, Verlauf and
-Einstellungen; hash routes such as `#/matter/<id>/findings`. Matters ("Akten") hold documents (upload or import of
+hamburger on mobile) with Assistent, the agents (Due Diligence, Vertragsprüfung,
+Vertrag entwerfen, Schriftsatz entwerfen), Alle Akten, Verlauf and Einstellungen; hash routes such as `#/matter/<id>/findings`. Matters ("Akten") hold documents (upload or import of
 files and whole folders from OneDrive/SharePoint), their extracted text, the
 analysis results, review tables and reports. Everything long-running is a
 server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),

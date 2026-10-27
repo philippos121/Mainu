@@ -10,6 +10,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
+import { agentsForClient, buildAgentTask } from './lib/agents.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -74,6 +75,19 @@ const MAX_UPLOADS = 5
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const SANDBOX_LIFETIME_MS = 300_000
 const CHAT_SESSION_TTL_MS = 15 * 60 * 1000
+
+// The knowledge base never sees our documents by itself: the relevant wording goes
+// into the request. Up to KB_CONTEXT_CHARS of verbatim passages (the fast model picks
+// them from up to KB_CONTEXT_SOURCE_CHARS of document text; short documents go in whole).
+const KB_CONTEXT_CHARS = Number(process.env.KB_CONTEXT_CHARS || 8000)
+const KB_CONTEXT_SOURCE_CHARS = Number(process.env.KB_CONTEXT_SOURCE_CHARS || 240_000)
+// Documents of a conversation stay available for follow-up questions (text only, in memory).
+const SESSION_DOCS_TTL_MS = Number(process.env.SESSION_DOCS_TTL_MS || 6 * 3600 * 1000)
+const SESSION_DOCS_MAX_CHARS = Number(process.env.SESSION_DOCS_MAX_CHARS || 2_000_000)
+const SESSION_DOCS_MAX_SESSIONS = 400
+// Local folders (File System Access API): the browser executes the file tools and answers within this time.
+const CLIENT_TOOL_TIMEOUT_MS = Number(process.env.CLIENT_TOOL_TIMEOUT_MS || 120_000)
+const FILES_PART_CHARS = 24_000
 
 // Pricing (USD per 1M tokens). Real GPT-6 API rates; override via
 // OPENAI_PRICES_JSON='{"gpt-6-sol":{"in":2,"cached":0.2,"out":10}}'.
@@ -738,19 +752,37 @@ const PLAN_SCHEMA = {
     scope: { type: 'string', enum: ['', ...SCOPES] },
     questions: { type: 'array', items: { type: 'string' } },
     difficulty: { type: 'string', enum: ['easy', 'hard'] },
+    needs_document_context: { type: 'boolean' },
     title: { type: 'string' },
   },
-  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'title'],
+  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'needs_document_context', 'title'],
 }
 const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Analysiere die Anfrage (inkl. Gesprächsverlauf und ggf. Dokumenttext) und entscheide als JSON:
 - mode: "legal" = Rechtsfrage, Rechtsauskunft, Recherche, Prüfung eines Sachverhalts (→ juristische Wissensdatenbank). "document" = hochgeladene Dateien analysieren/bearbeiten, Dateien (Word/Excel/PDF) erzeugen, Dokumente vergleichen, Entwürfe als Datei. "general" = ohne Rechtsrecherche lösbar: Umformulieren, Übersetzen, Zusammenfassen von eingefügtem Text, Small Talk, Rückfrage, Folgefrage, die allein aus dem Verlauf beantwortbar ist.
 - legal_area: Rechtsgebiet der Wissensdatenbank. "civil" = Zivilrecht im weiten Sinn (ABGB, Schadenersatz, Vertrags-, Miet-, Familien-, Erb-, Arbeits-, Unternehmens-, Gesellschafts-, Insolvenz-, Zivilverfahrens-, Exekutionsrecht, Konsumentenschutz; OGH-Judikatur). "criminal" = Straf- und Strafverfahrensrecht. "tax" = Steuer- und Abgabenrecht (BAO, EStG, UStG, KStG, Finanzstrafrecht). "public" = öffentliches Recht (Verfassungs- und Verwaltungsrecht, Verwaltungsverfahren, Gewerbe-, Bau-, Raumordnungs-, Fremden-, Asyl-, Vergabe-, Datenschutzrecht, Landesrecht; VwGH/VfGH/BVwG). "none" nur bei mode general/document ohne Rechtsfrage.
 - scope: nur bei "public": "Bund" oder ein Bundesland (Wien, Niederösterreich, Oberösterreich, Salzburg, Steiermark, Tirol, Vorarlberg, Kärnten, Burgenland), wenn Landesrecht einschlägig ist; sonst leer "".
 - questions: 1 bis ${KB_MAX_QUESTIONS} KONKRETE, KOMPAKTE Fragen an die juristische Wissensdatenbank (je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten; eigenständig, keine Verweise wie "siehe oben"; auf Deutsch). Zerlege die Anfrage nur dann in mehrere Fragen, wenn sie wirklich mehrere Rechtsfragen enthält – sonst genau eine. Bei mode "document": die Rechtsfragen, die für die Bearbeitung des Dokuments geklärt sein müssen (z. B. Zulässigkeit einer konkreten Klausel, Rechtsfolge, Frist); rein redaktionelle Dokumentaufgaben (Zusammenfassen, Vergleichen, Formatieren) → leere Liste. Bei mode "general": leere Liste.
+- needs_document_context: true, sobald sich eine Frage an die Wissensdatenbank auf den Inhalt eines Dokuments oder Akts bezieht (hochgeladen, früher im Gespräch hochgeladen, aus einem Ordner oder Akt), z. B. „Ist diese Klausel wirksam?“, „Was gilt nach Punkt 7?“, „Ist der Vertrag kündbar?“. Die Wissensdatenbank sieht die Dokumente NICHT – bei true wird ihr der einschlägige Wortlaut automatisch mitgeschickt. Formuliere die Fragen trotzdem eigenständig (Klausel kurz benennen, z. B. „die Haftungsbeschränkung in Punkt 9“). false bei abstrakten Rechtsfragen ohne Dokumentbezug.
 - difficulty: "hard" = schwere Aufgabe. Bei Rechtsfragen: Recherche in Normen und Judikatur nötig (Spezialmaterie, Judikaturlage, mehrere verschränkte Rechtsfragen, Rechtsfolgen/Fristen im Detail, Sachverhalt mit Dokumenten) → geht an die juristische Wissensdatenbank. Bei Dokument-/sonstigen Aufgaben: umfangreiche Dokumentbearbeitung (klauselweise Kommentierung, Vertragsentwurf, Redline, komplexe Excel-Auswertung), mehrschichtige Argumentation, lange Texte, mehrere große Dokumente. "easy" = einfache Rechtsfrage, die mit gesichertem Grundwissen und einer kurzen Websuche beantwortbar ist, bzw. kurze Entwürfe, Zusammenfassungen, Umformulierungen, einfache Dateien.
 - title: prägnanter Titel (max. 6 Wörter) für die Verlaufsliste.`
+// The fast model picks the verbatim passages the knowledge base needs (it never sees the documents itself).
+const KB_CONTEXT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    facts: { type: 'string' },
+    excerpts: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { source: { type: 'string' }, location: { type: 'string' }, text: { type: 'string' } }, required: ['source', 'location', 'text'] } },
+  },
+  required: ['facts', 'excerpts'],
+}
+const KB_CONTEXT_INSTRUCTIONS = `Du bereitest eine Anfrage an eine juristische Wissensdatenbank vor. Sie sieht die Unterlagen der Mandantin NICHT; du gibst ihr den Wortlaut mit, den sie zur Beantwortung der Fragen braucht.
+Antworte als JSON:
+- facts: 1–4 Sätze Sachverhalt aus den Unterlagen (Parteien und ihre Rollen, Vertragstyp, Datum, Beträge, Unternehmer/Verbraucher), nur was für die Fragen relevant ist.
+- excerpts: die einschlägigen Stellen WÖRTLICH und unverändert aus den Quellen kopiert (Klauseln, Definitionen, verwiesene Bestimmungen, Fristen, Beträge), je Stelle mit source (Quellenname exakt wie angegeben) und location (Punkt/§/Seite). Keine Zusammenfassung, keine Kürzung innerhalb eines Satzes, keine eigenen Formulierungen. Zusammen höchstens ${KB_CONTEXT_CHARS} Zeichen; nur, was für die Fragen nötig ist.
+Haben die Fragen keinen Bezug zu den Unterlagen: facts leer und excerpts leer.`
+
 // Asked of the knowledge base in front of every question: short answers, with references.
-const KB_BRIEF = 'Bitte knapp und präzise antworten (Kurzantwort, dann die Rechtsgrundlagen mit § / Gesetz bzw. Gericht / Datum / Geschäftszahl und eine kurze Begründung; keine Wiederholungen, keine allgemeinen Einleitungen).\n\n'
+const KB_BRIEF ='Bitte knapp und präzise antworten (Kurzantwort, dann die Rechtsgrundlagen mit § / Gesetz bzw. Gericht / Datum / Geschäftszahl und eine kurze Begründung; keine Wiederholungen, keine allgemeinen Einleitungen).\n\n'
 
 // The web-search wording depends on whether the hosted tool is actually offered.
 const WEB_SOURCES = 'bevorzugt ris.bka.gv.at, eur-lex.europa.eu, curia.europa.eu, parlament.gv.at, jusline.at, offizielle Quellen'
@@ -786,6 +818,16 @@ ${web ? `- web_search: für Fundstellen zu einfachen Rechtsfragen bzw. nur falls
 RECHTSQUELLE: Liegt unten ein Abschnitt „ANTWORTEN DER WISSENSDATENBANK“ vor, ist er die maßgebliche Rechtsquelle – übernimm ihn inhaltlich in das Deliverable, soweit einschlägig, und erfinde keine weiteren Normen oder Entscheidungen. Fehlt er, beantworte einfache Rechtsfragen aus gesichertem Grundwissen${web ? ' mit einer kurzen Websuche für die Fundstellen' : ''} und kennzeichne Unsicheres.
 
 ABLAUF (so kurz wie möglich): Liegt der Dokumenttext unten vor, NICHT zuerst lesen → Deliverable erzeugen (create_or_edit_file), wenn eine Datei verlangt oder sinnvoll ist; sonst direkt antworten → kurze Antwort. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
+// Extra instructions when a folder is attached: a local folder (the browser runs the
+// file tools) or the documents of an Akt on the server. The agent searches it itself.
+const filesInstructions = ({ local, name, count, kbTool }) => `
+ORDNER: ${local ? `Lokaler Ordner „${name}“ auf dem Rechner der Nutzerin (${count} Dateien; nichts davon ist hochgeladen – du liest nur, was du brauchst)` : `Dokumente des Akts „${name}“ auf dem Server (${count} Dokumente)`}. Durchsuche ihn selbst:
+- files_search: Dateinamen und Inhalte nach Begriffen durchsuchen (mehrere Begriffe = alle müssen vorkommen; Alternativen mit |). Zuerst suchen, dann gezielt lesen.
+- files_list: Ordnerstruktur (Unterordner mit path).
+- files_read: Text einer Datei (Teil für Teil, je ca. ${FILES_PART_CHARS / 1000}k Zeichen). Lies nur die Dateien und Teile, die für die Aufgabe nötig sind.
+- files_attach: Datei in die Sandbox übernehmen – nur wenn create_or_edit_file die Originaldatei bearbeiten soll (z. B. Kommentare in ein Word-Dokument).
+Nenne in der Antwort die Dateien mit Pfad, auf die du dich stützt.${kbTool ? `
+- ask_aissociate: EINE Anfrage an die juristische Wissensdatenbank für schwierige Rechtsfragen, ERST nachdem du die relevanten Dateien gelesen hast. Die Wissensdatenbank sieht die Dateien nicht: gib in context den einschlägigen Wortlaut wörtlich mit (Klauseln, Beträge, Daten, mit Datei und Fundstelle).` : ''}`
 // Documents up to this many characters (all attachments together) are handed to
 // Sol directly, which saves the read_document round trip on typical contracts.
 const INLINE_DOC_CHARS = Number(process.env.INLINE_DOC_CHARS || 80_000)
@@ -841,6 +883,27 @@ const TOOL_ASK_AISSOCIATE = {
     required: ['question', 'legal_area'],
   },
 }
+// The knowledge-base tool of the folder loop carries the wording it needs.
+const TOOL_ASK_AISSOCIATE_CTX = {
+  ...TOOL_ASK_AISSOCIATE,
+  description: 'Stellt EINE Anfrage an die juristische Wissensdatenbank AI:ssociate (österreichisches Recht). Nur ein Aufruf pro Aufgabe. Die Wissensdatenbank sieht die Dateien NICHT – der einschlägige Wortlaut gehört wörtlich in context.',
+  parameters: {
+    type: 'object',
+    properties: {
+      ...TOOL_ASK_AISSOCIATE.parameters.properties,
+      question: { type: 'string', description: 'Die Rechtsfrage(n), eigenständig formuliert; mehrere Fragen nummeriert.' },
+      context: { type: 'string', description: 'Sachverhalt und WÖRTLICHE Auszüge der relevanten Dokumentstellen mit Datei und Fundstelle (höchstens ca. 8000 Zeichen).' },
+    },
+    required: ['question', 'legal_area', 'context'],
+  },
+}
+// Folder tools (local folder in the browser or the documents of an Akt).
+const TOOLS_FILES = [
+  { type: 'function', name: 'files_search', strict: false, description: 'Durchsucht Dateinamen und Textinhalte des Ordners. Liefert Treffer mit Pfad, Größe und Textausschnitt.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Suchbegriffe (alle müssen vorkommen); Alternativen mit |, z. B. "Mietvertrag Wertsicherung|Indexierung".' }, path: { type: 'string', description: 'Optional: nur in diesem Unterordner.' }, content: { type: 'boolean', description: 'Auch Inhalte durchsuchen (Standard true).' } }, required: ['query'] } },
+  { type: 'function', name: 'files_list', strict: false, description: 'Listet Unterordner und Dateien eines Ordnerpfads.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'Pfad relativ zum Ordner, leer = oberste Ebene.' }, depth: { type: 'integer', description: '1 bis 3 (Standard 1).' } } } },
+  { type: 'function', name: 'files_read', strict: false, description: `Liest den Text einer Datei (Teil für Teil, je ca. ${FILES_PART_CHARS} Zeichen).`, parameters: { type: 'object', properties: { path: { type: 'string', description: 'Pfad exakt wie von files_search/files_list geliefert.' }, part: { type: 'integer', description: 'Teil-Nummer ab 1.' } }, required: ['path'] } },
+  { type: 'function', name: 'files_attach', strict: false, description: 'Übernimmt Originaldateien in die Sandbox (/home/user), damit create_or_edit_file sie bearbeiten kann (höchstens 5).', parameters: { type: 'object', properties: { paths: { type: 'array', items: { type: 'string' } } }, required: ['paths'] } },
+]
 const TOOL_FILE = {
   type: 'function', name: 'create_or_edit_file', strict: false,
   description: 'Erzeugt oder bearbeitet Dateien (Word .docx, Excel .xlsx, PDF, HTML) in einer Sandbox. Ein Codemodell schreibt und führt das Programm aus; du siehst nur das Ergebnis. Gib ALLE Inhalte wörtlich in task an (z. B. jede Kommentarstelle mit Kommentartext, neue Klauselformulierungen, Tabellenzeilen). Ein Aufruf pro Deliverable.',
@@ -1066,7 +1129,7 @@ async function msUpload(token, driveId, parentId, name, buf) {
 const app = express()
 app.set('trust proxy', 1)
 app.use(express.json({ limit: '48mb' })) // one 30 MB document as base64 plus envelope
-app.use(express.static(path.join(__dirname, 'public')))
+app.use(express.static(path.join(__dirname, 'public'), { setHeaders: (res, p) => { if (p.endsWith('.mjs')) res.setHeader('Content-Type', 'text/javascript; charset=utf-8') } }))
 
 // ---- Microsoft 365 routes ----
 app.get('/api/ms/login', (req, res) => {
@@ -1186,7 +1249,7 @@ function attachListener(job, res, after) {
   res.on('close', () => { job.listeners.delete(res); clearInterval(hb) })
 }
 function newJob(id) {
-  const job = { id, seq: 0, events: [], done: false, listeners: new Set(), createdAt: Date.now() }
+  const job = { id, seq: 0, events: [], done: false, listeners: new Set(), createdAt: Date.now(), clientCalls: new Map() }
   jobs.set(id, job)
   job.send = (event, data) => {
     const seq = ++job.seq
@@ -1194,7 +1257,16 @@ function newJob(id) {
     job.events.push({ seq, line })
     for (const l of job.listeners) { try { l.write(line) } catch {} }
   }
+  /** A tool executed by the browser (local folder): announced as an event, answered via POST /api/jobs/:id/tool-result. */
+  job.clientTool = (name, args, timeoutMs = CLIENT_TOOL_TIMEOUT_MS) => new Promise((resolve) => {
+    const callId = 'ct_' + crypto.randomBytes(9).toString('base64url')
+    const timer = setTimeout(() => { job.clientCalls.delete(callId); resolve({ ok: false, error: 'Der Browser hat nicht geantwortet (Ordner nicht mehr verfügbar oder Seite geschlossen).' }) }, timeoutMs)
+    timer.unref?.()
+    job.clientCalls.set(callId, (r) => { clearTimeout(timer); job.clientCalls.delete(callId); resolve(r) })
+    job.send('client_tool', { callId, name, args })
+  })
   job.finish = () => {
+    for (const done of job.clientCalls.values()) done({ ok: false, error: 'Auftrag beendet.' })
     job.done = true
     job.finishedAt = Date.now()
     for (const l of job.listeners) { try { l.end() } catch {} }
@@ -1210,6 +1282,41 @@ const streamJob = (req, res) => {
 }
 app.get('/api/chat/stream/:id', streamJob)
 app.get('/api/jobs/:id/stream', streamJob)
+// Result of a browser-executed tool. The job id is a random capability only the
+// requesting browser knows; the call id must belong to a pending call of that job.
+app.post('/api/jobs/:id/tool-result', (req, res) => {
+  const job = jobs.get(String(req.params.id || ''))
+  const b = req.body || {}
+  const done = job?.clientCalls.get(String(b.callId || ''))
+  if (!done) return res.status(404).json({ error: 'Kein offener Werkzeugaufruf.' })
+  const file = b.file && typeof b.file.name === 'string' && typeof b.file.base64 === 'string' ? { name: b.file.name.slice(0, 300), path: String(b.file.path || b.file.name).slice(0, 1000), base64: b.file.base64 } : null
+  const files = Array.isArray(b.files) ? b.files.filter((f) => f && typeof f.name === 'string' && typeof f.base64 === 'string').slice(0, MAX_UPLOADS).map((f) => ({ name: f.name.slice(0, 300), path: String(f.path || f.name).slice(0, 1000), base64: f.base64 })) : []
+  done({ ok: b.ok !== false, text: typeof b.text === 'string' ? b.text.slice(0, 400_000) : '', error: typeof b.error === 'string' ? b.error.slice(0, 500) : '', files: file ? [file, ...files] : files })
+  res.json({ ok: true })
+})
+
+// ---------------------------------------------------------------------------
+// Conversation documents: uploads (and files read from a folder) stay available
+// as text for follow-up questions of the same conversation, so a later question
+// about "the clause" still reaches the knowledge base with its wording.
+// ---------------------------------------------------------------------------
+const sessionDocs = new Map() // sessionId -> { at, docs: Map(name -> { text, pages, source }) }
+function rememberSessionDocs(sessionId, entries) {
+  if (!sessionId || !entries.length) return
+  const s = sessionDocs.get(sessionId) || { at: 0, docs: new Map() }
+  for (const e of entries) if (e.text && e.text.trim()) { s.docs.delete(e.name); s.docs.set(e.name, { text: e.text, pages: e.pages || null, source: e.source || 'upload' }) }
+  // Oldest documents give way first when the conversation holds too much text.
+  let total = [...s.docs.values()].reduce((n, d) => n + d.text.length, 0)
+  for (const k of s.docs.keys()) { if (total <= SESSION_DOCS_MAX_CHARS || s.docs.size <= 1) break; total -= s.docs.get(k).text.length; s.docs.delete(k) }
+  s.at = Date.now()
+  sessionDocs.delete(sessionId); sessionDocs.set(sessionId, s)
+  while (sessionDocs.size > SESSION_DOCS_MAX_SESSIONS) sessionDocs.delete(sessionDocs.keys().next().value)
+}
+setInterval(() => { const now = Date.now(); for (const [k, s] of sessionDocs) if (now - s.at > SESSION_DOCS_TTL_MS) sessionDocs.delete(k) }, 10 * 60_000).unref?.()
+
+// Specialist agents (workflow configuration for the UI) and the in-browser PDF reader for local folders.
+app.get('/api/agents', (_req, res) => res.json({ agents: agentsForClient() }))
+app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'build'), { maxAge: '7d', fallthrough: false, setHeaders: (res, p) => { if (/\.m?js$/.test(p)) res.setHeader('Content-Type', 'text/javascript; charset=utf-8') } }))
 
 // ---------------------------------------------------------------------------
 // Matters (Akten): documents, due diligence, review tables, reports.
@@ -1241,7 +1348,7 @@ async function loadMatter(req, res) {
 }
 const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 6) // upper bound; the run scales workers with the number of documents
 const ddDeps = (send) => ({
-  store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY,
+  store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY, kbContextChars: KB_CONTEXT_CHARS,
   verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send,
   // Per document: hard legal questions go to the knowledge base in one request; easy ones are
   // answered on the fast model with a short web search (same routing as the general agent).
@@ -1611,13 +1718,27 @@ app.post('/api/chat', async (req, res) => {
   let prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   let taskExtra = ''
   let forceMode = null
-  if (task && typeof task === 'object' && TASK_PRESETS[task.type]) {
+  let forceDifficulty = null // specialist agents fix the difficulty of a phase
+  let kbAllowed = true // a later agent phase builds on the legal answers of the first one
+  let agentRun = null
+  if (task && typeof task === 'object' && task.type === 'agent') {
+    agentRun = buildAgentTask(task)
+    if (!agentRun) { send('error', { message: 'Unbekannter Agent.' }); return finish() }
+    prompt = prompt || agentRun.text
+    taskExtra = agentRun.extra
+    forceMode = agentRun.forceMode
+    forceDifficulty = agentRun.difficulty
+    kbAllowed = agentRun.kb
+  } else if (task && typeof task === 'object' && TASK_PRESETS[task.type]) {
     const t = TASK_PRESETS[task.type](task.params || {})
     prompt = prompt || t.text
     taskExtra = t.extra
     forceMode = t.forceMode
   }
   if (!prompt) { send('error', { message: 'Bitte eine Frage oder Aufgabe eingeben.' }); return finish() }
+  // A local folder picked in the browser: the browser runs the file tools (nothing is uploaded up front).
+  const lf = body.localFolder && typeof body.localFolder === 'object' ? body.localFolder : null
+  const folderReq = lf && typeof lf.name === 'string' && lf.name ? { name: lf.name.slice(0, 200), count: Math.max(0, Math.min(1e6, Number(lf.count) || 0)), sample: (Array.isArray(lf.sample) ? lf.sample : []).slice(0, 150).map((x) => String(x).slice(0, 300)) } : null
 
   const persistent = typeof sessionId === 'string' && sessionId.length > 0
   const useWeb = WEB_SEARCH_ENABLED && webSearch !== false
@@ -1673,6 +1794,9 @@ app.post('/api/chat', async (req, res) => {
   const filesOut = []
   const uploadTexts = new Map()
   let inlineAll = false // attachments handed to the model as full text (set once they are extracted)
+  let matterCtx = '' // stored analysis of the Akt (when the question is asked in its context)
+  let filesSrc = null // { kind: 'local' | 'akt', name, count }: a folder the agent searches itself
+  const priorNames = [] // documents uploaded earlier in this conversation (text kept on the server)
   let heavy = false, workModel = MODEL_FAST // everything runs on the fast model; hard tasks switch to the main model
   let aissThreadOut = threadIn
   let aissCalls = 0 // attempts (enforces the one-call limit)
@@ -1741,11 +1865,55 @@ app.post('/api/chat', async (req, res) => {
     } finally { clearInterval(ticker) }
   }
   /** The planned questions (1–3) go to the knowledge base in ONE streamed request, numbered. */
-  async function runAissociateMany({ questions, legalArea, scope }) {
+  async function runAissociateMany({ questions, legalArea, scope, context = '' }) {
     const qs = questions.slice(0, KB_MAX_QUESTIONS)
-    const question = qs.length <= 1 ? qs[0] : `Beantworte die folgenden ${qs.length} Fragen getrennt und nummeriert:\n${qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
+    const question = (qs.length <= 1 ? qs[0] : `Beantworte die folgenden ${qs.length} Fragen getrennt und nummeriert:\n${qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}`) + (context ? `\n\n${context}` : '')
     const r = await runAissociate({ question, legalArea, scope, stream: true, label: qs.length > 1 ? `${qs.length} Fragen` : '' })
     return { answer: r.answer.trim(), evidence: r.evidence, questions: qs }
+  }
+
+  /**
+   * The wording the knowledge base needs: it never sees our documents. Short documents
+   * go in whole; otherwise the fast model picks verbatim passages, which are checked
+   * against the source text (invented "quotes" are dropped).
+   */
+  async function kbContextFor(questions) {
+    const sources = []
+    for (const [name, t] of uploadTexts) if (!t.unsupported && t.text && t.text.trim()) sources.push({ name, text: t.text })
+    if (matterCtx && !sources.length) sources.push({ name: `Akt ${matterReq.name} (gespeicherte Analyse)`, text: matterCtx })
+    if (!sources.length || !questions.length) return ''
+    const total = sources.reduce((n, x) => n + x.text.length, 0)
+    const sid = step('read', 'Relevante Dokumentstellen für AI:ssociate werden ausgewählt', { model: MODEL_FAST })
+    let facts = ''
+    let excerpts = []
+    let picked = false, parsedCount = 0
+    if (total <= KB_CONTEXT_CHARS) {
+      excerpts = sources.map((x) => ({ source: x.name, location: 'Volltext', text: x.text.trim() }))
+    } else {
+      try {
+        let left = KB_CONTEXT_SOURCE_CHARS
+        const body = sources.map((x) => { const take = x.text.slice(0, Math.max(0, Math.min(x.text.length, left))); left -= take.length; return take ? `=== QUELLE: ${x.name} ===\n${take}${take.length < x.text.length ? '\n[… gekürzt]' : ''}` : '' }).filter(Boolean).join('\n\n')
+        const r = await callModel(ctx, { model: MODEL_FAST, instructions: KB_CONTEXT_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 9000, input: [{ role: 'user', content: `FRAGEN AN DIE WISSENSDATENBANK:\n${questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nQUELLEN:\n${body}` }], text: { format: { type: 'json_schema', name: 'kb_context', schema: KB_CONTEXT_SCHEMA, strict: true } } })
+        const parsed = parseJsonLoose(r.output_text || '')
+        if (parsed && Array.isArray(parsed.excerpts)) { picked = true; parsedCount = parsed.excerpts.length }
+        facts = String(parsed?.facts || '').trim().slice(0, 1200)
+        for (const e of Array.isArray(parsed?.excerpts) ? parsed.excerpts : []) {
+          const src = sources.find((x) => x.name === e.source) || sources.find((x) => locateQuote(x.text, e.text).status !== 'unverified')
+          if (!src || !e.text || locateQuote(src.text, e.text).status === 'unverified') continue
+          excerpts.push({ source: src.name, location: String(e.location || '').slice(0, 80), text: String(e.text).trim() })
+        }
+      } catch (e) { if (e instanceof BudgetExceeded) throw e; console.error('kb context failed:', e?.message) }
+      // The selection failed (or every passage was invented): the beginning of each document is better than nothing.
+      // An empty selection on purpose (no reference to the documents) sends nothing.
+      if (!excerpts.length && !facts && !(picked && !(parsedCount > 0))) { const per = Math.floor(KB_CONTEXT_CHARS / sources.length); excerpts = sources.map((x) => ({ source: x.name, location: 'Anfang des Dokuments', text: x.text.slice(0, per).trim() })) }
+    }
+    let used = 0
+    const lines = []
+    for (const e of excerpts) { if (used >= KB_CONTEXT_CHARS) break; const t = e.text.slice(0, KB_CONTEXT_CHARS - used); used += t.length; lines.push(`[${e.source}${e.location ? ', ' + e.location : ''}]\n„${t}${t.length < e.text.length ? ' […]' : ''}“`) }
+    if (!lines.length && !facts) { stepDone(sid, { detail: 'kein Dokumentbezug' }); return '' }
+    const srcNames = [...new Set(excerpts.map((e) => e.source))]
+    stepDone(sid, { detail: `${total <= KB_CONTEXT_CHARS ? 'Volltext' : `${lines.length} Stelle${lines.length === 1 ? '' : 'n'}`} · ${used.toLocaleString('de-AT')} Zeichen aus ${srcNames.join(', ')}` })
+    return `SACHVERHALT UND RELEVANTE STELLEN AUS DEN UNTERLAGEN DER MANDANTIN (wörtlich; die Fragen beziehen sich darauf):\n${facts ? facts + '\n\n' : ''}${lines.join('\n\n')}`
   }
 
   // ---- document-mode tool implementations ----
@@ -1763,7 +1931,10 @@ app.post('/api/chat', async (req, res) => {
   async function toolAskAissociate(args) {
     if (aissCalls >= 1) return { text: `Limit erreicht: Die Wissensdatenbank wurde in dieser Aufgabe bereits befragt. Arbeite mit der vorliegenden Antwort weiter${useWeb ? ` (ggf. web_search, insgesamt höchstens ${MAX_WEB_SEARCHES} Suchen)` : ''}.`, detail: 'Limit (1 Aufruf)' }
     // Streamed, so the user watches the knowledge base answer arrive while the document task waits for it.
-    const r = await runAissociate({ question: String(args.question || ''), legalArea: isLegalArea(args.legal_area) ? args.legal_area : 'civil', scope: args.scope && SCOPES.includes(args.scope) ? args.scope : '', stream: true })
+    // The knowledge base does not see the files: the agent passes their wording in context.
+    const context = String(args.context || '').trim().slice(0, KB_CONTEXT_CHARS + 2000)
+    if (context) { const cs = step('read', 'Dokumentstellen an AI:ssociate übergeben', { model: workModel }); stepDone(cs, { detail: `${context.length.toLocaleString('de-AT')} Zeichen` }) }
+    const r = await runAissociate({ question: String(args.question || '') + (context ? `\n\nSACHVERHALT UND RELEVANTE STELLEN AUS DEN UNTERLAGEN DER MANDANTIN (wörtlich):\n${context}` : ''), legalArea: isLegalArea(args.legal_area) ? args.legal_area : (pickedArea || 'civil'), scope: args.scope && SCOPES.includes(args.scope) ? args.scope : (pickedScope || ''), stream: true })
     const srcLines = r.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')
     return { text: `ANTWORT DER WISSENSDATENBANK:\n${r.answer}\n${srcLines ? `\nQUELLEN:\n${srcLines}` : ''}`, detail: 'Antwort erhalten', skipStep: true }
   }
@@ -1804,11 +1975,118 @@ app.post('/api/chat', async (req, res) => {
     return { text: `Die Datei konnte nach mehreren Versuchen nicht fehlerfrei erzeugt werden. Letzte Ausgabe:\n${lastOut.slice(-2000)}\nErzeugte Dateien: ${newFiles.join(', ') || '(keine)'}`, detail: 'fehlgeschlagen', files: newFiles, failed: true }
   }
 
+  // ---- folder tools: a local folder (executed in the browser) or the documents of an Akt ----
+  const folderReads = new Map() // path -> text parts read (kept for follow-up questions)
+  const sanitizeName = (n) => path.basename(String(n || 'datei')).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 180) || 'datei'
+  async function addAttachment(name, buf, srcPath) {
+    let n = sanitizeName(name)
+    if (uploads.some((u) => u.name === n)) { const ext = path.extname(n); n = `${path.basename(n, ext)}_${uploads.length + 1}${ext}` }
+    if (uploads.length >= MAX_UPLOADS) throw new Error(`höchstens ${MAX_UPLOADS} Dateien je Aufgabe in der Sandbox`)
+    if (buf.length > MAX_UPLOAD_BYTES) throw new Error(`„${name}“ überschreitet ${MAX_UPLOAD_BYTES / 1048576} MB`)
+    uploads.push({ name: n, buf })
+    if (!uploadTexts.has(n)) uploadTexts.set(n, await extractText(n, buf))
+    if (sandboxReady) {
+      await sandbox.files.write(`${WORKDIR}/${n}`, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+      try { for (const e of await sandbox.files.list(WORKDIR)) if (e.name === n) before.set(e.path, e.size) } catch {}
+    }
+    return `${srcPath || name} → /home/user/${n}`
+  }
+  const normQ = (s) => String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+  /** Shared search semantics (the browser implements the same for local folders). */
+  function searchTexts(items, query, limit = 25) {
+    const terms = String(query || '').split(/\s+/).map((t) => t.split('|').map(normQ).filter(Boolean)).filter((a) => a.length)
+    if (!terms.length) return []
+    const hits = []
+    for (const it of items) {
+      const hay = normQ(it.path) + '\n' + normQ(it.text || '')
+      let score = 0, firstAt = -1
+      let ok = true
+      for (const alts of terms) {
+        let best = 0
+        for (const a of alts) { let n = 0, i = hay.indexOf(a); if (i >= 0 && (firstAt < 0 || i < firstAt)) firstAt = i; while (i >= 0 && n < 50) { n++; i = hay.indexOf(a, i + a.length) } best = Math.max(best, n + (normQ(it.path).includes(a) ? 20 : 0)) }
+        if (!best) { ok = false; break }
+        score += best
+      }
+      if (!ok) continue
+      const tpos = firstAt - normQ(it.path).length - 1
+      const snippet = it.text && tpos >= 0 ? it.text.slice(Math.max(0, tpos - 120), tpos + 200).replace(/\s+/g, ' ').trim() : ''
+      hits.push({ path: it.path, size: it.size, score, snippet })
+    }
+    return hits.sort((a, b) => b.score - a.score).slice(0, limit)
+  }
+  // Akt backend: documents of the matter, text extracted lazily (status new → extracted).
+  const aktTexts = new Map()
+  async function aktText(d) {
+    if (aktTexts.has(d.id)) return aktTexts.get(d.id)
+    let text = ''
+    try {
+      text = (await store.getText(matterReq.id, d.id)) || ''
+      if (!text && d.file) {
+        const buf = await store.getFile(matterReq.id, d.file)
+        const r = buf ? await extractText(d.name, buf) : null
+        text = r && !r.unsupported ? r.text : ''
+        if (text.trim()) { await store.putText(matterReq.id, d.id, text); if (d.status === 'new') { d.status = 'extracted'; d.textChars = text.length; d.pages = r.pages ?? null; aktDirty = true } }
+      }
+    } catch (e) { console.error('akt text failed:', e?.message) }
+    aktTexts.set(d.id, text)
+    return text
+  }
+  let aktDirty = false
+  const aktDoc = (p) => { const k = String(p || '').trim().toLowerCase(); return matterReq.documents.find((d) => d.name.toLowerCase() === k || (d.no || '').toLowerCase() === k || `${(d.no || '').toLowerCase()} ${d.name.toLowerCase()}` === k) || matterReq.documents.find((d) => d.name.toLowerCase().includes(k)) }
+  async function toolFiles(name, args) {
+    if (filesSrc.kind === 'local') {
+      const r = await job.clientTool(name, args, name === 'files_search' ? CLIENT_TOOL_TIMEOUT_MS * 1.5 : CLIENT_TOOL_TIMEOUT_MS)
+      if (!r.ok) return { text: `FEHLER: ${r.error || 'Werkzeug im Browser fehlgeschlagen'}`, detail: (r.error || 'fehlgeschlagen').slice(0, 120), failed: true }
+      if (name === 'files_read' && r.text) { const k = String(args.path || ''); folderReads.set(k, [...(folderReads.get(k) || []), r.text].slice(-6)) }
+      if (name === 'files_attach') {
+        const done = [], errs = []
+        for (const f of r.files || []) { try { done.push(await addAttachment(f.name, Buffer.from(f.base64, 'base64'), f.path)) } catch (e) { errs.push(`${f.path}: ${e.message}`) } }
+        return { text: `${done.length ? `Übernommen: ${done.join('; ')}` : 'Nichts übernommen.'}${errs.length ? `\nFehler: ${errs.join('; ')}` : ''}${r.text ? `\n${r.text}` : ''}`, detail: done.length ? `${done.length} Datei${done.length > 1 ? 'en' : ''}` : 'keine', failed: !done.length }
+      }
+      const m = r.text.match(/^(\d+) Treffer/)
+      return { text: r.text, detail: name === 'files_search' ? (m ? `${m[1]} Treffer` : 'durchsucht') : name === 'files_read' ? (r.text.match(/Teil \d+\/\d+/)?.[0] || 'gelesen') : 'aufgelistet' }
+    }
+    // Akt on the server
+    const docs = matterReq.documents
+    if (name === 'files_list') {
+      return { text: `AKT „${matterReq.name}“ – ${docs.length} Dokumente:\n${docs.map((d) => `- ${d.no || ''} ${d.name} · ${Math.round((d.size || 0) / 1024)} KB · ${d.status}${d.docType ? ' · ' + d.docType : ''}${d.summary ? ' · ' + d.summary.slice(0, 140) : ''}`).join('\n').slice(0, 30_000)}`, detail: `${docs.length} Dokumente` }
+    }
+    if (name === 'files_search') {
+      const items = []
+      for (const d of docs) items.push({ path: d.name, size: d.size, text: args.content === false ? '' : await aktText(d) })
+      const hits = searchTexts(items, args.query)
+      return { text: hits.length ? `${hits.length} Treffer für „${args.query}“:\n${hits.map((h, i) => `${i + 1}. ${h.path} (${Math.round((h.size || 0) / 1024)} KB)${h.snippet ? `\n   … ${h.snippet} …` : ''}`).join('\n')}` : `0 Treffer für „${args.query}“. Andere Begriffe oder Alternativen mit | versuchen, oder files_list.`, detail: `${hits.length} Treffer` }
+    }
+    if (name === 'files_read') {
+      const d = aktDoc(args.path)
+      if (!d) return { text: `Dokument „${args.path}“ nicht im Akt. files_list zeigt alle Dokumente.`, detail: 'nicht gefunden' }
+      const text = await aktText(d)
+      if (!text.trim()) return { text: `„${d.name}“ enthält keinen extrahierbaren Text (gescannt?).`, detail: 'kein Text' }
+      const parts = Math.max(1, Math.ceil(text.length / FILES_PART_CHARS)); const part = Math.min(parts, Math.max(1, Number(args.part) || 1))
+      const chunk = text.slice((part - 1) * FILES_PART_CHARS, part * FILES_PART_CHARS)
+      folderReads.set(d.name, [...(folderReads.get(d.name) || []), chunk].slice(-6))
+      return { text: `${d.name} – Teil ${part}/${parts}${d.pages ? ` (${d.pages} Seite${d.pages === 1 ? '' : 'n'})` : ''}\n\n${chunk}`, detail: `Teil ${part}/${parts}` }
+    }
+    if (name === 'files_attach') {
+      const done = [], errs = []
+      for (const p of (Array.isArray(args.paths) ? args.paths : []).slice(0, MAX_UPLOADS)) {
+        const d = aktDoc(p)
+        try { if (!d?.file) throw new Error('nicht gefunden'); const buf = await store.getFile(matterReq.id, d.file); if (!buf) throw new Error('Datei fehlt'); done.push(await addAttachment(d.name, buf, d.name)) } catch (e) { errs.push(`${p}: ${e.message}`) }
+      }
+      return { text: `${done.length ? `Übernommen: ${done.join('; ')}` : 'Nichts übernommen.'}${errs.length ? `\nFehler: ${errs.join('; ')}` : ''}`, detail: done.length ? `${done.length} Datei${done.length > 1 ? 'en' : ''}` : 'keine', failed: !done.length }
+    }
+    return { text: `Unbekanntes Werkzeug ${name}.` }
+  }
+
   const STEP_TITLES = {
     read_document: (a) => `Dokument lesen: ${a.name}${a.part > 1 ? ` (Teil ${a.part})` : ''}`,
     create_or_edit_file: (a) => `Datei erstellen/bearbeiten: ${(a.output_files || []).join(', ') || 'Ergebnisdatei'}`,
+    files_search: (a) => `Ordner durchsuchen: ${String(a.query || '').slice(0, 120)}${a.path ? ` (in ${String(a.path).slice(0, 80)})` : ''}`,
+    files_list: (a) => `Ordner ansehen: ${a.path ? String(a.path).slice(0, 120) : 'oberste Ebene'}`,
+    files_read: (a) => `Datei lesen: ${String(a.path || '').slice(0, 160)}${a.part > 1 ? ` (Teil ${a.part})` : ''}`,
+    files_attach: (a) => `Datei${(a.paths || []).length > 1 ? 'en' : ''} übernehmen: ${(a.paths || []).map((x) => String(x).split('/').pop()).join(', ').slice(0, 160)}`,
   }
-  const STEP_KIND = { read_document: 'upload', create_or_edit_file: 'file' }
+  const STEP_KIND = { read_document: 'upload', create_or_edit_file: 'file', files_search: 'search', files_list: 'folder', files_read: 'upload', files_attach: 'upload' }
 
   async function runToolCall(call) {
     let args = {}
@@ -1822,6 +2100,7 @@ app.post('/api/chat', async (req, res) => {
       let r
       if (name === 'read_document') r = await toolReadDocument(args)
       else if (name === 'create_or_edit_file') r = await toolCreateFile(args, sid)
+      else if (name.startsWith('files_') && filesSrc) r = await toolFiles(name, args)
       else r = { text: `Unbekanntes Werkzeug ${name}.` }
       if (r.failed) stepFail(sid, { detail: r.detail }); else stepDone(sid, { detail: r.detail })
       return r.text
@@ -1837,15 +2116,21 @@ app.post('/api/chat', async (req, res) => {
   async function documentLoop({ input }) {
     let prevId
     let text = ''
-    const baseTools = [TOOL_FILE, ...(uploads.length && !inlineAll ? [TOOL_READ_DOCUMENT] : [])]
-    for (let i = 1; i <= DOC_MAX_STEPS; i++) {
+    // read_document for every document whose text is not inline (long uploads, documents of earlier turns).
+    const readable = [...uploadTexts.keys()].filter((n) => !(inlineAll && uploads.some((u) => u.name === n)))
+    const kbTool = Boolean(filesSrc && heavy && kbAllowed && AISSOCIATE_API_KEY && aissCalls === 0)
+    const baseTools = [TOOL_FILE, ...(readable.length ? [TOOL_READ_DOCUMENT] : []), ...(filesSrc ? TOOLS_FILES : []), ...(kbTool ? [TOOL_ASK_AISSOCIATE_CTX] : [])]
+    const instructions = docInstructions(useWeb) + (filesSrc ? filesInstructions({ local: filesSrc.kind === 'local', name: filesSrc.name, count: filesSrc.count, kbTool }) : '')
+    // Folder searches need a few more steps (search → read → maybe a second search → deliverable).
+    const maxSteps = filesSrc ? DOC_MAX_STEPS + 6 : DOC_MAX_STEPS
+    for (let i = 1; i <= maxSteps; i++) {
       // max_tool_calls caps built-in tool calls per response, so hand the model
       // only the web budget that is still left over the whole task.
       const remainingWeb = useWeb ? Math.max(0, MAX_WEB_SEARCHES - ctx.usage.webSearchCalls) : 0
       const tools = remainingWeb > 0 ? [...baseTools, WEB_SEARCH_TOOL] : baseTools
       const sid = step('think', i === 1 ? 'Ergebnis wird erstellt' : 'Zwischenergebnis wird ausgewertet', { model: workModel })
       let resp
-      try { resp = await callModel(ctx, { model: workModel, instructions: docInstructions(useWeb), input, tools, effort: heavy ? EFFORT_MAIN : EFFORT_PLAN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
+      try { resp = await callModel(ctx, { model: workModel, instructions, input, tools, effort: heavy ? EFFORT_MAIN : EFFORT_PLAN, prevId, maxToolCalls: remainingWeb > 0 ? remainingWeb : undefined }) } catch (e) { stepFail(sid, { detail: String(e?.message || e).slice(0, 160) }); throw e }
       prevId = resp.id
       input = [] // everything sent so far is now part of the chain (previous_response_id)
       collectWebCitations(resp)
@@ -1858,7 +2143,7 @@ app.post('/api/chat', async (req, res) => {
     if (!text && prevId) {
       // Only unsent tool outputs (if any) plus the wrap-up request go into the chain.
       const sid = step('think', 'Zusammenfassung (Schrittlimit)', { model: workModel })
-      const resp = await callModel(ctx, { model: workModel, instructions: docInstructions(useWeb), input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
+      const resp = await callModel(ctx, { model: workModel, instructions, input: [...input, { role: 'user', content: 'Schrittlimit erreicht. Antworte JETZT abschließend; kennzeichne offene Punkte.' }], effort: EFFORT_MAIN, prevId })
       collectWebCitations(resp)
       text = resp.output_text || ''
       stepDone(sid)
@@ -1889,9 +2174,11 @@ app.post('/api/chat', async (req, res) => {
       for (const u of uploads) uploadTexts.set(u.name, await extractText(u.name, u.buf))
       stepDone(sid, { detail: uploads.map((u) => `${u.name} (${(uploadTexts.get(u.name).text.length / 1000).toFixed(0)}k Zeichen)`).join(', ') })
     }
+    // Documents of earlier turns of this conversation stay readable (and reach the knowledge base when a question refers to them).
+    const prior = persistent ? sessionDocs.get(sessionId) : null
+    if (prior) for (const [name, d] of prior.docs) if (!uploadTexts.has(name)) { uploadTexts.set(name, { text: d.text, pages: d.pages, prior: true }); priorNames.push(name) }
 
     // ---- 0b. matter context: the stored analysis (findings, summaries) and chosen documents ----
-    let matterCtx = ''
     if (matterReq) {
       const sid = step('read', `Akt „${matterReq.name}“ wird eingebunden`)
       matterCtx = matterContext(matterReq, 60_000)
@@ -1905,6 +2192,9 @@ app.post('/api/chat', async (req, res) => {
       }
       stepDone(sid, { detail: `${matterReq.documents.length} Dokumente, ${matterReq.findings.length} Befunde${matterDocs.length ? ` · ${matterDocs.length} Dokument${matterDocs.length > 1 ? 'e' : ''} angehängt` : ''}` })
     }
+    // A folder the agent searches itself: the local folder of the browser, else all documents of the Akt (none picked).
+    if (folderReq) filesSrc = { kind: 'local', name: folderReq.name, count: folderReq.count }
+    else if (matterReq && !matterDocs.length && matterReq.documents.length) filesSrc = { kind: 'akt', name: matterReq.name, count: matterReq.documents.length }
 
     const histInput = (Array.isArray(history) ? history : [])
       .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
@@ -1918,13 +2208,15 @@ app.post('/api/chat', async (req, res) => {
       : ''
     const inlineDocs = inlineAll ? uploads.map((u) => `=== DOKUMENT: ${u.name}${uploadTexts.get(u.name).pages ? ` (${uploadTexts.get(u.name).pages} Seiten)` : ''} ===\n${uploadTexts.get(u.name).text}\n=== ENDE ${u.name} ===`).join('\n\n') + '\n\n' : ''
     const matterLine = matterCtx ? `AKTENKONTEXT (gespeicherte Analyse des Akts; Befunde mit Zitat und Fundstelle sind belegt, alles andere ist Zusammenfassung):\n${matterCtx}\n\n` : ''
-    const userContent = areaHint + (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + inlineDocs + prompt
+    const priorLine = priorNames.length ? `FRÜHER IN DIESEM GESPRÄCH HOCHGELADEN (mit read_document lesbar; die Originale liegen ggf. noch in /home/user): ${priorNames.map((n) => `${n} (${uploadTexts.get(n).text.length} Zeichen)`).join('; ')}\n\n` : ''
+    const folderLine = folderReq ? `VERBUNDENER LOKALER ORDNER „${folderReq.name}“ (${folderReq.count} Dateien; mit files_search / files_read durchsuchen). Beispiele: ${folderReq.sample.slice(0, 40).join(', ')}\n\n` : filesSrc?.kind === 'akt' ? `ALLE ${filesSrc.count} DOKUMENTE DES AKTS sind mit files_search / files_read durchsuchbar.\n\n` : ''
+    const userContent = areaHint + (taskExtra ? taskExtra + '\n\n' : '') + matterLine + uploadLine + priorLine + folderLine + inlineDocs + prompt
 
     // ---- 1. plan: Luna decides the mode and formulates compact questions for the knowledge base ----
     const pid = step('triage', 'Anfrage wird analysiert', { model: MODEL_FAST })
     let plan = { mode: 'legal', legal_area: 'civil', scope: '', questions: [], title: prompt.slice(0, 60) }
     try {
-      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${task?.type ? `Workflow: ${task.type}\n` : ''}${pickedArea ? `Gewählte Wissensdatenbank: ${LEGAL_AREA_LABEL[pickedArea]}${pickedScope ? ` (${pickedScope})` : ''} – Rechtsfragen in diesem Rechtsgebiet beantworten.\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
+      const planInput = [...histInput.slice(-6), { role: 'user', content: `${uploads.length ? `Hochgeladene Dateien: ${uploads.map((u) => u.name).join(', ')}\n` : ''}${priorNames.length ? `Früher im Gespräch hochgeladen (Text liegt vor): ${priorNames.join(', ')}\n` : ''}${folderReq ? `Verbundener lokaler Ordner: ${folderReq.name} (${folderReq.count} Dateien, z. B. ${folderReq.sample.slice(0, 12).join(', ')})\n` : filesSrc?.kind === 'akt' ? `Alle ${filesSrc.count} Dokumente des Akts sind durchsuchbar.\n` : ''}${agentRun ? `Agent: ${agentRun.title} – ${agentRun.phaseLabel}\n` : task?.type ? `Workflow: ${task.type}\n` : ''}${pickedArea ? `Gewählte Wissensdatenbank: ${LEGAL_AREA_LABEL[pickedArea]}${pickedScope ? ` (${pickedScope})` : ''} – Rechtsfragen in diesem Rechtsgebiet beantworten.\n` : ''}${taskExtra ? taskExtra.slice(0, 2000) + '\n' : ''}${matterCtx ? `AKTENKONTEXT (Auszug; relevante Fakten in die Fragen an die Wissensdatenbank einarbeiten):\n${matterCtx.slice(0, 6000)}\n\n` : ''}${inlineAll ? `DOKUMENTTEXT (Auszug):\n${uploads.map((u) => `--- ${u.name} ---\n${uploadTexts.get(u.name).text.slice(0, 12_000)}`).join('\n')}\n\n` : ''}${priorNames.length && !uploads.length ? `FRÜHERES DOKUMENT (Anfang):\n${priorNames.slice(-2).map((n) => `--- ${n} ---\n${uploadTexts.get(n).text.slice(0, 4000)}`).join('\n')}\n\n` : ''}ANFRAGE:\n${prompt.slice(0, 8000)}` }]
       const planFormat = { format: { type: 'json_schema', name: 'plan', schema: PLAN_SCHEMA, strict: true } }
       // max_output_tokens includes reasoning tokens: retry once with more room if truncated.
       let pr = await callModel(ctx, { model: MODEL_FAST, instructions: PLAN_INSTRUCTIONS, effort: EFFORT_PLAN, maxOut: 6000, input: planInput, text: planFormat })
@@ -1942,6 +2234,10 @@ app.post('/api/chat', async (req, res) => {
     if (!isLegalArea(plan.legal_area)) plan.legal_area = plan.mode === 'legal' ? 'civil' : 'none'
     if (!SCOPES.includes(plan.scope)) plan.scope = ''
     if (pickedArea && plan.mode !== 'general') { plan.legal_area = pickedArea; if (pickedArea === 'public') plan.scope = pickedScope || plan.scope; else plan.scope = '' }
+    // A folder only helps in document mode (the agent searches it there); questions about its contents go there.
+    if (filesSrc && plan.mode === 'legal' && plan.needs_document_context) plan.mode = 'document'
+    if (forceDifficulty) plan.difficulty = forceDifficulty
+    if (!kbAllowed) plan.questions = []
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]
     if (plan.mode === 'general') plan.questions = []
     heavy = plan.difficulty === 'hard'
@@ -1969,8 +2265,10 @@ app.post('/api/chat', async (req, res) => {
       } else if (plan.mode === 'legal') {
         let kb = null
         try {
-          kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope })
-        } catch (e) { console.error('aissociate failed:', e?.message) }
+          // Questions about a document (also one from an earlier turn or the Akt) carry its wording.
+          const context = plan.needs_document_context ? await kbContextFor(plan.questions) : ''
+          kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope, context })
+        } catch (e) { if (e instanceof BudgetExceeded) throw e; console.error('aissociate failed:', e?.message) }
         if (kb && kb.answer.trim()) {
           // The knowledge-base answer is the deliverable and is shown as is; the
           // optional Sol review (REVIEW_ANSWERS=on) only adds to it.
@@ -2019,9 +2317,11 @@ app.post('/api/chat', async (req, res) => {
         // First pass: the knowledge base answers Luna's questions (short); then Sol
         // builds the deliverable from document + answers, or just answers.
         let kbBlock = ''
-        if (heavy && plan.questions.length && plan.legal_area !== 'none') {
-          try { const kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope }); kbBlock = `ANTWORTEN DER WISSENSDATENBANK (AI:ssociate, ${areaLabel}):\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}\n\n` }
-          catch (e) { console.error('aissociate (document) failed:', e?.message); kbBlock = 'HINWEIS: Die Wissensdatenbank war nicht erreichbar – rechtliche Aussagen ausdrücklich als nicht verifiziert kennzeichnen.\n\n' }
+        // With a folder and no document at hand yet, the agent asks the knowledge base itself after reading (ask_aissociate with context).
+        const docsAtHand = [...uploadTexts.values()].some((t) => t.text && t.text.trim())
+        if (heavy && kbAllowed && plan.questions.length && plan.legal_area !== 'none' && (docsAtHand || !filesSrc)) {
+          try { const context = docsAtHand || plan.needs_document_context ? await kbContextFor(plan.questions) : ''; const kb = await runAissociateMany({ questions: plan.questions, legalArea: plan.legal_area, scope: plan.scope, context }); kbBlock =`ANTWORTEN DER WISSENSDATENBANK (AI:ssociate, ${areaLabel}):\n${kb.answer}${kb.evidence.length ? `\n\nDOKUMENTE DER WISSENSDATENBANK:\n${kb.evidence.map((e) => `[${e.marker}] ${e.title}${e.url ? ' · ' + e.url : ''}`).join('\n')}` : ''}\n\n` }
+          catch (e) { if (e instanceof BudgetExceeded) throw e; console.error('aissociate (document) failed:', e?.message); kbBlock ='HINWEIS: Die Wissensdatenbank war nicht erreichbar – rechtliche Aussagen ausdrücklich als nicht verifiziert kennzeichnen.\n\n' }
         }
         answer = await documentLoop({ input: [...histInput, { role: 'user', content: kbBlock + userContent }] })
       } else {
@@ -2114,8 +2414,18 @@ app.post('/api/chat', async (req, res) => {
     // Knowledge-base documents are always shown; web citations are shown directly when the web search contributed.
     const sources = evidence.map((e) => ({ marker: e.marker, type: e.type, title: e.title, url: e.url, read: Boolean(e.read), cited: cited.has(e.marker) || e.type === 'aissociate' || (e.type === 'web' && verdict !== 'sufficient'), raw: e.raw || null }))
 
+    // Keep this turn's documents (uploads, Akt documents, parts read from a folder) for follow-up questions.
+    if (persistent) {
+      const keep = [...uploadTexts.entries()].filter(([, t]) => !t.prior && !t.unsupported && t.text && t.text.trim()).map(([name, t]) => ({ name, text: t.text, pages: t.pages }))
+      for (const [p, parts] of folderReads) keep.push({ name: p, text: parts.join('\n\n[…]\n\n'), source: 'ordner' })
+      rememberSessionDocs(sessionId, keep)
+    }
+    if (aktDirty && matterReq && !ddRuns.has(matterReq.id)) { try { await store.saveMatter(matterReq) } catch (e) { console.error('akt save failed:', e?.message) } }
+
     send('final', {
       answer, sources, verification, title: plan.title, route: plan.mode, legalArea: plan.legal_area, legalAreaLabel: areaLabel, scope: plan.scope, verdict,
+      agent: agentRun ? { key: agentRun.agent, title: agentRun.title, phase: agentRun.phase, next: agentRun.next } : null,
+      folder: filesSrc ? { kind: filesSrc.kind, name: filesSrc.name, read: [...folderReads.keys()] } : null,
       models: { main: workModel, used: Object.keys(ctx.usage.byModel), code: MODEL_CODE || workModel, knowledgeBase: aissOk ? 'AI:ssociate' : null }, questions: plan.questions, difficulty: plan.difficulty,
       aissThreadId: aissThreadOut,
       sync, syncTarget: target,

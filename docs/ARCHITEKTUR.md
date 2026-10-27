@@ -12,6 +12,8 @@ eine Seite `public/index.html`, Render).
 | Workflows | Rechtsrecherche, Vertrag prüfen (Kommentare im Word), Versionen vergleichen (Redline), Entwurf, Zusammenfassen, Fristen | explizit gesteuert, Deliverable per Code-Generierung in der Sandbox |
 | Akten | Dokumente je Causa (Upload, OneDrive/SharePoint-Import inkl. ganzer Ordner), Volltexte, Fragen im Kontext der Akte | explizit |
 | Due Diligence | Feste Prüfbereiche mit Red-Flag-Katalog und Regel-IDs (GES-001 …), je Dokument strukturierte Analyse mit Zitat + Fundstelle + Schweregrad + Deal-Impact + Normen, **Evidenzbindung** (jedes Zitat wird im Dokumenttext gesucht: belegt / teilweise / unbelegt), **Routing je Dokument wie beim Assistenten**: Triage auf dem schnellen Modell (Typ, Bereich, Schwierigkeit), Analyse leicht → schnelles Modell, schwer → Hauptmodell; 0–3 kompakte Rechtsfragen je Dokument, leicht → schnelles Modell mit Websuche, schwer → **AI:ssociate in genau einer Anfrage je Dokument** (Fragen nummeriert, kurze Antworten); Dokumente parallel (2/4/6 Worker nach Anzahl), Synthese je Bereich aus den Dokumentantworten, Executive Summary, RIS-Prüfung, **Review-Status je Befund** (Freigabe, Grad, Vermerk, manuelle Befunde), Request List, Red-Flag-Report (Word) und Workbook (Excel) mit stabilen IDs; Budget je DD 10 Mio. Eingabe- / 1 Mio. Ausgabe-Tokens inkl. geschätzter AI:ssociate-Tokens, Kostenschätzung vor jedem Lauf | explizit |
+| Vertragsprüfung, Vertrag entwerfen, Schriftsatz entwerfen | Fachagenten mit österreichischem Arbeitsablauf als versionierte Konfiguration (`lib/agents.js`): Prüfraster mit 16 Punkten, 17 Vertragstypen mit zwingendem Recht, Form und Gebühren, 14 Schriftsatzarten nach ZPO, EO, VwGVG, VwGG, StPO. Ablauf in Phasen (Prüfung → Redline; Gliederung → Entwurf → Selbstprüfung; Prüfung und Gliederung → Schriftsatz → Gegenargumente), Folgeschritt per Button, nur die erste Phase fragt die Wissensdatenbank, Entwürfe auf dem Hauptmodell | explizit, Deliverable per Code-Generierung |
+| Lokaler Ordner / Akt als Quelle | Ordner auf dem Rechner (File System Access API) wird agentisch durchsucht: Werkzeuge laufen im Browser, Text wird lokal extrahiert (pdf.js, Word/Excel entpackt), übertragen wird nur Gelesenes; alternativ einzelne Dateien anhängen oder den Ordner in einen Akt hochladen, dessen Dokumente der Agent serverseitig mit denselben Werkzeugen durchsucht | explizit |
 | Review-Tabellen | Gleiche Spalten über viele Dokumente (Vertragsübersicht, Dienstverträge, Mietverträge, Fristen, Steuerbescheide, eigene Spalten); jede Zelle mit Beleg und Fundstelle; Excel-Export | explizit |
 | Microsoft 365 | OAuth/PKCE, Browser für OneDrive/SharePoint, Anhängen, Import in Akten, Rückschreiben von Ergebnissen und Berichten (nie überschreiben) | explizit |
 | Lange Vorgänge | Server-Jobs mit Ereignisprotokoll, Wiederanbindung nach Verbindungsabbruch, Pausieren/Fortsetzen, Budget je Akte | explizit |
@@ -104,7 +106,13 @@ Prüfung, RIS). So bleiben die teuren Analyseergebnisse wiederverwendbar.
    Deshalb: Befund nur mit wörtlichem Zitat, Wesentlichkeitsschwelle,
    Empfehlung immer als konkrete Transaktionsmaßnahme (Garantie, Freistellung,
    CP, Kaufpreis), und alle Berichte als „Entwurf, anwaltlich zu prüfen“.
-7. **AI:ssociate-API.** Sie ist die maßgebliche Rechtsquelle für schwere
+7. **AI:ssociate-API.** Sie sieht unsere Dokumente nicht. Fragen mit
+   Dokumentbezug tragen deshalb den Wortlaut mit: kurze Dokumente ganz, längere
+   als wörtliche Passagen, die das schnelle Modell auswählt und der Server gegen
+   den Text prüft; Dokumente eines Gesprächs bleiben für Folgefragen verfügbar.
+   (Die API bietet zusätzlich einen Datei-Upload mit `file_context`; er ist nicht
+   angebunden, weil die Verarbeitung asynchron ist und das Format der Referenzen
+   nicht dokumentiert ist.) Sie ist die maßgebliche Rechtsquelle für schwere
    Rechtsfragen und wird in der DD **je Dokument höchstens einmal** befragt
    (mehrere nummerierte Fragen in einer Anfrage); leichte Rechtsfragen eines
    Dokuments beantwortet das schnelle Modell mit Websuche. Bei vielen Dokumenten

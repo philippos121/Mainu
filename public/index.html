@@ -480,6 +480,61 @@
       .legend { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
       .legend span { display: inline-flex; align-items: center; gap: 5px; }
 
+      /* ---------- local folder ---------- */
+      .chip.folder { background: rgba(14,124,138,0.10); border-color: rgba(14,124,138,0.32); color: var(--accent); font-weight: 600; cursor: pointer; }
+      .chip.folder svg { color: var(--accent); }
+      .fold-opts { display: grid; gap: 8px; margin: 4px 0 6px; }
+      .fold-opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); cursor: pointer; font-family: inherit; color: var(--text); }
+      .fold-opt:hover { border-color: var(--accent); }
+      .fold-opt .ico { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+      .fold-opt .ico svg { width: 18px; height: 18px; }
+      .fold-opt b { display: block; font-size: 14px; margin-bottom: 2px; }
+      .fold-opt span.d { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+      .fold-opt.rec { border-color: rgba(14,124,138,0.45); background: var(--accent-soft); }
+      .fold-tree { border: 1px solid var(--border); border-radius: 12px; max-height: 44vh; overflow-y: auto; margin-top: 8px; }
+      .fold-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; }
+      .fold-row:last-child { border-bottom: none; }
+      .fold-row:hover { background: var(--surface-2); }
+      .fold-row .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .fold-row .m { color: var(--faint); font-size: 12px; flex: 0 0 auto; }
+      .fold-row input { accent-color: var(--accent); width: 16px; height: 16px; flex: 0 0 auto; }
+      .fold-row.dim { opacity: .5; }
+      .fold-stats { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 12px; }
+
+      /* ---------- specialist agents ---------- */
+      .agent-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+      .agent-head .ico { width: 50px; height: 50px; border-radius: 14px; background: var(--header); color: #fff; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; box-shadow: 0 8px 22px rgba(14,92,105,0.25); }
+      .agent-head .ico svg { width: 24px; height: 24px; }
+      .agent-head h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
+      .agent-head .sub { color: var(--muted); font-size: 14px; margin-top: 4px; max-width: 720px; line-height: 1.5; }
+      .wf { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+      .wf-step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0; }
+      .wf-step .no { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 7px; }
+      .wf-step b { display: block; font-size: 13px; margin-bottom: 3px; }
+      .wf-step span { font-size: 12px; color: var(--muted); line-height: 1.42; display: block; }
+      .agent-cols { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+      .agent-cols .card h3 { margin-bottom: 10px; }
+      .agent-cols .field-row { margin-bottom: 0; }
+      .docs-hint { font-size: 12.5px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
+      .docs-box { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+      .docs-box:empty { display: none; }
+      .docs-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+      details.grid { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 12px; }
+      details.grid summary { cursor: pointer; font-weight: 700; font-size: 13.5px; list-style: none; display: flex; align-items: center; gap: 6px; }
+      details.grid summary::before { content: '›'; color: var(--faint); transition: transform .15s; }
+      details.grid[open] summary::before { transform: rotate(90deg); }
+      .grid-list { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; padding-left: 18px; line-height: 1.45; }
+      .grid-list li { margin: 5px 0; }
+      .grid-list b { color: var(--text); }
+      .agent-start { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+      .agent-start .note { margin: 0; flex: 1; min-width: 200px; }
+      .next-panel { margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(14,124,138,0.3); background: var(--accent-soft); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .next-panel .t { width: 100%; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 800; }
+      .next-panel .h { width: 100%; font-size: 12.5px; color: var(--muted); }
+      @media (max-width: 1100px) { .wf { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+      @media (max-width: 960px) { .agent-cols { grid-template-columns: minmax(0, 1fr); } }
+      @media (max-width: 640px) { .wf { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agent-head h1 { font-size: 20px; } .agent-head .ico { width: 42px; height: 42px; } }
+
       /* ---------- tour / toast ---------- */
       .tour-target { position: relative; z-index: 71 !important; box-shadow: 0 0 0 4px rgba(243,146,0,0.9), 0 0 0 9999px rgba(14,37,46,0.55) !important; border-radius: 14px; }
       .tour-card { position: fixed; z-index: 72; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom)); width: min(420px, calc(100vw - 32px)); background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: 0 16px 50px rgba(14,37,46,0.35); }
@@ -553,7 +608,12 @@
         <button class="btn full sb-new" id="sbNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neue Frage</button>
         <nav class="sb-nav">
           <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent</a>
+          <div class="sb-sec">Agenten</div>
           <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
+          <a class="nav-item" data-nav="agent:contract_review" href="#/agent/contract_review" id="navAgentReview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>Vertragsprüfung</a>
+          <a class="nav-item" data-nav="agent:contract_draft" href="#/agent/contract_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>Vertrag entwerfen</a>
+          <a class="nav-item" data-nav="agent:brief_draft" href="#/agent/brief_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/></svg>Schriftsatz entwerfen</a>
+          <div class="sb-sec">Akten</div>
           <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
           <div class="sb-sec sb-hist" id="sbHistSec" hidden>Verlauf <a href="#/history">Alle</a></div>
           <div class="sb-recent" id="sbRecent"></div>
@@ -594,6 +654,9 @@
             </footer>
           </main>
         </section>
+
+        <!-- ---------- specialist agent (contract review, contract drafting, pleadings) ---------- -->
+        <section class="view" data-view="agent"><div class="page" id="agentPage"></div></section>
 
         <!-- ---------- matters list ---------- -->
         <section class="view" data-view="matters"><div class="page" id="mattersPage"></div></section>
@@ -674,6 +737,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
           <span class="lbl">Microsoft 365</span>
         </button>
+        <button class="ctool" id="folderBtn" title="Lokalen Ordner verbinden – der Assistent durchsucht ihn selbst, nichts wird vorab hochgeladen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg>
+          <span class="lbl">Ordner</span>
+        </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
@@ -682,6 +749,7 @@
     </div>
 
     <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
+    <input type="file" id="folderInput" multiple hidden webkitdirectory />
     <div class="modal" id="msModal"><div class="modal-card ms-card" id="msCard"></div></div>
     <div class="modal" id="taskModal"><div class="modal-card" id="taskCard"></div></div>
     <div class="modal" id="dlg"><div class="modal-card" id="dlgCard"></div></div>
@@ -819,6 +887,10 @@
         matter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
         question: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/></svg>',
         chev: '<svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+        brief: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/></svg>',
+        localfolder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg>',
+        server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
+        attach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>',
       }
       const svg = (name) => { const s = document.createElement('span'); s.innerHTML = ICONS[name] || ICONS.tool; return s.firstChild }
 
@@ -904,6 +976,7 @@
         const v = seg[0] || 'assistant'
         if (v === 'chat' && seg[1]) { openConversation(seg[1], { silent: true }); return }
         if (v === 'matter' && seg[1]) { await openMatter(seg[1], seg[2] || matterTab); return }
+        if (v === 'agent' && seg[1]) { showView('agent', 'agent:' + seg[1]); await renderAgent(seg[1]); return }
         if (v === 'workflows') { location.hash = '#/assistant'; return }
         if (v === 'tables') { location.hash = '#/matters'; return }
         if (!(v in VIEW_TITLES) || v === 'matter') { location.hash = '#/assistant'; return }
@@ -924,25 +997,23 @@
           { k: 'question', label: 'Rechtsfrage', type: 'textarea', required: true, ph: 'z. B. Kann der Vermieter bei befristetem Mietvertrag nach MRG vorzeitig kündigen, wenn …?' },
           { k: 'jurisdiction', label: 'Rechtsordnung', type: 'select', opts: ['Österreich', 'Österreich + EU-Recht', 'EU-Recht', 'Deutschland'] },
           { k: 'depth', label: 'Tiefe', type: 'select', opts: ['ausführlich', 'kurz'] } ] },
-        contract_review: { title: 'Vertrag prüfen', desc: 'Klauselweise Prüfung mit Risiko-Ampel. Kommentare direkt im Word-Dokument, Memo oder Excel-Tabelle.', icon: 'contract', needsFiles: true, fields: [
-          { k: 'perspective', label: 'Perspektive', type: 'select', opts: ['neutral', 'Auftraggeber / Kunde', 'Auftragnehmer / Lieferant', 'Vermieter', 'Mieter', 'Arbeitgeber', 'Arbeitnehmer', 'Käufer', 'Verkäufer'] },
-          { k: 'focus', label: 'Fokus (optional)', type: 'text', ph: 'z. B. Haftung, Kündigung, Datenschutz' },
-          { k: 'output', label: 'Ergebnis', type: 'select', opts: ['Kommentare im Word-Dokument', 'Prüfmemo', 'Risikotabelle (Excel)'] },
-          { k: 'notes', label: 'Hinweise (optional)', type: 'textarea', ph: 'Besondere Umstände, Verhandlungsziel …' } ] },
         compare: { title: 'Versionen vergleichen', desc: 'Zwei Fassungen hochladen: Delta-Ansicht (rot/grün) als HTML und Word plus juristische Bewertung der Änderungen.', icon: 'compare', needsFiles: true, minFiles: 2, fields: [ { k: 'notes', label: 'Hinweise (optional)', type: 'textarea', ph: 'Worauf soll besonders geachtet werden?' } ] },
-        draft: { title: 'Entwurf erstellen', desc: 'Schriftsatz, Vertrag, Mahnung oder Memo – rechtlich geprüft und als Word-Datei.', icon: 'draft', fields: [
-          { k: 'doc_type', label: 'Dokumenttyp', type: 'select', opts: ['Mahnschreiben', 'Klage', 'Klagebeantwortung', 'Vertrag', 'Kündigungsschreiben', 'Vollmacht', 'Memo / Gutachten', 'Sonstiges'], required: true },
-          { k: 'parties', label: 'Parteien', type: 'text', ph: 'z. B. Muster GmbH (Klägerin) / Max Beispiel (Beklagter)' },
-          { k: 'facts', label: 'Sachverhalt / Vorgaben', type: 'textarea', required: true, ph: 'Was ist passiert, was soll erreicht werden, Beträge, Daten …' },
-          { k: 'extra', label: 'Weitere Vorgaben (optional)', type: 'text', ph: 'Tonfall, Länge, Gericht, Frist …' } ] },
         summary: { title: 'Zusammenfassen', desc: 'Memo, Kurzfassung oder mandantentaugliche Zusammenfassung hochgeladener Dokumente.', icon: 'summary', needsFiles: true, fields: [
           { k: 'style', label: 'Stil', type: 'select', opts: ['Juristisches Memo', 'Kurzfassung (10 Sätze)', 'Für Mandanten verständlich'] },
           { k: 'question', label: 'Schwerpunkt (optional)', type: 'text', ph: 'z. B. Haftungsfragen, Zahlungsmodalitäten' } ] },
       }
       // The workflow forms live behind the template chips above the composer (structured inputs, fixed outputs).
+      // Specialist agents get their own guided page; the short templates stay forms.
+      const AGENT_CHIPS = { contract_review: ['Vertragsprüfung', 'contract', 'Klauselweise Prüfung nach österreichischem Recht'], contract_draft: ['Vertrag entwerfen', 'draft', 'Term Sheet → Gliederung → Word-Entwurf'], brief_draft: ['Schriftsatz entwerfen', 'brief', 'Klage, Rechtsmittel, Beschwerde im österreichischen Aufbau'] }
       function renderActions() {
         const c = $('homeChips'); if (!c) return; c.innerHTML = ''
-        for (const [key, w] of Object.entries(WORKFLOWS)) { const b = el('button'); b.dataset.wf = key; b.title = w.desc; b.appendChild(svg(w.icon)); b.appendChild(el('span', null, w.title)); b.addEventListener('click', () => openTask(key)); c.appendChild(b) }
+        const order = [['wf', 'research'], ['agent', 'contract_review'], ['agent', 'contract_draft'], ['agent', 'brief_draft'], ['wf', 'compare'], ['wf', 'summary']]
+        for (const [kind, key] of order) {
+          const b = el('button')
+          if (kind === 'wf') { const w = WORKFLOWS[key]; b.dataset.wf = key; b.title = w.desc; b.appendChild(svg(w.icon)); b.appendChild(el('span', null, w.title)); b.addEventListener('click', () => openTask(key)) }
+          else { const [t, ic, d] = AGENT_CHIPS[key]; b.dataset.agent = key; b.title = d; b.appendChild(svg(ic)); b.appendChild(el('span', null, t)); b.addEventListener('click', () => navigate('#/agent/' + key)) }
+          c.appendChild(b)
+        }
       }
       // Knowledge-base selection (home list + composer chip + dialog), persisted with the settings.
       function kbItem() { return KB_ITEMS.find((x) => x.k === settings.kb) || KB_ITEMS[0] }
@@ -1056,16 +1127,26 @@
         if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, `Akt: ${current.matter.name}${current.matter.docIds?.length ? ` · ${current.matter.docIds.length} Dokument${current.matter.docIds.length > 1 ? 'e' : ''}` : ''}`)); const x = el('button', null, '×'); x.title = 'Aktenkontext entfernen'; x.addEventListener('click', () => { current.matter = null; persistCurrent(); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
         pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
         pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() }); c.appendChild(x); attachList.appendChild(c) })
+        if (localFolder) attachList.appendChild(folderChip())
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
         msBtn.classList.toggle('on', pendingMs.length > 0)
+        $('folderBtn').classList.toggle('on', Boolean(localFolder))
+        renderAgentDocs()
         updateSend()
+      }
+      function folderChip() {
+        const c = el('span', 'chip folder'); c.title = 'Ordneroptionen: agentisch durchsuchen, Dateien anhängen oder in einen Akt hochladen'
+        c.appendChild(svg('localfolder')); c.appendChild(el('span', null, `${localFolder.name} · ${localFolder.entries.length} Datei${localFolder.entries.length === 1 ? '' : 'en'}`))
+        c.addEventListener('click', openFolderDialog)
+        const x = el('button', null, '×'); x.title = 'Ordner trennen'; x.addEventListener('click', (e) => { e.stopPropagation(); localFolder = null; renderAttachments(); toast('Ordner getrennt.') }); c.appendChild(x)
+        return c
       }
       const defaultFileChange = async () => { await addFiles(fileInput.files); fileInput.value = '' }
       fileInput.onchange = defaultFileChange
       attachBtn.addEventListener('click', () => fileInput.click())
       // drag & drop onto the composer (matter pages have their own drop zones)
       document.addEventListener('dragover', (e) => { e.preventDefault() })
-      document.addEventListener('drop', (e) => { e.preventDefault(); if (viewName === 'assistant' && e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
+      document.addEventListener('drop', (e) => { e.preventDefault(); if ((viewName === 'assistant' || viewName === 'agent') && e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
 
       // ------------------------------------------------------------------
       // Composer behaviour
@@ -1273,8 +1354,9 @@
       // ------------------------------------------------------------------
       function renderUser(m) {
         const b = el('div', 'msg-user')
-        if (m.taskTitle) b.appendChild(el('div', 'tasklbl', 'Workflow · ' + m.taskTitle))
+        if (m.taskTitle) b.appendChild(el('div', 'tasklbl', (m.agent ? 'Agent · ' : 'Workflow · ') + m.taskTitle))
         if (m.matterName) b.appendChild(el('div', 'tasklbl', 'Akt · ' + m.matterName))
+        if (m.folder) b.appendChild(el('div', 'tasklbl', 'Ordner · ' + m.folder))
         b.appendChild(document.createTextNode(m.text))
         if (m.files?.length) { const f = el('div', 'files'); m.files.forEach((n) => f.appendChild(el('span', null, n))); b.appendChild(f) }
         messages.appendChild(b)
@@ -1414,6 +1496,19 @@
           body.appendChild(p)
         }
 
+        // Specialist agent: the next step of its workflow builds on this answer (it is in the history).
+        if (data.agent?.next?.length && data.answer) {
+          const p = el('div', 'next-panel'); p.appendChild(el('div', 't', 'Nächster Schritt · ' + data.agent.title))
+          for (const n of data.agent.next) {
+            const b = el('button', 'btn sm', n.label); b.dataset.phase = n.phase
+            b.addEventListener('click', () => { if (busy) return; sendMessage({ text: n.label, task: { type: 'agent', agent: data.agent.key, phase: n.phase, params: current?.agent?.params || {} }, taskTitle: data.agent.title, agent: true }) })
+            p.appendChild(b)
+          }
+          p.appendChild(el('div', 'h', 'Änderungswünsche vorher einfach als Nachricht schreiben – der nächste Schritt baut auf dem Verlauf auf.'))
+          body.appendChild(p)
+        }
+        if (data.folder?.read?.length) body.appendChild(el('div', 'note', `${data.folder.kind === 'local' ? 'Aus dem lokalen Ordner' : 'Aus dem Akt'} gelesen: ${data.folder.read.slice(0, 12).join(', ')}${data.folder.read.length > 12 ? ` und ${data.folder.read.length - 12} weitere` : ''}`))
+
         if (data.answer) {
           const acts = el('div', 'actions')
           const cp = el('button', 'mini', 'Kopieren'); cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(data.answer) ; toast('Kopiert.') } catch { toast('Kopieren nicht möglich.') } })
@@ -1465,7 +1560,7 @@
       // ------------------------------------------------------------------
       // Sending (SSE)
       // ------------------------------------------------------------------
-      async function sendMessage({ text, task = null, taskTitle = null }) {
+      async function sendMessage({ text, task = null, taskTitle = null, agent = false }) {
         if (busy) return
         if (!current) newConversation({ keepView: true })
         if (msState.connected && (pendingMs.length || current.msTarget)) {
@@ -1480,7 +1575,8 @@
         busy = true; updateSend()
         if (!current.title) { current.title = taskTitle ? `${taskTitle}: ${text.split('\n')[0].replace(taskTitle + ': ', '').slice(0, 50)}` : text.slice(0, 60) }
         showView('assistant'); showChat(); if (location.hash !== '#/chat/' + current.id) history.replaceState(null, '', '#/chat/' + current.id)
-        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, matterName: matterCtx?.name || null }
+        const folderMeta = localFolder ? { name: localFolder.name, count: localFolder.entries.length, sample: localFolder.entries.slice(0, 150).map((e) => e.path) } : null
+        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, agent, matterName: matterCtx?.name || null, folder: folderMeta?.name || null }
         current.messages.push(um); renderUser(um)
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
@@ -1490,6 +1586,7 @@
         const handle = (ev) => {
           if (ev.seq) { if (ev.seq <= lastSeq) return; lastSeq = ev.seq }
           if (ev.event === 'job') return
+          if (ev.event === 'client_tool') { runClientTool(jobId, ev); return }
           if (ev.event === 'step') addStep(ui, ev)
           else if (ev.event === 'step_update') updateStep(ui, ev)
           else if (ev.event === 'route') { if (ev.title && (!current.title || current.title === text.slice(0, 60))) { current.title = ev.title; showChat() } renderModelTags(ui.models, ev.models) }
@@ -1502,7 +1599,7 @@
         let hardFail = false
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [] }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta }) })
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readSse(resp, handle)
         } catch (err) { firstError = err }
@@ -1527,6 +1624,405 @@
           persistCurrent()
         }
       }
+      // ------------------------------------------------------------------
+      // Local folder (File System Access API; fallback: folder/file input).
+      // The folder stays on the device: the server-side agent calls file tools
+      // (search, list, read, attach) that run here in the browser; only what it
+      // reads (or explicitly takes over) is sent. Text is extracted locally
+      // (PDF via pdf.js from /vendor/pdfjs, Word/Excel by unzipping in the browser).
+      // ------------------------------------------------------------------
+      const FOLDER_MAX_ENTRIES = 5000
+      const FOLDER_SKIP = new Set(['node_modules', '.git', '$RECYCLE.BIN', 'System Volume Information', '__MACOSX'])
+      const LOCAL_TEXT_EXT = /\.(pdf|docx|xlsx|txt|md|csv|tsv|json|xml|html?|rtf|eml|log)$/i
+      const AKT_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml)$/i
+      const FILE_PART = 24000
+      let localFolder = null // { name, via, entries: [{ path, size, lastModified, get }], texts: Map(path -> {text, pages} | null) }
+      const handledCalls = new Set()
+
+      async function pickFolder() {
+        if (window.showDirectoryPicker) {
+          let h
+          try { h = await window.showDirectoryPicker({ id: 'aiss-folder', mode: 'read' }) } catch (e) { if (e?.name !== 'AbortError') toast('Ordner konnte nicht geöffnet werden: ' + (e?.message || e)); return }
+          toast('Ordner wird eingelesen…', 6000)
+          const entries = []
+          try { await walkDir(h, '', entries, 0) } catch (e) { toast('Ordner nicht vollständig lesbar: ' + (e?.message || e)) }
+          setLocalFolder({ name: h.name, via: 'fsa', entries })
+          return
+        }
+        $('folderInput').click() // Safari/Firefox: folder selection via input (files stay in the browser as well)
+      }
+      async function walkDir(dir, prefix, out, depth) {
+        for await (const [name, h] of dir.entries()) {
+          if (out.length >= FOLDER_MAX_ENTRIES) return
+          if (name.startsWith('.') || name.startsWith('~$') || FOLDER_SKIP.has(name)) continue
+          const p = prefix ? `${prefix}/${name}` : name
+          if (h.kind === 'directory') { if (depth < 12) await walkDir(h, p, out, depth + 1) }
+          else { let f = null; try { f = await h.getFile() } catch {} out.push({ path: p, size: f?.size || 0, lastModified: f?.lastModified || 0, get: () => h.getFile() }) }
+        }
+      }
+      $('folderInput').addEventListener('change', () => {
+        const files = [...$('folderInput').files].filter((f) => !f.name.startsWith('.') && !f.name.startsWith('~$'))
+        $('folderInput').value = ''
+        if (!files.length) return
+        const top = (files[0].webkitRelativePath || '').split('/')[0]
+        const entries = files.slice(0, FOLDER_MAX_ENTRIES).map((f) => ({ path: f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(1).join('/') : f.name, size: f.size, lastModified: f.lastModified, get: async () => f }))
+        setLocalFolder({ name: top || 'Ausgewählte Dateien', via: 'input', entries })
+      })
+      function setLocalFolder({ name, via, entries }) {
+        entries.sort((a, b) => a.path.localeCompare(b.path, 'de'))
+        localFolder = { name, via, entries, texts: new Map() }
+        renderAttachments()
+        const readable = entries.filter((e) => LOCAL_TEXT_EXT.test(e.path)).length
+        toast(`Ordner „${name}“ verbunden · ${entries.length} Dateien (${readable} lesbar). Der Assistent durchsucht ihn bei Bedarf selbst.`, 5000)
+      }
+      $('folderBtn').addEventListener('click', () => { if (localFolder) openFolderDialog(); else pickFolder() })
+      // Test hook: a folder from in-memory files ({ path, content: string | Uint8Array }).
+      window.__aissSetLocalFolder = (name, files) => setLocalFolder({ name, via: 'test', entries: files.map((f) => { const file = new File([f.content], f.path.split('/').pop()); return { path: f.path, size: file.size, lastModified: Date.now(), get: async () => file } }) })
+
+      // ---- local text extraction ----
+      function decodeText(buf) { let t = new TextDecoder('utf-8').decode(buf); if ((t.match(/�/g) || []).length > 20) t = new TextDecoder('windows-1252').decode(buf); return t }
+      const xmlDecode = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(Number(d))).replace(/&amp;/g, '&')
+      async function unzipEntries(buf, want) {
+        const u8 = new Uint8Array(buf), dv = new DataView(buf)
+        let eocd = -1
+        for (let i = u8.length - 22; i >= Math.max(0, u8.length - 70000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break }
+        if (eocd < 0) throw new Error('keine gültige Office-Datei')
+        const count = dv.getUint16(eocd + 10, true)
+        let off = dv.getUint32(eocd + 16, true)
+        const out = new Map()
+        for (let n = 0; n < count && off + 46 <= u8.length; n++) {
+          if (dv.getUint32(off, true) !== 0x02014b50) break
+          const method = dv.getUint16(off + 10, true), csize = dv.getUint32(off + 20, true), nameLen = dv.getUint16(off + 28, true), extraLen = dv.getUint16(off + 30, true), commentLen = dv.getUint16(off + 32, true), local = dv.getUint32(off + 42, true)
+          const name = new TextDecoder().decode(u8.subarray(off + 46, off + 46 + nameLen))
+          off += 46 + nameLen + extraLen + commentLen
+          if (!want(name)) continue
+          const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true)
+          const data = u8.subarray(start, start + csize)
+          if (method === 0) out.set(name, data)
+          else if (method === 8) out.set(name, new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()))
+        }
+        return out
+      }
+      async function docxText(buf) {
+        const files = await unzipEntries(buf, (n) => /^word\/(document|footnotes|endnotes)\.xml$/.test(n))
+        const para = (xml) => xml.split(/<\/w:p>/).map((p) => xmlDecode((p.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>|<w:tab\/>|<w:br\/>/g) || []).map((x) => x === '<w:tab/>' ? '\t' : x === '<w:br/>' ? '\n' : x.replace(/<[^>]+>/g, '')).join(''))).filter((x) => x.trim()).join('\n')
+        const dec = (n) => files.has(n) ? new TextDecoder().decode(files.get(n)) : ''
+        return [para(dec('word/document.xml')), para(dec('word/footnotes.xml')), para(dec('word/endnotes.xml'))].filter(Boolean).join('\n\n')
+      }
+      async function xlsxText(buf) {
+        const files = await unzipEntries(buf, (n) => n === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(n))
+        const dec = (n) => new TextDecoder().decode(files.get(n))
+        const shared = files.has('xl/sharedStrings.xml') ? (dec('xl/sharedStrings.xml').match(/<si>[\s\S]*?<\/si>/g) || []).map((si) => xmlDecode((si.match(/<t(?:\s[^>]*)?>[^<]*<\/t>/g) || []).map((t) => t.replace(/<[^>]+>/g, '')).join(''))) : []
+        const sheets = [...files.keys()].filter((n) => n.startsWith('xl/worksheets/')).sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]))
+        const out = []
+        for (const sn of sheets) {
+          const rows = (dec(sn).match(/<row[\s\S]*?<\/row>/g) || []).map((r) => (r.match(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g) || []).map((c) => { const t = (c.match(/\bt="(\w+)"/) || [])[1]; const v = (c.match(/<v>([\s\S]*?)<\/v>/) || [])[1]; if (t === 's') return shared[Number(v)] || ''; if (t === 'inlineStr') return xmlDecode((c.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/) || [])[1] || ''); return v != null ? xmlDecode(v) : '' }).join('\t'))
+          out.push(`## Blatt ${sn.match(/\d+/)[0]}\n${rows.join('\n')}`)
+        }
+        return out.join('\n\n').slice(0, 400_000)
+      }
+      let pdfjsP = null
+      async function pdfText(buf) {
+        pdfjsP ||= import('/vendor/pdfjs/pdf.min.mjs').then((m) => { m.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs'; return m })
+        const pdfjs = await pdfjsP
+        const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise
+        const pages = doc.numPages, n = Math.min(pages, 500), parts = []
+        for (let i = 1; i <= n; i++) { const pg = await doc.getPage(i); const tc = await pg.getTextContent(); parts.push(tc.items.map((it) => (it.str || '') + (it.hasEOL ? '\n' : '')).join('')); pg.cleanup?.() }
+        try { await doc.destroy() } catch {}
+        return { text: parts.join('\n\n'), pages }
+      }
+      const rtfText = (s) => s.replace(/\\par[d]?\b/g, '\n').replace(/\{\\\*[^{}]*\}/g, '').replace(/\\'([0-9a-f]{2})/gi, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\u(-?\d+)\??/g, (m, d) => String.fromCharCode((Number(d) + 65536) % 65536)).replace(/\\[a-z]+-?\d* ?/gi, '').replace(/[{}]/g, '')
+      /** Text of a folder file ({ text, pages } | null for unsupported types); cached per path. */
+      async function localText(e) {
+        if (localFolder.texts.has(e.path)) return localFolder.texts.get(e.path)
+        let r = null
+        const ext = (e.path.match(/\.([^./]+)$/) || [])[1]?.toLowerCase() || ''
+        try {
+          if (LOCAL_TEXT_EXT.test(e.path) && e.size <= 60 * 1048576) {
+            const buf = await (await e.get()).arrayBuffer()
+            if (ext === 'pdf') r = await pdfText(buf)
+            else if (ext === 'docx') r = { text: await docxText(buf) }
+            else if (ext === 'xlsx') r = { text: await xlsxText(buf) }
+            else if (ext === 'html' || ext === 'htm') r = { text: new DOMParser().parseFromString(decodeText(buf), 'text/html').body?.textContent || '' }
+            else if (ext === 'rtf') r = { text: rtfText(decodeText(buf)) }
+            else r = { text: decodeText(buf) }
+          }
+        } catch (err) { r = { text: '', error: String(err?.message || err).slice(0, 120) } }
+        localFolder.texts.set(e.path, r)
+        return r
+      }
+
+      // ---- the file tools the server-side agent calls (same search semantics as the server) ----
+      const normQ = (s) => String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      function matchScore(pathStr, text, terms) {
+        const np = normQ(pathStr), hay = np + '\n' + normQ(text || '')
+        let score = 0, firstAt = -1
+        for (const alts of terms) {
+          let best = 0
+          for (const a of alts) { let n = 0, i = hay.indexOf(a); if (i >= 0 && (firstAt < 0 || i < firstAt)) firstAt = i; while (i >= 0 && n < 50) { n++; i = hay.indexOf(a, i + a.length) } best = Math.max(best, n + (np.includes(a) ? 20 : 0)) }
+          if (!best) return null
+          score += best
+        }
+        const tpos = firstAt - np.length - 1
+        return { score, snippet: text && tpos >= 0 ? text.slice(Math.max(0, tpos - 120), tpos + 200).replace(/\s+/g, ' ').trim() : '' }
+      }
+      function folderFind(p) {
+        const k = String(p || '').trim().replace(/^\/+/, '').replace(/\\/g, '/'), kl = k.toLowerCase(), es = localFolder.entries
+        return es.find((e) => e.path === k) || es.find((e) => e.path.toLowerCase() === kl) || es.find((e) => e.path.toLowerCase().endsWith('/' + kl)) || es.find((e) => e.path.split('/').pop().toLowerCase() === kl.split('/').pop())
+      }
+      const CLIENT_TOOLS = {
+        async files_list({ path: base = '', depth = 1 }) {
+          const b = String(base || '').replace(/^\/+|\/+$/g, ''), d = Math.min(3, Math.max(1, Number(depth) || 1))
+          const under = localFolder.entries.filter((e) => !b || e.path.startsWith(b + '/'))
+          if (b && !under.length) return { ok: true, text: `Pfad „${b}“ nicht gefunden. files_list ohne path zeigt die oberste Ebene.` }
+          const dirs = new Map(), files = []
+          for (const e of under) {
+            const segs = (b ? e.path.slice(b.length + 1) : e.path).split('/')
+            if (segs.length <= d) files.push(e)
+            for (let i = 1; i <= Math.min(d, segs.length - 1); i++) { const k = segs.slice(0, i).join('/'); dirs.set(k, (dirs.get(k) || 0) + 1) }
+          }
+          const lines = [...[...dirs.entries()].map(([k, n]) => `[Ordner] ${b ? b + '/' : ''}${k}/ (${n} Dateien)`), ...files.map((e) => `${e.path} · ${fmtSize(e.size)}`)]
+          return { ok: true, text: `${b || localFolder.name}: ${dirs.size} Unterordner, ${files.length} Dateien${lines.length > 300 ? ' (gekürzt)' : ''}\n${lines.slice(0, 300).join('\n')}` }
+        },
+        async files_search({ query, path: base = '', content = true }) {
+          const terms = String(query || '').split(/\s+/).map((t) => t.split('|').map(normQ).filter(Boolean)).filter((a) => a.length)
+          if (!terms.length) return { ok: true, text: '0 Treffer: leere Suche.' }
+          const b = String(base || '').replace(/^\/+|\/+$/g, '')
+          const cands = localFolder.entries.filter((e) => !b || e.path.startsWith(b + '/'))
+          // Files whose name already hints at the query are read first; the content scan has a time budget.
+          const hint = (e) => terms.some((alts) => alts.some((a) => normQ(e.path).includes(a))) ? 0 : 1
+          const order = cands.slice().sort((x, y) => hint(x) - hint(y) || (/\.(docx|pdf)$/i.test(x.path) ? 0 : 1) - (/\.(docx|pdf)$/i.test(y.path) ? 0 : 1))
+          const t0 = Date.now(); let scanned = 0, unreadable = 0, timedOut = false
+          const hits = []
+          for (const e of order) {
+            let text = ''
+            if (content !== false && LOCAL_TEXT_EXT.test(e.path)) {
+              if (localFolder.texts.has(e.path) || (Date.now() - t0 < 60_000 && scanned < 600)) { const r = await localText(e); scanned++; if (!r || !r.text) unreadable++; text = r?.text || '' }
+              else timedOut = true
+            }
+            const m = matchScore(e.path, text, terms)
+            if (m) hits.push({ path: e.path, size: e.size, ...m })
+          }
+          hits.sort((x, y) => y.score - x.score)
+          const top = hits.slice(0, 25)
+          const note = content === false ? 'nur Dateinamen durchsucht' : `Inhalte von ${scanned} von ${cands.filter((e) => LOCAL_TEXT_EXT.test(e.path)).length} lesbaren Dateien durchsucht${unreadable ? `, ${unreadable} ohne Text (z. B. gescannt)` : ''}${timedOut ? '; Zeitlimit erreicht – Suche enger fassen oder path angeben' : ''}`
+          return { ok: true, text: top.length ? `${hits.length} Treffer für „${query}“ (${note}):\n${top.map((h, i) => `${i + 1}. ${h.path} (${fmtSize(h.size)})${h.snippet ? `\n   … ${h.snippet} …` : ''}`).join('\n')}` : `0 Treffer für „${query}“ (${note}). Andere Begriffe, Alternativen mit | oder files_list versuchen.` }
+        },
+        async files_read({ path: p, part = 1 }) {
+          const e = folderFind(p)
+          if (!e) { const near = localFolder.entries.filter((x) => normQ(x.path).includes(normQ(String(p || '').split('/').pop()).slice(0, 6))).slice(0, 8).map((x) => x.path); return { ok: true, text: `Datei „${p}“ nicht gefunden.${near.length ? ` Ähnlich: ${near.join('; ')}` : ''}` } }
+          const r = await localText(e)
+          if (!r) return { ok: true, text: `„${e.path}“ kann im Browser nicht gelesen werden (Dateityp). Mit files_attach in die Sandbox übernehmen, wenn der Inhalt nötig ist.` }
+          if (!r.text.trim()) return { ok: true, text: `„${e.path}“ enthält keinen lesbaren Text${r.error ? ` (${r.error})` : ' (gescannt?)'}.` }
+          const parts = Math.max(1, Math.ceil(r.text.length / FILE_PART)), n = Math.min(parts, Math.max(1, Number(part) || 1))
+          return { ok: true, text: `${e.path} – Teil ${n}/${parts}${r.pages ? ` (${r.pages} Seite${r.pages === 1 ? '' : 'n'})` : ''}\n\n${r.text.slice((n - 1) * FILE_PART, n * FILE_PART)}` }
+        },
+        async files_attach({ paths }) {
+          const out = [], errs = []; let total = 0
+          for (const p of (Array.isArray(paths) ? paths : [paths]).slice(0, MAX_UPLOADS)) {
+            const e = folderFind(p)
+            if (!e) { errs.push(`${p}: nicht gefunden`); continue }
+            if (e.size > MAX_UPLOAD_BYTES) { errs.push(`${e.path}: größer als 15 MB`); continue }
+            if (total + e.size > MAX_TOTAL_UPLOAD_BYTES) { errs.push(`${e.path}: zusammen mehr als 28 MB`); continue }
+            const f = await e.get(); total += e.size
+            out.push({ name: e.path.split('/').pop(), path: e.path, base64: await readAsBase64(f) })
+          }
+          return { ok: out.length > 0, files: out, text: errs.join('; '), error: out.length ? '' : errs.join('; ') || 'keine Datei' }
+        },
+      }
+      async function runClientTool(jobId, ev) {
+        if (!ev.callId || handledCalls.has(ev.callId)) return
+        handledCalls.add(ev.callId)
+        let res
+        try {
+          if (!localFolder) res = { ok: false, error: 'Kein lokaler Ordner verbunden (Seite neu geladen?). Bitte den Ordner erneut verbinden.' }
+          else if (!CLIENT_TOOLS[ev.name]) res = { ok: false, error: 'Unbekanntes Werkzeug ' + ev.name }
+          else res = await CLIENT_TOOLS[ev.name](ev.args || {})
+        } catch (e) { res = { ok: false, error: String(e?.message || e).slice(0, 300) } }
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try { const r = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/tool-result`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callId: ev.callId, ...res }) }); if (r.ok || r.status === 404) return } catch {}
+          await new Promise((r) => setTimeout(r, 600 * 2 ** attempt))
+        }
+      }
+
+      // ---- folder dialog: search agentically, attach chosen files, or upload into an Akt ----
+      function openFolderDialog() {
+        if (!localFolder) return
+        const f = localFolder
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.parentElement.classList.add('wide')
+        card.appendChild(el('h2', null, `Ordner „${f.name}“`))
+        const readable = f.entries.filter((e) => LOCAL_TEXT_EXT.test(e.path))
+        const st = el('div', 'fold-stats')
+        st.appendChild(el('span', 'pill teal', `${f.entries.length} Dateien`)); st.appendChild(el('span', 'pill', `${readable.length} lesbar`))
+        const byExt = {}; for (const e of readable) { const x = (e.path.match(/\.([^./]+)$/) || [])[1]?.toLowerCase(); byExt[x] = (byExt[x] || 0) + 1 }
+        for (const [x, n] of Object.entries(byExt).sort((a, b) => b[1] - a[1]).slice(0, 5)) st.appendChild(el('span', 'pill', `${n} ${x.toUpperCase()}`))
+        card.appendChild(st)
+        const opts = el('div', 'fold-opts')
+        const opt = (icon, title, desc, cls, onClick) => { const b = el('button', 'fold-opt' + (cls ? ' ' + cls : '')); const i = el('span', 'ico'); i.appendChild(svg(icon)); const t = el('span'); t.appendChild(el('b', null, title)); t.appendChild(el('span', 'd', desc)); b.append(i, t); b.addEventListener('click', onClick); opts.appendChild(b); return b }
+        opt('search', 'Agentisch durchsuchen (aktiv)', 'Der Assistent und die Agenten suchen und lesen bei jeder Frage nur die Dateien, die sie brauchen. Nur gelesene Inhalte werden für die Antwort übertragen, nichts wird gespeichert. Der Browser-Tab muss dafür offen bleiben.', 'rec', () => { closeDlg(); input.focus() })
+        opt('attach', 'Dateien auswählen und anhängen', 'Bis zu 5 Dateien als normale Anhänge in den Kontext laden (werden mit der Nachricht in die Sandbox übertragen).', '', () => folderPickFiles())
+        opt('server', 'In einen Akt hochladen', `Alle lesbaren Dokumente (PDF, Word, Text; höchstens ${ddConfig?.limits?.maxDocs || 300}) auf den Server laden. Der Assistent durchsucht dann den Akt – auch später, auf anderen Geräten und für die Due Diligence.`, '', () => folderToAkt())
+        card.appendChild(opts)
+        const a = el('div', 'modal-actions'); const x = el('button', 'btn ghost', 'Ordner trennen'); x.addEventListener('click', () => { localFolder = null; closeDlg(); renderAttachments(); toast('Ordner getrennt.') })
+        const other = el('button', 'btn ghost', 'Anderen Ordner'); other.addEventListener('click', () => { closeDlg(); pickFolder() })
+        const ok = el('button', 'btn', 'Fertig'); ok.addEventListener('click', closeDlg)
+        a.append(x, el('span', 'sp'), other, ok); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+      function folderPickFiles() {
+        const f = localFolder, card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, 'Dateien anhängen')); card.appendChild(el('div', 'md', `Aus „${f.name}“ bis zu ${MAX_UPLOADS} Dateien wählen (je höchstens 15 MB).`))
+        const q = el('input'); q.type = 'search'; q.placeholder = 'Dateien filtern…'; q.style.cssText = 'width:100%;font-family:inherit;font-size:14px;border:1px solid var(--border);border-radius:10px;padding:8px 11px'
+        card.appendChild(q)
+        const tree = el('div', 'fold-tree'); card.appendChild(tree)
+        const chosen = new Set()
+        const draw = () => {
+          tree.innerHTML = ''
+          const nq = normQ(q.value.trim())
+          const list = f.entries.filter((e) => !nq || normQ(e.path).includes(nq)).slice(0, 400)
+          if (!list.length) tree.appendChild(el('div', 'ms-empty', 'Keine Datei gefunden.'))
+          for (const e of list) {
+            const row = el('label', 'fold-row' + (e.size > MAX_UPLOAD_BYTES ? ' dim' : '')); const cb = el('input'); cb.type = 'checkbox'; cb.checked = chosen.has(e.path); cb.disabled = e.size > MAX_UPLOAD_BYTES
+            cb.addEventListener('change', () => { if (cb.checked) { if (chosen.size >= MAX_UPLOADS) { cb.checked = false; toast(`Höchstens ${MAX_UPLOADS} Dateien.`); return } chosen.add(e.path) } else chosen.delete(e.path); go.textContent = `Anhängen (${chosen.size})`; go.disabled = !chosen.size })
+            row.append(cb, el('span', 'n', e.path), el('span', 'm', fmtSize(e.size))); tree.appendChild(row)
+          }
+        }
+        q.addEventListener('input', draw)
+        const a = el('div', 'modal-actions'); const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', openFolderDialog)
+        const go = el('button', 'btn', 'Anhängen (0)'); go.disabled = true
+        go.addEventListener('click', async () => { go.disabled = true; const files = []; for (const p of chosen) { const e = folderFind(p); if (e) files.push(await e.get()) } await addFiles(files); closeDlg(); toast(`${files.length} Datei${files.length > 1 ? 'en' : ''} angehängt.`) })
+        a.append(back, el('span', 'sp'), go); card.appendChild(a)
+        draw(); setTimeout(() => q.focus(), 30)
+      }
+      async function folderToAkt() {
+        await loadMatters(); await loadDdConfig()
+        const f = localFolder, card = $('dlgCard'); card.innerHTML = ''
+        const maxDocs = ddConfig?.limits?.maxDocs || 300, maxBytes = ddConfig?.limits?.maxDocBytes || 30 * 1048576
+        const docs = f.entries.filter((e) => AKT_EXT.test(e.path) && e.size > 0 && e.size <= maxBytes)
+        const skipped = f.entries.length - docs.length
+        card.appendChild(el('h2', null, 'In einen Akt hochladen'))
+        card.appendChild(el('div', 'md', `${Math.min(docs.length, maxDocs)} Dokumente werden hochgeladen${skipped ? `; ${skipped} Dateien werden übersprungen (Typ nicht unterstützt oder größer als ${Math.round(maxBytes / 1048576)} MB)` : ''}${docs.length > maxDocs ? `; höchstens ${maxDocs} je Akt` : ''}. Unterordner bleiben im Dateinamen erkennbar.`))
+        const fld = el('div', 'field'); fld.appendChild(el('label', null, 'Ziel'))
+        const sel = el('select'); const o0 = el('option', null, `Neuer Akt „${f.name}“`); o0.value = ''; sel.appendChild(o0)
+        for (const m of mattersCache) { const o = el('option', null, `${m.kind === 'dd' ? 'DD · ' : ''}${m.name} (${m.documents} Dok.)`); o.value = m.id; sel.appendChild(o) }
+        fld.appendChild(sel); card.appendChild(fld)
+        const prog = el('div', 'progress'); prog.hidden = true; const bar = el('i'); bar.style.width = '0%'; prog.appendChild(bar); card.appendChild(prog)
+        const msg = el('div', 'note'); card.appendChild(msg)
+        const a = el('div', 'modal-actions'); const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', openFolderDialog)
+        const go = el('button', 'btn', 'Hochladen'); go.disabled = !docs.length
+        go.addEventListener('click', async () => {
+          go.disabled = true; back.disabled = true; sel.disabled = true; prog.hidden = false
+          try {
+            const m = sel.value ? mattersCache.find((x) => x.id === sel.value) : (await api('/api/matters', { method: 'POST', body: { name: f.name, kind: 'matter', settings: {} } })).matter
+            const list = docs.slice(0, maxDocs)
+            let done = 0, added = 0; const errors = []
+            let batch = [], bytes = 0
+            const flush = async () => { if (!batch.length) return; const r = await api(`/api/matters/${m.id}/documents`, { method: 'POST', body: { files: batch } }); added += r.added?.length || 0; errors.push(...(r.errors || [])); batch = []; bytes = 0 }
+            for (const e of list) {
+              if (batch.length >= 20 || bytes + e.size > 18 * 1048576) await flush()
+              batch.push({ name: e.path.replace(/\//g, ' - '), base64: await readAsBase64(await e.get()) }); bytes += e.size
+              done++; bar.style.width = Math.round(done / list.length * 100) + '%'; msg.textContent = `${done} / ${list.length} · ${e.path}`
+            }
+            await flush()
+            await loadMatters()
+            if (!current) newConversation({ keepView: true })
+            current.matter = { id: m.id, name: m.name, docIds: [] }
+            localFolder = null
+            persistCurrent(); renderAttachments(); closeDlg()
+            toast(`${added} Dokumente in den Akt „${m.name}“ hochgeladen${errors.length ? ` (${errors.length} übersprungen)` : ''}. Der Assistent durchsucht jetzt den Akt.`, 6000)
+          } catch (e) { msg.textContent = 'Fehler: ' + e.message; go.disabled = false; back.disabled = false; sel.disabled = false }
+        })
+        a.append(back, el('span', 'sp'), go); card.appendChild(a)
+      }
+      // The folder dialog uses the wide card; other dialogs keep the default width.
+      const _closeDlg = closeDlg
+      closeDlg = function () { _closeDlg(); $('dlgCard').parentElement?.classList.remove('wide') }
+
+      // ------------------------------------------------------------------
+      // Specialist agents: Vertragsprüfung, Vertrag entwerfen, Schriftsatz entwerfen
+      // ------------------------------------------------------------------
+      const LS_AGENT_DRAFTS = 'aiss.agentDrafts.v1'
+      let agentsCfg = []
+      let agentDrafts = {}
+      try { agentDrafts = JSON.parse(localStorage.getItem(LS_AGENT_DRAFTS) || '{}') } catch {}
+      const saveAgentDrafts = () => { try { localStorage.setItem(LS_AGENT_DRAFTS, JSON.stringify(agentDrafts)) } catch {} }
+      let agentShown = null
+      async function loadAgents() { if (!agentsCfg.length) { try { agentsCfg = (await (await fetch('/api/agents', { cache: 'no-store' })).json()).agents || [] } catch { agentsCfg = [] } } return agentsCfg }
+      async function renderAgent(key) {
+        await loadAgents()
+        const a = agentsCfg.find((x) => x.key === key)
+        if (!a) { navigate('#/assistant'); return }
+        agentShown = a
+        setTitle(['Agenten', a.title])
+        const page = $('agentPage'); page.innerHTML = ''
+        const head = el('div', 'agent-head'); const ico = el('div', 'ico'); ico.appendChild(svg(a.icon)); const ht = el('div'); ht.appendChild(el('h1', null, a.title)); ht.appendChild(el('div', 'sub', a.short)); head.append(ico, ht); page.appendChild(head)
+        const wf = el('div', 'wf'); a.steps.forEach((s, i) => { const c = el('div', 'wf-step'); c.appendChild(el('div', 'no', String(i + 1))); c.appendChild(el('b', null, s.title)); c.appendChild(el('span', null, s.text)); wf.appendChild(c) }); page.appendChild(wf)
+        const cols = el('div', 'agent-cols')
+        // left: the form
+        const form = el('div', 'card'); form.appendChild(el('h3', null, 'Angaben'))
+        const vals = agentDrafts[key] || (agentDrafts[key] = {})
+        const inputs = {}
+        for (const f of a.fields) {
+          const fld = el('div', 'field'); fld.appendChild(el('label', null, f.label + (f.required ? ' *' : '')))
+          let c
+          if (f.type === 'select') { c = el('select'); for (const o of f.opts) { const op = el('option', null, o); op.value = o; c.appendChild(op) } if (vals[f.k] && f.opts.includes(vals[f.k])) c.value = vals[f.k] }
+          else if (f.type === 'textarea') { c = el('textarea'); c.placeholder = f.ph || ''; c.value = vals[f.k] || '' }
+          else { c = el('input'); c.type = 'text'; c.placeholder = f.ph || ''; c.value = vals[f.k] || '' }
+          c.name = f.k; c.dataset.agentField = f.k
+          c.addEventListener('input', () => { vals[f.k] = c.value; saveAgentDrafts() }); c.addEventListener('change', () => { vals[f.k] = c.value; saveAgentDrafts() })
+          inputs[f.k] = c; fld.appendChild(c); form.appendChild(fld)
+        }
+        cols.appendChild(form)
+        // right: documents and the Austrian checklist
+        const side = el('div'); side.style.cssText = 'display:grid;gap:14px'
+        const docs = el('div', 'card'); docs.appendChild(el('h3', null, 'Unterlagen'))
+        docs.appendChild(el('p', 'docs-hint', a.needsDocuments ? 'Den Vertrag hochladen, aus Microsoft 365 wählen, einen lokalen Ordner verbinden (der Agent sucht den Vertrag selbst) oder einen Akt verwenden.' : 'Optional: Hausmuster, Korrespondenz, Urkunden. Ein lokaler Ordner oder Akt wird bei Bedarf selbst durchsucht.'))
+        const box = el('div', 'docs-box'); box.id = 'agentDocs'; docs.appendChild(box)
+        const acts = el('div', 'docs-actions')
+        const mk = (icon, label, fn) => { const b = el('button', 'btn ghost sm'); b.appendChild(svg(icon)); b.appendChild(document.createTextNode(label)); b.addEventListener('click', fn); acts.appendChild(b) }
+        mk('attach', 'Dokumente', () => fileInput.click())
+        mk('localfolder', 'Ordner', () => (localFolder ? openFolderDialog() : pickFolder()))
+        mk('cloud', 'Microsoft 365', () => msBtn.click())
+        mk('matter', 'Akt', async () => { await loadMatters(); if (!mattersCache.length) { toast('Noch kein Akt vorhanden.'); return } chooseMatter('Akt für den Agenten', (m) => { if (!current) newConversation({ keepView: true }); current.matter = { id: m.id, name: m.name, docIds: [] }; renderAttachments(); toast(`Akt: ${m.name} – der Agent durchsucht seine Dokumente.`) }) })
+        docs.appendChild(acts); side.appendChild(docs)
+        const ref = el('div', 'card'); ref.appendChild(el('h3', null, a.grid ? 'Prüfraster (österreichisches Recht)' : 'Typische Erfordernisse'))
+        const det = el('details', 'grid'); det.appendChild(el('summary', null, a.grid ? `${a.grid.length} Prüfpunkte anzeigen` : `${a.types.length} Typen anzeigen`))
+        const ul = el('ul', 'grid-list')
+        for (const g of a.grid || a.types) { const li = el('li'); li.appendChild(el('b', null, g.label + ': ')); li.appendChild(document.createTextNode(g.text || g.notes)); ul.appendChild(li) }
+        det.appendChild(ul); ref.appendChild(det); side.appendChild(ref)
+        cols.appendChild(side); page.appendChild(cols)
+        // start
+        const start = el('div', 'agent-start')
+        start.appendChild(el('p', 'note', `Das Ergebnis erscheint im Assistenten; danach geht es mit „${Object.values(a.phases)[0].next?.[0]?.label || 'Rückfragen'}“ weiter.`))
+        const go = el('button', 'btn'); go.id = 'agentStart'; go.textContent = a.phases[a.firstPhase].label
+        go.addEventListener('click', () => startAgent(a, inputs))
+        start.appendChild(go); page.appendChild(start)
+        renderAgentDocs()
+      }
+      function renderAgentDocs() {
+        const box = $('agentDocs'); if (!box) return
+        box.innerHTML = ''
+        if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, 'Akt: ' + current.matter.name)); const x = el('button', null, '×'); x.addEventListener('click', () => { current.matter = null; renderAttachments() }); c.appendChild(x); box.appendChild(c) }
+        pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); box.appendChild(c) })
+        pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments() }); c.appendChild(x); box.appendChild(c) })
+        if (localFolder) box.appendChild(folderChip())
+      }
+      function startAgent(a, inputs) {
+        if (busy) { toast('Bitte warten, bis die laufende Antwort fertig ist.'); return }
+        const params = {}
+        for (const f of a.fields) { const v = String(inputs[f.k].value || '').trim(); if (f.required && !v) { toast(`Bitte „${f.label}“ ausfüllen.`); inputs[f.k].focus(); return } if (v) params[f.k] = v }
+        if (a.needsDocuments && !pendingFiles.length && !pendingMs.length && !localFolder && !current?.matter) { toast('Bitte den Vertrag hochladen, einen Ordner verbinden oder einen Akt wählen.', 4000); return }
+        // A fresh conversation per run; attachments chosen on this page travel along.
+        const keep = { files: pendingFiles.slice(), ms: pendingMs.slice(), matter: current?.matter || null }
+        newConversation({ keepView: true, matterCtx: keep.matter })
+        pendingFiles = keep.files; pendingMs = keep.ms
+        current.agent = { key: a.key, params }
+        const summary = a.fields.filter((f) => params[f.k] && f.type !== 'textarea').map((f) => `${f.label}: ${params[f.k]}`).slice(0, 6).join('\n')
+        const long = a.fields.filter((f) => params[f.k] && f.type === 'textarea').map((f) => `${f.label}: ${params[f.k].length > 220 ? params[f.k].slice(0, 220) + ' …' : params[f.k]}`).join('\n')
+        sendMessage({ text: [a.phases[a.firstPhase].label, summary, long].filter(Boolean).join('\n'), task: { type: 'agent', agent: a.key, phase: a.firstPhase, params }, taskTitle: a.title, agent: true })
+      }
+
       // ------------------------------------------------------------------
       // Matters (Akten) & Due Diligence
       // ------------------------------------------------------------------
@@ -2122,8 +2618,10 @@
       const TOUR = [
         { sel: '#kbList', title: 'Wissensdatenbank', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage; alternativ Zivil-, Straf-, Steuer- oder öffentliches Recht (mit Bundesland) fest wählen. Rechtsfragen beantwortet die Wissensdatenbank AI:ssociate kurz mit Fundstellen, jede Fundstelle wird gegen das RIS geprüft; Dokumentaufgaben liefern Word, Excel oder PDF.' },
         { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
+        { sel: '#folderBtn', title: 'Lokaler Ordner', text: 'Einen Ordner auf dem Rechner verbinden: Der Assistent und die Agenten durchsuchen ihn selbst und lesen nur, was sie brauchen – nichts wird vorab hochgeladen. Alternativ einzelne Dateien anhängen oder den ganzen Ordner in einen Akt hochladen.' },
         { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
         { sel: '#navDd', title: 'Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Review-Tabellen im Akt, Request List, Red-Flag-Report als Word und Excel.', nav: true },
+        { sel: '#navAgentReview', title: 'Fachagenten', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen: geführte Arbeitsabläufe nach österreichischem Recht – Angaben erfassen, Prüfraster bzw. Gliederung, dann Word-Ergebnis und der nächste Schritt per Klick.', nav: true },
         { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
       ]
       let tourIdx = -1, tourCard = null, tourTarget = null
@@ -2155,7 +2653,7 @@
           if (!health.openai) toast('Server: OPENAI_API_KEY fehlt.')
         } catch { toast('Server nicht erreichbar.') }
       }
-      renderActions(); buildKbList($('kbList')); renderKb(); renderSidebarRecent()
+      renderActions(); buildKbList($('kbList')); renderKb(); renderSidebarRecent(); loadAgents()
       try {
         const q = new URLSearchParams(location.search)
         if (q.get('ms') === 'connected') toast('Microsoft 365 verbunden.')
