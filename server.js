@@ -1,4 +1,6 @@
 import express from 'express'
+import fs from 'node:fs'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -11,6 +13,7 @@ import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
 import { agentsForClient, buildAgentTask } from './lib/agents.js'
+import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
 import { BUILTIN_SKILLS, SKILL_OUTPUTS, SKILL_KB, SKILL_AREAS, SKILL_LIMITS, normalizeSkill, skillBlock, skillView } from './lib/skills.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -66,7 +69,19 @@ const WEB_SEARCH_TOOL = { type: process.env.OPENAI_WEB_SEARCH_TOOL || 'web_searc
 // Matters (Akten) and due diligence: file-backed store (set DATA_DIR to a
 // persistent disk on Render), a separate extraction model for the per-document
 // pass, and a cap on concurrent long-running analyses per instance.
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
+// A Render disk mounted at /data is used automatically, even without DATA_DIR.
+function defaultDataDir() {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR
+  try { if (fs.statSync('/data').isDirectory()) { fs.accessSync('/data', fs.constants.W_OK); return '/data' } } catch {}
+  return path.join(__dirname, 'data')
+}
+const DATA_DIR = defaultDataDir()
+// Accounts: on by default (AUTH=off only for local development and tests). Self-registration
+// is limited to the first account (becomes admin), AUTH_ALLOWED_DOMAINS (e.g. "kanzlei.at")
+// or AUTH_SIGNUP=open; otherwise an admin creates the accounts.
+const AUTH_ON = process.env.AUTH !== 'off'
+const AUTH_DOMAINS = String(process.env.AUTH_ALLOWED_DOMAINS || '').split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean)
+const AUTH_SIGNUP_OPEN = process.env.AUTH_SIGNUP === 'open'
 const MODEL_EXTRACT = USE_AZURE ? MODEL_FAST : (process.env.OPENAI_MODEL_EXTRACT || MODEL_FAST)
 const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
 const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
@@ -1148,6 +1163,106 @@ app.set('trust proxy', 1)
 app.use(express.json({ limit: '48mb' })) // one 30 MB document as base64 plus envelope
 app.use(express.static(path.join(__dirname, 'public'), { setHeaders: (res, p) => { if (p.endsWith('.mjs')) res.setHeader('Content-Type', 'text/javascript; charset=utf-8') } }))
 
+// ---------------------------------------------------------------------------
+// Accounts: every /api route needs a signed-in user (except health, the login
+// routes and the Microsoft OAuth callback). Data is separated per user.
+// ---------------------------------------------------------------------------
+const auth = new AuthStore(DATA_DIR)
+const loginThrottle = new Throttle(8, 15 * 60_000) // per IP and e-mail
+const ipThrottle = new Throttle(40, 15 * 60_000) // per IP (offices share one address)
+const SESSION_COOKIE = 'aiss_session'
+function startSession(req, res, u) { setCookie(req, res, SESSION_COOKIE, signSession({ uid: u.id, sv: u.sv || 1, exp: Date.now() + SESSION_DAYS * 86400_000 }, auth.secret()), SESSION_DAYS * 86400) }
+app.use('/api', async (req, res, next) => {
+  req.user = null
+  if (!AUTH_ON) return next()
+  const p = verifySession(parseCookies(req)[SESSION_COOKIE], auth.secret())
+  if (p) { const u = await auth.get(p.uid).catch(() => null); if (u && !u.disabled && (u.sv || 1) === p.sv) req.user = u }
+  if (req.user || req.path === '/health' || req.path.startsWith('/auth/') || req.path === '/ms/callback') return next()
+  res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+})
+const signupAllowed = async (email) => AUTH_SIGNUP_OPEN || (AUTH_DOMAINS.length > 0 && AUTH_DOMAINS.includes(normEmail(email).split('@')[1] || ''))
+app.get('/api/auth/me', async (req, res) => {
+  const n = AUTH_ON ? await auth.count() : 0
+  res.json({ enabled: AUTH_ON, user: userView(req.user), setup: AUTH_ON && n === 0, signup: { open: AUTH_SIGNUP_OPEN, domains: AUTH_DOMAINS } })
+})
+app.post('/api/auth/setup', async (req, res) => {
+  if (!AUTH_ON) return res.status(400).json({ error: 'Anmeldung ist deaktiviert.' })
+  if (await auth.count()) return res.status(409).json({ error: 'Es gibt bereits Konten – bitte anmelden.' })
+  try { const u = await auth.create({ ...req.body, role: 'admin' }); u.lastLoginAt = Date.now(); await auth.save(u); startSession(req, res, u); res.json({ user: userView(u) }) }
+  catch (e) { res.status(400).json({ error: e.message }) }
+})
+app.post('/api/auth/signup', async (req, res) => {
+  if (!AUTH_ON) return res.status(400).json({ error: 'Anmeldung ist deaktiviert.' })
+  if (!(await auth.count())) return res.status(409).json({ error: 'Zuerst das Administrator-Konto anlegen.' })
+  if (!(await signupAllowed(req.body?.email))) return res.status(403).json({ error: 'Selbstregistrierung ist für diese Adresse nicht freigegeben – bitte die Administration um ein Konto bitten.' })
+  try { const u = await auth.create({ ...req.body, role: 'user' }); u.lastLoginAt = Date.now(); await auth.save(u); startSession(req, res, u); res.json({ user: userView(u) }) }
+  catch (e) { res.status(400).json({ error: e.message }) }
+})
+app.post('/api/auth/login', async (req, res) => {
+  if (!AUTH_ON) return res.status(400).json({ error: 'Anmeldung ist deaktiviert.' })
+  const email = normEmail(req.body?.email), key = `${req.ip}|${email}`
+  if (loginThrottle.blocked(key) || ipThrottle.blocked(req.ip)) return res.status(429).json({ error: 'Zu viele Fehlversuche – bitte in 15 Minuten erneut versuchen.' })
+  const u = await auth.byEmail(email)
+  // The hash is computed even for unknown addresses, so timing does not reveal which accounts exist.
+  const ok = verifyPassword(req.body?.password, u?.pass || 'scrypt$AAAAAAAAAAAAAAAAAAAAAA==$' + 'A'.repeat(86) + '==')
+  if (!u || !ok || u.disabled) { loginThrottle.fail(key); ipThrottle.fail(req.ip); return res.status(401).json({ error: u?.disabled && ok ? 'Dieses Konto ist deaktiviert.' : 'E-Mail-Adresse oder Passwort falsch.' }) }
+  loginThrottle.reset(key)
+  u.lastLoginAt = Date.now(); await auth.save(u)
+  startSession(req, res, u); res.json({ user: userView(u) })
+})
+app.post('/api/auth/logout', async (req, res) => {
+  // everywhere: invalidates the sessions of this user on all devices
+  if (req.user && req.body?.everywhere) { req.user.sv = (req.user.sv || 1) + 1; await auth.save(req.user) }
+  clearCookie(req, res, SESSION_COOKIE); try { msClearSession(req, res) } catch {} res.json({ ok: true })
+})
+app.post('/api/auth/password', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  if (!verifyPassword(req.body?.current, req.user.pass)) return res.status(400).json({ error: 'Das bisherige Passwort ist falsch.' })
+  try { checkPassword(req.body?.next) } catch (e) { return res.status(400).json({ error: e.message }) }
+  req.user.pass = hashPassword(req.body.next); req.user.sv = (req.user.sv || 1) + 1; await auth.save(req.user)
+  startSession(req, res, req.user); res.json({ ok: true })
+})
+const adminOnly = (req, res) => { if (!req.user) { res.status(401).json({ error: 'Bitte anmelden.', auth: true }); return false } if (req.user.role !== 'admin') { res.status(403).json({ error: 'Nur für Administratoren.' }); return false } return true }
+app.get('/api/auth/users', async (req, res) => { if (!adminOnly(req, res)) return; res.json({ users: (await auth.list()).map(userView) }) })
+app.post('/api/auth/users', async (req, res) => {
+  if (!adminOnly(req, res)) return
+  try { const u = await auth.create({ email: req.body?.email, name: req.body?.name, password: req.body?.password, role: req.body?.role }); res.json({ user: userView(u) }) }
+  catch (e) { res.status(400).json({ error: e.message }) }
+})
+app.patch('/api/auth/users/:id', async (req, res) => {
+  if (!adminOnly(req, res)) return
+  const u = await auth.get(String(req.params.id || '')).catch(() => null); if (!u) return res.status(404).json({ error: 'Konto nicht gefunden.' })
+  const b = req.body || {}
+  if (u.id === req.user.id && (b.role === 'user' || b.disabled === true)) return res.status(400).json({ error: 'Das eigene Administrator-Konto kann nicht herabgestuft oder deaktiviert werden.' })
+  if (b.role === 'admin' || b.role === 'user') u.role = b.role
+  if (typeof b.disabled === 'boolean') { u.disabled = b.disabled; u.sv = (u.sv || 1) + 1 }
+  if (typeof b.password === 'string' && b.password) { try { checkPassword(b.password) } catch (e) { return res.status(400).json({ error: e.message }) } u.pass = hashPassword(b.password); u.sv = (u.sv || 1) + 1 }
+  if (typeof b.name === 'string') u.name = b.name.trim().slice(0, 80) || u.name
+  await auth.save(u); res.json({ user: userView(u) })
+})
+app.delete('/api/auth/users/:id', async (req, res) => {
+  if (!adminOnly(req, res)) return
+  const u = await auth.get(String(req.params.id || '')).catch(() => null); if (!u) return res.status(404).json({ error: 'Konto nicht gefunden.' })
+  if (u.id === req.user.id) return res.status(400).json({ error: 'Das eigene Konto kann nicht gelöscht werden.' })
+  // The account goes together with its data (Akten, Skills, Verlauf).
+  const owner = ownerKeyOfUser(u)
+  for (const m of await store.listMatters(owner)) { if (!ddRuns.has(m.id)) await store.deleteMatter(m.id) }
+  for (const sk of await store.listSkills(owner)) await store.deleteSkill(sk.id)
+  await fsp.rm(convoDir(owner), { recursive: true, force: true })
+  await auth.remove(u.id); res.json({ ok: true })
+})
+// Data of the browser workspace from before the accounts (X-Owner-Key) moves to the signed-in user once.
+app.post('/api/auth/claim', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  const key = String(req.body?.key || '')
+  if (!/^[\w-]{16,80}$/.test(key) || key.startsWith('u_')) return res.status(400).json({ error: 'Ungültiger Schlüssel.' })
+  const owner = ownerKeyOfUser(req.user)
+  let matters = 0, skills = 0
+  for (const m of await store.listMatters(key)) { m.ownerKey = owner; await store.saveMatter(m); matters++ }
+  for (const sk of await store.listSkills(key)) { sk.ownerKey = owner; await store.saveSkill(sk); skills++ }
+  res.json({ matters, skills })
+})
+
 // ---- Microsoft 365 routes ----
 app.get('/api/ms/login', (req, res) => {
   if (!MS.clientId) return res.status(503).send('Microsoft 365 ist nicht konfiguriert (MS_CLIENT_ID fehlt).')
@@ -1217,7 +1332,7 @@ app.get('/api/ms/browse', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   let storeStats = null
   try { storeStats = await store.stats() } catch {}
-  res.json({ ok: true, openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
+  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -1292,8 +1407,10 @@ function newJob(id) {
   return job
 }
 
+// A job belongs to the user who started it (with accounts); others get 404.
+const jobOf = (req) => { const job = jobs.get(String(req.params.id || '')); return job && (!AUTH_ON || !job.owner || job.owner === ownerOf(req)) ? job : null }
 const streamJob = (req, res) => {
-  const job = jobs.get(String(req.params.id || ''))
+  const job = jobOf(req)
   if (!job) return res.status(404).json({ error: 'Auftrag unbekannt oder abgelaufen.' })
   attachListener(job, res, Number(req.query.after) || 0)
 }
@@ -1302,7 +1419,7 @@ app.get('/api/jobs/:id/stream', streamJob)
 // Result of a browser-executed tool. The job id is a random capability only the
 // requesting browser knows; the call id must belong to a pending call of that job.
 app.post('/api/jobs/:id/tool-result', (req, res) => {
-  const job = jobs.get(String(req.params.id || ''))
+  const job = jobOf(req)
   const b = req.body || {}
   const done = job?.clientCalls.get(String(b.callId || ''))
   if (!done) return res.status(404).json({ error: 'Kein offener Werkzeugaufruf.' })
@@ -1346,7 +1463,46 @@ app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules', 'pd
 const store = new JsonStore(DATA_DIR)
 store.reconcileInterrupted().then((n) => { if (n) console.log(`matters: ${n} interrupted run(s) marked as paused`) }).catch((e) => console.error('reconcile failed:', e?.message))
 const ddRuns = new Map() // matterId -> { jobId, kind }
-const ownerOf = (req) => { const k = String(req.get('x-owner-key') || ''); return /^[\w-]{16,80}$/.test(k) ? k : null }
+// With accounts the data belongs to the signed-in user; without (AUTH=off) to the browser key.
+const ownerKeyOfUser = (u) => `u_${u.id}`
+const ownerOf = (req) => { if (AUTH_ON) return req.user ? ownerKeyOfUser(req.user) : null; const k = String(req.get('x-owner-key') || ''); return /^[\w-]{16,80}$/.test(k) ? k : null }
+
+// ---- conversation history per user (was browser-only): one JSON file per conversation ----
+const CONVO_MAX_BYTES = 3 * 1024 * 1024
+const CONVO_MAX = 300
+const convoDir = (owner) => path.join(DATA_DIR, 'convos', crypto.createHash('sha256').update(String(owner)).digest('hex').slice(0, 32))
+const convoOk = (id) => /^[\w-]{6,64}$/.test(String(id || ''))
+app.get('/api/convos', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  const dir = convoDir(owner), out = []
+  let files = []
+  try { files = (await fsp.readdir(dir)).filter((f) => f.endsWith('.json')) } catch {}
+  for (const f of files) { try { out.push(JSON.parse(await fsp.readFile(path.join(dir, f), 'utf8'))) } catch {} }
+  out.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+  res.json({ convos: out.slice(0, CONVO_MAX) })
+})
+app.put('/api/convos/:id', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  const id = String(req.params.id || ''), c = req.body
+  if (!convoOk(id) || !c || typeof c !== 'object' || c.id !== id || !Array.isArray(c.messages)) return res.status(400).json({ error: 'Ungültiges Gespräch.' })
+  const json = JSON.stringify(c)
+  if (json.length > CONVO_MAX_BYTES) return res.status(413).json({ error: 'Gespräch zu groß zum Speichern.' })
+  const dir = convoDir(owner); await fsp.mkdir(dir, { recursive: true })
+  const p = path.join(dir, `${id}.json`), tmp = `${p}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
+  await fsp.writeFile(tmp, json, 'utf8'); await fsp.rename(tmp, p)
+  // keep the newest CONVO_MAX conversations
+  try { const fs2 = (await fsp.readdir(dir)).filter((f) => f.endsWith('.json')); if (fs2.length > CONVO_MAX) { const st = await Promise.all(fs2.map(async (f) => [f, (await fsp.stat(path.join(dir, f))).mtimeMs])); st.sort((a, b) => a[1] - b[1]); for (const [f] of st.slice(0, fs2.length - CONVO_MAX)) await fsp.rm(path.join(dir, f), { force: true }) } } catch {}
+  res.json({ ok: true })
+})
+app.delete('/api/convos/:id', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  const id = String(req.params.id || ''); if (!convoOk(id)) return res.status(400).json({ error: 'Ungültige ID.' })
+  await fsp.rm(path.join(convoDir(owner), `${id}.json`), { force: true }); res.json({ ok: true })
+})
+app.delete('/api/convos', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  await fsp.rm(convoDir(owner), { recursive: true, force: true }); res.json({ ok: true })
+})
 const matterSummary = (m) => ({
   id: m.id, name: m.name, kind: m.kind, client: m.client, createdAt: m.createdAt, updatedAt: m.updatedAt, settings: m.settings,
   documents: m.documents.length, analysed: m.documents.filter((d) => d.status === 'analysed').length,
@@ -1385,6 +1541,7 @@ function startMatterJob(m, kind, runner) {
   if (ddRuns.has(m.id)) return null
   if (ddRuns.size >= DD_MAX_CONCURRENT) throw Object.assign(new Error(`Es laufen bereits ${DD_MAX_CONCURRENT} Analysen auf diesem Server – bitte später erneut starten.`), { status: 429 })
   const job = newJob(`dd_${Date.now().toString(36)}_${crypto.randomBytes(6).toString('base64url')}`)
+  job.owner = m.ownerKey
   m.job.jobId = job.id
   ddRuns.set(m.id, { jobId: job.id, kind })
   job.send('job', { id: job.id, matterId: m.id, kind })
@@ -1811,6 +1968,7 @@ app.post('/api/chat', async (req, res) => {
     matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
   }
   const job = newJob(jobId)
+  job.owner = ownerOf(req)
   const send = job.send
   attachListener(job, res, 0)
   send('job', { id: jobId })

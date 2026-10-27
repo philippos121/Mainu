@@ -3,7 +3,7 @@ services:
   - type: web
     name: aissociate-playground
     runtime: docker
-    plan: free
+    plan: starter   # a persistent disk needs a paid instance
     healthCheckPath: /api/health
     envVars:
       - key: AZURE_OPENAI_API_KEY
@@ -22,9 +22,13 @@ services:
         value: gpt-6-sol
       - key: DATA_DIR
         value: /data
-    # Matters (Akten) and due-diligence results live in DATA_DIR. Uncomment the
-    # disk (paid plans) so they survive deploys; without it they are ephemeral.
-    # disk:
-    #   name: aissociate-data
-    #   mountPath: /data
-    #   sizeGB: 10
+      - key: AUTH_SECRET
+        generateValue: true   # signs the session cookies (else a key stored on the disk is used)
+      # - key: AUTH_ALLOWED_DOMAINS   # self-registration for these e-mail domains, e.g. kanzlei.at
+      #   value: kanzlei.at
+    # Accounts, Akten, Skills and conversations live in DATA_DIR on this disk and
+    # survive deploys. (A disk at /data is also picked up without DATA_DIR.)
+    disk:
+      name: aissociate-data
+      mountPath: /data
+      sizeGB: 10

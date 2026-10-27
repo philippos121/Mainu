@@ -148,8 +148,9 @@ AI:ssociate je Dokument (eine Anfrage), Budget 10 Mio./1 Mio. Tokens je DD,
 Kostenschätzung vor dem Lauf, Retries und parallele Dokumentanalyse,
 stabile IDs in UI/Word/Excel. Noch offen (Reihenfolge nach Abhängigkeit):
 
-1. Identität und Mandantentrennung (Entra-ID-Login verpflichtend, Akten an
-   Benutzer/Kanzlei gebunden, Audit-Log) und dauerhafte Speicherung
+1. Identität und Mandantentrennung: umgesetzt sind Benutzerkonten (Anmeldung,
+   Rollen, Daten je Benutzer, Disk unter /data). Offen: Entra-ID-Login (SSO),
+   gemeinsame Akten einer Kanzlei, Audit-Log und dauerhafte Speicherung
    (Persistent Disk, dann SQLite/Postgres) – Voraussetzung für Mehrbenutzer.
 2. Ingest in Skala (Multipart-Upload, SharePoint-Delta-Sync, ZIP, Dedupe) und
    Extraktion mit Seitenindex + OCR für gescannte Datenräume.

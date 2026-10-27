@@ -209,9 +209,25 @@ with `value / quote / location` per cell; Excel export.
 **Questions about a matter**: the stored analysis is passed as context (and
 selected documents as attachments) to the normal legal pipeline.
 
-Workspaces are separated by a browser-generated key sent as `X-Owner-Key`
-(shown in the settings so a workspace can be opened on another device). This is
-isolation, not authentication — see `docs/ARCHITEKTUR.md` for the critical
+**Accounts** (`lib/auth.js`, on by default): every `/api` route except health,
+the sign-in routes and the Microsoft callback needs a signed-in user. The first
+account is created on the setup screen and becomes administrator; it creates the
+other accounts in the settings ("Benutzer": role, deactivate, reset password,
+delete with all data). Self-registration only for `AUTH_ALLOWED_DOMAINS` or with
+`AUTH_SIGNUP=open`. Passwords are hashed with scrypt, the session is an
+HMAC-signed HttpOnly cookie (30 days; password change, deactivation and "auf
+allen Geräten abmelden" end all sessions), failed logins are throttled. Each
+user sees only their own Akten, Skills, conversations and jobs; the
+conversation history is stored on the server (`/api/convos`) and available on
+every device. Data of a browser from before the accounts (workspace key, local
+history) moves to the first account that signs in there. `AUTH=off` restores
+the old workspace-key mode for local development. Routes: `GET /api/auth/me`,
+`POST /api/auth/setup|signup|login|logout|password|claim`,
+`GET/POST /api/auth/users`, `PATCH/DELETE /api/auth/users/:id`.
+
+**Data disk:** accounts, Akten, Skills and conversations live in `DATA_DIR`. A
+disk mounted at `/data` is used automatically; `GET /api/health` shows
+`dataDir` and `persistentDisk`. See `docs/ARCHITEKTUR.md` for the critical
 review, the explicit-code-vs-code-generation trade-off and the roadmap
 (persistent disk/Postgres, Entra-bound identities, OCR, job queue).
 
@@ -236,8 +252,9 @@ npm run dev            # http://localhost:3000
 The service builds from the `Dockerfile`. Set `AZURE_OPENAI_API_KEY` (or `OPENAI_API_KEY`),
 `AISSOCIATE_API_KEY` and `E2B_API_KEY` in the Render dashboard; everything else
 has defaults (see `.env.example`). `GET /api/health` reports the configuration.
-Matters are stored in `DATA_DIR` (`/data` in `render.yaml`): attach a persistent
-disk there, otherwise they are lost on every deploy.
+Data is stored in `DATA_DIR` (`/data` in `render.yaml`, which also declares the
+disk and a generated `AUTH_SECRET`): attach a persistent disk at `/data` (paid
+instance), otherwise accounts and data are lost on every deploy.
 
 ## Endpoints
 

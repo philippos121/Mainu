@@ -560,6 +560,23 @@
       .ai-head .pill { margin-left: 4px; }
       @media (max-width: 640px) { .field-rows .fr { grid-template-columns: 1fr 1fr; } }
 
+      /* ---------- sign-in ---------- */
+      .auth-screen { position: fixed; inset: 0; z-index: 90; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px 16px; overflow-y: auto; }
+      .auth-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px 22px; box-shadow: 0 12px 40px rgba(14,60,70,0.10); }
+      .auth-card img { display: block; height: 34px; margin: 0 auto 18px; }
+      .auth-card h2 { margin: 0 0 4px; font-size: 19px; font-weight: 800; text-align: center; }
+      .auth-card .md { font-size: 13.5px; color: var(--muted); text-align: center; margin-bottom: 18px; line-height: 1.5; }
+      .auth-card .btn { width: 100%; margin-top: 6px; }
+      .auth-card .err { color: var(--err); font-size: 13px; min-height: 18px; margin: 2px 0 6px; }
+      .auth-card .alt { text-align: center; font-size: 13px; margin-top: 14px; color: var(--muted); }
+      .auth-card .alt a { cursor: pointer; font-weight: 700; text-decoration: none; }
+      .auth-band { height: 6px; background: var(--header); position: fixed; top: 0; left: 0; right: 0; }
+      .user-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 13.5px; flex-wrap: wrap; }
+      .user-row:first-of-type { border-top: none; }
+      .user-row .who { flex: 1; min-width: 180px; }
+      .user-row .who b { display: block; }
+      .user-row .who span { font-size: 12px; color: var(--faint); }
+
       /* ---------- tour / toast ---------- */
       .tour-target { position: relative; z-index: 71 !important; box-shadow: 0 0 0 4px rgba(243,146,0,0.9), 0 0 0 9999px rgba(14,37,46,0.55) !important; border-radius: 14px; }
       .tour-card { position: fixed; z-index: 72; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom)); width: min(420px, calc(100vw - 32px)); background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: 0 16px 50px rgba(14,37,46,0.35); }
@@ -645,6 +662,7 @@
           <div class="sb-recent" id="sbRecent"></div>
         </nav>
         <div class="sb-foot">
+          <div class="sb-account" id="sbUser" hidden></div>
           <div class="sb-account" id="sbAccount"><span class="av">M</span><span class="who"><b>Microsoft 365</b><span>nicht verbunden</span></span></div>
           <a class="nav-item" data-nav="settings" href="#/settings" id="navSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Einstellungen<span class="cnt" id="sbCost" hidden></span></a>
         </div>
@@ -695,7 +713,7 @@
 
         <!-- ---------- history ---------- -->
         <section class="view" data-view="history"><div class="page" style="max-width:760px">
-          <div class="page-head"><div><h1>Verlauf</h1><div class="sub">Gespräche werden nur in diesem Browser gespeichert.</div></div><div class="acts"><button class="btn sm" id="histNew">Neues Gespräch</button><button class="mini danger" id="miClear">Verlauf löschen</button></div></div>
+          <div class="page-head"><div><h1>Verlauf</h1><div class="sub">Gespräche werden auf dem Server gespeichert und sind auf allen Geräten verfügbar.</div></div><div class="acts"><button class="btn sm" id="histNew">Neues Gespräch</button><button class="mini danger" id="miClear">Verlauf löschen</button></div></div>
           <div id="histList"></div>
         </div></section>
 
@@ -705,6 +723,22 @@
           <div class="card" style="margin-bottom:14px">
             <h3>Recherche</h3>
             <div class="setting"><div><div class="sl">Websuche</div><div class="sd">Fallback nach der Wissensdatenbank (max. 3 Suchen)</div></div><button class="switch on" id="swWeb" role="switch" aria-checked="true"></button></div>
+          </div>
+          <div class="card" style="margin-bottom:14px" id="cardAccount" hidden>
+            <h3>Konto</h3>
+            <div class="kv"><span>Name</span><b id="kvUserName">–</b></div>
+            <div class="kv"><span>E-Mail</span><b id="kvUserEmail">–</b></div>
+            <div class="kv"><span>Rolle</span><b id="kvUserRole">–</b></div>
+            <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="mini" id="pwChange">Passwort ändern</button>
+              <button class="mini" id="logoutBtn">Abmelden</button>
+              <button class="mini danger" id="logoutAll">Auf allen Geräten abmelden</button>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:14px" id="cardUsers" hidden>
+            <h3 style="display:flex;align-items:center">Benutzer <button class="mini" id="userAdd" style="margin-left:auto">+ Benutzer</button></h3>
+            <p class="sub" style="font-size:12.5px;color:var(--muted);margin:0 0 6px">Jedes Konto sieht nur die eigenen Akten, Skills und Gespräche.</p>
+            <div id="userList"></div>
           </div>
           <div class="card" style="margin-bottom:14px">
             <h3>Lokaler Ordner</h3>
@@ -731,7 +765,7 @@
             <div class="kv"><span>Limit je Frage</span><b id="kvBudget">–</b></div>
             <div class="kv"><span>Sitzungskosten</span><b id="kvCost">$0.0000</b></div>
           </div>
-          <div class="card" style="margin-bottom:14px">
+          <div class="card" style="margin-bottom:14px" id="cardWorkspace">
             <h3>Arbeitsbereich</h3>
             <p class="sub" style="font-size:13px;color:var(--muted);margin:0 0 8px">Akten liegen auf dem Server und sind an diesen Schlüssel gebunden. Zum Weiterarbeiten auf einem anderen Gerät den Schlüssel dort eintragen.</p>
             <div class="kv"><span>Schlüssel</span><b id="kvOwner">–</b></div>
@@ -744,9 +778,9 @@
             <h3>Daten &amp; Hilfe</h3>
             <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
               <button class="mini" id="miTour">Feature-Tour</button>
-              <button class="mini danger" id="miClear2">Verlauf in diesem Browser löschen</button>
+              <button class="mini danger" id="miClear2">Verlauf löschen</button>
             </div>
-            <p class="disclaimer" style="text-align:left;margin-top:14px">Gespräche werden nur in diesem Browser gespeichert. Hochgeladene Dateien einer Frage werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht. Dokumente in Akten bleiben auf dem Server, bis die Akt gelöscht wird.</p>
+            <p class="disclaimer" style="text-align:left;margin-top:14px" id="dataNote">Gespräche werden auf dem Server gespeichert (je Konto bzw. Arbeitsbereich). Hochgeladene Dateien einer Frage werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht. Dokumente in Akten bleiben auf dem Server, bis die Akt gelöscht wird.</p>
           </div>
         </div></section>
       </div>
@@ -792,6 +826,7 @@
     <div class="modal" id="msModal"><div class="modal-card ms-card" id="msCard"></div></div>
     <div class="modal" id="taskModal"><div class="modal-card" id="taskCard"></div></div>
     <div class="modal" id="dlg"><div class="modal-card" id="dlgCard"></div></div>
+    <div class="auth-screen" id="authScreen" hidden><div class="auth-band"></div><form class="auth-card" id="authCard" autocomplete="on"></form></div>
     <div class="toast" id="toast"></div>
     <script>
       // ------------------------------------------------------------------
@@ -827,7 +862,7 @@
       let busy = false
       let sessionCostUsd = 0
       let convos = []
-      try { convos = JSON.parse(localStorage.getItem(LS_CONVOS) || '[]') } catch {}
+      // Conversations are loaded after sign-in (per user / workspace); nothing is shown from another account.
       let current = null // { id, sessionId, title, messages, history, matter: {id,name,docIds} }
       let health = null
       let ddConfig = null
@@ -844,7 +879,16 @@
       try { ownerKey = localStorage.getItem(LS_OWNER) || '' } catch {}
       if (!/^[\w-]{16,80}$/.test(ownerKey)) { ownerKey = 'w_' + uid().replace(/-/g, ''); try { localStorage.setItem(LS_OWNER, ownerKey) } catch {} }
       const saveSettings = () => { try { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)) } catch {} }
-      const saveConvos = () => { try { localStorage.setItem(LS_CONVOS, JSON.stringify(convos.slice(0, 60))) } catch (e) { try { convos = convos.slice(0, 10); localStorage.setItem(LS_CONVOS, JSON.stringify(convos)) } catch {} } }
+      let convoScope = '' // local cache key suffix: the user id, or the workspace key without accounts
+      const convoKey = () => `${LS_CONVOS}.${convoScope}`
+      const saveConvos = () => { if (!convoScope) return; try { localStorage.setItem(convoKey(), JSON.stringify(convos.slice(0, 60))) } catch (e) { try { localStorage.setItem(convoKey(), JSON.stringify(convos.slice(0, 10))) } catch {} } }
+      // Server copy of each conversation (debounced per conversation).
+      const convoTimers = new Map()
+      function syncConvo(c) {
+        if (!convoScope) return
+        clearTimeout(convoTimers.get(c.id))
+        convoTimers.set(c.id, setTimeout(async () => { convoTimers.delete(c.id); try { await api(`/api/convos/${encodeURIComponent(c.id)}`, { method: 'PUT', body: c }) } catch (e) { if (e.status !== 401) console.warn('convo sync failed', e.message) } }, 700))
+      }
 
       // ------------------------------------------------------------------
       // Helpers
@@ -875,6 +919,7 @@
         if (raw) { if (!r.ok) { let m = `Fehler ${r.status}`; try { m = (await r.json()).error || m } catch {} throw new Error(m) } return r }
         const j = await r.json().catch(() => ({}))
         if (r.status === 401 && j.reauth) { msState.connected = false; renderMsUi() }
+        if (r.status === 401 && j.auth) showAuthScreen('login', 'Die Sitzung ist abgelaufen – bitte erneut anmelden.')
         if (!r.ok) throw Object.assign(new Error(j.error || `Fehler ${r.status}`), { status: r.status })
         return j
       }
@@ -1362,6 +1407,7 @@
         const stored = { ...current, messages: current.messages.map((m) => m.role === 'assistant' ? { ...m, data: { ...m.data, execution: { images: [], files: (m.data?.execution?.files || []).map((f) => ({ name: f.name, size: f.size, gone: true })) } } } : m) }
         if (idx >= 0) convos[idx] = stored; else convos.unshift(stored)
         convos.sort((a, b) => b.updatedAt - a.updatedAt)
+        syncConvo(stored)
         saveConvos(); renderRecent(); renderSidebarRecent(); if (viewName === 'history') renderHistory()
       }
       function openConversation(id, { silent = false } = {}) {
@@ -1373,7 +1419,7 @@
         showView('assistant'); showChat(); renderSidebarRecent(); window.scrollTo(0, document.body.scrollHeight)
         if (!silent && location.hash !== '#/chat/' + id) history.replaceState(null, '', '#/chat/' + id)
       }
-      function deleteConversation(id) { convos = convos.filter((c) => c.id !== id); saveConvos(); renderRecent(); renderSidebarRecent(); renderHistory(); if (current?.id === id) newConversation() }
+      function deleteConversation(id) { convos = convos.filter((c) => c.id !== id); api(`/api/convos/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {}); saveConvos(); renderRecent(); renderSidebarRecent(); renderHistory(); if (current?.id === id) newConversation() }
       function renderRecent() {}
       function renderSidebarRecent() {
         const box = $('sbRecent'); box.innerHTML = ''
@@ -1392,7 +1438,7 @@
         }
       }
       $('histNew').addEventListener('click', () => newConversation())
-      const clearHistory = async () => { if (await confirmDlg('Verlauf löschen', 'Gesamten Gesprächsverlauf in diesem Browser löschen? Akten auf dem Server bleiben erhalten.')) { convos = []; saveConvos(); renderSidebarRecent(); newConversation(); toast('Verlauf gelöscht.') } }
+      const clearHistory = async () => { if (await confirmDlg('Verlauf löschen', 'Gesamten Gesprächsverlauf löschen (auf allen Geräten)? Akten und Skills bleiben erhalten.')) { convos = []; api('/api/convos', { method: 'DELETE' }).catch(() => {}); saveConvos(); renderSidebarRecent(); newConversation(); toast('Verlauf gelöscht.') } }
       $('miClear').addEventListener('click', clearHistory); $('miClear2').addEventListener('click', clearHistory)
 
       // ------------------------------------------------------------------
@@ -1649,6 +1695,7 @@
         try {
           activeAbort = new AbortController()
           const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta, skill: skillReq }) })
+          if (resp.status === 401) showAuthScreen('login', 'Bitte anmelden, um fortzufahren.')
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readSse(resp, handle)
         } catch (err) { firstError = err }
@@ -2936,6 +2983,7 @@
       // ------------------------------------------------------------------
       function renderSettings() {
         setSwitch('swWeb', settings.webSearch !== false); setSwitch('swFolderSave', settings.folderSave !== false); renderMsUi()
+        renderAccount(); if (me.user?.role === 'admin' && viewName === 'settings') renderUsers()
         $('kvOwner').textContent = ownerKey
         if (health) {
           $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
@@ -2979,6 +3027,114 @@
       // ------------------------------------------------------------------
       // Init
       // ------------------------------------------------------------------
+      // ------------------------------------------------------------------
+      // Accounts: sign-in screen, account and user management
+      // ------------------------------------------------------------------
+      let me = { enabled: false, user: null }
+      function showAuthScreen(mode = 'login', note = '') {
+        if (!me.enabled && mode !== 'setup') me.enabled = true
+        const card = $('authCard'); card.innerHTML = ''
+        const img = el('img'); img.src = '/aissociate-logo.png'; img.alt = 'AI:ssociate'; card.appendChild(img)
+        const setup = mode === 'setup', signup = mode === 'signup'
+        const canSignup = Boolean(me.signup?.open || me.signup?.domains?.length)
+        card.appendChild(el('h2', null, setup ? 'Administrator-Konto anlegen' : signup ? 'Konto anlegen' : 'Anmelden'))
+        card.appendChild(el('div', 'md', note || (setup ? 'Erste Einrichtung: Mit diesem Konto legst du später weitere Benutzer an.' : signup ? `Registrierung${me.signup?.domains?.length ? ' für ' + me.signup.domains.map((d) => '@' + d).join(', ') : ''}.` : 'Jedes Konto sieht nur die eigenen Akten, Skills und Gespräche.')))
+        const f = (label, type, name, ac) => { const w = el('div', 'field'); w.appendChild(el('label', null, label)); const i = el('input'); i.type = type; i.name = name; i.autocomplete = ac; i.required = true; i.id = 'auth_' + name; w.appendChild(i); card.appendChild(w); return i }
+        const name = setup || signup ? f('Name', 'text', 'name', 'name') : null
+        const email = f('E-Mail', 'email', 'email', 'username')
+        const pw = f('Passwort', 'password', 'password', setup || signup ? 'new-password' : 'current-password')
+        if (setup || signup) { pw.minLength = 10; pw.parentElement.appendChild(el('div', 'hint', 'Mindestens 10 Zeichen.')) }
+        const err = el('div', 'err'); err.id = 'authErr'; card.appendChild(err)
+        const btn = el('button', 'btn', setup ? 'Konto anlegen' : signup ? 'Registrieren' : 'Anmelden'); btn.type = 'submit'; btn.id = 'authSubmit'; card.appendChild(btn)
+        if (!setup && (canSignup || signup)) { const alt = el('div', 'alt'); alt.appendChild(document.createTextNode(signup ? 'Schon registriert? ' : 'Noch kein Konto? ')); const a = el('a', null, signup ? 'Anmelden' : 'Registrieren'); a.addEventListener('click', () => showAuthScreen(signup ? 'login' : 'signup')); alt.appendChild(a); card.appendChild(alt) }
+        else if (!setup) card.appendChild(el('div', 'alt', 'Kein Konto? Die Administration legt Konten an.'))
+        card.onsubmit = async (e) => {
+          e.preventDefault(); err.textContent = ''; btn.disabled = true
+          try {
+            const r = await fetch(`/api/auth/${setup ? 'setup' : signup ? 'signup' : 'login'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, password: pw.value, ...(name ? { name: name.value } : {}) }) })
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok) throw new Error(j.error || 'Anmeldung fehlgeschlagen.')
+            location.reload()
+          } catch (x) { err.textContent = x.message; btn.disabled = false }
+        }
+        $('authScreen').hidden = false; setTimeout(() => (name || email).focus(), 30)
+      }
+      /** After sign-in: per-user history; earlier data of this browser (workspace key, local history) moves over once. */
+      async function afterSignIn() {
+        convoScope = me.enabled ? me.user.id : ownerKey
+        const MIG = 'aiss.migrated.v1'
+        let migrated = ''; try { migrated = localStorage.getItem(MIG) || '' } catch {}
+        if (!migrated) {
+          if (me.enabled) { try { const r = await api('/api/auth/claim', { method: 'POST', body: { key: ownerKey } }); if (r.matters || r.skills) toast(`${r.matters} Akt${r.matters === 1 ? '' : 'en'} und ${r.skills} Skill${r.skills === 1 ? '' : 's'} aus diesem Browser übernommen.`, 5000) } catch {} }
+          let legacy = []; try { legacy = JSON.parse(localStorage.getItem(LS_CONVOS) || '[]') } catch {}
+          for (const c of legacy.slice(0, 60)) { try { await api(`/api/convos/${encodeURIComponent(c.id)}`, { method: 'PUT', body: c }) } catch {} }
+          try { localStorage.removeItem(LS_CONVOS); localStorage.setItem(MIG, convoScope) } catch {}
+        }
+        try { convos = JSON.parse(localStorage.getItem(convoKey()) || '[]') } catch { convos = [] }
+        renderSidebarRecent()
+        try { const r = await api('/api/convos'); convos = r.convos || []; saveConvos() } catch {}
+        renderSidebarRecent()
+      }
+      function renderAccount() {
+        const on = Boolean(me.enabled && me.user)
+        $('cardAccount').hidden = !on; $('cardUsers').hidden = !(on && me.user.role === 'admin'); $('cardWorkspace').hidden = Boolean(me.enabled)
+        const sb = $('sbUser'); sb.hidden = !on; sb.innerHTML = ''
+        if (!on) return
+        $('kvUserName').textContent = me.user.name; $('kvUserEmail').textContent = me.user.email; $('kvUserRole').textContent = me.user.role === 'admin' ? 'Administrator' : 'Benutzer'
+        const ini = (me.user.name || me.user.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join('')
+        const who = el('span', 'who'); who.appendChild(el('b', null, me.user.name)); who.appendChild(el('span', null, me.user.email))
+        sb.append(el('span', 'av', ini || '?'), who); sb.style.cursor = 'pointer'; sb.onclick = () => navigate('#/settings')
+      }
+      async function renderUsers() {
+        const list = $('userList'); if (!list || $('cardUsers').hidden) return
+        let users = []
+        try { users = (await api('/api/auth/users')).users } catch (e) { list.textContent = e.message; return }
+        list.innerHTML = ''
+        for (const u of users) {
+          const row = el('div', 'user-row'); row.dataset.user = u.id
+          const who = el('div', 'who'); who.appendChild(el('b', null, u.name)); who.appendChild(el('span', null, `${u.email}${u.lastLoginAt ? ' · zuletzt ' + fmtDate(u.lastLoginAt) : ' · noch nie angemeldet'}`)); row.appendChild(who)
+          row.appendChild(el('span', 'pill ' + (u.role === 'admin' ? 'teal' : ''), u.role === 'admin' ? 'Admin' : 'Benutzer'))
+          if (u.disabled) row.appendChild(el('span', 'pill red', 'deaktiviert'))
+          if (u.id !== me.user.id) {
+            const act = (label, fn, cls = 'mini') => { const b = el('button', cls, label); b.addEventListener('click', async () => { try { await fn(); renderUsers() } catch (e) { toast(e.message, 4000) } }); row.appendChild(b) }
+            act(u.role === 'admin' ? 'Zum Benutzer' : 'Zum Admin', () => api(`/api/auth/users/${u.id}`, { method: 'PATCH', body: { role: u.role === 'admin' ? 'user' : 'admin' } }))
+            act(u.disabled ? 'Aktivieren' : 'Deaktivieren', () => api(`/api/auth/users/${u.id}`, { method: 'PATCH', body: { disabled: !u.disabled } }))
+            act('Passwort zurücksetzen', async () => { const v = await promptDlg('Neues Passwort', `Für ${u.email} (mindestens 10 Zeichen). Bestehende Anmeldungen dieses Kontos werden beendet.`); if (v) { await api(`/api/auth/users/${u.id}`, { method: 'PATCH', body: { password: v } }); toast('Passwort gesetzt.') } })
+            act('Löschen', async () => { if (await confirmDlg('Konto löschen?', `${u.email} und alle Daten dieses Kontos (Akten, Skills, Gespräche) werden endgültig gelöscht.`)) { await api(`/api/auth/users/${u.id}`, { method: 'DELETE' }); toast('Konto gelöscht.') } }, 'mini danger')
+          } else row.appendChild(el('span', 'pill', 'du'))
+          list.appendChild(row)
+        }
+      }
+      function formDlg(title, text, fields, okLabel, onOk) {
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, title)); if (text) card.appendChild(el('div', 'md', text))
+        const inputs = {}
+        for (const f of fields) {
+          const w = el('div', 'field'); w.appendChild(el('label', null, f.label))
+          let c; if (f.type === 'select') { c = el('select'); for (const [v, t] of f.opts) { const o = el('option', null, t); o.value = v; c.appendChild(o) } } else { c = el('input'); c.type = f.type || 'text'; c.autocomplete = f.ac || 'off' }
+          c.id = 'dlg_' + f.k; inputs[f.k] = c; w.appendChild(c); card.appendChild(w)
+        }
+        const err = el('div', 'err'); err.style.cssText = 'color:var(--err);font-size:13px;min-height:16px'; card.appendChild(err)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg)
+        const g = el('button', 'btn', okLabel); g.id = 'dlgOk'
+        g.addEventListener('click', async () => { err.textContent = ''; g.disabled = true; try { await onOk(Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))); closeDlg() } catch (e) { err.textContent = e.message; g.disabled = false } })
+        a.append(c, g); card.appendChild(a); $('dlg').classList.add('show'); setTimeout(() => Object.values(inputs)[0]?.focus(), 30)
+      }
+      $('pwChange').addEventListener('click', () => formDlg('Passwort ändern', 'Andere Anmeldungen dieses Kontos werden dabei beendet.', [{ k: 'current', label: 'Bisheriges Passwort', type: 'password', ac: 'current-password' }, { k: 'next', label: 'Neues Passwort (mindestens 10 Zeichen)', type: 'password', ac: 'new-password' }], 'Ändern', async (v) => { await api('/api/auth/password', { method: 'POST', body: v }); toast('Passwort geändert.') }))
+      $('logoutBtn').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); location.href = '/' })
+      $('logoutAll').addEventListener('click', async () => { if (!(await confirmDlg('Überall abmelden?', 'Alle Anmeldungen dieses Kontos – auch auf anderen Geräten – werden beendet.', { ok: 'Abmelden' }))) return; await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ everywhere: true }) }); location.href = '/' })
+      $('userAdd').addEventListener('click', () => formDlg('Benutzer anlegen', 'Das Konto sieht nur die eigenen Akten, Skills und Gespräche. Das Passwort bitte sicher übermitteln.', [{ k: 'name', label: 'Name' }, { k: 'email', label: 'E-Mail', type: 'email' }, { k: 'password', label: 'Anfangspasswort (mindestens 10 Zeichen)', type: 'text' }, { k: 'role', label: 'Rolle', type: 'select', opts: [['user', 'Benutzer'], ['admin', 'Administrator']] }], 'Anlegen', async (v) => { await api('/api/auth/users', { method: 'POST', body: v }); toast('Benutzer angelegt.'); renderUsers() }))
+
+      async function boot() {
+        try { me = await (await fetch('/api/auth/me', { cache: 'no-store' })).json() } catch { me = { enabled: false, user: null } }
+        if (me.enabled && !me.user) { showAuthScreen(me.setup ? 'setup' : 'login'); return }
+        await afterSignIn()
+        renderAccount()
+        router()
+        try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
+        checkHealth(); loadMsState(); loadMatters(); loadSkills()
+      }
+
       async function checkHealth() {
         try {
           health = await (await fetch('/api/health')).json()
@@ -2996,9 +3152,7 @@
       } catch {}
       setSwitch('swWeb', settings.webSearch !== false)
       newConversation({ keepView: true })
-      router()
-      try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
-      checkHealth(); loadMsState(); loadMatters(); loadSkills()
+      boot()
     </script>
   </body>
 </html>
