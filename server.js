@@ -129,18 +129,28 @@ const RIS_BASE = 'https://data.bka.gv.at/ris/api/v2.6'
 // Microsoft 365 (OneDrive / SharePoint via Microsoft Graph). Register an app in
 // Entra ID (platform "Web", redirect URI https://<host>/api/ms/callback, delegated
 // permissions User.Read, Files.ReadWrite.All, Sites.ReadWrite.All, offline_access).
+// The MICROSOFT_* names of other deployments work as aliases (MS_* wins).
+const envList = (v) => {
+  const s = String(v || '').trim()
+  if (!s) return []
+  try { const j = JSON.parse(s); if (Array.isArray(j)) return j.map((x) => String(x).trim()).filter(Boolean) } catch {}
+  return s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean)
+}
+const MS_ALLOWED_TENANTS = envList(process.env.MS_ALLOWED_TENANTS || process.env.MICROSOFT_ALLOWED_TENANTS).map((t) => t.toLowerCase())
 const MS = {
-  clientId: process.env.MS_CLIENT_ID || '',
-  clientSecret: process.env.MS_CLIENT_SECRET || '',
-  tenant: process.env.MS_TENANT || 'common',
-  redirectUri: process.env.MS_REDIRECT_URI || '',
+  clientId: /^(0|false|off|no)$/i.test(process.env.MICROSOFT_ENABLED || '') ? '' : (process.env.MS_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID || ''),
+  clientSecret: process.env.MS_CLIENT_SECRET || process.env.MICROSOFT_CLIENT_SECRET || '',
+  // One allowed tenant becomes the authority; several only admit work accounts
+  // and are checked against the token's tid after sign-in.
+  tenant: process.env.MS_TENANT || (MS_ALLOWED_TENANTS.length === 1 ? MS_ALLOWED_TENANTS[0] : MS_ALLOWED_TENANTS.length ? 'organizations' : 'common'),
+  redirectUri: process.env.MS_REDIRECT_URI || process.env.MICROSOFT_REDIRECT_URI || '',
   scopes: process.env.MS_SCOPES || 'openid profile offline_access User.Read Files.ReadWrite.All Sites.ReadWrite.All',
   loginBase: (process.env.MS_LOGIN_BASE_URL || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
   graphBase: (process.env.MS_GRAPH_BASE_URL || 'https://graph.microsoft.com/v1.0').replace(/\/+$/, ''),
 }
 // Cookie encryption key: MS_COOKIE_SECRET, else the client secret. Never a guessable
 // value: without both, a random per-process key is used (logins survive until restart).
-const MS_COOKIE_SECRET = process.env.MS_COOKIE_SECRET || process.env.MS_CLIENT_SECRET || ''
+const MS_COOKIE_SECRET = process.env.MS_COOKIE_SECRET || process.env.MICROSOFT_TOKEN_ENCRYPTION_KEY || MS.clientSecret
 if (MS.clientId && !MS_COOKIE_SECRET) console.warn('MS_COOKIE_SECRET/MS_CLIENT_SECRET fehlen: Microsoft-Logins gelten nur bis zum nächsten Neustart.')
 const MS_COOKIE_KEY = MS_COOKIE_SECRET ? crypto.createHash('sha256').update(MS_COOKIE_SECRET).digest() : crypto.randomBytes(32)
 const MS_UPLOAD_SIMPLE_MAX = 4 * 1024 * 1024 // Graph: simple PUT up to 4 MB, else upload session
@@ -1032,7 +1042,24 @@ function setCookie(req, res, name, value, maxAge) {
   res.setHeader('Set-Cookie', [...(Array.isArray(prev) ? prev : prev ? [prev] : []), parts.join('; ')])
 }
 const clearCookie = (req, res, name) => setCookie(req, res, name, '', 0)
-const msRedirectUri = (req) => MS.redirectUri || `${isHttps(req) ? 'https' : 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}/api/ms/callback`
+const MS_CALLBACK_PATHS = ['/api/ms/callback', '/api/integrations/microsoft/callback']
+const isLocalHost = (h) => /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(String(h || ''))
+// A configured localhost URI (from a local setup) is not reachable for a deployed
+// host: keep its path, take scheme and host from the request.
+const msRedirectUri = (req) => {
+  const host = req.headers['x-forwarded-host'] || req.headers.host
+  const own = (path) => `${isHttps(req) ? 'https' : 'http'}://${host}${path}`
+  if (!MS.redirectUri) return own(MS_CALLBACK_PATHS[0])
+  try {
+    const u = new URL(MS.redirectUri)
+    if (isLocalHost(u.host) && !isLocalHost(host)) return own(MS_CALLBACK_PATHS.includes(u.pathname) ? u.pathname : MS_CALLBACK_PATHS[0])
+  } catch {}
+  return MS.redirectUri
+}
+// tid claim of the id_token (straight from the token endpoint over TLS)
+const idTokenTenant = (idToken) => {
+  try { return String(JSON.parse(Buffer.from(String(idToken).split('.')[1], 'base64url').toString('utf8')).tid || '').toLowerCase() } catch { return '' }
+}
 
 // Big refresh tokens that do not fit a cookie live in memory under a session id.
 const msSessions = new Map() // sid -> { rt, account, createdAt }
@@ -1177,7 +1204,7 @@ app.use('/api', async (req, res, next) => {
   if (!AUTH_ON) return next()
   const p = verifySession(parseCookies(req)[SESSION_COOKIE], auth.secret())
   if (p) { const u = await auth.get(p.uid).catch(() => null); if (u && !u.disabled && (u.sv || 1) === p.sv) req.user = u }
-  if (req.user || req.path === '/health' || req.path.startsWith('/auth/') || req.path === '/ms/callback') return next()
+  if (req.user || req.path === '/health' || req.path.startsWith('/auth/') || MS_CALLBACK_PATHS.includes('/api' + req.path)) return next()
   res.status(401).json({ error: 'Bitte anmelden.', auth: true })
 })
 const signupAllowed = async (email) => AUTH_SIGNUP_OPEN || (AUTH_DOMAINS.length > 0 && AUTH_DOMAINS.includes(normEmail(email).split('@')[1] || ''))
@@ -1274,7 +1301,7 @@ app.get('/api/ms/login', (req, res) => {
   for (const [k, v] of Object.entries({ client_id: MS.clientId, response_type: 'code', redirect_uri: msRedirectUri(req), response_mode: 'query', scope: MS.scopes, state, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account' })) u.searchParams.set(k, v)
   res.redirect(u.toString())
 })
-app.get('/api/ms/callback', async (req, res) => {
+app.get(MS_CALLBACK_PATHS, async (req, res) => {
   const o = unseal(parseCookies(req).ms_oauth)
   clearCookie(req, res, 'ms_oauth')
   if (req.query.error) return res.redirect('/?ms=error&reason=' + encodeURIComponent(String(req.query.error_description || req.query.error).slice(0, 200)))
@@ -1282,6 +1309,7 @@ app.get('/api/ms/callback', async (req, res) => {
   try {
     const j = await msTokenRequest(req, { grant_type: 'authorization_code', code: String(req.query.code), code_verifier: o.verifier })
     if (!j.refresh_token) throw new Error('Kein Refresh-Token erhalten (offline_access fehlt?)')
+    if (MS_ALLOWED_TENANTS.length && !MS_ALLOWED_TENANTS.includes(idTokenTenant(j.id_token))) throw new Error('Dieser Microsoft-365-Mandant ist nicht freigegeben.')
     let account = { name: '', email: '' }
     try { const me = await graph(j.access_token, '/me?$select=displayName,mail,userPrincipalName'); account = { name: me.displayName || '', email: me.mail || me.userPrincipalName || '' } } catch {}
     msWriteSession(req, res, { rt: j.refresh_token, account })
@@ -1329,10 +1357,10 @@ app.get('/api/ms/browse', async (req, res) => {
   } catch (e) { res.status(e.status === 401 ? 401 : 502).json({ error: e.message, reauth: e.status === 401 }) }
 })
 
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', async (req, res) => {
   let storeStats = null
   try { storeStats = await store.stats() } catch {}
-  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
+  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), msRedirectUri: MS.clientId ? msRedirectUri(req) : undefined, msTenant: MS.clientId ? MS.tenant : undefined, models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {

@@ -143,8 +143,11 @@ never overwritten (Graph `conflictBehavior=rename`). The refresh token lives in
 an encrypted, HttpOnly cookie; the server keeps no account data.
 
 Configure `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and optionally `MS_TENANT` /
-`MS_REDIRECT_URI` (see `.env.example`). Routes: `GET /api/ms/login`,
-`GET /api/ms/callback`, `GET /api/ms/me`, `POST /api/ms/logout`,
+`MS_REDIRECT_URI` / `MS_ALLOWED_TENANTS` (see `.env.example`); the
+`MICROSOFT_*` names of other deployments are accepted as aliases. `GET
+/api/health` shows the redirect URI to register in Entra. Routes: `GET
+/api/ms/login`, `GET /api/ms/callback` (also
+`/api/integrations/microsoft/callback`), `GET /api/ms/me`, `POST /api/ms/logout`,
 `GET /api/ms/browse`, `GET /api/ms/sites`, `GET /api/ms/site-drives`; the chat
 request takes `msFiles` and `msSync`.
 
