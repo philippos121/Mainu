@@ -5,3 +5,14 @@ data/
 !.env.example
 npm-debug.log*
 .DS_Store
+
+# explainer video pipeline (tools/video): generated files
+tools/video/audio/
+tools/video/frames/
+tools/video/out/
+tools/video/data_*/
+tools/video/timeline.json
+tools/video/frames.txt
+tools/video/subs.srt
+tools/video/*.onnx*
+tools/video/voice.tgz

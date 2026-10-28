@@ -67,6 +67,20 @@ turn still reaches the knowledge base with the clause). In the due diligence the
 per-document request carries the full text (short documents) or the quotes of
 the red/amber findings.
 
+## Feature tour and explainer video
+
+The feature tour (welcome banner, Settings → Daten & Hilfe) has 17 steps in
+chapters: knowledge base, templates, asking, "Hinzufügen" (the menu opens during
+the steps), "Ergebnisse →", Skills, answers with RIS checks, specialist agents,
+due diligence, Akten, skill library, history and "Quellen & Speichern". It visits
+the pages it explains, puts a spotlight on the element, places its card next to
+it and is driven with Weiter/Zurück or the arrow keys (Esc ends it).
+
+The explainer video (`public/media/erklaervideo.mp4`, 2:16 min, 1080p, German
+narration, captions as WebVTT, chapter buttons) opens from the banner, the
+tour's first and last step and Settings → Daten & Hilfe. `tools/video/` rebuilds
+it from the real UI (see its README).
+
 ## Adding documents: attach or connect
 
 One "Hinzufügen" button (composer and agent pages) opens a menu with two groups:

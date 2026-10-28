@@ -3288,7 +3288,7 @@
         { chapter: 'Unterlagen', title: 'Quelle verbinden', sel: ['#folderBtn', '#matterBtn'], route: 'home', menu: true, html: ['<b>Lokaler Ordner</b> – der Assistent durchsucht ihn selbst und liest nur, was er braucht; nichts wird vorab hochgeladen.', '<b>Akt</b> – alle Dokumente eines Akts auf dem Server, auch auf anderen Geräten.', 'Zuletzt verwendete Ordner und Akten stehen darunter für einen Klick bereit.'] },
         { chapter: 'Unterlagen', title: 'Ergebnisse →', sel: '#saveLine', route: 'home', demoSave: true, text: 'Zeigt, wohin erzeugte Dateien (Word, Excel, PDF) gespeichert werden: automatisch dorthin, woher die Unterlagen kommen – in den lokalen Ordner oder nach SharePoint, nie überschreibend. Ein Klick ändert das Ziel für dieses Gespräch.' },
         { chapter: 'Skills', title: 'Skills anwenden', sel: '#skillBtn', route: 'home', text: 'Wiederverwendbare Arbeitsanweisungen der Kanzlei – etwa Chronologie, Honorarnote oder Mandantenbrief. Hier wählen oder einfach „/“ ins Eingabefeld tippen; passende Skills wendet der Assistent auch selbst an.' },
-        { chapter: 'Antworten', title: 'Antworten, denen Sie folgen können', route: 'home', html: ['<b>Fundstellen</b> aus der Wissensdatenbank, verlinkt ins RIS.', '<b>RIS-Prüfung</b>: jede zitierte Norm und Entscheidung wird gegen das Rechtsinformationssystem geprüft – ✓ bestätigt, ⚠ außer Kraft oder nicht gefunden.', '<b>Dateien</b> als Word, Excel oder PDF, Export der Antwort als Word.', '<b>Folgefragen</b> als Vorschlag und die genauen Kosten je Antwort.'] },
+        { chapter: 'Antworten', title: 'Antworten, denen Sie folgen können', route: 'home', html: ['<b>Fundstellen</b> aus der Wissensdatenbank, verlinkt ins RIS.', '<b>RIS-Prüfung</b>: jede zitierte Norm und Entscheidung wird gegen das Rechtsinformationssystem geprüft – ✓ bestätigt, ⚠ außer Kraft oder nicht gefunden.', '<b>Dateien</b> als Word, Excel oder PDF, Export der Antwort als Word.', '<b>Kosten</b> – genau ausgewiesen je Antwort.'] },
         { chapter: 'Agenten', title: 'Fachagenten', sel: '#agentPage .wf', route: '#/agent/contract_review', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen folgen einem festen Ablauf nach österreichischem Recht: Angaben erfassen, Prüfraster bzw. Gliederung, Rechtsfragen klären, Word-Ergebnis – und der nächste Schritt per Klick.' },
         { chapter: 'Agenten', title: 'Due Diligence', sel: '#mattersPage .page-head', route: '#/dd', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Jedes Dokument wird nach Prüfbereichen analysiert; jeder Befund mit Zitat und Fundstelle, Ampel, Request List und Red-Flag-Report als Word und Excel.' },
         { chapter: 'Akten', title: 'Akten', sel: '#mattersPage .page-head', route: '#/matters', text: 'Dokumente eines Mandats an einem Ort: Fragen im Kontext des Akts, Review-Tabellen über viele Dokumente, Import aus SharePoint oder einem lokalen Ordner.' },
@@ -3399,7 +3399,7 @@
       // Explainer video (public/media; shown only when the file is deployed)
       // ------------------------------------------------------------------
       const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg', vtt: '/media/erklaervideo.vtt' }
-      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 14], ['Unterlagen', 52], ['Ordner', 76], ['Skills', 112], ['Agenten', 128], ['Due Diligence', 146], ['Akten & Einstellungen', 168]]
+      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 8], ['Unterlagen', 47], ['Ordner', 63], ['Skills', 80], ['Agenten', 88], ['Due Diligence', 101], ['Akten & Einstellungen', 112]]
       let videoAvailable = false
       async function checkVideo() {
         try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }
@@ -3407,7 +3407,7 @@
       }
       function openVideo() {
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide', 'video-card')
-        const head = el('div', 'vc-head'); head.appendChild(el('h2', null, 'Erklärvideo: AI:ssociate in drei Minuten')); head.appendChild(el('span', 'sp'))
+        const head = el('div', 'vc-head'); head.appendChild(el('h2', null, 'Erklärvideo: AI:ssociate im Überblick')); head.appendChild(el('span', 'sp'))
         const x = el('button', 'mini', 'Schließen'); x.addEventListener('click', closeDlg); head.appendChild(x); card.appendChild(head)
         const v = document.createElement('video'); v.controls = true; v.preload = 'metadata'; v.poster = VIDEO.poster; v.src = VIDEO.src; v.playsInline = true
         const tr = document.createElement('track'); tr.kind = 'captions'; tr.srclang = 'de'; tr.label = 'Deutsch'; tr.src = VIDEO.vtt; v.appendChild(tr)

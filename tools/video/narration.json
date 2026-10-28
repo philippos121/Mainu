@@ -1,0 +1,74 @@
+[
+ {
+  "id": "intro",
+  "chapter": "Überblick",
+  "text": "AI:ssociate Playground – juristische KI für österreichisches Recht. In wenigen Minuten zeigen wir Ihnen die wichtigsten Funktionen.",
+  "tts": "Essouschi-eit Plejgraund: juristische Ka-I für österreichisches Recht. In wenigen Minuten zeigen wir Ihnen die wichtigsten Funktionen."
+ },
+ {
+  "id": "kb",
+  "chapter": "Fragen",
+  "text": "Auf der Startseite wählen Sie die Wissensdatenbank. „Automatisch“ erkennt das Rechtsgebiet aus der Frage. Sie können es auch fest vorgeben – beim öffentlichen Recht samt Bundesland.",
+  "tts": "Auf der Startseite wählen Sie die Wissensdatenbank. Automatisch erkennt das Rechtsgebiet aus der Frage. Sie können es auch fest vorgeben, beim öffentlichen Recht samt Bundesland."
+ },
+ {
+  "id": "templates",
+  "chapter": "Fragen",
+  "text": "Darunter liegen Vorlagen für häufige Aufgaben – von der Rechtsrecherche bis zum Schriftsatz.",
+  "tts": "Darunter liegen Vorlagen für häufige Aufgaben, von der Rechtsrecherche bis zum Schriftsatz."
+ },
+ {
+  "id": "ask",
+  "chapter": "Fragen",
+  "text": "Stellen wir eine Frage. Während die Antwort entsteht, sehen Sie jeden Schritt: das Rechtsgebiet, die Anfrage an die Wissensdatenbank und die Prüfung der Fundstellen.",
+  "tts": "Stellen wir eine Frage. Während die Antwort entsteht, sehen Sie jeden Schritt: das Rechtsgebiet, die Anfrage an die Wissensdatenbank, und die Prüfung der Fundstellen."
+ },
+ {
+  "id": "answer",
+  "chapter": "Fragen",
+  "text": "Die Antwort nennt ihre Fundstellen. Jede zitierte Norm wird automatisch im Rechtsinformationssystem des Bundes geprüft – der grüne Haken heißt: im RIS bestätigt. Die Antwort lässt sich als Word exportieren; die Kosten stehen direkt darunter.",
+  "tts": "Die Antwort nennt ihre Fundstellen. Jede zitierte Norm wird automatisch im Rechtsinformationssystem des Bundes geprüft. Der grüne Haken heißt: im Ries bestätigt. Die Antwort lässt sich als Wörd exportieren, die Kosten stehen direkt darunter."
+ },
+ {
+  "id": "add",
+  "chapter": "Unterlagen",
+  "text": "Unterlagen kommen über einen einzigen Knopf: Hinzufügen. „Dateien anhängen“ schickt sie mit der Frage mit – vom Computer oder direkt aus OneDrive und SharePoint. „Quelle verbinden“ heißt: Der Assistent sucht selbst, in einem lokalen Ordner oder in einem Akt.",
+  "tts": "Unterlagen kommen über einen einzigen Knopf: Hinzufügen. Dateien anhängen schickt sie mit der Frage mit, vom Computer oder direkt aus Wandreif und Schärpoint. Quelle verbinden heißt: Der Assistent sucht selbst, in einem lokalen Ordner oder in einem Akt."
+ },
+ {
+  "id": "folder",
+  "chapter": "Ordner",
+  "text": "Verbinden wir den Ordner einer Mandantin. Nichts wird vorab hochgeladen: Der Assistent durchsucht den Ordner, liest nur die Dateien, die er braucht, und sagt, wo er fündig wurde. Unter dem Eingabefeld steht, wohin Ergebnisse gespeichert werden – zurück in den Ordner, ohne etwas zu überschreiben.",
+  "tts": "Verbinden wir den Ordner einer Mandantin. Nichts wird vorab hochgeladen. Der Assistent durchsucht den Ordner, liest nur die Dateien, die er braucht, und sagt, wo er fündig wurde. Unter dem Eingabefeld steht, wohin Ergebnisse gespeichert werden: zurück in den Ordner, ohne etwas zu überschreiben."
+ },
+ {
+  "id": "skills",
+  "chapter": "Skills",
+  "text": "Mit Skills wenden Sie die Arbeitsweise Ihrer Kanzlei an, etwa für einen Mandantenbrief. Ein Schrägstrich im Eingabefeld genügt.",
+  "tts": "Mit Skills wenden Sie die Arbeitsweise Ihrer Kanzlei an, etwa für einen Mandantenbrief. Ein Schrägstrich im Eingabefeld genügt."
+ },
+ {
+  "id": "agents",
+  "chapter": "Agenten",
+  "text": "Für größere Aufgaben gibt es Fachagenten: Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen. Jeder folgt einem festen Ablauf nach österreichischem Recht – vom Erfassen bis zum fertigen Word-Dokument.",
+  "tts": "Für größere Aufgaben gibt es Fachagenten: Vertragsprüfung, Vertrag entwerfen, und Schriftsatz entwerfen. Jeder folgt einem festen Ablauf nach österreichischem Recht, vom Erfassen bis zum fertigen Wörd-Dokument."
+ },
+ {
+  "id": "dd",
+  "chapter": "Due Diligence",
+  "text": "Die Due Diligence analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel; dazu kommen Request List und Red-Flag-Report als Word und Excel.",
+  "tts": "Die Dschuh Dilidschens analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel. Dazu kommen Riekwest-List und Rett-Fläg-Riport, als Wörd und Exel."
+ },
+ {
+  "id": "matters",
+  "chapter": "Akten & Einstellungen",
+  "text": "In Akten sammeln Sie die Dokumente eines Mandats und stellen Fragen im Kontext des Akts. Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Microsoft 365.",
+  "tts": "In Akten sammeln Sie die Dokumente eines Mandats, und stellen Fragen im Kontext des Akts. Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Maikrosoft dreihundertfünfundsechzig."
+ },
+ {
+  "id": "outro",
+  "chapter": "Akten & Einstellungen",
+  "text": "Die Feature-Tour unter „Einstellungen → Daten & Hilfe“ führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit AI:ssociate!",
+  "tts": "Die Fietscha-Tur unter Einstellungen, Daten und Hilfe, führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit Essouschi-eit!"
+ }
+]
