@@ -86,7 +86,9 @@ Language: Deutsch (Österreich) by default, Deutsch (Deutschland) or English.
 
 ## Feature tour and explainer video
 
-The feature tour (welcome banner, Settings → Daten & Hilfe) has 17 steps in
+The feature tour and the explainer video are always reachable: two tiles below
+the composer on the home page ("Neu hier?" badge until the tour was seen), the
+"?" menu in the top bar on every page, and Settings → Daten & Hilfe. The tour has 17 steps in
 chapters: knowledge base, templates, asking, "Hinzufügen" (the menu opens during
 the steps), "Ergebnisse →", Skills, answers with RIS checks, specialist agents,
 due diligence, Akten, skill library, history and "Quellen & Speichern". It visits
@@ -94,8 +96,8 @@ the pages it explains, puts a spotlight on the element, places its card next to
 it and is driven with Weiter/Zurück or the arrow keys (Esc ends it).
 
 The explainer video (`public/media/erklaervideo.mp4`, 2:16 min, 1080p, German
-narration, captions as WebVTT, chapter buttons) opens from the banner, the
-tour's first and last step and Settings → Daten & Hilfe. `tools/video/` rebuilds
+narration, captions as WebVTT, chapter buttons) also opens from the tour's first
+and last step. `tools/video/` rebuilds
 it from the real UI (see its README).
 
 ## Adding documents: attach or connect

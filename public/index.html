@@ -655,6 +655,23 @@
       .video-card .vc-head h2 { margin: 0; font-size: 16px; }
       .video-card .vc-head .sp { flex: 1; }
       .video-card .vc-chaps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+      .home-help { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 18px; }
+      .home-help:has(#tourVideo[hidden]) { grid-template-columns: 1fr; }
+      .help-tile { position: relative; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; cursor: pointer; font-family: inherit; color: var(--text); transition: border-color .15s, box-shadow .15s, transform .15s; }
+      .help-tile[hidden] { display: none; }
+      .help-tile:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(14,60,70,0.08); transform: translateY(-1px); }
+      .help-tile .thumb { position: relative; width: 84px; height: 47px; border-radius: 7px; overflow: hidden; flex: 0 0 auto; background: #0e3c46; }
+      .help-tile .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .help-tile .play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(14,37,46,0.35); }
+      .help-tile .play svg { width: 20px; height: 20px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.4)); }
+      .help-tile .ico { width: 42px; height: 42px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+      .help-tile .ico svg { width: 21px; height: 21px; }
+      .help-tile .tx { min-width: 0; }
+      .help-tile .tx b { display: block; font-size: 14px; }
+      .help-tile .tx span { display: block; font-size: 12.5px; color: var(--muted); }
+      .help-tile .new { position: absolute; top: -9px; right: 10px; background: var(--orange); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+      .help-tile .new[hidden] { display: none; }
+      @media (max-width: 640px) { .home-help { grid-template-columns: 1fr; } }
       .tour-banner { width: 100%; margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
       .tour-banner b { color: var(--text); }
       .tour-banner .sp { flex: 1; }
@@ -707,6 +724,7 @@
         <div class="mainbar-title" id="mainTitle"></div>
         <div class="mainbar-right">
           <span class="cost-pill" id="costPill" title="Kosten dieser Sitzung (Modelle + Websuche + Sandbox)"></span>
+          <button class="iconbtn" id="helpBtn" aria-label="Hilfe" title="Hilfe: Feature-Tour und Erklärvideo" aria-haspopup="menu" aria-expanded="false" aria-controls="helpMenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.8"/><path d="M12 17.2h.01"/></svg></button>
           <button class="iconbtn" id="historyBtn" aria-label="Verlauf" title="Verlauf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg></button>
         </div>
       </header>
@@ -752,11 +770,9 @@
               <div class="home-sec"><div class="sec-lbl">Vorlagen</div><div class="chips" id="homeChips"></div></div>
               <div id="composerSlotHome"></div>
               <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können falsch sein und müssen vor Verwendung juristisch geprüft werden.</p>
-              <div class="tour-banner" id="tourBanner" hidden>
-                <span class="sp"><b>Neu hier?</b> Die wichtigsten Funktionen in zwei Minuten.</span>
-                <button class="btn ghost" id="tourVideo" hidden>▶ Video</button>
-                <button class="btn ghost" id="tourStart">Tour starten</button>
-                <button class="mini" id="tourSkip">Später</button>
+              <div class="home-help" id="tourBanner" aria-label="Hilfe">
+                <button class="help-tile" id="tourVideo" type="button" hidden><span class="thumb"><img src="/media/erklaervideo.jpg" alt="" loading="lazy" /><span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span></span><span class="tx"><b>Erklärvideo</b><span>Alle Funktionen in gut zwei Minuten</span></span></button>
+                <button class="help-tile" id="tourStart" type="button"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour</b><span>Schritt für Schritt direkt in der App</span></span><span class="new" id="tourNew" hidden>Neu hier?</span></button>
               </div>
             </div>
           </main>
@@ -903,6 +919,11 @@
       <div id="addRecent"></div>
     </div>
     <div class="pop-menu" id="saveMenu" role="menu" aria-label="Ergebnisse speichern" hidden></div>
+    <div class="pop-menu help-menu" id="helpMenu" role="menu" aria-label="Hilfe" hidden>
+      <div class="pm-sec"><b>Hilfe</b></div>
+      <button class="pm-item" id="helpVideo" role="menuitem" hidden><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span><span class="tx"><b>Erklärvideo ansehen</b><span>Alle Funktionen in gut zwei Minuten</span></span></button>
+      <button class="pm-item" id="helpTour" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour starten</b><span>Schritt für Schritt direkt in der App</span></span></button>
+    </div>
 
     <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
     <input type="file" id="folderInput" multiple hidden webkitdirectory />
@@ -1421,7 +1442,7 @@
       document.addEventListener('pointerdown', (e) => { if (openPop && !openPop.menu.contains(e.target) && !openPop.anchor.contains(e.target) && !e.target.closest?.('.tour-card')) closePop() }, true)
       window.addEventListener('resize', () => { if (openPop) placePop(openPop.menu, openPop.anchor) })
       document.addEventListener('scroll', () => { if (openPop) placePop(openPop.menu, openPop.anchor) }, true)
-      for (const menu of [$('addMenu'), $('saveMenu')]) {
+      for (const menu of [$('addMenu'), $('saveMenu'), $('helpMenu')]) {
         menu.addEventListener('keydown', (e) => {
           const items = [...menu.querySelectorAll('.pm-item')].filter((b) => !b.hidden && !b.disabled)
           const i = items.indexOf(document.activeElement)
@@ -3502,8 +3523,8 @@
         { chapter: 'Akten', title: 'Akten', sel: '#mattersPage .page-head', route: '#/matters', text: 'Dokumente eines Mandats an einem Ort: Fragen im Kontext des Akts, Review-Tabellen über viele Dokumente, Import aus SharePoint oder einem lokalen Ordner.' },
         { chapter: 'Skills', title: 'Skill-Bibliothek', sel: '#skillsPage .page-head', route: '#/skills', text: 'Eigene Skills mit Anweisungen, Eingabefeldern und Referenzdokumenten (Muster, Playbook, Vorlage) anlegen, als JSON exportieren und im Team teilen.' },
         { chapter: 'Verlauf', title: 'Verlauf', sel: '#historyBtn', route: 'home', text: 'Alle Gespräche – auf dem Server gespeichert und auf jedem Gerät verfügbar, auf dem Sie angemeldet sind.' },
-        { chapter: 'Einstellungen', title: 'Quellen & Speichern', sel: '#cardSources', route: '#/settings', text: 'Standardziele für Ergebnisse, Microsoft-365-Konto, Websuche, Budget und Sitzungskosten. Hier starten Sie diese Tour und das Erklärvideo jederzeit erneut.' },
-        { chapter: 'Fertig', title: 'Bereit für die erste Frage', route: 'home', done: true, text: 'Tipp: Eine Rechtsfrage direkt eintippen oder ein Dokument per Drag & Drop ins Eingabefeld ziehen. Die Tour und das Erklärvideo finden Sie unter Einstellungen → Daten & Hilfe.' },
+        { chapter: 'Einstellungen', title: 'Quellen & Speichern', sel: '#cardSources', route: '#/settings', text: 'Standardziele für Ergebnisse, Microsoft-365-Konto, Websuche, Budget und Sitzungskosten. Tour und Erklärvideo auch hier unter Daten & Hilfe.' },
+        { chapter: 'Fertig', title: 'Bereit für die erste Frage', route: 'home', done: true, text: 'Tipp: Eine Rechtsfrage direkt eintippen oder ein Dokument per Drag & Drop ins Eingabefeld ziehen. Tour und Erklärvideo finden Sie jederzeit auf der Startseite und über das ? oben rechts.' },
       ]
       let tourIdx = -1, tourCard = null, tourSpot = null, tourRaf = 0, tourGen = 0
       function startTour(at = 0) { closeDlg(); closePop(); tourIdx = at; showTourStep() }
@@ -3591,7 +3612,7 @@
         if ($('saveLine').dataset.tourDemo) { delete $('saveLine').dataset.tourDemo; renderSaveLine() }
         if (openPop?.menu === $('addMenu')) closePop()
         closeSidebar(); tourIdx = -1
-        try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true
+        try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourNew').hidden = true
       }
       document.addEventListener('keydown', (e) => {
         if (tourIdx < 0 || !tourCard || e.altKey || e.ctrlKey || e.metaKey) return
@@ -3611,7 +3632,7 @@
       let videoAvailable = false
       async function checkVideo() {
         try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }
-        $('miVideo').hidden = !videoAvailable; $('tourVideo').hidden = !videoAvailable
+        $('miVideo').hidden = !videoAvailable; $('tourVideo').hidden = !videoAvailable; $('helpVideo').hidden = !videoAvailable
       }
       function openVideo() {
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide', 'video-card')
@@ -3626,8 +3647,10 @@
         v.play().catch(() => {})
       }
       $('miVideo').addEventListener('click', openVideo)
-      $('tourVideo').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true; openVideo() })
-      $('tourSkip').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true })
+      $('tourVideo').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourNew').hidden = true; openVideo() })
+      $('helpBtn').addEventListener('click', () => { if (openPop?.anchor === $('helpBtn')) closePop(); else showPop($('helpMenu'), $('helpBtn')) })
+      $('helpTour').addEventListener('click', menuAction(() => startTour(1)))
+      $('helpVideo').addEventListener('click', menuAction(() => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourNew').hidden = true; openVideo() }))
 
       // ------------------------------------------------------------------
       // Init
@@ -3736,7 +3759,7 @@
         await afterSignIn()
         renderAccount()
         router()
-        try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
+        try { if (!localStorage.getItem(LS_TOUR)) $('tourNew').hidden = false } catch {}
         checkHealth(); loadMsState(); checkVideo(); loadMatters(); loadSkills()
       }
 
