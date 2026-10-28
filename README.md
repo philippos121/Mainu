@@ -67,6 +67,23 @@ turn still reaches the knowledge base with the clause). In the due diligence the
 per-document request carries the full text (short documents) or the quotes of
 the red/amber findings.
 
+## Dictation
+
+A microphone button in the composer (and on every multi-line form field of the
+templates, skills and agents) dictates via the browser's Web Speech API
+(Chrome, Edge, Safari; hidden in Firefox). Interim text appears live, final text
+is appended; recognition restarts by itself after pauses until stopped (button,
+Ctrl/Cmd + M, or sending with Enter). Spoken commands: "Punkt", "Komma",
+"Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "Strichpunkt", "Klammer auf/zu",
+"neue Zeile", "neuer Absatz"; "Paragraf 1489 Absatz 2" becomes "§ 1489 Abs 2"
+("Punkt 7" stays a contract clause). Before the first use a notice explains
+where the audio is processed: by default in the browser vendor's cloud (Google,
+Microsoft, Apple). Settings → Diktat → "Nur auf dem Gerät erkennen" switches to
+on-device recognition where the browser offers it (language pack download on
+demand). Some Chromium builds crash the tab on the on-device API; a marker in
+localStorage detects that on the next load and falls back to the cloud mode.
+Language: Deutsch (Österreich) by default, Deutsch (Deutschland) or English.
+
 ## Feature tour and explainer video
 
 The feature tour (welcome banner, Settings → Daten & Hilfe) has 17 steps in

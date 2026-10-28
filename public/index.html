@@ -165,6 +165,20 @@
       .save-line svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--accent); }
       .save-line b { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .save-line .chg { color: var(--accent); font-weight: 600; white-space: nowrap; }
+      /* dictation (Web Speech API) */
+      .ctool.rec { background: rgba(196,43,28,0.10); color: #b3261e; border-color: rgba(196,43,28,0.35); }
+      .ctool.rec .lbl { display: inline; }
+      .ctool.rec svg { animation: micPulse 1.2s ease-in-out infinite; }
+      @keyframes micPulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+      .composer.dictating { border-color: rgba(196,43,28,0.55); box-shadow: 0 6px 26px rgba(196,43,28,0.12); }
+      .dict-hint { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 6px; }
+      #cardDictation select { font-family: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; background: var(--surface); color: var(--text); flex: 0 0 auto; }
+      .switch:disabled { opacity: .45; cursor: not-allowed; }
+      .field-mic { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 6px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; vertical-align: middle; }
+      .field-mic svg { width: 13px; height: 13px; }
+      .field-mic:hover { color: var(--accent); border-color: var(--accent); }
+      .field-mic.rec { color: #fff; background: #b3261e; border-color: #b3261e; }
+      .field-mic.rec svg { animation: micPulse 1.2s ease-in-out infinite; }
       /* popover menus (Hinzufügen, Ergebnisse →) */
       .pop-menu { position: fixed; z-index: 70; width: 340px; max-width: calc(100vw - 24px); max-height: min(70vh, 560px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 16px 44px rgba(14,60,70,0.20); padding: 6px; }
       .pm-sec { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 9px 10px 4px; }
@@ -812,6 +826,12 @@
               </div>
             </div>
           </div>
+          <div class="card" style="margin-bottom:14px" id="cardDictation">
+            <h3>Diktat</h3>
+            <div class="kv"><span>Spracherkennung</span><b id="kvDict">–</b></div>
+            <div class="setting"><div><div class="sl">Nur auf dem Gerät erkennen</div><div class="sd">Audio verlässt den Rechner nicht. Ohne diese Einstellung nutzt der Browser die Spracherkennung seines Herstellers in der Cloud, wenn er lokal nicht erkennen kann.</div></div><button class="switch" id="swDictLocal" role="switch" aria-checked="false" aria-label="Nur auf dem Gerät erkennen"></button></div>
+            <div class="setting"><div><div class="sl">Sprache</div><div class="sd">Befehle: „Punkt“, „Komma“, „Fragezeichen“, „Doppelpunkt“, „neue Zeile“, „neuer Absatz“; „Paragraf 1489“ wird zu „§ 1489“</div></div><select id="selDictLang" aria-label="Sprache des Diktats"><option value="de-AT">Deutsch (Österreich)</option><option value="de-DE">Deutsch (Deutschland)</option><option value="en-GB">Englisch</option></select></div>
+          </div>
           <div class="card" style="margin-bottom:14px">
             <h3>Recherche &amp; Budget</h3>
             <div class="kv"><span>Wissensdatenbank</span><b id="kvKb">–</b></div>
@@ -860,10 +880,15 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
           <span class="lbl">Skills</span>
         </button>
+        <button class="ctool" id="dictBtn" aria-pressed="false" title="Diktieren (Strg + M)" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <span class="lbl">Diktieren</span>
+        </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
+      <div class="dict-hint" id="dictHint" hidden></div>
       <button class="save-line" id="saveLine" type="button" aria-haspopup="menu" hidden></button>
     </div>
 
@@ -1239,6 +1264,7 @@
           else if (f.type === 'textarea') { c = el('textarea'); c.placeholder = f.ph || '' }
           else { c = el('input'); c.type = f.type === 'date' ? 'date' : 'text'; c.placeholder = f.ph || '' }
           c.name = f.k; inputs[f.k] = c; fld.appendChild(c); form.appendChild(fld)
+          if (f.type === 'textarea') addFieldMic(fld, c)
         }
         const act = el('div', 'modal-actions')
         const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.type = 'button'; cancel.addEventListener('click', closeTask)
@@ -1526,6 +1552,183 @@
       document.addEventListener('drop', (e) => { e.preventDefault(); if ((viewName === 'assistant' || viewName === 'agent') && e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
 
       // ------------------------------------------------------------------
+      // Dictation (Web Speech API). Chrome and Edge recognise on the device when
+      // the language pack is installed (processLocally), otherwise in the vendor's
+      // cloud; Safari uses Apple's recognition. Firefox has no speech recognition.
+      // ------------------------------------------------------------------
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null
+      const dict = { rec: null, target: null, btn: null, want: false, base: '', interim: '', restarts: 0, local: false, fatal: false }
+      const dictLang = () => settings.dictLang || 'de-AT'
+      // On-device recognition is only touched after the user opts in: some Chromium builds
+      // without the on-device service crash the tab on available()/processLocally. A marker in
+      // localStorage survives such a crash; on the next load local mode is switched off.
+      const LS_DICT_GUARD = 'aiss.dictLocalGuard'
+      const guard = (on) => { try { if (on) localStorage.setItem(LS_DICT_GUARD, String(Date.now())); else localStorage.removeItem(LS_DICT_GUARD) } catch {} }
+      try { if (localStorage.getItem(LS_DICT_GUARD)) { guard(false); settings.dictLocal = false; settings.dictLocalBroken = true; saveSettings(); setTimeout(() => toast('Die Spracherkennung auf dem Gerät hat den Tab beendet – das Diktat nutzt wieder die Erkennung des Browsers.', 7000), 1200) } } catch {}
+      const localPossible = () => Boolean(SpeechRec) && !settings.dictLocalBroken && (typeof SpeechRec.available === 'function' || typeof SpeechRec.availableOnDevice === 'function')
+      async function dictOnDevice(lang = dictLang()) {
+        if (!localPossible()) return 'unsupported'
+        guard(true)
+        try {
+          if (typeof SpeechRec.available === 'function') return await SpeechRec.available({ langs: [lang], processLocally: true })
+          return await SpeechRec.availableOnDevice(lang)
+        } catch { return 'unsupported' } finally { guard(false) }
+      }
+      async function dictInstall(lang = dictLang()) {
+        guard(true)
+        try {
+          if (typeof SpeechRec.install === 'function') return await SpeechRec.install({ langs: [lang], processLocally: true })
+          if (typeof SpeechRec.installOnDevice === 'function') return await SpeechRec.installOnDevice(lang)
+        } catch {} finally { guard(false) }
+        return false
+      }
+      /** Spoken punctuation and legal shorthand ("Paragraf 1489 Absatz 2" → "§ 1489 Abs 2"). */
+      function dictFormat(seg, before) {
+        let t = ' ' + seg.trim() + ' '
+        const sub = (re, s) => { t = t.replace(re, s) }
+        sub(/\s+neue[rn]? absatz\s+/gi, '\n\n'); sub(/\s+neue zeile\s+/gi, '\n')
+        sub(/\s+(?:fragezeichen)(?=\s)/gi, '?'); sub(/\s+(?:ausrufezeichen)(?=\s)/gi, '!'); sub(/\s+(?:doppelpunkt)(?=\s)/gi, ':')
+        sub(/\s+(?:semikolon|strichpunkt)(?=\s)/gi, ';'); sub(/\s+komma(?=\s)/gi, ','); sub(/\s+punkt(?=\s)(?!\s*\d)/gi, '.')
+        sub(/\s+klammer auf\s+/gi, ' ('); sub(/\s+klammer zu(?=\s)/gi, ')'); sub(/\s+bindestrich\s+/gi, '-')
+        sub(/\bparagra(?:f|ph)(?:en)?\s+(?=\d)/gi, '§ '); sub(/(§\s*\d+[a-z]?)\s+absatz\s+(?=\d)/gi, '$1 Abs '); sub(/(\d)\s+ziffer\s+(?=\d)/gi, '$1 Z ')
+        t = t.replace(/[ \t]+([.,;:?!)])/g, '$1').replace(/[ \t]*\n[ \t]*/g, '\n').replace(/^[ \t]+|[ \t]+$/g, '')
+        const startOfSentence = !before.trim() || /[.?!:]\s*$|\n\s*$/.test(before)
+        if (startOfSentence) t = t.replace(/^(\s*)(\p{Ll})/u, (m, sp, c) => sp + c.toUpperCase())
+        t = t.replace(/([.?!]\s+|\n)(\p{Ll})/gu, (m, p, c) => p + c.toUpperCase())
+        const join = !before || /[\s(\n]$/.test(before) || /^[.,;:?!)\n]/.test(t) ? '' : ' '
+        return join + t
+      }
+      function dictShow() {
+        const t = dict.target; if (!t) return
+        t.value = dict.base + (dict.interim ? (dict.base && !/\s$/.test(dict.base) ? ' ' : '') + dict.interim : '')
+        t.dispatchEvent(new Event('input', { bubbles: true }))
+        t.scrollTop = t.scrollHeight
+        try { t.setSelectionRange(t.value.length, t.value.length) } catch {}
+      }
+      function dictUi(on) {
+        const b = dict.btn
+        if (b) { b.classList.toggle('rec', on); b.setAttribute('aria-pressed', String(on)); if (b.id === 'dictBtn') b.querySelector('.lbl').textContent = on ? 'Stopp' : 'Diktieren'; else b.title = on ? 'Diktat beenden' : 'Diktieren' }
+        composer.classList.toggle('dictating', on && dict.target === input)
+        $('dictHint').hidden = !(on && dict.target === input)
+        if (on && dict.target === input) $('dictHint').textContent = `Diktat läuft${dict.local ? ' · auf dem Gerät' : ''} – „Punkt“, „Komma“, „neue Zeile“ werden umgesetzt. Enter sendet, Strg + M beendet.`
+      }
+      function dictStop({ discard = false } = {}) {
+        if (!dict.rec && !dict.want) return
+        dict.want = false
+        if (discard) dict.target = null
+        try { dict.rec?.stop() } catch {}
+        if (!dict.rec) dictCleanup()
+      }
+      function dictCleanup() {
+        if (dict.target && dict.interim) { dict.base += dictFormat(dict.interim, dict.base); dict.interim = ''; dictShow() }
+        dictUi(false)
+        dict.rec = null; dict.target = null; dict.btn = null; dict.interim = ''
+      }
+      function dictStartRec() {
+        const r = new SpeechRec()
+        r.lang = dictLang(); r.continuous = true; r.interimResults = true; r.maxAlternatives = 1
+        if (dict.local) {
+          if ('processLocally' in r) r.processLocally = true; else if ('mode' in r) r.mode = 'ondevice-only'
+          guard(true); r.onstart = r.onaudiostart = () => guard(false)
+        }
+        r.onresult = (e) => {
+          if (dict.local) guard(false)
+          if (!dict.target) return
+          let interim = ''
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const txt = e.results[i][0].transcript
+            if (e.results[i].isFinal) dict.base += dictFormat(txt, dict.base); else interim += txt
+          }
+          dict.interim = interim.trim(); dict.restarts = 0; dictShow()
+        }
+        r.onerror = (e) => {
+          if (dict.local) guard(false)
+          const msg = { 'not-allowed': 'Mikrofon-Zugriff wurde nicht erlaubt (Adressleiste → Website-Einstellungen).', 'service-not-allowed': 'Die Spracherkennung ist in diesem Browser gesperrt.', 'audio-capture': 'Kein Mikrofon gefunden.', network: 'Spracherkennung nicht erreichbar – Internetverbindung prüfen oder „Nur auf dem Gerät“ einrichten.', 'language-not-supported': 'Diese Sprache wird von der Spracherkennung nicht unterstützt.' }[e.error]
+          if (msg) { dict.fatal = true; dict.want = false; toast(msg, 5000) }
+        }
+        r.onend = () => {
+          if (dict.local) guard(false)
+          // Chrome ends continuous recognition after silence or ~1 minute: keep going while wanted.
+          if (dict.want && !dict.fatal && dict.restarts < 30 && dict.target) { dict.restarts++; if (dict.interim) { dict.base += dictFormat(dict.interim, dict.base); dict.interim = '' } try { dict.rec = dictStartRec(); return } catch {} }
+          dictCleanup()
+        }
+        r.start()
+        return r
+      }
+      function dictConsent(status) {
+        return new Promise((resolve) => {
+          const card = $('dlgCard'); card.innerHTML = ''; card.classList.remove('wide')
+          card.appendChild(el('h2', null, 'Diktat'))
+          const local = status === 'available'
+          card.appendChild(el('div', 'md', local
+            ? 'Die Spracherkennung läuft auf diesem Gerät – das Audio verlässt den Rechner nicht. Der Browser fragt einmal nach dem Mikrofon.'
+            : 'Der Browser erkennt Sprache über den Dienst seines Herstellers (Chrome: Google, Edge: Microsoft, Safari: Apple); das Audio wird dafür in dessen Cloud verarbeitet. Bitte nur diktieren, was Ihre Kanzlei dort verarbeiten lassen darf.'))
+          if (!local && status === 'downloadable') card.appendChild(el('p', 'sub', 'Tipp: Unter Einstellungen → Diktat lässt sich die Erkennung auf dem Gerät einrichten (einmaliger Download des Sprachpakets).')).style.cssText = 'font-size:12.5px;color:var(--muted)'
+          const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', () => { closeDlg(); resolve(false) })
+          const ok = el('button', 'btn', 'Diktat starten'); ok.addEventListener('click', () => { closeDlg(); resolve(true) })
+          a.append(c, ok); card.appendChild(a); $('dlg').classList.add('show'); ok.focus()
+        })
+      }
+      /** Starts or stops dictation into a textarea; btn shows the state. */
+      async function toggleDictation(target = input, btn = $('dictBtn')) {
+        if (dict.want || dict.rec) { const same = dict.target === target; dictStop(); if (same) return }
+        if (!SpeechRec) { toast('Diktat wird von diesem Browser nicht unterstützt (Chrome, Edge oder Safari verwenden).', 4500); return }
+        let status = settings.dictLocal ? await dictOnDevice() : 'cloud'
+        if (settings.dictLocal && status !== 'available') {
+          if (status === 'downloadable' || status === 'downloading') {
+            toast('Sprachpaket für das Diktat auf dem Gerät wird geladen…', 6000)
+            const ok = await dictInstall(); status = await dictOnDevice()
+            if (!ok || status !== 'available') { toast('Erkennung auf dem Gerät nicht verfügbar – bitte später erneut versuchen.', 5000); return }
+          } else { toast('Dieser Browser kann nicht auf dem Gerät erkennen. „Nur auf dem Gerät“ in den Einstellungen ausschalten oder Chrome/Edge aktualisieren.', 6000); return }
+        }
+        const consentKey = status === 'available' ? 'local' : 'cloud'
+        if (settings.dictConsent !== consentKey && settings.dictConsent !== 'cloud') {
+          if (!(await dictConsent(status))) return
+          settings.dictConsent = consentKey; saveSettings()
+        }
+        dict.target = target; dict.btn = btn; dict.local = status === 'available'
+        dict.base = target.value; dict.interim = ''; dict.restarts = 0; dict.fatal = false; dict.want = true
+        try { dict.rec = dictStartRec() } catch (e) { dict.want = false; dict.target = null; toast('Diktat konnte nicht starten: ' + (e?.message || e)); return }
+        dictUi(true); target.focus()
+      }
+      function addFieldMic(fld, textarea) {
+        if (!SpeechRec) return
+        const b = el('button', 'field-mic'); b.type = 'button'; b.title = 'Diktieren'; b.setAttribute('aria-label', 'In dieses Feld diktieren')
+        b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>'
+        b.addEventListener('click', () => toggleDictation(textarea, b))
+        fld.querySelector('label')?.appendChild(b)
+      }
+      $('dictBtn').hidden = !SpeechRec
+      $('dictBtn').addEventListener('click', () => toggleDictation(input, $('dictBtn')))
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'm' && SpeechRec) {
+          const t = document.activeElement?.tagName === 'TEXTAREA' && document.activeElement !== input ? document.activeElement : input
+          if (t === input && composer.offsetParent === null) return
+          e.preventDefault()
+          const mic = t === input ? $('dictBtn') : t.closest('.field')?.querySelector('.field-mic')
+          if (mic) toggleDictation(t, mic)
+        }
+      })
+      function renderDictSettings() {
+        setSwitch('swDictLocal', Boolean(settings.dictLocal)); $('selDictLang').value = dictLang()
+        if (!SpeechRec) { $('kvDict').textContent = 'in diesem Browser nicht verfügbar'; return }
+        $('swDictLocal').disabled = !localPossible() && !settings.dictLocal
+        $('kvDict').textContent = settings.dictLocal ? 'auf dem Gerät' : !localPossible() ? 'Cloud des Browser-Herstellers (auf dem Gerät nicht verfügbar)' : 'Cloud des Browser-Herstellers'
+      }
+      $('swDictLocal').addEventListener('click', async () => {
+        if (settings.dictLocal) { settings.dictLocal = false; saveSettings(); renderDictSettings(); return }
+        if (!localPossible()) { toast('Dieser Browser kann nicht auf dem Gerät erkennen (aktuelles Chrome oder Edge am Desktop nötig).', 5000); return }
+        $('kvDict').textContent = 'wird geprüft…'
+        let st = await dictOnDevice()
+        if (st === 'downloadable' || st === 'downloading') { toast('Sprachpaket für das Diktat wird geladen…', 6000); await dictInstall(); st = await dictOnDevice() }
+        if (st === 'available') { settings.dictLocal = true; saveSettings(); toast('Diktat erkennt jetzt auf dem Gerät.') }
+        else toast('Erkennung auf dem Gerät ist in diesem Browser für ' + ($('selDictLang').selectedOptions[0]?.textContent || dictLang()) + ' nicht verfügbar.', 5000)
+        renderDictSettings()
+      })
+      $('selDictLang').addEventListener('change', () => { settings.dictLang = $('selDictLang').value; if (settings.dictLocal) settings.dictLocal = false; saveSettings(); renderDictSettings() })
+      window.__aissDictFormat = dictFormat // test hook
+
+      // ------------------------------------------------------------------
       // Composer behaviour
       // ------------------------------------------------------------------
       function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0 || pendingMs.length > 0 || Boolean(pendingSkill)) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
@@ -1533,6 +1736,7 @@
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
       sendBtn.addEventListener('click', submit)
       function submit() {
+        if (dict.target === input) { if (dict.interim) { dict.base += dictFormat(dict.interim, dict.base); dict.interim = ''; dictShow() } dictStop({ discard: true }) }
         const text = input.value.trim()
         if ((!text && !pendingFiles.length && !pendingMs.length && !pendingSkill) || busy) return
         sendMessage({ text: text || (pendingSkill && !pendingFiles.length && !pendingMs.length ? `Skill „${pendingSkill.name}“ anwenden.` : 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.') })
@@ -1677,6 +1881,7 @@
       function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; setTitle([]); renderRecent(); if (window.innerWidth > 960) input.focus() }
       function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.matter ? ['Akt · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
       function newConversation({ keepView = false, matterCtx = null } = {}) {
+        if (dict.target === input) dictStop({ discard: true })
         current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, matter: matterCtx, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
         $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true
         messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; pendingMs = []; renderAttachments(); renderMsUi()
@@ -2466,6 +2671,7 @@
           else { c = el('input'); c.type = 'text'; c.placeholder = f.ph || '' }
           if (values[f.k]) c.value = values[f.k]
           c.dataset.skillField = f.k; inputs[f.k] = c; fld.appendChild(c); card.appendChild(fld)
+          if (f.type === 'textarea') addFieldMic(fld, c)
         }
         const a = el('div', 'modal-actions'); const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', () => openSkillPicker())
         const ok = el('button', 'btn', 'Übernehmen')
@@ -2633,6 +2839,7 @@
           else if (f.type === 'textarea') { c = el('textarea'); c.placeholder = f.ph || ''; c.value = vals[f.k] || '' }
           else { c = el('input'); c.type = 'text'; c.placeholder = f.ph || ''; c.value = vals[f.k] || '' }
           c.name = f.k; c.dataset.agentField = f.k
+          if (f.type === 'textarea') addFieldMic(fld, c)
           c.addEventListener('input', () => { vals[f.k] = c.value; saveAgentDrafts() }); c.addEventListener('change', () => { vals[f.k] = c.value; saveAgentDrafts() })
           inputs[f.k] = c; fld.appendChild(c); form.appendChild(fld)
         }
@@ -3262,6 +3469,7 @@
       function renderSettings() {
         setSwitch('swWeb', settings.webSearch !== false); setSwitch('swFolderSave', settings.folderSave !== false); renderMsUi()
         renderAccount(); if (me.user?.role === 'admin' && viewName === 'settings') renderUsers()
+        renderDictSettings()
         $('kvOwner').textContent = ownerKey
         if (health) {
           $('kvKb').textContent = health.aissociate ? (health.knowledgeBase || 'AI:ssociate API') : 'nicht konfiguriert'; $('kvWeb').textContent = health.webSearch ? `max. ${health.maxWebSearches || 3} Suchen` : 'aus'
@@ -3282,7 +3490,7 @@
         { chapter: 'Willkommen', title: 'Willkommen bei AI:ssociate', route: 'home', welcome: true, text: 'In etwa zwei Minuten durch alle Funktionen: Fragen stellen, Unterlagen hinzufügen, Skills, Fachagenten, Due Diligence und Akten. Mit den Pfeiltasten weiterblättern, Esc beendet die Tour.' },
         { chapter: 'Fragen', title: 'Wissensdatenbank wählen', sel: '#kbList', route: 'home', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage. Wer es weiß, wählt Zivil-, Straf-, Steuer- oder öffentliches Recht – beim öffentlichen Recht mit Bundesland, damit das Landesrecht passt.' },
         { chapter: 'Fragen', title: 'Vorlagen', sel: '#homeChips', route: 'home', text: 'Häufige Aufgaben mit einem Klick: Rechtsrecherche, Versionen vergleichen und Zusammenfassen öffnen ein kurzes Formular; Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen starten die Fachagenten.' },
-        { chapter: 'Fragen', title: 'Frage stellen', sel: '#composer', route: 'home', html: ['Frage eintippen und mit <b>Enter</b> senden (Umschalt + Enter für eine neue Zeile).', 'Sie sehen live, was passiert: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.', 'Folgefragen bleiben im Gespräch – auch zu bereits angehängten Dokumenten.'] },
+        { chapter: 'Fragen', title: 'Frage stellen', sel: '#composer', route: 'home', html: ['Frage eintippen und mit <b>Enter</b> senden (Umschalt + Enter für eine neue Zeile) – oder mit dem <b>Mikrofon</b> diktieren.', 'Sie sehen live, was passiert: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.', 'Folgefragen bleiben im Gespräch – auch zu bereits angehängten Dokumenten.'] },
         { chapter: 'Unterlagen', title: 'Hinzufügen', sel: '#addBtn', route: 'home', text: 'Ein Knopf für alle Unterlagen. Die Zahl daneben zeigt, wie viel gerade angehängt oder verbunden ist.' },
         { chapter: 'Unterlagen', title: 'Dateien anhängen', sel: ['#attachBtn', '#msBtn'], route: 'home', menu: true, html: ['<b>Von diesem Computer</b> – PDF, Word, Excel, Text; auch per Drag & Drop.', '<b>Aus OneDrive / SharePoint</b> – nach der Microsoft-Anmeldung direkt aus den Bibliotheken der Kanzlei.', 'Angehängte Dateien werden mit der Frage geschickt.'] },
         { chapter: 'Unterlagen', title: 'Quelle verbinden', sel: ['#folderBtn', '#matterBtn'], route: 'home', menu: true, html: ['<b>Lokaler Ordner</b> – der Assistent durchsucht ihn selbst und liest nur, was er braucht; nichts wird vorab hochgeladen.', '<b>Akt</b> – alle Dokumente eines Akts auf dem Server, auch auf anderen Geräten.', 'Zuletzt verwendete Ordner und Akten stehen darunter für einen Klick bereit.'] },
