@@ -124,7 +124,7 @@ const AISSOCIATE_PRICE_PER_CALL = Number(process.env.AISSOCIATE_PRICE_PER_CALL |
 const E2B_PRICE_PER_SEC = Number(process.env.E2B_PRICE_PER_SEC || 0.00014)
 
 const UA = 'AIssociate-Playground/2.1 (+https://aissociate.at)'
-const RIS_BASE = 'https://data.bka.gv.at/ris/api/v2.6'
+const RIS_BASE = (process.env.RIS_BASE_URL || 'https://data.bka.gv.at/ris/api/v2.6').replace(/\/+$/, '')
 
 // Microsoft 365 (OneDrive / SharePoint via Microsoft Graph). Register an app in
 // Entra ID (platform "Web", redirect URI https://<host>/api/ms/callback, delegated

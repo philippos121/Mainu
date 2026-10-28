@@ -616,12 +616,31 @@
       .user-row .who span { font-size: 12px; color: var(--faint); }
 
       /* ---------- tour / toast ---------- */
-      .tour-target { position: relative; z-index: 71 !important; box-shadow: 0 0 0 4px rgba(243,146,0,0.9), 0 0 0 9999px rgba(14,37,46,0.55) !important; border-radius: 14px; }
-      .tour-card { position: fixed; z-index: 72; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom)); width: min(420px, calc(100vw - 32px)); background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: 0 16px 50px rgba(14,37,46,0.35); }
-      .tour-card .tc-step { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--orange); font-weight: 800; }
-      .tour-card h3 { margin: 4px 0 6px; font-size: 16px; font-weight: 800; }
-      .tour-card p { margin: 0 0 12px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
-      .tour-card .ta { display: flex; gap: 8px; justify-content: flex-end; }
+      .tour-spot { position: fixed; z-index: 71; pointer-events: none; border-radius: 12px; box-shadow: 0 0 0 3px rgba(243,146,0,0.95), 0 0 0 9999px rgba(14,37,46,0.58); transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease; }
+      .tour-spot.none { box-shadow: 0 0 0 9999px rgba(14,37,46,0.58); }
+      .tour-card { position: fixed; z-index: 72; width: min(390px, calc(100vw - 24px)); background: var(--surface); border-radius: 16px; padding: 16px 18px 14px; box-shadow: 0 18px 54px rgba(14,37,46,0.38); transition: left .28s ease, top .28s ease; }
+      .tour-card.center { width: min(470px, calc(100vw - 24px)); padding: 22px 22px 16px; }
+      .tour-card .tc-head { display: flex; align-items: baseline; gap: 8px; }
+      .tour-card .tc-chap { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--orange); font-weight: 800; }
+      .tour-card .tc-count { margin-left: auto; font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+      .tour-card h3 { margin: 4px 0 6px; font-size: 16.5px; font-weight: 800; }
+      .tour-card.center h3 { font-size: 20px; }
+      .tour-card p { margin: 0 0 8px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+      .tour-card ul { margin: 0 0 8px; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+      .tour-card ul li { margin: 2px 0; }
+      .tour-card ul b { color: var(--text); }
+      .tc-prog { height: 3px; border-radius: 3px; background: var(--surface-2); margin: 10px 0 12px; overflow: hidden; }
+      .tc-prog span { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .28s ease; }
+      .tour-card .ta { display: flex; gap: 8px; align-items: center; }
+      .tour-card .ta .sp { flex: 1; }
+      .tour-card .tc-keys { font-size: 11px; color: var(--faint); }
+      @media (max-width: 640px) { .tour-card .tc-keys { display: none; } }
+      .video-card { width: min(960px, calc(100vw - 24px)) !important; max-width: none !important; padding: 14px !important; }
+      .video-card video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #0e252e; border-radius: 10px; }
+      .video-card .vc-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 10px; }
+      .video-card .vc-head h2 { margin: 0; font-size: 16px; }
+      .video-card .vc-head .sp { flex: 1; }
+      .video-card .vc-chaps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
       .tour-banner { width: 100%; margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
       .tour-banner b { color: var(--text); }
       .tour-banner .sp { flex: 1; }
@@ -720,7 +739,8 @@
               <div id="composerSlotHome"></div>
               <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können falsch sein und müssen vor Verwendung juristisch geprüft werden.</p>
               <div class="tour-banner" id="tourBanner" hidden>
-                <span class="sp"><b>Neu hier?</b> In 60 Sekunden durch die Funktionen.</span>
+                <span class="sp"><b>Neu hier?</b> Die wichtigsten Funktionen in zwei Minuten.</span>
+                <button class="btn ghost" id="tourVideo" hidden>▶ Video</button>
                 <button class="btn ghost" id="tourStart">Tour starten</button>
                 <button class="mini" id="tourSkip">Später</button>
               </div>
@@ -812,6 +832,7 @@
             <h3>Daten &amp; Hilfe</h3>
             <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
               <button class="mini" id="miTour">Feature-Tour</button>
+              <button class="mini" id="miVideo" hidden>▶ Erklärvideo</button>
               <button class="mini danger" id="miClear2">Verlauf löschen</button>
             </div>
             <p class="disclaimer" style="text-align:left;margin-top:14px" id="dataNote">Gespräche werden auf dem Server gespeichert (je Konto bzw. Arbeitsbereich). Hochgeladene Dateien einer Frage werden zur Verarbeitung an die Sandbox übertragen und nach Ende der Sitzung gelöscht. Dokumente in Akten bleiben auf dem Server, bis die Akt gelöscht wird.</p>
@@ -1371,7 +1392,7 @@
         menu.hidden = true; anchor.setAttribute('aria-expanded', 'false')
         if (focus && anchor.isConnected) anchor.focus({ preventScroll: true })
       }
-      document.addEventListener('pointerdown', (e) => { if (openPop && !openPop.menu.contains(e.target) && !openPop.anchor.contains(e.target)) closePop() }, true)
+      document.addEventListener('pointerdown', (e) => { if (openPop && !openPop.menu.contains(e.target) && !openPop.anchor.contains(e.target) && !e.target.closest?.('.tour-card')) closePop() }, true)
       window.addEventListener('resize', () => { if (openPop) placePop(openPop.menu, openPop.anchor) })
       document.addEventListener('scroll', () => { if (openPop) placePop(openPop.menu, openPop.anchor) }, true)
       for (const menu of [$('addMenu'), $('saveMenu')]) {
@@ -2383,7 +2404,7 @@
       }
       // The folder dialog uses the wide card; other dialogs keep the default width.
       const _closeDlg = closeDlg
-      closeDlg = function () { _closeDlg(); $('dlgCard').classList.remove('wide') }
+      closeDlg = function () { const v = $('dlgCard').querySelector('video'); if (v) v.pause(); _closeDlg(); $('dlgCard').classList.remove('wide', 'video-card') }
 
       // ------------------------------------------------------------------
       // Skills: reusable instruction packages (standard skills + the workspace's own).
@@ -3254,29 +3275,150 @@
       // ------------------------------------------------------------------
       // Feature tour
       // ------------------------------------------------------------------
+      // Each step: chapter, title, text (or html list), sel (one or more targets; none = centred card),
+      // route (page to show first), menu (keep the "Hinzufügen" menu open), demoSave (show the
+      // "Ergebnisse →" line with an example), nav (sidebar item: opens the drawer on phones).
       const TOUR = [
-        { sel: '#kbList', title: 'Wissensdatenbank', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage; alternativ Zivil-, Straf-, Steuer- oder öffentliches Recht (mit Bundesland) fest wählen. Rechtsfragen beantwortet die Wissensdatenbank AI:ssociate kurz mit Fundstellen, jede Fundstelle wird gegen das RIS geprüft; Dokumentaufgaben liefern Word, Excel oder PDF.' },
-        { sel: '#addBtn', title: 'Hinzufügen', text: 'Ein Knopf für alle Unterlagen. Dateien anhängen – vom Computer oder aus OneDrive / SharePoint – schickt sie mit der Frage mit. Eine Quelle verbinden – lokaler Ordner oder Akt – lässt den Assistenten selbst darin suchen; aus dem Ordner wird nichts vorab hochgeladen. Darunter zeigt „Ergebnisse →“, wohin erzeugte Dateien gespeichert werden.' },
-        { sel: '#navDd', title: 'Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Review-Tabellen im Akt, Request List, Red-Flag-Report als Word und Excel.', nav: true },
-        { sel: '#navAgentReview', title: 'Fachagenten', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen: geführte Arbeitsabläufe nach österreichischem Recht – Angaben erfassen, Prüfraster bzw. Gliederung, dann Word-Ergebnis und der nächste Schritt per Klick.', nav: true },
-        { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Quellen & Speichern (lokaler Ordner, Microsoft 365), Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
+        { chapter: 'Willkommen', title: 'Willkommen bei AI:ssociate', route: 'home', welcome: true, text: 'In etwa zwei Minuten durch alle Funktionen: Fragen stellen, Unterlagen hinzufügen, Skills, Fachagenten, Due Diligence und Akten. Mit den Pfeiltasten weiterblättern, Esc beendet die Tour.' },
+        { chapter: 'Fragen', title: 'Wissensdatenbank wählen', sel: '#kbList', route: 'home', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage. Wer es weiß, wählt Zivil-, Straf-, Steuer- oder öffentliches Recht – beim öffentlichen Recht mit Bundesland, damit das Landesrecht passt.' },
+        { chapter: 'Fragen', title: 'Vorlagen', sel: '#homeChips', route: 'home', text: 'Häufige Aufgaben mit einem Klick: Rechtsrecherche, Versionen vergleichen und Zusammenfassen öffnen ein kurzes Formular; Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen starten die Fachagenten.' },
+        { chapter: 'Fragen', title: 'Frage stellen', sel: '#composer', route: 'home', html: ['Frage eintippen und mit <b>Enter</b> senden (Umschalt + Enter für eine neue Zeile).', 'Sie sehen live, was passiert: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.', 'Folgefragen bleiben im Gespräch – auch zu bereits angehängten Dokumenten.'] },
+        { chapter: 'Unterlagen', title: 'Hinzufügen', sel: '#addBtn', route: 'home', text: 'Ein Knopf für alle Unterlagen. Die Zahl daneben zeigt, wie viel gerade angehängt oder verbunden ist.' },
+        { chapter: 'Unterlagen', title: 'Dateien anhängen', sel: ['#attachBtn', '#msBtn'], route: 'home', menu: true, html: ['<b>Von diesem Computer</b> – PDF, Word, Excel, Text; auch per Drag & Drop.', '<b>Aus OneDrive / SharePoint</b> – nach der Microsoft-Anmeldung direkt aus den Bibliotheken der Kanzlei.', 'Angehängte Dateien werden mit der Frage geschickt.'] },
+        { chapter: 'Unterlagen', title: 'Quelle verbinden', sel: ['#folderBtn', '#matterBtn'], route: 'home', menu: true, html: ['<b>Lokaler Ordner</b> – der Assistent durchsucht ihn selbst und liest nur, was er braucht; nichts wird vorab hochgeladen.', '<b>Akt</b> – alle Dokumente eines Akts auf dem Server, auch auf anderen Geräten.', 'Zuletzt verwendete Ordner und Akten stehen darunter für einen Klick bereit.'] },
+        { chapter: 'Unterlagen', title: 'Ergebnisse →', sel: '#saveLine', route: 'home', demoSave: true, text: 'Zeigt, wohin erzeugte Dateien (Word, Excel, PDF) gespeichert werden: automatisch dorthin, woher die Unterlagen kommen – in den lokalen Ordner oder nach SharePoint, nie überschreibend. Ein Klick ändert das Ziel für dieses Gespräch.' },
+        { chapter: 'Skills', title: 'Skills anwenden', sel: '#skillBtn', route: 'home', text: 'Wiederverwendbare Arbeitsanweisungen der Kanzlei – etwa Chronologie, Honorarnote oder Mandantenbrief. Hier wählen oder einfach „/“ ins Eingabefeld tippen; passende Skills wendet der Assistent auch selbst an.' },
+        { chapter: 'Antworten', title: 'Antworten, denen Sie folgen können', route: 'home', html: ['<b>Fundstellen</b> aus der Wissensdatenbank, verlinkt ins RIS.', '<b>RIS-Prüfung</b>: jede zitierte Norm und Entscheidung wird gegen das Rechtsinformationssystem geprüft – ✓ bestätigt, ⚠ außer Kraft oder nicht gefunden.', '<b>Dateien</b> als Word, Excel oder PDF, Export der Antwort als Word.', '<b>Folgefragen</b> als Vorschlag und die genauen Kosten je Antwort.'] },
+        { chapter: 'Agenten', title: 'Fachagenten', sel: '#agentPage .wf', route: '#/agent/contract_review', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen folgen einem festen Ablauf nach österreichischem Recht: Angaben erfassen, Prüfraster bzw. Gliederung, Rechtsfragen klären, Word-Ergebnis – und der nächste Schritt per Klick.' },
+        { chapter: 'Agenten', title: 'Due Diligence', sel: '#mattersPage .page-head', route: '#/dd', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Jedes Dokument wird nach Prüfbereichen analysiert; jeder Befund mit Zitat und Fundstelle, Ampel, Request List und Red-Flag-Report als Word und Excel.' },
+        { chapter: 'Akten', title: 'Akten', sel: '#mattersPage .page-head', route: '#/matters', text: 'Dokumente eines Mandats an einem Ort: Fragen im Kontext des Akts, Review-Tabellen über viele Dokumente, Import aus SharePoint oder einem lokalen Ordner.' },
+        { chapter: 'Skills', title: 'Skill-Bibliothek', sel: '#skillsPage .page-head', route: '#/skills', text: 'Eigene Skills mit Anweisungen, Eingabefeldern und Referenzdokumenten (Muster, Playbook, Vorlage) anlegen, als JSON exportieren und im Team teilen.' },
+        { chapter: 'Verlauf', title: 'Verlauf', sel: '#historyBtn', route: 'home', text: 'Alle Gespräche – auf dem Server gespeichert und auf jedem Gerät verfügbar, auf dem Sie angemeldet sind.' },
+        { chapter: 'Einstellungen', title: 'Quellen & Speichern', sel: '#cardSources', route: '#/settings', text: 'Standardziele für Ergebnisse, Microsoft-365-Konto, Websuche, Budget und Sitzungskosten. Hier starten Sie diese Tour und das Erklärvideo jederzeit erneut.' },
+        { chapter: 'Fertig', title: 'Bereit für die erste Frage', route: 'home', done: true, text: 'Tipp: Eine Rechtsfrage direkt eintippen oder ein Dokument per Drag & Drop ins Eingabefeld ziehen. Die Tour und das Erklärvideo finden Sie unter Einstellungen → Daten & Hilfe.' },
       ]
-      let tourIdx = -1, tourCard = null, tourTarget = null
-      function startTour() { closeDlg(); if (viewName !== 'assistant') { navigate('#/assistant') } if (home.hidden) showHome(); tourIdx = 0; showTourStep() }
-      function showTourStep() {
-        if (tourTarget) tourTarget.classList.remove('tour-target')
-        if (tourCard) tourCard.remove()
-        const s = TOUR[tourIdx]; if (!s) return endTour()
-        if (s.nav && window.innerWidth <= 960) openSidebar(); else if (!s.nav) closeSidebar()
-        tourTarget = s.sel ? document.querySelector(s.sel) : null
-        if (tourTarget) { tourTarget.classList.add('tour-target'); tourTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }) }
-        tourCard = el('div', 'tour-card')
-        tourCard.appendChild(el('div', 'tc-step', `Schritt ${tourIdx + 1} von ${TOUR.length}`)); tourCard.appendChild(el('h3', null, s.title)); tourCard.appendChild(el('p', null, s.text))
-        const a = el('div', 'ta'); const skip = el('button', 'btn ghost', 'Beenden'); skip.addEventListener('click', endTour); const next = el('button', 'btn', tourIdx === TOUR.length - 1 ? 'Fertig' : 'Weiter'); next.addEventListener('click', () => { tourIdx++; showTourStep() }); a.append(skip, next); tourCard.appendChild(a)
-        document.body.appendChild(tourCard)
+      let tourIdx = -1, tourCard = null, tourSpot = null, tourRaf = 0, tourGen = 0
+      function startTour(at = 0) { closeDlg(); closePop(); tourIdx = at; showTourStep() }
+      const tourTargets = (s) => (s.sel ? [].concat(s.sel).map((q) => document.querySelector(q)).filter((x) => x && x.offsetParent !== null && !x.hidden) : [])
+      async function tourRoute(s) {
+        const before = location.hash
+        if (s.route === 'home') { if (viewName !== 'assistant') navigate('#/assistant'); if (home.hidden) showHome() }
+        else if (s.route && location.hash !== s.route) navigate(s.route)
+        if (location.hash !== before) await new Promise((r) => setTimeout(r, 40)) // let the router render first
+        if (s.menu) { if (openPop?.menu !== $('addMenu')) openAddMenu($('addBtn')) } else if (openPop) closePop()
+        if (s.demoSave) { const line = $('saveLine'); if (line.hidden) { line.hidden = false; line.innerHTML = ''; line.appendChild(svg('save')); line.appendChild(el('span', null, 'Ergebnisse →')); line.appendChild(el('b', null, 'Ordner „Mandant Huber“')); line.appendChild(el('span', 'chg', 'ändern')); line.dataset.tourDemo = '1' } }
+        else if ($('saveLine').dataset.tourDemo) { delete $('saveLine').dataset.tourDemo; renderSaveLine() }
+        if (s.nav && window.innerWidth <= 960) openSidebar(); else closeSidebar()
+        // wait for asynchronously rendered pages (agents, Akten, Skills)
+        for (let i = 0; i < 30 && s.sel && !tourTargets(s).length; i++) await new Promise((r) => setTimeout(r, 60))
       }
-      function endTour() { if (tourTarget) tourTarget.classList.remove('tour-target'); if (tourCard) tourCard.remove(); tourTarget = null; tourCard = null; if (tourIdx >= 0) closeSidebar(); tourIdx = -1; try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true }
-      $('tourStart').addEventListener('click', startTour)
+      function tourRect(s) {
+        const els = tourTargets(s); if (!els.length) return null
+        const rs = els.map((e) => e.getBoundingClientRect())
+        const l = Math.min(...rs.map((r) => r.left)), t = Math.min(...rs.map((r) => r.top)), r = Math.max(...rs.map((x) => x.right)), b = Math.max(...rs.map((x) => x.bottom))
+        const pad = 6
+        return { left: l - pad, top: t - pad, width: r - l + pad * 2, height: b - t + pad * 2 }
+      }
+      function placeTour() {
+        const s = TOUR[tourIdx]; if (!s || !tourCard) return
+        const vw = window.innerWidth, vh = window.innerHeight
+        const r = tourRect(s)
+        if (r) Object.assign(tourSpot.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' })
+        else Object.assign(tourSpot.style, { left: vw / 2 + 'px', top: vh / 2 + 'px', width: '0px', height: '0px' })
+        tourSpot.classList.toggle('none', !r)
+        const cw = tourCard.offsetWidth, ch = tourCard.offsetHeight, gap = 14
+        let left, top
+        if (!r) { left = (vw - cw) / 2; top = Math.max(12, (vh - ch) / 2) }
+        else {
+          const below = vh - (r.top + r.height), above = r.top, right = vw - (r.left + r.width)
+          if (below >= ch + gap + 12) { top = r.top + r.height + gap; left = r.left + r.width / 2 - cw / 2 }
+          else if (above >= ch + gap + 12) { top = r.top - ch - gap; left = r.left + r.width / 2 - cw / 2 }
+          else if (right >= cw + gap + 12) { left = r.left + r.width + gap; top = r.top + r.height / 2 - ch / 2 }
+          else if (r.left >= cw + gap + 12) { left = r.left - cw - gap; top = r.top + r.height / 2 - ch / 2 }
+          else { left = (vw - cw) / 2; top = vh - ch - 12 }
+        }
+        tourCard.style.left = Math.max(12, Math.min(left, vw - cw - 12)) + 'px'
+        tourCard.style.top = Math.max(12, Math.min(top, vh - ch - 12)) + 'px'
+      }
+      function tourLoop() { placeTour(); if (tourIdx >= 0) tourRaf = requestAnimationFrame(tourLoop) }
+      async function showTourStep() {
+        const s = TOUR[tourIdx]; if (!s) return endTour()
+        const gen = ++tourGen
+        await tourRoute(s)
+        if (gen !== tourGen || tourIdx < 0) return
+        const t = tourTargets(s)[0]
+        if (t) { const r = t.getBoundingClientRect(); if (r.top < 70 || r.bottom > window.innerHeight - 20) t.scrollIntoView({ block: 'center' }) }
+        if (!tourSpot) { tourSpot = el('div', 'tour-spot'); document.body.appendChild(tourSpot) }
+        if (tourCard) tourCard.remove()
+        tourCard = el('div', 'tour-card' + (s.sel ? '' : ' center'))
+        tourCard.setAttribute('role', 'dialog'); tourCard.setAttribute('aria-live', 'polite'); tourCard.setAttribute('aria-label', 'Feature-Tour: ' + s.title)
+        const head = el('div', 'tc-head'); head.appendChild(el('span', 'tc-chap', s.chapter)); head.appendChild(el('span', 'tc-count', `${tourIdx + 1} / ${TOUR.length}`)); tourCard.appendChild(head)
+        tourCard.appendChild(el('h3', null, s.title))
+        if (s.text) tourCard.appendChild(el('p', null, s.text))
+        if (s.html) { const ul = el('ul'); for (const h of s.html) { const li = el('li'); li.innerHTML = h; ul.appendChild(li) } tourCard.appendChild(ul) }
+        const prog = el('div', 'tc-prog'); const bar = el('span'); bar.style.width = `${((tourIdx + 1) / TOUR.length) * 100}%`; prog.appendChild(bar); tourCard.appendChild(prog)
+        const a = el('div', 'ta')
+        const go = (d) => { tourIdx += d; showTourStep() }
+        if (s.welcome || s.done) {
+          if (videoAvailable) { const v = el('button', 'btn ghost', '▶ Erklärvideo'); v.addEventListener('click', () => { endTour(); openVideo() }); a.appendChild(v) }
+          a.appendChild(el('span', 'sp'))
+          if (s.welcome) { const skip = el('button', 'mini', 'Später'); skip.addEventListener('click', endTour); a.appendChild(skip); const n = el('button', 'btn', 'Tour starten'); n.addEventListener('click', () => go(1)); a.appendChild(n) }
+          else { const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', () => go(-1)); const n = el('button', 'btn', 'Fertig'); n.addEventListener('click', endTour); a.append(back, n) }
+        } else {
+          const skip = el('button', 'mini', 'Beenden'); skip.addEventListener('click', endTour); a.appendChild(skip)
+          a.appendChild(el('span', 'sp')); a.appendChild(el('span', 'tc-keys', '← →'))
+          const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', () => go(-1))
+          const n = el('button', 'btn', 'Weiter'); n.addEventListener('click', () => go(1))
+          a.append(back, n)
+        }
+        tourCard.appendChild(a)
+        document.body.appendChild(tourCard)
+        cancelAnimationFrame(tourRaf); tourLoop()
+        const primary = tourCard.querySelector('.ta .btn:not(.ghost)'); if (primary) primary.focus({ preventScroll: true })
+      }
+      function endTour() {
+        if (tourIdx < 0 && !tourCard) return
+        tourGen++; cancelAnimationFrame(tourRaf)
+        if (tourCard) tourCard.remove(); if (tourSpot) tourSpot.remove(); tourCard = null; tourSpot = null
+        if ($('saveLine').dataset.tourDemo) { delete $('saveLine').dataset.tourDemo; renderSaveLine() }
+        if (openPop?.menu === $('addMenu')) closePop()
+        closeSidebar(); tourIdx = -1
+        try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true
+      }
+      document.addEventListener('keydown', (e) => {
+        if (tourIdx < 0 || !tourCard || e.altKey || e.ctrlKey || e.metaKey) return
+        const ae = document.activeElement
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(ae?.tagName || '') && !(ae === input && !input.value)) return
+        const s = TOUR[tourIdx]
+        if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); if (s.done) endTour(); else { tourIdx++; showTourStep() } }
+        else if (e.key === 'ArrowLeft' && tourIdx > 0) { e.preventDefault(); e.stopPropagation(); tourIdx--; showTourStep() }
+      }, true)
+      $('tourStart').addEventListener('click', () => startTour(1))
+
+      // ------------------------------------------------------------------
+      // Explainer video (public/media; shown only when the file is deployed)
+      // ------------------------------------------------------------------
+      const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg', vtt: '/media/erklaervideo.vtt' }
+      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 14], ['Unterlagen', 52], ['Ordner', 76], ['Skills', 112], ['Agenten', 128], ['Due Diligence', 146], ['Akten & Einstellungen', 168]]
+      let videoAvailable = false
+      async function checkVideo() {
+        try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }
+        $('miVideo').hidden = !videoAvailable; $('tourVideo').hidden = !videoAvailable
+      }
+      function openVideo() {
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide', 'video-card')
+        const head = el('div', 'vc-head'); head.appendChild(el('h2', null, 'Erklärvideo: AI:ssociate in drei Minuten')); head.appendChild(el('span', 'sp'))
+        const x = el('button', 'mini', 'Schließen'); x.addEventListener('click', closeDlg); head.appendChild(x); card.appendChild(head)
+        const v = document.createElement('video'); v.controls = true; v.preload = 'metadata'; v.poster = VIDEO.poster; v.src = VIDEO.src; v.playsInline = true
+        const tr = document.createElement('track'); tr.kind = 'captions'; tr.srclang = 'de'; tr.label = 'Deutsch'; tr.src = VIDEO.vtt; v.appendChild(tr)
+        card.appendChild(v)
+        const ch = el('div', 'vc-chaps'); for (const [label, t] of VIDEO_CHAPTERS) { const b = el('button', 'mini', label); b.addEventListener('click', () => { v.currentTime = t; v.play().catch(() => {}) }); ch.appendChild(b) }
+        card.appendChild(ch)
+        $('dlg').classList.add('show')
+        v.play().catch(() => {})
+      }
+      $('miVideo').addEventListener('click', openVideo)
+      $('tourVideo').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true; openVideo() })
       $('tourSkip').addEventListener('click', () => { try { localStorage.setItem(LS_TOUR, '1') } catch {}; $('tourBanner').hidden = true })
 
       // ------------------------------------------------------------------
@@ -3387,7 +3529,7 @@
         renderAccount()
         router()
         try { if (!localStorage.getItem(LS_TOUR)) $('tourBanner').hidden = false } catch {}
-        checkHealth(); loadMsState(); loadMatters(); loadSkills()
+        checkHealth(); loadMsState(); checkVideo(); loadMatters(); loadSkills()
       }
 
       async function checkHealth() {
