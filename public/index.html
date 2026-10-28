@@ -141,12 +141,52 @@
       .attach-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 6px; }
       .attach-list:empty { display: none; }
       .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; color: var(--text); max-width: 100%; }
-      .chip.matter { background: rgba(243,146,0,0.12); border-color: rgba(243,146,0,0.35); color: #8a5300; font-weight: 600; }
       .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .chip button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1; }
       .chip button:hover { color: var(--err); }
       .chip svg { width: 13px; height: 13px; color: var(--accent); flex: 0 0 auto; }
-      .sync-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 8px; }
+      .ctool .cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+      .ctool[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
+      /* context bar: connected sources (searched) and attached files (sent along) */
+      .attach-list:has(.ctx-grp) { flex-direction: column; align-items: flex-start; }
+      .docs-box:has(.ctx-grp) { flex-direction: column; }
+      .ctx-grp { display: flex; align-items: flex-start; gap: 6px; max-width: 100%; }
+      .ctx-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+      .ctx-lbl { flex: 0 0 auto; min-width: 84px; padding-top: 7px; }
+      .ctx-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+      .chip.ctx-src { background: rgba(14,124,138,0.10); border-color: rgba(14,124,138,0.32); color: var(--accent); font-weight: 600; cursor: pointer; }
+      .chip.ctx-src:hover, .chip.more:hover { border-color: var(--accent); }
+      .chip .meta { font-weight: 500; opacity: .8; }
+      .chip.more { cursor: pointer; font-weight: 600; }
+      .chip.more .chev { width: 12px; height: 12px; transform: rotate(90deg); transition: transform .15s; color: var(--muted); }
+      .chip.more.open .chev { transform: rotate(-90deg); }
+      .save-line { display: flex; align-items: center; gap: 6px; max-width: 100%; margin: 8px auto 0; padding: 4px 10px; border: 1px solid transparent; border-radius: 999px; background: none; font-family: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+      .save-line:hover, .save-line[aria-expanded="true"] { border-color: var(--border); background: var(--surface-2); color: var(--text); }
+      .save-line svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--accent); }
+      .save-line b { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .save-line .chg { color: var(--accent); font-weight: 600; white-space: nowrap; }
+      /* popover menus (Hinzufügen, Ergebnisse →) */
+      .pop-menu { position: fixed; z-index: 70; width: 340px; max-width: calc(100vw - 24px); max-height: min(70vh, 560px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 16px 44px rgba(14,60,70,0.20); padding: 6px; }
+      .pm-sec { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 9px 10px 4px; }
+      .pm-sec b { white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+      .pm-sec span { font-size: 11.5px; color: var(--faint); }
+      .pm-sec + .pm-item { margin-top: 0; }
+      .pm-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; border: none; background: none; border-radius: 10px; padding: 8px 10px; font-family: inherit; color: var(--text); cursor: pointer; }
+      .pm-item:hover, .pm-item:focus-visible { background: var(--surface-2); outline: none; }
+      .pm-item[hidden] { display: none; }
+      .pm-item .ico { width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+      .pm-item .ico svg { width: 17px; height: 17px; }
+      .pm-item .tx { min-width: 0; flex: 1; }
+      .pm-item .tx b { display: block; font-size: 13.5px; font-weight: 600; }
+      .pm-item .tx span { display: block; font-size: 12px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; }
+      .pm-item.on .tx span { color: var(--accent); font-weight: 600; }
+      .pm-item .ck { color: var(--accent); font-weight: 700; flex: 0 0 auto; }
+      .pm-item:disabled { opacity: .5; cursor: default; }
+      .pm-item:disabled:hover { background: none; }
+      .pm-item.sm { padding: 6px 10px; }
+      .pm-item.sm .ico { width: 26px; height: 26px; background: var(--surface-2); color: var(--muted); }
+      .pm-item.sm .ico svg { width: 14px; height: 14px; }
+      .pm-sep { height: 1px; background: var(--border); margin: 6px 4px; }
       .badge.ms { background: rgba(14,124,138,0.12); color: var(--accent); }
 
       /* Microsoft 365 picker */
@@ -481,8 +521,6 @@
       .legend span { display: inline-flex; align-items: center; gap: 5px; }
 
       /* ---------- local folder ---------- */
-      .chip.folder { background: rgba(14,124,138,0.10); border-color: rgba(14,124,138,0.32); color: var(--accent); font-weight: 600; cursor: pointer; }
-      .chip.folder svg { color: var(--accent); }
       .fold-opts { display: grid; gap: 8px; margin: 4px 0 6px; }
       .fold-opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); cursor: pointer; font-family: inherit; color: var(--text); }
       .fold-opt:hover { border-color: var(--accent); }
@@ -740,22 +778,18 @@
             <p class="sub" style="font-size:12.5px;color:var(--muted);margin:0 0 6px">Jedes Konto sieht nur die eigenen Akten, Skills und Gespräche.</p>
             <div id="userList"></div>
           </div>
-          <div class="card" style="margin-bottom:14px">
-            <h3>Lokaler Ordner</h3>
-            <div class="setting"><div><div class="sl">Ergebnisse im Ordner speichern</div><div class="sd">Erzeugte Dateien automatisch neben der Quelldatei ablegen, nie überschreiben (Chrome oder Edge am Desktop; sonst Download)</div></div><button class="switch on" id="swFolderSave" role="switch" aria-checked="true"></button></div>
-          </div>
-          <div class="card" style="margin-bottom:14px">
-            <h3>Microsoft 365</h3>
-            <div class="kv"><span>Konto</span><b id="kvMsAccount">nicht verbunden</b></div>
-            <div style="padding:8px 0 4px;display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn ghost sm" id="msConnectBtn">Mit Microsoft anmelden</button>
-              <button class="mini" id="msDisconnectBtn" hidden>Trennen</button>
-            </div>
-            <div class="setting"><div><div class="sl">Ergebnisse zurückschreiben</div><div class="sd" id="msTargetText">Standard: Ordner der Quelldatei</div></div><button class="switch on" id="swMsSync" role="switch" aria-checked="true"></button></div>
-            <div class="setting"><div><div class="sl">Antwort als Word speichern</div><div class="sd">Memo zusätzlich zu erzeugten Dateien</div></div><button class="switch on" id="swMsAnswer" role="switch" aria-checked="true"></button></div>
-            <div style="padding:6px 0 0;display:flex;gap:8px;flex-wrap:wrap">
-              <button class="mini" id="msPickTargetBtn">Zielordner wählen</button>
-              <button class="mini" id="msClearTargetBtn" hidden>Zielordner zurücksetzen</button>
+          <div class="card" style="margin-bottom:14px" id="cardSources">
+            <h3>Quellen &amp; Speichern</h3>
+            <p class="sub" style="font-size:12.5px;color:var(--muted);margin:0 0 6px">Erzeugte Dateien gehen standardmäßig dorthin zurück, woher die Unterlagen kommen – vorhandene Dateien werden nie überschrieben. Für ein einzelnes Gespräch lässt sich das Ziel unter dem Eingabefeld bei „Ergebnisse →“ ändern.</p>
+            <div class="setting"><div><div class="sl">Lokaler Ordner</div><div class="sd">Ergebnisse neben der Quelldatei im verbundenen Ordner speichern (Chrome oder Edge am Desktop; sonst Download)</div></div><button class="switch on" id="swFolderSave" role="switch" aria-checked="true" aria-label="Ergebnisse im lokalen Ordner speichern"></button></div>
+            <div id="msSettings">
+              <div class="setting"><div><div class="sl">OneDrive / SharePoint</div><div class="sd">Ergebnisse in den Ordner der Quelldatei zurückschreiben</div></div><button class="switch on" id="swMsSync" role="switch" aria-checked="true" aria-label="Ergebnisse nach OneDrive / SharePoint zurückschreiben"></button></div>
+              <div class="setting"><div><div class="sl">Antwort als Word-Memo</div><div class="sd">Beim Zurückschreiben nach SharePoint zusätzlich die Antwort ablegen</div></div><button class="switch on" id="swMsAnswer" role="switch" aria-checked="true" aria-label="Antwort als Word-Memo speichern"></button></div>
+              <div class="kv"><span>Microsoft-Konto</span><b id="kvMsAccount">nicht verbunden</b></div>
+              <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn ghost sm" id="msConnectBtn">Mit Microsoft anmelden</button>
+                <button class="mini" id="msDisconnectBtn" hidden>Trennen</button>
+              </div>
             </div>
           </div>
           <div class="card" style="margin-bottom:14px">
@@ -796,28 +830,33 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
           <span class="klbl" id="kbBtnLbl">Automatisch</span>
         </button>
-        <button class="ctool" id="attachBtn" title="Dokumente anhängen (PDF, Word, Text)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>
-          <span class="lbl">Dokumente</span>
-        </button>
-        <button class="ctool" id="msBtn" title="Dokumente aus OneDrive / SharePoint anhängen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg>
-          <span class="lbl">Microsoft 365</span>
+        <button class="ctool" id="addBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu" title="Dokumente anhängen oder eine Quelle verbinden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+          <span class="lbl">Hinzufügen</span>
+          <span class="cnt" id="addCount" hidden></span>
         </button>
         <button class="ctool" id="skillBtn" title="Skill anwenden (oder „/“ tippen)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
           <span class="lbl">Skills</span>
         </button>
-        <button class="ctool" id="folderBtn" title="Lokalen Ordner verbinden – der Assistent durchsucht ihn selbst, nichts wird vorab hochgeladen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg>
-          <span class="lbl">Ordner</span>
-        </button>
         <button class="sendbtn" id="sendBtn" aria-label="Senden" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
-      <div class="sync-note" id="syncNote" hidden></div>
+      <button class="save-line" id="saveLine" type="button" aria-haspopup="menu" hidden></button>
     </div>
+
+    <!-- "Hinzufügen" menu: attach files (sent with the question) or connect a source (searched by the assistant) -->
+    <div class="pop-menu add-menu" id="addMenu" role="menu" aria-label="Hinzufügen" hidden>
+      <div class="pm-sec"><b>Dateien anhängen</b><span>werden mit der Frage geschickt</span></div>
+      <button class="pm-item" id="attachBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><span class="tx"><b>Von diesem Computer</b><span id="attachItemSub">PDF, Word, Excel, Text – auch per Drag &amp; Drop</span></span></button>
+      <button class="pm-item" id="msBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg></span><span class="tx"><b>Aus OneDrive / SharePoint</b><span id="msItemSub">Anmeldung erforderlich</span></span></button>
+      <div class="pm-sec"><b>Quelle verbinden</b><span>der Assistent durchsucht sie selbst</span></div>
+      <button class="pm-item" id="folderBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg></span><span class="tx"><b>Lokaler Ordner</b><span id="folderItemSub">bleibt auf dem Gerät, nichts wird vorab hochgeladen</span></span></button>
+      <button class="pm-item" id="matterBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="tx"><b>Akt</b><span id="matterItemSub">Dokumente auf dem Server</span></span></button>
+      <div id="addRecent"></div>
+    </div>
+    <div class="pop-menu" id="saveMenu" role="menu" aria-label="Ergebnisse speichern" hidden></div>
 
     <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
     <input type="file" id="folderInput" multiple hidden webkitdirectory />
@@ -835,7 +874,7 @@
       const $ = (id) => document.getElementById(id)
       const home = $('home'), chatView = $('chat'), messages = $('messages'), composer = $('composer')
       const input = $('input'), sendBtn = $('sendBtn'), attachBtn = $('attachBtn'), fileInput = $('fileInput'), attachList = $('attachList')
-      const msBtn = $('msBtn'), syncNote = $('syncNote')
+      const msBtn = $('msBtn')
       const costPill = $('costPill'), mainTitle = $('mainTitle')
 
       const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v3', LS_OWNER = 'aiss.owner.v1'
@@ -976,6 +1015,9 @@
         server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
         skill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>',
         mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+        computer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
+        auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
+        save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>',
         attach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12 20.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.2a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8"/></svg>',
       }
       const svg = (name) => { const s = document.createElement('span'); s.innerHTML = ICONS[name] || ICONS.tool; return s.firstChild }
@@ -1210,30 +1252,254 @@
         }
         renderAttachments()
       }
+      // ---- context bar: "Durchsucht" (connected folder / Akt) and "Angehängt" (files sent with the question) ----
+      let filesOpen = false // more than two attachments are folded into one chip
+      const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+      function chipEl(cls, icon, label, meta, onRemove, removeTitle) {
+        const c = el('span', 'chip' + (cls ? ' ' + cls : ''))
+        if (icon) c.appendChild(svg(icon))
+        const t = el('span'); t.appendChild(document.createTextNode(label)); if (meta) t.appendChild(el('span', 'meta', ' · ' + meta)); c.appendChild(t)
+        if (onRemove) { const x = el('button', null, '×'); x.type = 'button'; x.title = removeTitle || 'Entfernen'; x.setAttribute('aria-label', `${x.title}: ${label}`); x.addEventListener('click', (e) => { e.stopPropagation(); onRemove() }); c.appendChild(x) }
+        return c
+      }
+      function matterChip() {
+        const m = current.matter, n = m.docIds?.length || 0
+        const c = chipEl('ctx-src matter', 'matter', m.name, n ? plural(n, 'Dokument', 'Dokumente') : 'Akt', () => { current.matter = null; persistCurrent(); renderAttachments() }, 'Akt entfernen')
+        c.title = 'Akt: der Assistent durchsucht seine Dokumente. Klicken für Optionen.'
+        c.addEventListener('click', openMatterChipDialog)
+        return c
+      }
+      function folderChip() {
+        const c = chipEl('ctx-src folder', 'localfolder', localFolder.name, plural(localFolder.entries.length, 'Datei', 'Dateien'), () => { localFolder = null; renderAttachments(); toast('Ordner getrennt.') }, 'Ordner trennen')
+        c.title = 'Lokaler Ordner: der Assistent durchsucht ihn selbst. Klicken für Optionen (Dateien anhängen, in einen Akt hochladen).'
+        c.addEventListener('click', openFolderDialog)
+        return c
+      }
+      function fileChips() {
+        const items = [
+          ...pendingFiles.map((f, i) => ({ icon: f.folderPath ? 'localfolder' : 'computer', name: f.name, size: f.size, from: f.folderPath ? 'aus dem Ordner' : 'von diesem Computer', remove: () => { pendingFiles.splice(i, 1); renderAttachments() } })),
+          ...pendingMs.map((f, i) => ({ icon: 'cloud', name: f.name, size: f.size, from: 'aus OneDrive / SharePoint', remove: () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() } })),
+        ]
+        if (items.length < 3) filesOpen = false
+        const chip = (it) => { const c = chipEl('', it.icon, it.name, it.size ? fmtSize(it.size) : '', it.remove); c.title = `${it.name} – ${it.from}`; return c }
+        if (items.length < 3 || filesOpen) {
+          const out = items.map(chip)
+          if (filesOpen) { const less = el('button', 'chip more open'); less.type = 'button'; less.appendChild(document.createTextNode('weniger')); less.appendChild(svg('chev')); less.addEventListener('click', () => { filesOpen = false; renderAttachments() }); out.push(less) }
+          return out
+        }
+        const c = el('button', 'chip more'); c.type = 'button'; c.title = items.map((it) => it.name).join('\n')
+        c.appendChild(svg('attach')); c.appendChild(el('span', null, plural(items.length, 'Datei', 'Dateien'))); c.appendChild(svg('chev'))
+        c.setAttribute('aria-label', `${plural(items.length, 'angehängte Datei', 'angehängte Dateien')} anzeigen`)
+        c.addEventListener('click', () => { filesOpen = true; renderAttachments() })
+        return [c]
+      }
+      function skillChip() {
+        const c = chipEl('skill', 'skill', 'Skill: ' + pendingSkill.name, '', () => { pendingSkill = null; renderAttachments() }, 'Skill entfernen')
+        c.title = 'Skill für die nächste Nachricht'
+        c.addEventListener('click', () => { const sk = skillsCache.find((x) => x.id === pendingSkill.id); if (sk?.fields?.length) skillParamsForm(sk, pendingSkill.params) })
+        return c
+      }
+      /** Fills a container with the grouped context chips (composer and agent pages share it). */
+      function renderContextInto(box, { skill = true } = {}) {
+        box.innerHTML = ''
+        const group = (label, chips) => { if (!chips.length) return; const g = el('div', 'ctx-grp'); if (label) g.appendChild(el('span', 'ctx-lbl', label)); const w = el('div', 'ctx-chips'); for (const c of chips) w.appendChild(c); g.appendChild(w); box.appendChild(g) }
+        group('Durchsucht', [...(current?.matter ? [matterChip()] : []), ...(localFolder ? [folderChip()] : [])])
+        group('Angehängt', fileChips())
+        if (skill && pendingSkill) group('', [skillChip()])
+      }
       function renderAttachments() {
-        attachList.innerHTML = ''
-        if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, `Akt: ${current.matter.name}${current.matter.docIds?.length ? ` · ${current.matter.docIds.length} Dokument${current.matter.docIds.length > 1 ? 'e' : ''}` : ''}`)); const x = el('button', null, '×'); x.title = 'Aktenkontext entfernen'; x.addEventListener('click', () => { current.matter = null; persistCurrent(); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
-        pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); attachList.appendChild(c) })
-        pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, `${f.name}${f.size ? ' · ' + fmtSize(f.size) : ''}`)); const x = el('button', null, '×'); x.title = 'Entfernen'; x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments(); renderMsUi() }); c.appendChild(x); attachList.appendChild(c) })
-        if (localFolder) attachList.appendChild(folderChip())
-        if (pendingSkill) { const c = el('span', 'chip skill'); c.title = 'Skill für die nächste Nachricht'; c.appendChild(svg('skill')); c.appendChild(el('span', null, 'Skill: ' + pendingSkill.name)); c.addEventListener('click', () => { const sk = skillsCache.find((x) => x.id === pendingSkill.id); if (sk?.fields?.length) skillParamsForm(sk, pendingSkill.params) }); const x = el('button', null, '×'); x.title = 'Skill entfernen'; x.addEventListener('click', (e) => { e.stopPropagation(); pendingSkill = null; renderAttachments() }); c.appendChild(x); attachList.appendChild(c) }
+        renderContextInto(attachList)
+        const n = pendingFiles.length + pendingMs.length + (localFolder ? 1 : 0) + (current?.matter ? 1 : 0)
+        $('addCount').hidden = !n; $('addCount').textContent = n
         $('skillBtn').classList.toggle('on', Boolean(pendingSkill))
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
         msBtn.classList.toggle('on', pendingMs.length > 0)
         $('folderBtn').classList.toggle('on', Boolean(localFolder))
+        $('matterBtn').classList.toggle('on', Boolean(current?.matter))
         renderAgentDocs()
+        renderSaveLine()
         updateSend()
       }
-      function folderChip() {
-        const c = el('span', 'chip folder'); c.title = 'Ordneroptionen: agentisch durchsuchen, Dateien anhängen oder in einen Akt hochladen'
-        c.appendChild(svg('localfolder')); c.appendChild(el('span', null, `${localFolder.name} · ${localFolder.entries.length} Datei${localFolder.entries.length === 1 ? '' : 'en'}`))
-        c.addEventListener('click', openFolderDialog)
-        const x = el('button', null, '×'); x.title = 'Ordner trennen'; x.addEventListener('click', (e) => { e.stopPropagation(); localFolder = null; renderAttachments(); toast('Ordner getrennt.') }); c.appendChild(x)
-        return c
+      function openMatterChipDialog() {
+        const m = current?.matter; if (!m) return
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.remove('wide')
+        card.appendChild(el('h2', null, `Akt „${m.name}“`))
+        card.appendChild(el('div', 'md', m.docIds?.length ? `Fragen beziehen sich auf ${plural(m.docIds.length, 'ausgewähltes Dokument', 'ausgewählte Dokumente')} dieses Akts.` : 'Der Assistent durchsucht die Dokumente dieses Akts selbst und liest nur, was er für die Antwort braucht.'))
+        const opts = el('div', 'fold-opts')
+        const opt = (icon, title, desc, onClick) => { const b = el('button', 'fold-opt'); const i = el('span', 'ico'); i.appendChild(svg(icon)); const t = el('span'); t.appendChild(el('b', null, title)); t.appendChild(el('span', 'd', desc)); b.append(i, t); b.addEventListener('click', onClick); opts.appendChild(b) }
+        opt('matter', 'Akt öffnen', 'Dokumente, Befunde und Tabellen ansehen.', () => { closeDlg(); navigate('#/matter/' + m.id) })
+        opt('search', 'Anderen Akt wählen', 'Den Kontext dieses Gesprächs wechseln.', () => { closeDlg(); pickMatterSource() })
+        card.appendChild(opts)
+        const a = el('div', 'modal-actions'); const x = el('button', 'btn ghost', 'Akt entfernen'); x.addEventListener('click', () => { current.matter = null; persistCurrent(); closeDlg(); renderAttachments() }); const ok = el('button', 'btn', 'Fertig'); ok.addEventListener('click', closeDlg); a.append(x, el('span', 'sp'), ok); card.appendChild(a)
+        $('dlg').classList.add('show')
       }
+      async function pickMatterSource() {
+        await loadMatters()
+        if (!mattersCache.length) { toast('Noch kein Akt vorhanden.'); openMatterWizard('matter'); return }
+        chooseMatter('Akt verbinden', (m) => useMatter(m))
+      }
+      function useMatter(m) {
+        if (!current) newConversation({ keepView: true })
+        current.matter = { id: m.id, name: m.name, docIds: [] }
+        persistCurrent(); rememberRecent('matter', { id: m.id, name: m.name }); renderAttachments()
+        if (current.messages.length && viewName === 'assistant') showChat()
+        toast(`Akt „${m.name}“ verbunden – der Assistent durchsucht seine Dokumente.`)
+      }
+
+      // ---- popover menus ----
+      let openPop = null // { menu, anchor }
+      function placePop(menu, anchor) {
+        const r = anchor.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight
+        menu.style.visibility = 'hidden'; menu.hidden = false
+        const mw = menu.offsetWidth, mh = menu.offsetHeight
+        const left = Math.max(12, Math.min(r.left, vw - mw - 12))
+        const above = r.top - 8 >= mh || r.top > vh - r.bottom
+        menu.style.left = left + 'px'
+        menu.style.top = (above ? Math.max(12, r.top - mh - 8) : Math.min(vh - mh - 12, r.bottom + 8)) + 'px'
+        menu.style.visibility = ''
+      }
+      function showPop(menu, anchor) {
+        if (openPop) closePop()
+        openPop = { menu, anchor }
+        placePop(menu, anchor)
+        anchor.setAttribute('aria-expanded', 'true')
+        const first = [...menu.querySelectorAll('.pm-item')].find((b) => !b.hidden && !b.disabled); if (first) first.focus({ preventScroll: true })
+      }
+      function closePop({ focus = false } = {}) {
+        if (!openPop) return
+        const { menu, anchor } = openPop; openPop = null
+        menu.hidden = true; anchor.setAttribute('aria-expanded', 'false')
+        if (focus && anchor.isConnected) anchor.focus({ preventScroll: true })
+      }
+      document.addEventListener('pointerdown', (e) => { if (openPop && !openPop.menu.contains(e.target) && !openPop.anchor.contains(e.target)) closePop() }, true)
+      window.addEventListener('resize', () => { if (openPop) placePop(openPop.menu, openPop.anchor) })
+      document.addEventListener('scroll', () => { if (openPop) placePop(openPop.menu, openPop.anchor) }, true)
+      for (const menu of [$('addMenu'), $('saveMenu')]) {
+        menu.addEventListener('keydown', (e) => {
+          const items = [...menu.querySelectorAll('.pm-item')].filter((b) => !b.hidden && !b.disabled)
+          const i = items.indexOf(document.activeElement)
+          if (e.key === 'Escape') { e.preventDefault(); closePop({ focus: true }) }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus() }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus() }
+          else if (e.key === 'Tab') closePop()
+        })
+      }
+
+      // ---- "Hinzufügen": one entry point for uploads, Microsoft 365, local folder and Akt ----
+      function openAddMenu(anchor) {
+        const ms = $('msBtn')
+        ms.hidden = !msState.configured
+        $('msItemSub').textContent = msState.connected ? (msState.account?.email || 'verbunden') + (pendingMs.length ? ` · ${pendingMs.length} gewählt` : '') : 'Anmeldung erforderlich'
+        const nUp = pendingFiles.length
+        $('attachItemSub').textContent = nUp ? `${plural(nUp, 'Datei', 'Dateien')} angehängt – weitere hinzufügen` : 'PDF, Word, Excel, Text – auch per Drag & Drop'
+        $('folderItemSub').textContent = localFolder ? `Verbunden: ${localFolder.name} – Optionen` : 'bleibt auf dem Gerät, nichts wird vorab hochgeladen'
+        $('matterItemSub').textContent = current?.matter ? `Verbunden: ${current.matter.name} – Optionen` : 'Dokumente auf dem Server, auch für die Due Diligence'
+        renderAddRecent()
+        showPop($('addMenu'), anchor)
+      }
+      const addBtn = $('addBtn')
+      addBtn.addEventListener('click', () => { if (openPop?.anchor === addBtn) closePop(); else openAddMenu(addBtn) })
+      const menuAction = (fn) => () => { closePop(); fn() }
+      attachBtn.addEventListener('click', menuAction(() => fileInput.click()))
+      $('matterBtn').addEventListener('click', menuAction(() => (current?.matter ? openMatterChipDialog() : pickMatterSource())))
+
+      // recently used folders (directory handles in IndexedDB, per account) and Akten (localStorage)
+      const RECENT_MAX = 3
+      const recentKey = (kind) => `aiss.recent.${kind}.${convoScope || 'local'}`
+      function rememberRecent(kind, item) {
+        try { const list = JSON.parse(localStorage.getItem(recentKey(kind)) || '[]').filter((x) => (x.id || x.name) !== (item.id || item.name)); list.unshift({ ...item, t: Date.now() }); localStorage.setItem(recentKey(kind), JSON.stringify(list.slice(0, RECENT_MAX))) } catch {}
+      }
+      function recentList(kind) { try { return JSON.parse(localStorage.getItem(recentKey(kind)) || '[]') } catch { return [] } }
+      function handleDb() {
+        return new Promise((resolve, reject) => { const r = indexedDB.open('aiss-folders', 1); r.onupgradeneeded = () => r.result.createObjectStore('handles'); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) })
+      }
+      async function idbHandle(mode, key, value) {
+        const db = await handleDb()
+        try {
+          return await new Promise((resolve, reject) => {
+            const tx = db.transaction('handles', mode === 'get' ? 'readonly' : 'readwrite'), st = tx.objectStore('handles')
+            const req = mode === 'get' ? st.get(key) : mode === 'put' ? st.put(value, key) : st.delete(key)
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error)
+          })
+        } finally { db.close() }
+      }
+      async function rememberFolderHandle(h) {
+        rememberRecent('folder', { name: h.name })
+        try { await idbHandle('put', `${convoScope || 'local'}|${h.name}`, h) } catch {}
+      }
+      async function reopenRecentFolder(name) {
+        let h = null
+        try { h = await idbHandle('get', `${convoScope || 'local'}|${name}`) } catch {}
+        if (!h || !h.requestPermission) { toast('Ordner nicht mehr verfügbar – bitte neu wählen.'); pickFolder(); return }
+        let p = 'denied'
+        try { p = await h.requestPermission({ mode: settings.folderSave !== false ? 'readwrite' : 'read' }) } catch {}
+        if (p !== 'granted') { try { p = (await h.requestPermission({ mode: 'read' })) === 'granted' ? 'prompt' : 'denied' } catch {} if (p === 'denied') { toast('Zugriff auf den Ordner wurde nicht erlaubt.'); return } }
+        await loadFolderFromHandle(h, p === 'granted' ? 'granted' : 'prompt')
+        rememberRecent('folder', { name: h.name })
+      }
+      function renderAddRecent() {
+        const box = $('addRecent'); box.innerHTML = ''
+        const folders = window.showDirectoryPicker ? recentList('folder').filter((f) => f.name !== localFolder?.name) : []
+        const matters = recentList('matter').filter((m) => m.id !== current?.matter?.id)
+        if (!folders.length && !matters.length) return
+        box.appendChild(el('div', 'pm-sep')); box.appendChild(el('div', 'pm-sec')).appendChild(el('b', null, 'Zuletzt verwendet'))
+        const row = (icon, title, sub, fn) => { const b = el('button', 'pm-item sm'); b.setAttribute('role', 'menuitem'); const i = el('span', 'ico'); i.appendChild(svg(icon)); const t = el('span', 'tx'); t.appendChild(el('b', null, title)); t.appendChild(el('span', null, sub)); b.append(i, t); b.addEventListener('click', menuAction(fn)); box.appendChild(b) }
+        for (const f of folders) row('localfolder', f.name, 'Lokaler Ordner – erneut verbinden', () => reopenRecentFolder(f.name))
+        for (const m of matters) row('matter', m.name, 'Akt', () => useMatter(m))
+      }
+
+      // ---- "Ergebnisse →": where generated files go (per conversation; default: back to the source) ----
+      const saveMode = () => current?.saveTo || 'auto'
+      /** Effective targets: Microsoft 365 write-back and/or the local folder; neither = download only. */
+      function saveTargets({ msContext = pendingMs.length > 0 } = {}) {
+        const mode = saveMode()
+        const msOk = Boolean(msState.connected), localOk = Boolean(localFolder) && canWriteFolder()
+        if (mode === 'download') return { ms: false, local: false }
+        if (mode === 'ms') return { ms: msOk && Boolean(current?.msTarget), local: false }
+        if (mode === 'local') return { ms: false, local: localOk }
+        return { ms: msOk && settings.msSync !== false && (msContext || Boolean(current?.msTarget)), local: localOk && settings.folderSave !== false }
+      }
+      const localSaveOn = () => { const m = saveMode(); return m === 'local' || (m === 'auto' && settings.folderSave !== false) }
+      function saveLabel() {
+        const t = saveTargets(), parts = []
+        if (t.ms) parts.push(current?.msTarget ? `SharePoint · ${current.msTarget.name || 'Zielordner'}` : 'SharePoint · neben der Quelldatei')
+        if (t.local) parts.push(`Ordner „${localFolder.name}“${localFolder.write === 'granted' ? '' : ' (Freigabe beim Speichern)'}`)
+        if (parts.length) return parts.join(' + ')
+        return localFolder && !canWriteFolder() && saveMode() !== 'download' ? 'Download (dieser Browser kann nicht in den Ordner schreiben)' : 'Download in der Antwort'
+      }
+      function renderSaveLine() {
+        const line = $('saveLine')
+        const show = Boolean(pendingFiles.length || pendingMs.length || localFolder || current?.matter || current?.msTarget || saveMode() !== 'auto')
+        line.hidden = !show
+        if (!show) { if (openPop?.anchor === line) closePop(); return }
+        line.innerHTML = ''
+        line.appendChild(svg('save')); line.appendChild(el('span', null, 'Ergebnisse →')); line.appendChild(el('b', null, saveLabel())); line.appendChild(el('span', 'chg', 'ändern'))
+        line.title = 'Wohin erzeugte Dateien gespeichert werden'
+      }
+      function openSaveMenu() {
+        const menu = $('saveMenu'); menu.innerHTML = ''
+        const mode = saveMode()
+        const item = (icon, title, sub, on, fn, disabled = false) => {
+          const b = el('button', 'pm-item' + (on ? ' on' : '')); b.setAttribute('role', 'menuitemradio'); b.setAttribute('aria-checked', String(on)); b.disabled = disabled
+          const i = el('span', 'ico'); i.appendChild(svg(icon)); const t = el('span', 'tx'); t.appendChild(el('b', null, title)); t.appendChild(el('span', null, sub)); b.append(i, t)
+          if (on) b.appendChild(el('span', 'ck', '✓'))
+          b.addEventListener('click', menuAction(fn)); menu.appendChild(b)
+        }
+        const set = (m) => { if (!current) newConversation({ keepView: true }); current.saveTo = m; current.msTarget = null; persistCurrent(); renderAttachments(); renderMsUi() }
+        menu.appendChild(el('div', 'pm-sec')).appendChild(el('b', null, 'Ergebnisse speichern'))
+        item('auto', 'Automatisch', 'zurück dorthin, woher die Unterlagen kommen', mode === 'auto', () => set('auto'))
+        if (localFolder) item('localfolder', `Lokaler Ordner „${localFolder.name}“`, canWriteFolder() ? 'neben der Quelldatei, nie überschreiben' : 'nur in Chrome oder Edge am Desktop', mode === 'local', async () => { set('local'); if (canWriteFolder() && localFolder.write !== 'granted') { await folderPermission(true); renderSaveLine() } }, !canWriteFolder())
+        if (msState.configured) item('cloud', current?.msTarget ? `SharePoint · ${current.msTarget.name || 'Zielordner'}` : 'SharePoint- / OneDrive-Ordner …', msState.connected ? (current?.msTarget ? 'anderen Ordner wählen' : 'Zielordner wählen') : 'Anmeldung erforderlich', mode === 'ms', () => {
+          if (!msState.connected) { openMsConnect(); return }
+          openMsPicker({ mode: 'folder' })
+        })
+        item('save', 'Nur herunterladen', 'Dateien erscheinen in der Antwort', mode === 'download', () => set('download'))
+        showPop(menu, $('saveLine'))
+      }
+      $('saveLine').addEventListener('click', () => { if (openPop?.anchor === $('saveLine')) closePop(); else openSaveMenu() })
+
       const defaultFileChange = async () => { await addFiles(fileInput.files); fileInput.value = '' }
       fileInput.onchange = defaultFileChange
-      attachBtn.addEventListener('click', () => fileInput.click())
       // drag & drop onto the composer (matter pages have their own drop zones)
       document.addEventListener('dragover', (e) => { e.preventDefault() })
       document.addEventListener('drop', (e) => { e.preventDefault(); if ((viewName === 'assistant' || viewName === 'agent') && e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files) })
@@ -1261,14 +1527,10 @@
         $('kvMsAccount').textContent = !msState.configured ? 'nicht konfiguriert' : connected ? (msState.account?.email || msState.account?.name || 'verbunden') : 'nicht verbunden'
         $('msConnectBtn').hidden = !msState.configured || connected
         $('msDisconnectBtn').hidden = !connected
-        const t = current?.msTarget
-        $('msTargetText').textContent = t ? `Ziel: ${t.name || 'gewählter Ordner'}` : 'Standard: Ordner der Quelldatei'
-        $('msClearTargetBtn').hidden = !t
-        $('msPickTargetBtn').hidden = !connected
+        $('msSettings').hidden = !msState.configured
         setSwitch('swMsSync', settings.msSync !== false); setSwitch('swMsAnswer', settings.msSaveAnswer !== false)
         msBtn.classList.toggle('on', pendingMs.length > 0)
-        syncNote.hidden = !(connected && settings.msSync !== false && (pendingMs.length || t))
-        syncNote.textContent = t ? `Ergebnisse werden nach „${t.name || 'Zielordner'}“ zurückgeschrieben.` : 'Ergebnisse werden in den Ordner der ausgewählten Datei zurückgeschrieben.'
+        renderSaveLine()
         const acc = $('sbAccount'); acc.innerHTML = ''
         const av = el('span', 'av', connected ? (msState.account?.name || msState.account?.email || 'M').trim().slice(0, 1).toUpperCase() : 'M'); const who = el('span', 'who')
         who.appendChild(el('b', null, connected ? (msState.account?.name || 'Microsoft 365') : 'Microsoft 365')); who.appendChild(el('span', null, connected ? (msState.account?.email || 'verbunden') : msState.configured ? 'nicht verbunden – anmelden' : 'nicht konfiguriert'))
@@ -1289,11 +1551,10 @@
       $('msDisconnectBtn').addEventListener('click', async () => { await fetch('/api/ms/logout', { method: 'POST' }); pendingMs = []; renderAttachments(); await loadMsState(); toast('Microsoft 365 getrennt.') })
       $('swMsSync').addEventListener('click', () => { settings.msSync = settings.msSync === false; saveSettings(); renderMsUi() })
       $('swMsAnswer').addEventListener('click', () => { settings.msSaveAnswer = settings.msSaveAnswer === false; saveSettings(); renderMsUi() })
-      $('msPickTargetBtn').addEventListener('click', () => openMsPicker({ mode: 'folder' }))
-      $('msClearTargetBtn').addEventListener('click', () => { if (current) { current.msTarget = null; persistCurrent() } renderMsUi() })
       $('swWeb').addEventListener('click', () => { settings.webSearch = !settings.webSearch; saveSettings(); setSwitch('swWeb', settings.webSearch) })
-      $('swFolderSave').addEventListener('click', () => { settings.folderSave = settings.folderSave === false; saveSettings(); setSwitch('swFolderSave', settings.folderSave !== false) })
+      $('swFolderSave').addEventListener('click', () => { settings.folderSave = settings.folderSave === false; saveSettings(); setSwitch('swFolderSave', settings.folderSave !== false); renderSaveLine() })
       msBtn.addEventListener('click', () => {
+        closePop()
         if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
         if (!msState.connected) { openMsConnect(); return }
         openMsPicker({ mode: 'attach' })
@@ -1382,7 +1643,7 @@
           const f = { driveId: msNav.driveId, itemId: msNav.itemId, name: folderName() }
           if (mode === 'import') { closeMs(); onImport?.({ items: [], folder: f }); return }
           if (mode === 'target') { closeMs(); onPick?.(f); return }
-          if (!current) newConversation({ keepView: true }); current.msTarget = f; persistCurrent(); renderMsUi(); toast('Zielordner gesetzt.'); if (pickFolder) closeMs()
+          if (!current) newConversation({ keepView: true }); current.msTarget = f; current.saveTo = 'ms'; persistCurrent(); renderMsUi(); toast(`Ergebnisse gehen nach „${f.name || 'Zielordner'}“.`); if (pickFolder) closeMs()
         })
         attachB.addEventListener('click', () => { if (mode === 'import') { closeMs(); onImport?.({ items: [...selected.values()], folder: null }); return } pendingMs = [...selected.values()]; renderAttachments(); renderMsUi(); closeMs() })
         $('msModal').classList.add('show')
@@ -1694,7 +1955,7 @@
         let hardFail = false
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: settings.msSync !== false, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta, skill: skillReq }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: saveTargets({ msContext: msFiles.length > 0 }).ms, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta, skill: skillReq }) })
           if (resp.status === 401) showAuthScreen('login', 'Bitte anmelden, um fortzufahren.')
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readSse(resp, handle)
@@ -1742,7 +2003,7 @@
           // Saving results into the folder needs write access; the browser asks once, right after the pick (still within the click).
           let write = 'prompt'
           if (settings.folderSave !== false && h.requestPermission) { try { write = await h.requestPermission({ mode: 'readwrite' }) } catch { write = 'prompt' } }
-          await loadFolderFromHandle(h, write)
+          await loadFolderFromHandle(h, write); rememberFolderHandle(h)
           return
         }
         $('folderInput').click() // Safari/Firefox: folder selection via input (files stay in the browser as well)
@@ -1776,9 +2037,9 @@
         localFolder = { name, via, entries, texts: new Map(), root, dirs: dirs || new Map(), write: root ? write : 'unsupported' }
         renderAttachments()
         const readable = entries.filter((e) => LOCAL_TEXT_EXT.test(e.path)).length
-        toast(`Ordner „${name}“ verbunden · ${entries.length} Dateien (${readable} lesbar). Der Assistent durchsucht ihn bei Bedarf selbst.`, 5000)
+        toast(`Ordner „${name}“ verbunden · ${plural(entries.length, 'Datei', 'Dateien')} (${readable} lesbar). Der Assistent durchsucht ihn bei Bedarf selbst.`, 5000)
       }
-      $('folderBtn').addEventListener('click', () => { if (localFolder) openFolderDialog(); else pickFolder() })
+      $('folderBtn').addEventListener('click', menuAction(() => { if (localFolder) openFolderDialog(); else pickFolder() }))
       // Test hook: a folder from in-memory files ({ path, content: string | Uint8Array }).
       window.__aissSetLocalFolder = (name, files) => setLocalFolder({ name, via: 'test', entries: files.map((f) => { const file = new File([f.content], f.path.split('/').pop()); return { path: f.path, size: file.size, lastModified: Date.now(), get: async () => file } }) })
 
@@ -2021,7 +2282,7 @@
         btn.addEventListener('click', () => save(true))
         row.append(btn, info); panel.appendChild(row)
         // Automatic only for a fresh answer and when the folder already allows saving (no prompt without a click).
-        if (opts.live && settings.folderSave !== false && !data.folderSaved) save(false)
+        if (opts.live && localSaveOn() && !data.folderSaved) save(false)
       }
 
       // ---- folder dialog: search agentically, attach chosen files, or upload into an Akt ----
@@ -2358,14 +2619,13 @@
         // right: documents and the Austrian checklist
         const side = el('div'); side.style.cssText = 'display:grid;gap:14px'
         const docs = el('div', 'card'); docs.appendChild(el('h3', null, 'Unterlagen'))
-        docs.appendChild(el('p', 'docs-hint', a.needsDocuments ? 'Den Vertrag hochladen, aus Microsoft 365 wählen, einen lokalen Ordner verbinden (der Agent sucht den Vertrag selbst) oder einen Akt verwenden.' : 'Optional: Hausmuster, Korrespondenz, Urkunden. Ein lokaler Ordner oder Akt wird bei Bedarf selbst durchsucht.'))
+        docs.appendChild(el('p', 'docs-hint', a.needsDocuments ? 'Den Vertrag anhängen (Computer, OneDrive / SharePoint) oder einen lokalen Ordner bzw. Akt verbinden – dort sucht der Agent den Vertrag selbst.' : 'Optional: Hausmuster, Korrespondenz, Urkunden. Ein verbundener Ordner oder Akt wird bei Bedarf selbst durchsucht.'))
         const box = el('div', 'docs-box'); box.id = 'agentDocs'; docs.appendChild(box)
         const acts = el('div', 'docs-actions')
-        const mk = (icon, label, fn) => { const b = el('button', 'btn ghost sm'); b.appendChild(svg(icon)); b.appendChild(document.createTextNode(label)); b.addEventListener('click', fn); acts.appendChild(b) }
-        mk('attach', 'Dokumente', () => fileInput.click())
-        mk('localfolder', 'Ordner', () => (localFolder ? openFolderDialog() : pickFolder()))
-        mk('cloud', 'Microsoft 365', () => msBtn.click())
-        mk('matter', 'Akt', async () => { await loadMatters(); if (!mattersCache.length) { toast('Noch kein Akt vorhanden.'); return } chooseMatter('Akt für den Agenten', (m) => { if (!current) newConversation({ keepView: true }); current.matter = { id: m.id, name: m.name, docIds: [] }; renderAttachments(); toast(`Akt: ${m.name} – der Agent durchsucht seine Dokumente.`) }) })
+        const add = el('button', 'btn ghost sm'); add.id = 'agentAddBtn'; add.setAttribute('aria-haspopup', 'menu'); add.setAttribute('aria-expanded', 'false')
+        add.appendChild(svg('file')); add.appendChild(document.createTextNode('Unterlagen hinzufügen'))
+        add.addEventListener('click', () => { if (openPop?.anchor === add) closePop(); else openAddMenu(add) })
+        acts.appendChild(add)
         docs.appendChild(acts); side.appendChild(docs)
         const ref = el('div', 'card'); ref.appendChild(el('h3', null, a.grid ? 'Prüfraster (österreichisches Recht)' : 'Typische Erfordernisse'))
         const det = el('details', 'grid'); det.appendChild(el('summary', null, a.grid ? `${a.grid.length} Prüfpunkte anzeigen` : `${a.types.length} Typen anzeigen`))
@@ -2383,11 +2643,7 @@
       }
       function renderAgentDocs() {
         const box = $('agentDocs'); if (!box) return
-        box.innerHTML = ''
-        if (current?.matter) { const c = el('span', 'chip matter'); c.appendChild(svg('matter')); c.appendChild(el('span', null, 'Akt: ' + current.matter.name)); const x = el('button', null, '×'); x.addEventListener('click', () => { current.matter = null; renderAttachments() }); c.appendChild(x); box.appendChild(c) }
-        pendingFiles.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(el('span', null, `${f.name} · ${fmtSize(f.size)}`)); const x = el('button', null, '×'); x.addEventListener('click', () => { pendingFiles.splice(i, 1); renderAttachments() }); c.appendChild(x); box.appendChild(c) })
-        pendingMs.forEach((f, i) => { const c = el('span', 'chip'); c.appendChild(svg('cloud')); c.appendChild(el('span', null, f.name)); const x = el('button', null, '×'); x.addEventListener('click', () => { pendingMs.splice(i, 1); renderAttachments() }); c.appendChild(x); box.appendChild(c) })
-        if (localFolder) box.appendChild(folderChip())
+        renderContextInto(box, { skill: false })
       }
       function startAgent(a, inputs) {
         if (busy) { toast('Bitte warten, bis die laufende Antwort fertig ist.'); return }
@@ -2966,6 +3222,7 @@
       function askAboutMatter(m, docIds = [], prefill = '') {
         const ctx = { id: m.id, name: m.name, docIds: docIds.slice(0, MAX_UPLOADS) }
         if (current && !current.messages.length) { current.matter = ctx } else newConversation({ keepView: true, matterCtx: ctx })
+        rememberRecent('matter', { id: m.id, name: m.name })
         docSelection = new Set()
         navigate('#/assistant'); showView('assistant'); showHome(); renderAttachments()
         input.value = prefill; input.dispatchEvent(new Event('input')); input.focus()
@@ -2999,12 +3256,10 @@
       // ------------------------------------------------------------------
       const TOUR = [
         { sel: '#kbList', title: 'Wissensdatenbank', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage; alternativ Zivil-, Straf-, Steuer- oder öffentliches Recht (mit Bundesland) fest wählen. Rechtsfragen beantwortet die Wissensdatenbank AI:ssociate kurz mit Fundstellen, jede Fundstelle wird gegen das RIS geprüft; Dokumentaufgaben liefern Word, Excel oder PDF.' },
-        { sel: '#attachBtn', title: 'Dokumente', text: 'PDF, Word oder Text anhängen (auch per Drag & Drop). Analysen, Kommentare im Word-Dokument, Vergleiche, Fristen – Ergebnisse kommen als Word/Excel/PDF zurück.' },
-        { sel: '#folderBtn', title: 'Lokaler Ordner', text: 'Einen Ordner auf dem Rechner verbinden: Der Assistent und die Agenten durchsuchen ihn selbst und lesen nur, was sie brauchen – nichts wird vorab hochgeladen. Alternativ einzelne Dateien anhängen oder den ganzen Ordner in einen Akt hochladen.' },
-        { sel: '#msBtn', title: 'Microsoft 365', text: 'Dokumente aus OneDrive oder SharePoint anhängen; erzeugte Dateien und Berichte werden in den Aktenordner zurückgeschrieben, ohne vorhandene Dateien zu überschreiben.' },
+        { sel: '#addBtn', title: 'Hinzufügen', text: 'Ein Knopf für alle Unterlagen. Dateien anhängen – vom Computer oder aus OneDrive / SharePoint – schickt sie mit der Frage mit. Eine Quelle verbinden – lokaler Ordner oder Akt – lässt den Assistenten selbst darin suchen; aus dem Ordner wird nichts vorab hochgeladen. Darunter zeigt „Ergebnisse →“, wohin erzeugte Dateien gespeichert werden.' },
         { sel: '#navDd', title: 'Due Diligence', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Feste Prüfbereiche für Rechts- und Tax-DD, jeder Befund mit Zitat und Fundstelle, Review-Tabellen im Akt, Request List, Red-Flag-Report als Word und Excel.', nav: true },
         { sel: '#navAgentReview', title: 'Fachagenten', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen: geführte Arbeitsabläufe nach österreichischem Recht – Angaben erfassen, Prüfraster bzw. Gliederung, dann Word-Ergebnis und der nächste Schritt per Klick.', nav: true },
-        { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Microsoft 365, Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
+        { sel: '#navSettings', title: 'Einstellungen', text: 'Websuche, Quellen & Speichern (lokaler Ordner, Microsoft 365), Budget, Sitzungskosten und der Arbeitsbereich-Schlüssel, mit dem Akten auf einem anderen Gerät geöffnet werden können.', nav: true },
       ]
       let tourIdx = -1, tourCard = null, tourTarget = null
       function startTour() { closeDlg(); if (viewName !== 'assistant') { navigate('#/assistant') } if (home.hidden) showHome(); tourIdx = 0; showTourStep() }

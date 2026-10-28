@@ -49,8 +49,8 @@ question ──▶ fast model: mode, legal area, difficulty, 0–3 compact quest
   detect it), template chips (Rechtsrecherche, Versionen vergleichen,
   Zusammenfassen as forms; Vertragsprüfung, Vertrag entwerfen, Schriftsatz
   entwerfen open their agents), the "Frage AI:ssociate." composer with the chosen
-  knowledge base as a chip and the buttons Dokumente, Microsoft 365 and Ordner,
-  disclaimer. Conversation
+  knowledge base as a chip, one "Hinzufügen" button and Skills, disclaimer.
+  Conversation
   history (browser-local), feature tour, agent steps without code, sources with
   "Volltext geprüft" status, RIS verification panel, Word/Markdown export, exact
   cost per answer. No model names anywhere in the UI.
@@ -67,9 +67,24 @@ turn still reaches the knowledge base with the clause). In the due diligence the
 per-document request carries the full text (short documents) or the quotes of
 the red/amber findings.
 
+## Adding documents: attach or connect
+
+One "Hinzufügen" button (composer and agent pages) opens a menu with two groups:
+**Dateien anhängen** – from this computer or from OneDrive / SharePoint, sent with
+the question – and **Quelle verbinden** – a local folder or an Akt, which the
+assistant searches itself. Recently used folders (directory handles kept in
+IndexedDB, permission asked again on click) and Akten are offered for one click.
+Above the input, a context bar groups the chips into "Durchsucht" (folder, Akt)
+and "Angehängt" (files with their origin; three or more are folded into one
+chip). Below the input, "Ergebnisse →" names where generated files go: by
+default back to the source (folder next to the source file, SharePoint folder of
+the source file), else download; per conversation it can be set to the local
+folder, a SharePoint / OneDrive folder or download only. Settings → "Quellen &
+Speichern" holds the defaults.
+
 ## Local folders and Akten as searchable sources
 
-The composer's "Ordner" button connects a local folder (File System Access API;
+"Lokaler Ordner" in the "Hinzufügen" menu connects a local folder (File System Access API;
 Safari/Firefox: folder or file selection). Nothing is uploaded up front: the agent
 calls file tools (`files_search`, `files_list`, `files_read`, `files_attach`) that
 the server forwards to the browser (`client_tool` event, answer via
@@ -82,7 +97,8 @@ to five files to the message, or upload the whole folder into an Akt. Generated 
 source file (attached, picked or read by the agent), otherwise in the subfolder
 `AIssociate`; existing files are never overwritten (`Name (2).docx`). Write access
 is requested once right after picking the folder; automatic saving can be
-switched off in the settings ("Ergebnisse im Ordner speichern"), then a button
+switched off in the settings ("Quellen & Speichern" → Lokaler Ordner) or per
+conversation ("Ergebnisse →" → Nur herunterladen), then a button
 "Im Ordner speichern" appears under the files. Browsers without the API (Safari,
 Firefox, mobile) keep the download. A question
 in the context of an Akt without picked documents lets the agent search all of
@@ -134,11 +150,11 @@ imported elsewhere. Routes: `GET/POST /api/skills`, `PATCH/DELETE /api/skills/:i
 ## Microsoft 365 (OneDrive / SharePoint)
 
 Users sign in with their Microsoft account (OAuth 2.0 + PKCE against Entra ID,
-delegated permissions). The composer's "Microsoft 365" button opens a picker for
+delegated permissions). "Aus OneDrive / SharePoint" in the "Hinzufügen" menu opens a picker for
 OneDrive and SharePoint document libraries; picked files are downloaded
 server-side via Microsoft Graph and processed like uploads. After a task, the
 generated files and (optionally) the answer as a Word memo are written back to
-the folder of the source file or to a chosen target folder; existing files are
+the folder of the source file or to a target folder chosen under "Ergebnisse →"; existing files are
 never overwritten (Graph `conflictBehavior=rename`). The refresh token lives in
 an encrypted, HttpOnly cookie; the server keeps no account data.
 
