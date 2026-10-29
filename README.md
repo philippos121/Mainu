@@ -262,7 +262,10 @@ inside the Akt (tabs), the form-driven templates above the composer
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
 The UI is an app shell: teal app bar plus a sidebar (drawer behind the
-hamburger on mobile) with Allgemeiner Agent, Spezialagenten (Due Diligence,
+hamburger on mobile) with Allgemeiner Agent (each click starts a new question;
+there is no separate "Neue Frage" button in the menu – an open conversation, also
+one reopened from the Verlauf, shows "Neue Frage" in the app bar, which in a
+project conversation leads back to the project), Spezialagenten (Due Diligence,
 Vertragsprüfung, Vertrag entwerfen, Schriftsatz entwerfen), Skills (foldable),
 Projekte, Verlauf and Einstellungen. Akten have no menu entry of their own: the
 Due Diligence page lists the due diligences and, below, any other Akten

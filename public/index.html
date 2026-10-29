@@ -42,7 +42,6 @@
       .sb-brand { display: none; align-items: center; gap: 10px; padding: 14px 16px 6px; }
       .sb-brand img { height: 24px; width: auto; }
       .sb-brand .iconbtn { margin-left: auto; color: var(--muted); }
-      .btn.full.sb-new { margin: 8px 14px 6px; width: calc(100% - 28px); }
       .sb-nav { flex: 1; overflow-y: auto; padding: 4px 10px 10px; }
       .sb-sec { display: flex; align-items: center; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 800; margin: 14px 8px 4px; }
       .sb-sec a { margin-left: auto; font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 700; text-decoration: none; }
@@ -85,6 +84,12 @@
       .mainbar-title .crumb { color: rgba(255,255,255,0.68); font-weight: 600; }
       .mainbar-title .crumb::after { content: '›'; margin-left: 8px; }
       .mainbar-right { display: flex; align-items: center; gap: 4px; }
+      .ab-new { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 13px 0 10px; margin-right: 4px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.32); background: rgba(255,255,255,0.12); color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+      .ab-new[hidden] { display: none; }
+      .ab-new:hover { background: rgba(255,255,255,0.22); }
+      .ab-new:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+      .ab-new svg { width: 15px; height: 15px; }
+      @media (max-width: 560px) { .ab-new { padding: 0; width: 34px; justify-content: center; margin-right: 0; } .ab-new span { display: none; } }
       .cost-pill { font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,0.16); border-radius: 999px; padding: 4px 10px; white-space: nowrap; cursor: pointer; }
       .cost-pill:hover { background: rgba(255,255,255,0.26); }
       .cost-pill:empty { display: none; }
@@ -791,6 +796,7 @@
         <a class="brand" href="#/assistant" aria-label="AI:ssociate – Startseite"><img src="/aissociate-logo.png" alt="AI:ssociate" /><span class="tag">Playground</span></a>
         <div class="mainbar-title" id="mainTitle"></div>
         <div class="mainbar-right">
+          <button class="ab-new" id="chatNewBtn" type="button" title="Neue Frage an den allgemeinen Agenten" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Neue Frage</span></button>
           <span class="cost-pill" id="costPill" title="Kosten dieser Sitzung (Modelle + Websuche + Sandbox)"></span>
           <button class="iconbtn" id="helpBtn" aria-label="Hilfe" title="Hilfe: Feature-Tour und Erklärvideo" aria-haspopup="menu" aria-expanded="false" aria-controls="helpMenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.8"/><path d="M12 17.2h.01"/></svg></button>
           <button class="iconbtn" id="historyBtn" aria-label="Verlauf" title="Verlauf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg></button>
@@ -804,9 +810,8 @@
           <span class="tag">Playground</span>
           <button class="iconbtn" id="sidebarClose" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
-        <button class="btn full sb-new" id="sbNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neue Frage</button>
         <nav class="sb-nav">
-          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Allgemeiner Agent</a>
+          <a class="nav-item" data-nav="assistant" href="#/assistant" id="navGeneral" title="Neue Frage an den allgemeinen Agenten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Allgemeiner Agent</a>
           <div class="sb-sec">Spezialagenten</div>
           <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
           <a class="nav-item" data-nav="agent:contract_review" href="#/agent/contract_review" id="navAgentReview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>Vertragsprüfung</a>
@@ -876,7 +881,7 @@
 
         <!-- ---------- history ---------- -->
         <section class="view" data-view="history"><div class="page" style="max-width:760px">
-          <div class="page-head"><div><h1>Verlauf</h1><div class="sub">Gespräche werden auf dem Server gespeichert und sind auf allen Geräten verfügbar.</div></div><div class="acts"><button class="btn sm" id="histNew">Neues Gespräch</button><button class="mini danger" id="miClear">Verlauf löschen</button></div></div>
+          <div class="page-head"><div><h1>Verlauf</h1><div class="sub">Gespräche werden auf dem Server gespeichert und sind auf allen Geräten verfügbar.</div></div><div class="acts"><button class="btn sm" id="histNew">Neue Frage</button><button class="mini danger" id="miClear">Verlauf löschen</button></div></div>
           <div id="histList"></div>
         </div></section>
 
@@ -1228,7 +1233,11 @@
       function openSidebar() { sidebar.classList.add('show'); overlay.classList.add('show') }
       function closeSidebar() { sidebar.classList.remove('show'); overlay.classList.remove('show') }
       $('menuBtn').addEventListener('click', openSidebar); $('sidebarClose').addEventListener('click', closeSidebar); overlay.addEventListener('click', closeSidebar)
-      $('sbNew').addEventListener('click', () => { newConversation() })
+      // "Allgemeiner Agent" always opens a fresh question (old conversations stay in the Verlauf).
+      $('navGeneral').addEventListener('click', (e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; e.preventDefault(); newConversation() })
+      // In a conversation: "Neue Frage" – in a project conversation back to the project's question box.
+      $('chatNewBtn').addEventListener('click', () => { if (current?.project) navigate('#/project/' + current.project.id); else newConversation() })
+      const syncNewBtn = () => { $('chatNewBtn').hidden = !(viewName === 'assistant' && !chatView.hidden) }
       $('historyBtn').addEventListener('click', () => navigate('#/history'))
       costPill.addEventListener('click', () => navigate('#/settings'))
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
@@ -1241,7 +1250,7 @@
         const navKey = nav || (name === 'matter' ? 'dd' : name === 'project' || (name === 'assistant' && current?.project) ? 'projects' : name)
         if (name !== 'project') stopProjectPolling()
         document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === navKey))
-        closeSidebar(); window.scrollTo(0, 0)
+        closeSidebar(); window.scrollTo(0, 0); syncNewBtn()
       }
       async function router() {
         const h = location.hash || '#/assistant'
@@ -1999,12 +2008,12 @@
       // ------------------------------------------------------------------
       // Conversations / views
       // ------------------------------------------------------------------
-      function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; setTitle([]); renderRecent(); if (window.innerWidth > 960) input.focus() }
-      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.project ? ['Projekt · ' + current.project.name, current?.title || 'Neue Unterhaltung'] : current?.matter ? ['Akt · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
+      function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; syncNewBtn(); setTitle([]); renderRecent(); if (window.innerWidth > 960) input.focus() }
+      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; syncNewBtn(); setTitle(current?.project ? ['Projekt · ' + current.project.name, current?.title || 'Neue Unterhaltung'] : current?.matter ? ['Akt · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
       function newConversation({ keepView = false, matterCtx = null, project = null } = {}) {
         if (dict.target === input) dictStop({ discard: true })
         current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, matter: matterCtx, project, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
-        $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true
+        $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; syncNewBtn()
         messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; pendingMs = []; renderAttachments(); renderMsUi()
         if (!keepView) { if (location.hash === '#/assistant' || location.hash === '') { showView('assistant'); showHome() } else navigate('#/assistant') }
       }
@@ -3926,6 +3935,7 @@
       // "Ergebnisse →" line with an example), nav (sidebar item: opens the drawer on phones).
       const TOUR = [
         { chapter: 'Willkommen', title: 'Willkommen bei AI:ssociate', route: 'home', welcome: true, text: 'In etwa zwei Minuten durch alle Funktionen: Fragen stellen, Unterlagen hinzufügen, Skills, Spezialagenten, Due Diligence und Projekte. Mit den Pfeiltasten weiterblättern, Esc beendet die Tour.' },
+        { chapter: 'Fragen', title: 'Neue Frage', sel: '#navGeneral', nav: true, route: 'home', text: 'Ein Klick auf „Allgemeiner Agent“ im Menü startet immer eine neue Frage. Ist ein Gespräch offen – auch ein älteres aus dem Verlauf –, steht oben rechts zusätzlich „Neue Frage“.' },
         { chapter: 'Fragen', title: 'Wissensdatenbank wählen', sel: '#kbList', route: 'home', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage. Wer es weiß, wählt Zivil-, Straf-, Steuer- oder öffentliches Recht – beim öffentlichen Recht mit Bundesland, damit das Landesrecht passt.' },
         { chapter: 'Fragen', title: 'Vorlagen', sel: '#homeChips', route: 'home', text: 'Häufige Aufgaben mit einem Klick: Rechtsrecherche öffnet ein kurzes Formular; Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen starten die Spezialagenten; „Skills“ öffnet die Skill-Auswahl.' },
         { chapter: 'Fragen', title: 'Frage stellen', sel: '#composer', route: 'home', html: ['Frage eintippen und mit <b>Enter</b> senden (Umschalt + Enter für eine neue Zeile) – oder mit dem <b>Mikrofon</b> diktieren.', 'Sie sehen live, was passiert: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.', 'Folgefragen bleiben im Gespräch – auch zu bereits angehängten Dokumenten.'] },
@@ -3940,7 +3950,7 @@
         { chapter: 'Projekte', title: 'Projekte – im Team arbeiten', sel: '#projectsPage .page-head', route: '#/projects', text: 'Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Auf die Projektdokumente wenden Sie Skills mit einem Klick an – Tabellarische Übersicht in Excel oder Word, Zusammenfassen, Versionen vergleichen – oder stellen Fragen dazu. Über „Teilen“ wählen Sie registrierte Kolleginnen und Kollegen aus einer Liste.' },
         { chapter: 'Skills', title: 'Skills im Menü', sel: '#sbSkillsToggle', nav: true, route: 'home', text: 'Alle Skills stehen auch im Menü links – unter „Skills“ aufklappen und mit einem Klick anwenden. Darüber: der allgemeine Agent und die Spezialagenten.' },
         { chapter: 'Skills', title: 'Skill-Bibliothek', sel: '#skillsPage .page-head', route: '#/skills', text: 'Eigene Skills mit Anweisungen, Eingabefeldern und Referenzdokumenten (Muster, Playbook, Vorlage) anlegen, als JSON exportieren und im Team teilen.' },
-        { chapter: 'Verlauf', title: 'Verlauf', sel: '#historyBtn', route: 'home', text: 'Alle Gespräche – auf dem Server gespeichert und auf jedem Gerät verfügbar, auf dem Sie angemeldet sind.' },
+        { chapter: 'Verlauf', title: 'Verlauf', sel: '#historyBtn', route: 'home', text: 'Alle Gespräche – auf dem Server gespeichert und auf jedem Gerät verfügbar, auf dem Sie angemeldet sind. Ein älteres Gespräch öffnen und weiterfragen, oder oben rechts mit „Neue Frage“ neu beginnen.' },
         { chapter: 'Einstellungen', title: 'Quellen & Speichern', sel: '#cardSources', route: '#/settings', text: 'Standardziele für Ergebnisse, Microsoft-365-Konto, Websuche, Budget und Sitzungskosten. Tour und Erklärvideo auch hier unter Daten & Hilfe.' },
         { chapter: 'Fertig', title: 'Bereit für die erste Frage', route: 'home', done: true, text: 'Tipp: Eine Rechtsfrage direkt eintippen oder ein Dokument per Drag & Drop ins Eingabefeld ziehen. Tour und Erklärvideo finden Sie jederzeit auf der Startseite und über das ? oben rechts.' },
       ]
@@ -3949,7 +3959,7 @@
       const tourTargets = (s) => (s.sel ? [].concat(s.sel).map((q) => document.querySelector(q)).filter((x) => x && x.offsetParent !== null && !x.hidden) : [])
       async function tourRoute(s) {
         const before = location.hash
-        if (s.route === 'home') { if (viewName !== 'assistant') navigate('#/assistant'); if (home.hidden) showHome() }
+        if (s.route === 'home') { if (current?.messages.length || current?.project || current?.matter) newConversation({ keepView: true }); if (viewName !== 'assistant') navigate('#/assistant'); if (home.hidden) showHome() }
         else if (s.route && location.hash !== s.route) navigate(s.route)
         if (location.hash !== before) await new Promise((r) => setTimeout(r, 40)) // let the router render first
         if (s.menu) { if (openPop?.menu !== $('addMenu')) openAddMenu($('addBtn')) } else if (openPop) closePop()
