@@ -60,6 +60,12 @@
   "tts": "Die Dschuh Dilidschens analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel. Dazu kommen Riekwest-List und Red Fläg Riport, als Wörd und Ecksel."
  },
  {
+  "id": "projects",
+  "chapter": "Projekte",
+  "text": "Mit Projekten arbeiten Sie im Team: Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Über „Teilen“ wählen Sie registrierte Kolleginnen und Kollegen aus der Liste – mit Recht zum Bearbeiten oder nur zum Lesen. Alle Mitglieder sehen dieselben Unterhaltungen.",
+  "tts": "Mit Projekten arbeiten Sie im Team: Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Über Teilen wählen Sie registrierte Kolleginnen und Kollegen aus der Liste, mit Recht zum Bearbeiten, oder nur zum Lesen. Alle Mitglieder sehen dieselben Unterhaltungen."
+ },
+ {
   "id": "matters",
   "chapter": "Akten & Einstellungen",
   "text": "In Akten sammeln Sie die Dokumente eines Mandats und stellen Fragen im Kontext des Akts. Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Microsoft 365.",

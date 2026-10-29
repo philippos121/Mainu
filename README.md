@@ -88,17 +88,39 @@ Language: Deutsch (Österreich) by default, Deutsch (Deutschland) or English.
 
 The feature tour and the explainer video are always reachable: two tiles below
 the composer on the home page ("Neu hier?" badge until the tour was seen), the
-"?" menu in the top bar on every page, and Settings → Daten & Hilfe. The tour has 17 steps in
+"?" menu in the top bar on every page, and Settings → Daten & Hilfe. The tour has 18 steps in
 chapters: knowledge base, templates, asking, "Hinzufügen" (the menu opens during
 the steps), "Ergebnisse →", Skills, answers with RIS checks, specialist agents,
-due diligence, Akten, skill library, history and "Quellen & Speichern". It visits
+due diligence, Akten, projects, skill library, history and "Quellen & Speichern". It visits
 the pages it explains, puts a spotlight on the element, places its card next to
 it and is driven with Weiter/Zurück or the arrow keys (Esc ends it).
 
-The explainer video (`public/media/erklaervideo.mp4`, 2:40 min, 1080p, German
+The explainer video (`public/media/erklaervideo.mp4`, 2:57 min, 1080p, German
 narration, captions as WebVTT, chapter buttons) also opens from the tour's first
 and last step. `tools/video/` rebuilds
 it from the real UI (see its README).
+
+## Projects (shared workspaces)
+
+A project bundles standing instructions, documents and conversations, and can be
+shared with other registered users. Sidebar → Projekte lists own and shared
+projects; the project page has a box for a new question, the shared
+conversations (with who started and who last continued them), the instructions
+(applied to every request in the project, like a standing brief), the documents
+(stored in an internal Akt, searched by the assistant with the Akt tools) and the
+members. "Teilen" (owner) offers a dropdown of all registered, active accounts
+(`GET /api/users/directory`, name and e-mail only) and a role: *Kann bearbeiten*
+(ask, upload, edit instructions) or *Kann lesen* (read conversations and
+documents; the composer is read-only). Members can leave; only the owner shares,
+deletes or removes members. Conversations of a project are stored with the
+project (`/api/projects/:id/convos`), not in the personal history; the project
+page refreshes every 15 s while open. Deleting an account deletes its projects
+and ends its memberships. Sharing needs accounts (AUTH on).
+
+Routes: `GET/POST /api/projects`, `GET/PATCH/DELETE /api/projects/:id`,
+`POST /api/projects/:id/members`, `PATCH/DELETE /api/projects/:id/members/:userId`,
+`GET /api/projects/:id/convos`, `GET/PUT/DELETE /api/projects/:id/convos/:cid`;
+the chat request takes `projectId`.
 
 ## Adding documents: attach or connect
 

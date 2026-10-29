@@ -406,6 +406,54 @@
       .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
       .modal-actions .sp { flex: 1; }
 
+      /* ---------- projects ---------- */
+      .sb-proj .nav-item svg { width: 15px; height: 15px; }
+      .avs { display: inline-flex; align-items: center; }
+      .avs .av { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--surface); margin-left: -6px; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; color: #fff; background: var(--accent); }
+      .avs .av:first-child { margin-left: 0; }
+      .avs .av.more { background: var(--surface-3); color: var(--muted); }
+      .proj-cols { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+      .proj-cols > div { display: grid; gap: 14px; min-width: 0; }
+      @media (max-width: 900px) { .proj-cols { grid-template-columns: 1fr; } }
+      .proj-ask textarea { width: 100%; min-height: 74px; resize: vertical; font-family: inherit; font-size: 15px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface); color: var(--text); }
+      .proj-ask textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      .proj-ask .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+      .proj-ask .row .sp { flex: 1; }
+      .proj-ask .hint { font-size: 12px; color: var(--muted); }
+      .pc-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-top: 1px solid var(--border); cursor: pointer; }
+      .pc-row:first-of-type { border-top: none; }
+      .pc-row:hover .pc-t { color: var(--accent); }
+      .pc-row .pc-main { flex: 1; min-width: 0; }
+      .pc-row .pc-t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pc-row .pc-m { font-size: 12px; color: var(--muted); }
+      .pc-row .hx { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 6px; }
+      .pc-row .hx:hover { color: var(--err); background: var(--surface-2); }
+      .pd-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 7px 0; border-top: 1px dashed var(--border); }
+      .pd-row:first-of-type { border-top: none; }
+      .pd-row svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--accent); }
+      .ctool:disabled { opacity: .45; cursor: not-allowed; }
+      .ctool:disabled:hover { background: transparent; color: var(--muted); }
+      .pd-row .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pd-row .s { color: var(--faint); font-size: 12px; white-space: nowrap; }
+      .pd-row button { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 15px; }
+      .pd-row button:hover { color: var(--err); }
+      .pm-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+      .pm-row:first-of-type { border-top: none; }
+      .pm-row .avs .av { width: 30px; height: 30px; font-size: 11.5px; }
+      .pm-row .who { flex: 1; min-width: 0; }
+      .pm-row .who b { display: block; font-size: 13.5px; }
+      .pm-row .who span { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pm-row select { font-family: inherit; font-size: 12.5px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; background: var(--surface); color: var(--text); }
+      .pm-row .rm { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 16px; }
+      .pm-row .rm:hover { color: var(--err); }
+      .share-add { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; margin: 6px 0 14px; }
+      .share-add select { font-family: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; background: var(--surface); color: var(--text); min-width: 0; }
+      @media (max-width: 560px) { .share-add { grid-template-columns: 1fr 1fr; } .share-add select:first-child { grid-column: 1 / -1; } }
+      .instr { width: 100%; min-height: 120px; resize: vertical; font-family: inherit; font-size: 13.5px; line-height: 1.5; border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--text); }
+      .instr[readonly] { background: var(--surface-2); }
+      .chip.project { background: rgba(243,146,0,0.12); border-color: rgba(243,146,0,0.4); color: #8a5300; }
+      .chip.project svg { color: #b36a00; }
+      .ro-note { font-size: 12px; color: #8a5300; background: rgba(243,146,0,0.10); border-radius: 8px; padding: 6px 10px; margin: 0 4px 6px; }
       /* ---------- matters / DD ---------- */
       .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
       .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; min-width: 0; }
@@ -745,6 +793,9 @@
           <a class="nav-item" data-nav="agent:contract_draft" href="#/agent/contract_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>Vertrag entwerfen</a>
           <a class="nav-item" data-nav="agent:brief_draft" href="#/agent/brief_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/></svg>Schriftsatz entwerfen</a>
           <a class="nav-item" data-nav="skills" href="#/skills" id="navSkills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Skills<span class="cnt" id="cntSkills" hidden></span></a>
+          <div class="sb-sec">Projekte</div>
+          <a class="nav-item" data-nav="projects" href="#/projects" id="navProjects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>Alle Projekte<span class="cnt" id="cntProjects" hidden></span></a>
+          <div class="sb-recent sb-proj" id="sbProjects"></div>
           <div class="sb-sec">Akten</div>
           <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
           <div class="sb-sec sb-hist" id="sbHistSec" hidden>Verlauf <a href="#/history">Alle</a></div>
@@ -795,6 +846,8 @@
 
         <!-- ---------- matters list ---------- -->
         <section class="view" data-view="matters"><div class="page" id="mattersPage"></div></section>
+        <section class="view" data-view="projects"><div class="page" id="projectsPage"></div></section>
+        <section class="view" data-view="project"><div class="page" id="projectPage"></div></section>
 
         <!-- ---------- matter detail ---------- -->
         <section class="view" data-view="matter"><div class="page" id="matterPage"></div></section>
@@ -1082,6 +1135,8 @@
         server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
         skill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>',
         mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+        project: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>',
+        share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M19 8v6M16 11h6"/></svg>',
         computer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
         auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
         save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>',
@@ -1155,13 +1210,14 @@
       $('historyBtn').addEventListener('click', () => navigate('#/history'))
       costPill.addEventListener('click', () => navigate('#/settings'))
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
-      const VIEW_TITLES = { assistant: 'Assistent', matters: 'Akten', dd: 'Due Diligence', skills: 'Skills', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt' }
+      const VIEW_TITLES = { assistant: 'Assistent', matters: 'Akten', dd: 'Due Diligence', skills: 'Skills', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt', projects: 'Projekte', project: 'Projekt' }
       function navigate(hash) { if (location.hash === hash) router(); else location.hash = hash }
       function setTitle(parts) { mainTitle.innerHTML = ''; parts.forEach((p, i) => mainTitle.appendChild(el('span', i < parts.length - 1 ? 'crumb' : '', p))) }
       function showView(name, nav) {
         viewName = name
         document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === name))
-        const navKey = nav || (name === 'matter' ? (matter?.kind === 'dd' ? 'dd' : 'matters') : name)
+        const navKey = nav || (name === 'matter' ? (matter?.kind === 'dd' ? 'dd' : 'matters') : name === 'project' || (name === 'assistant' && current?.project) ? 'projects' : name)
+        if (name !== 'project') stopProjectPolling()
         document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === navKey))
         closeSidebar(); window.scrollTo(0, 0)
       }
@@ -1171,16 +1227,18 @@
         const v = seg[0] || 'assistant'
         if (v === 'chat' && seg[1]) { openConversation(seg[1], { silent: true }); return }
         if (v === 'matter' && seg[1]) { await openMatter(seg[1], seg[2] || matterTab); return }
+        if (v === 'project' && seg[1]) { if (seg[2] === 'chat' && seg[3]) await openProjectConversation(seg[1], seg[3]); else await openProject(seg[1]); return }
         if (v === 'agent' && seg[1]) { showView('agent', 'agent:' + seg[1]); await renderAgent(seg[1]); return }
         if (v === 'workflows') { location.hash = '#/assistant'; return }
         if (v === 'tables') { location.hash = '#/matters'; return }
-        if (!(v in VIEW_TITLES) || v === 'matter') { location.hash = '#/assistant'; return }
+        if (!(v in VIEW_TITLES) || v === 'matter' || v === 'project') { location.hash = '#/assistant'; return }
         showView(v === 'dd' ? 'matters' : v, v)
         if (v === 'assistant') { if (current?.messages.length) showChat(); else showHome() }
         else setTitle([VIEW_TITLES[v]])
         if (v === 'matters') renderMatters('all')
         if (v === 'dd') renderMatters('dd')
         if (v === 'history') renderHistory()
+        if (v === 'projects') renderProjects()
         if (v === 'skills') renderSkills()
         if (v === 'settings') renderSettings()
       }
@@ -1330,6 +1388,14 @@
         if (onRemove) { const x = el('button', null, '×'); x.type = 'button'; x.title = removeTitle || 'Entfernen'; x.setAttribute('aria-label', `${x.title}: ${label}`); x.addEventListener('click', (e) => { e.stopPropagation(); onRemove() }); c.appendChild(x) }
         return c
       }
+      function projectChip() {
+        const p = current.project
+        // No ×: a conversation belongs to its project for good (start a new one outside it instead).
+        const c = chipEl('ctx-src project', 'project', p.name, p.role === 'view' ? 'nur lesen' : 'Projekt')
+        c.title = 'Projekt: Anweisungen und Dokumente des Projekts gelten; die Unterhaltung sehen alle Mitglieder. Klicken öffnet das Projekt.'
+        c.addEventListener('click', () => navigate('#/project/' + p.id))
+        return c
+      }
       function matterChip() {
         const m = current.matter, n = m.docIds?.length || 0
         const c = chipEl('ctx-src matter', 'matter', m.name, n ? plural(n, 'Dokument', 'Dokumente') : 'Akt', () => { current.matter = null; persistCurrent(); renderAttachments() }, 'Akt entfernen')
@@ -1371,11 +1437,18 @@
       function renderContextInto(box, { skill = true } = {}) {
         box.innerHTML = ''
         const group = (label, chips) => { if (!chips.length) return; const g = el('div', 'ctx-grp'); if (label) g.appendChild(el('span', 'ctx-lbl', label)); const w = el('div', 'ctx-chips'); for (const c of chips) w.appendChild(c); g.appendChild(w); box.appendChild(g) }
-        group('Durchsucht', [...(current?.matter ? [matterChip()] : []), ...(localFolder ? [folderChip()] : [])])
+        group('Durchsucht', [...(current?.project ? [projectChip()] : []), ...(current?.matter ? [matterChip()] : []), ...(localFolder ? [folderChip()] : [])])
         group('Angehängt', fileChips())
         if (skill && pendingSkill) group('', [skillChip()])
       }
+      function applyComposerMode() {
+        const ro = current?.project?.role === 'view'
+        input.disabled = ro
+        input.placeholder = ro ? 'Nur Lesezugriff – dieses Projekt ist mit Ihnen zum Lesen geteilt.' : 'Frage AI:ssociate.'
+        for (const id of ['addBtn', 'skillBtn', 'dictBtn']) $(id).disabled = ro
+      }
       function renderAttachments() {
+        applyComposerMode()
         renderContextInto(attachList)
         const n = pendingFiles.length + pendingMs.length + (localFolder ? 1 : 0) + (current?.matter ? 1 : 0)
         $('addCount').hidden = !n; $('addCount').textContent = n
@@ -1761,7 +1834,7 @@
       // ------------------------------------------------------------------
       // Composer behaviour
       // ------------------------------------------------------------------
-      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0 || pendingMs.length > 0 || Boolean(pendingSkill)) && !busy; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
+      function updateSend() { const ready = (input.value.trim().length > 0 || pendingFiles.length > 0 || pendingMs.length > 0 || Boolean(pendingSkill)) && !busy && current?.project?.role !== 'view'; sendBtn.classList.toggle('ready', ready); sendBtn.classList.toggle('busy', busy); sendBtn.disabled = !ready }
       input.addEventListener('input', () => { if (input.value === '/') { input.value = ''; openSkillPicker(); return } input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; updateSend() })
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } })
       sendBtn.addEventListener('click', submit)
@@ -1909,19 +1982,22 @@
       // Conversations / views
       // ------------------------------------------------------------------
       function showHome() { $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true; setTitle([]); renderRecent(); if (window.innerWidth > 960) input.focus() }
-      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.matter ? ['Akt · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
-      function newConversation({ keepView = false, matterCtx = null } = {}) {
+      function showChat() { $('composerSlotChat').appendChild(composer); home.hidden = true; chatView.hidden = false; setTitle(current?.project ? ['Projekt · ' + current.project.name, current?.title || 'Neue Unterhaltung'] : current?.matter ? ['Akt · ' + current.matter.name, current?.title || 'Neues Gespräch'] : [current?.title || 'Neues Gespräch']) }
+      function newConversation({ keepView = false, matterCtx = null, project = null } = {}) {
         if (dict.target === input) dictStop({ discard: true })
-        current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, matter: matterCtx, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
+        current = { id: uid(), sessionId: uid(), aissThreadId: null, msTarget: null, matter: matterCtx, project, title: '', titleLocked: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [], history: [] }
         $('composerSlotHome').appendChild(composer); home.hidden = false; chatView.hidden = true
         messages.innerHTML = ''; input.value = ''; input.style.height = 'auto'; pendingFiles = []; pendingMs = []; renderAttachments(); renderMsUi()
         if (!keepView) { if (location.hash === '#/assistant' || location.hash === '') { showView('assistant'); showHome() } else navigate('#/assistant') }
       }
       function persistCurrent() {
         if (!current || !current.messages.length) return
+        if (current.project?.role === 'view') return
         current.updatedAt = Date.now()
-        const idx = convos.findIndex((c) => c.id === current.id)
         const stored = { ...current, messages: current.messages.map((m) => m.role === 'assistant' ? { ...m, data: { ...m.data, execution: { images: [], files: (m.data?.execution?.files || []).map((f) => ({ name: f.name, size: f.size, gone: true })) } } } : m) }
+        // Conversations of a project are shared: they live with the project, not in the personal history.
+        if (current.project) { syncProjectConvo(current.project.id, stored); return }
+        const idx = convos.findIndex((c) => c.id === current.id)
         if (idx >= 0) convos[idx] = stored; else convos.unshift(stored)
         convos.sort((a, b) => b.updatedAt - a.updatedAt)
         syncConvo(stored)
@@ -2185,7 +2261,7 @@
         input.value = ''; input.style.height = 'auto'
         busy = true; updateSend()
         if (!current.title) { current.title = taskTitle ? `${taskTitle}: ${text.split('\n')[0].replace(taskTitle + ': ', '').slice(0, 50)}` : text.slice(0, 60) }
-        showView('assistant'); showChat(); if (location.hash !== '#/chat/' + current.id) history.replaceState(null, '', '#/chat/' + current.id)
+        showView('assistant'); showChat(); { const h = current.project ? `#/project/${current.project.id}/chat/${current.id}` : '#/chat/' + current.id; if (location.hash !== h) history.replaceState(null, '', h) }
         const skillReq = pendingSkill ? { id: pendingSkill.id, params: pendingSkill.params || {} } : null; const skillName = pendingSkill?.name || null; if (pendingSkill) { pendingSkill = null; renderAttachments() }
         const folderMeta = localFolder ? { name: localFolder.name, count: localFolder.entries.length, sample: localFolder.entries.slice(0, 150).map((e) => e.path) } : null
         const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, agent, matterName: matterCtx?.name || null, folder: folderMeta?.name || null, skill: skillName }
@@ -2211,7 +2287,7 @@
         let hardFail = false
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: saveTargets({ msContext: msFiles.length > 0 }).ms, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], localFolder: folderMeta, skill: skillReq }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: saveTargets({ msContext: msFiles.length > 0 }).ms, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], projectId: current.project?.id || null, localFolder: folderMeta, skill: skillReq }) })
           if (resp.status === 401) showAuthScreen('login', 'Bitte anmelden, um fortzufahren.')
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readSse(resp, handle)
@@ -3476,6 +3552,244 @@
         openMsPicker({ mode: 'target', onPick: async (f) => { toast('Speichert…'); try { const r = await api(`/api/matters/${m.id}/sync`, { method: 'POST', body: { driveId: f.driveId, itemId: f.itemId } }); m.sync = r.sync; renderMatter(); const ok = r.sync.filter((s) => s.ok).length; toast(`${ok}/${r.sync.length} Dateien nach „${f.name}“ gespeichert.`, 4000) } catch (e) { toast(e.message, 4000) } } })
       }
 
+      // ------------------------------------------------------------------
+      // Projects: shared workspaces (instructions, documents, conversations, members)
+      // ------------------------------------------------------------------
+      let projectsCache = [], project = null, projectPoll = 0, directory = null
+      const ROLE_LABEL = { owner: 'Eigentümer:in', edit: 'Bearbeiten', view: 'Lesen' }
+      const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?'
+      const AV_COLORS = ['#0e7c8a', '#b36a00', '#5b6bbf', '#2e8b57', '#a2477a', '#6b7a8f']
+      const avColor = (s) => AV_COLORS[[...String(s || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length]
+      function avatars(people, max = 4) {
+        const w = el('span', 'avs')
+        for (const p of people.slice(0, max)) { const a = el('span', 'av', initials(p.name || p.email)); a.style.background = avColor(p.email || p.name); a.title = `${p.name || ''}${p.email ? ' · ' + p.email : ''}${p.role ? ' · ' + ROLE_LABEL[p.role] : ''}`; w.appendChild(a) }
+        if (people.length > max) w.appendChild(el('span', 'av more', '+' + (people.length - max)))
+        return w
+      }
+      const projectPeople = (p) => [{ name: p.owner?.name || (me.user?.name || 'Ich'), email: p.owner?.email || '', role: 'owner' }, ...(p.members || [])]
+      async function loadProjects() {
+        try { projectsCache = (await api('/api/projects')).projects } catch { projectsCache = [] }
+        renderSidebarProjects()
+        return projectsCache
+      }
+      function renderSidebarProjects() {
+        const box = $('sbProjects'); if (!box) return
+        box.innerHTML = ''
+        $('cntProjects').hidden = !projectsCache.length; $('cntProjects').textContent = projectsCache.length
+        for (const p of [...projectsCache].sort((a, b) => b.lastActivity - a.lastActivity).slice(0, 4)) {
+          const a = el('a', 'nav-item' + (viewName === 'project' && project?.id === p.id ? ' active' : '')); a.href = '#/project/' + p.id
+          a.appendChild(svg(p.role === 'owner' ? 'project' : 'share')); a.appendChild(el('span', 't', p.name)); box.appendChild(a)
+        }
+      }
+      async function renderProjects() {
+        const page = $('projectsPage'); page.innerHTML = ''
+        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, 'Projekte')); hl.appendChild(el('div', 'sub', 'Gemeinsame Arbeitsbereiche: Anweisungen, Dokumente und Unterhaltungen eines Mandats oder Vorhabens – mit registrierten Kolleginnen und Kollegen teilbar.')); head.appendChild(hl)
+        const acts = el('div', 'acts'); const bNew = el('button', 'btn', 'Neues Projekt'); bNew.id = 'projNew'; bNew.addEventListener('click', newProjectDialog); acts.appendChild(bNew); head.appendChild(acts); page.appendChild(head)
+        const grid = el('div', 'cards'); grid.appendChild(el('div', 'recent-empty', 'Lädt…')); page.appendChild(grid)
+        await loadProjects()
+        grid.innerHTML = ''
+        if (!projectsCache.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, 'Noch keine Projekte')); e.appendChild(document.createTextNode('Lege ein Projekt an, gib ihm Anweisungen und Dokumente und teile es mit deinem Team.')); const b = el('button', 'btn sm', 'Projekt anlegen'); b.style.marginLeft = '8px'; b.addEventListener('click', newProjectDialog); e.appendChild(b); grid.appendChild(e); return }
+        for (const p of projectsCache) grid.appendChild(projectCard(p))
+      }
+      function projectCard(p) {
+        const c = el('div', 'card click proj-card'); c.addEventListener('click', () => navigate('#/project/' + p.id))
+        const top = el('div', 'kinds'); top.appendChild(el('span', 'pill ' + (p.role === 'owner' ? 'teal' : 'orange'), p.role === 'owner' ? (p.members.length ? `Geteilt mit ${p.members.length}` : 'Eigenes Projekt') : `Geteilt von ${p.owner?.name || '–'} · ${ROLE_LABEL[p.role]}`)); c.appendChild(top)
+        c.appendChild(el('h3', null, p.name)).style.marginTop = '8px'
+        if (p.description) c.appendChild(el('div', 'meta', p.description))
+        const foot = el('div', 'foot'); foot.appendChild(avatars(projectPeople(p)))
+        foot.appendChild(el('span', 'pill', `${p.conversations} Unterhaltung${p.conversations === 1 ? '' : 'en'}`)); foot.appendChild(el('span', 'pill', `${p.documents} Dokument${p.documents === 1 ? '' : 'e'}`))
+        foot.appendChild(el('span', 'sub', fmtDate(p.lastActivity))).style.cssText = 'margin-left:auto;font-size:12px;color:var(--faint)'
+        c.appendChild(foot)
+        return c
+      }
+      function projectFormDlg(title, okLabel, values, onOk) {
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, title))
+        const f = (label, node, hint) => { const w = el('div', 'field'); w.appendChild(el('label', null, label)); w.appendChild(node); if (hint) w.appendChild(el('div', 'sub', hint)).style.cssText = 'font-size:12px;color:var(--muted);margin-top:4px'; card.appendChild(w); return node }
+        const name = f('Name *', Object.assign(el('input'), { value: values.name || '', placeholder: 'z. B. Mietrecht Huber – Kündigung Geschäftslokal' }))
+        const desc = f('Beschreibung', Object.assign(el('input'), { value: values.description || '', placeholder: 'Worum geht es? (für die Übersicht)' }))
+        const instr = f('Anweisungen für alle Unterhaltungen', Object.assign(el('textarea', 'instr'), { value: values.instructions || '', placeholder: 'z. B. Wir vertreten die Mieterin. Immer auf das MRG eingehen, Fristen nur als Prüfpunkt mit Rechtsgrundlage nennen, Antworten als Entwurf für ein Mandantenschreiben formulieren.' }), 'Gilt für jede Frage in diesem Projekt – wie ein ständiges Briefing.')
+        name.id = 'projName'; desc.id = 'projDesc'; instr.id = 'projInstr'
+        const err = el('div', 'err'); err.style.cssText = 'color:var(--err);font-size:13px;min-height:16px'; card.appendChild(err)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg)
+        const g = el('button', 'btn', okLabel); g.id = 'projSave'
+        g.addEventListener('click', async () => { if (!name.value.trim()) { err.textContent = 'Bitte einen Namen angeben.'; name.focus(); return } g.disabled = true; try { await onOk({ name: name.value.trim(), description: desc.value.trim(), instructions: instr.value }); closeDlg() } catch (e) { err.textContent = e.message; g.disabled = false } })
+        a.append(c, g); card.appendChild(a); $('dlg').classList.add('show'); setTimeout(() => name.focus(), 30)
+      }
+      function newProjectDialog() {
+        projectFormDlg('Neues Projekt', 'Projekt anlegen', {}, async (v) => { const r = await api('/api/projects', { method: 'POST', body: v }); await loadProjects(); navigate('#/project/' + r.project.id); toast('Projekt angelegt.') })
+      }
+      function stopProjectPolling() { clearInterval(projectPoll); projectPoll = 0 }
+      async function openProject(id) {
+        showView('project')
+        const page = $('projectPage')
+        if (project?.id !== id) { page.innerHTML = ''; page.appendChild(el('div', 'recent-empty', 'Lädt…')) }
+        try { project = (await api('/api/projects/' + encodeURIComponent(id))).project } catch (e) { toast(e.message); navigate('#/projects'); return }
+        renderProject()
+        stopProjectPolling()
+        // Colleagues work in the same project: refresh the lists while the page is open.
+        projectPoll = setInterval(async () => {
+          if (viewName !== 'project' || !project || document.hidden || $('dlg').classList.contains('show')) return
+          try { project = (await api('/api/projects/' + encodeURIComponent(project.id))).project; fillProjectLists() } catch (e) { if (e.status === 404) { stopProjectPolling(); toast('Das Projekt ist nicht mehr verfügbar.'); navigate('#/projects') } }
+        }, 15000)
+      }
+      function renderProject() {
+        const p = project, page = $('projectPage'); page.innerHTML = ''
+        const canEdit = p.role !== 'view', isOwner = p.role === 'owner'
+        setTitle(['Projekte', p.name])
+        const head = el('div', 'page-head'); const hl = el('div'); hl.style.flex = '1'
+        const crumb = el('a', 'back', '‹ Projekte'); crumb.href = '#/projects'; crumb.style.cssText = 'font-size:12.5px;color:var(--muted);text-decoration:none'; hl.appendChild(crumb)
+        hl.appendChild(el('h1', null, p.name))
+        hl.appendChild(el('div', 'sub', [p.description, isOwner ? (p.members.length ? `Geteilt mit ${p.members.map((m) => m.name).join(', ')}` : 'Nur für dich – über „Teilen“ für Kolleginnen und Kollegen freigeben') : `Geteilt von ${p.owner?.name || '–'} · deine Rolle: ${ROLE_LABEL[p.role]}`].filter(Boolean).join(' · ')))
+        head.appendChild(hl)
+        const acts = el('div', 'acts'); acts.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap'
+        const avs = avatars(projectPeople(p), 5); avs.id = 'projAvatars'; acts.appendChild(avs)
+        if (isOwner) { const sh = el('button', 'btn'); sh.id = 'projShare'; sh.appendChild(svg('share')); sh.appendChild(document.createTextNode(' Teilen')); sh.addEventListener('click', shareDialog); acts.appendChild(sh) }
+        if (canEdit) { const ed = el('button', 'btn ghost sm', 'Bearbeiten'); ed.addEventListener('click', () => projectFormDlg('Projekt bearbeiten', 'Speichern', p, async (v) => { project = (await api('/api/projects/' + p.id, { method: 'PATCH', body: v })).project; renderProject(); loadProjects() })); acts.appendChild(ed) }
+        if (isOwner) { const del = el('button', 'mini danger', 'Löschen'); del.addEventListener('click', async () => { if (!(await confirmDlg('Projekt löschen?', `„${p.name}“ mit allen Unterhaltungen und Dokumenten löschen – auch für alle Mitglieder.`))) return; try { await api('/api/projects/' + p.id, { method: 'DELETE' }); project = null; await loadProjects(); navigate('#/projects'); toast('Projekt gelöscht.') } catch (e) { toast(e.message) } }); acts.appendChild(del) }
+        else { const lv = el('button', 'mini', 'Verlassen'); lv.addEventListener('click', async () => { if (!(await confirmDlg('Projekt verlassen?', `Du verlierst den Zugriff auf „${p.name}“, bis es erneut mit dir geteilt wird.`, { ok: 'Verlassen' }))) return; try { await api(`/api/projects/${p.id}/members/${me.user.id}`, { method: 'DELETE' }); project = null; await loadProjects(); navigate('#/projects') } catch (e) { toast(e.message) } }); acts.appendChild(lv) }
+        head.appendChild(acts); page.appendChild(head)
+
+        const cols = el('div', 'proj-cols'); const left = el('div'), right = el('div'); cols.append(left, right); page.appendChild(cols)
+        // ask
+        const ask = el('div', 'card proj-ask'); ask.appendChild(el('h3', null, 'Neue Unterhaltung im Projekt'))
+        if (canEdit) {
+          const ta = el('textarea'); ta.id = 'projAsk'; ta.placeholder = `Frage zum Projekt „${p.name}“ – Anweisungen und Dokumente des Projekts gelten automatisch.`
+          const row = el('div', 'row'); row.appendChild(el('span', 'hint', p.documents ? `${p.documents} Projektdokument${p.documents === 1 ? '' : 'e'} durchsuchbar · Enter sendet` : 'Enter sendet'))
+          row.appendChild(el('span', 'sp')); const go = el('button', 'btn', 'Fragen'); go.id = 'projAskGo'; row.appendChild(go)
+          const start = () => { const t = ta.value.trim(); if (!t) { ta.focus(); return } startProjectConversation(t) }
+          go.addEventListener('click', start); ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); start() } })
+          ask.append(ta, row); addFieldMic(ask, ta)
+        } else ask.appendChild(el('div', 'md', 'Du kannst die Unterhaltungen und Dokumente dieses Projekts lesen. Neue Fragen stellen Mitglieder mit Bearbeitungsrecht.'))
+        left.appendChild(ask)
+        const convCard = el('div', 'card'); convCard.id = 'projConvos'; left.appendChild(convCard)
+        // instructions
+        const ins = el('div', 'card'); ins.appendChild(el('h3', null, 'Anweisungen'))
+        const it = el('textarea', 'instr'); it.id = 'projInstrSide'; it.value = p.instructions || ''; it.readOnly = !canEdit; it.placeholder = canEdit ? 'Ständiges Briefing für alle Fragen in diesem Projekt (Rolle, Rechtsgebiet, Stil …)' : 'Keine Anweisungen.'
+        ins.appendChild(it)
+        if (canEdit) { const sv = el('button', 'mini', 'Speichern'); sv.id = 'projInstrSave'; sv.style.marginTop = '8px'; sv.addEventListener('click', async () => { sv.disabled = true; try { project = (await api('/api/projects/' + p.id, { method: 'PATCH', body: { instructions: it.value } })).project; toast('Anweisungen gespeichert – gelten ab der nächsten Frage.') } catch (e) { toast(e.message) } sv.disabled = false }); ins.appendChild(sv) }
+        right.appendChild(ins)
+        // documents
+        const docs = el('div', 'card'); docs.id = 'projDocs'; right.appendChild(docs)
+        // members
+        const mem = el('div', 'card'); mem.id = 'projMembers'; right.appendChild(mem)
+        fillProjectLists()
+        renderSidebarProjects()
+      }
+      function fillProjectLists() {
+        const p = project; if (!p) return
+        const canEdit = p.role !== 'view', isOwner = p.role === 'owner'
+        const avs = $('projAvatars'); if (avs) avs.replaceWith(Object.assign(avatars(projectPeople(p), 5), { id: 'projAvatars' }))
+        // conversations
+        const cc = $('projConvos'); if (cc) {
+          cc.innerHTML = ''; cc.appendChild(el('h3', null, `Unterhaltungen (${p.convos.length})`))
+          if (!p.convos.length) cc.appendChild(el('div', 'recent-empty', 'Noch keine Unterhaltungen – die erste Frage oben stellen.'))
+          for (const c of p.convos) {
+            const row = el('div', 'pc-row'); row.dataset.convo = c.id
+            const av = avatars([{ name: c.createdByName || me.user?.name || 'Ich', email: c.createdByName }], 1)
+            const main = el('div', 'pc-main'); main.appendChild(el('div', 'pc-t', c.title || 'Unterhaltung')); main.appendChild(el('div', 'pc-m', `${c.createdByName || 'Ich'} · ${fmtDate(c.updatedAt)} · ${c.messages} Nachricht${c.messages === 1 ? '' : 'en'}${c.updatedByName && c.updatedByName !== c.createdByName ? ` · zuletzt ${c.updatedByName}` : ''}`))
+            row.append(av, main)
+            if (canEdit) { const x = el('button', 'hx', '×'); x.title = 'Unterhaltung löschen'; x.addEventListener('click', async (e) => { e.stopPropagation(); if (!(await confirmDlg('Unterhaltung löschen?', 'Die Unterhaltung wird für alle Mitglieder gelöscht.'))) return; try { await api(`/api/projects/${p.id}/convos/${c.id}`, { method: 'DELETE' }); p.convos = p.convos.filter((x) => x.id !== c.id); fillProjectLists() } catch (err) { toast(err.message) } }); row.appendChild(x) }
+            row.addEventListener('click', () => navigate(`#/project/${p.id}/chat/${c.id}`))
+            cc.appendChild(row)
+          }
+        }
+        // documents
+        const dc = $('projDocs'); if (dc) {
+          dc.innerHTML = ''; dc.appendChild(el('h3', null, `Dokumente (${p.documentList.length})`))
+          if (!p.documentList.length) dc.appendChild(el('div', 'recent-empty', canEdit ? 'Dokumente hochladen – der Assistent durchsucht sie bei jeder Frage im Projekt selbst.' : 'Keine Dokumente.'))
+          for (const d of p.documentList) {
+            const row = el('div', 'pd-row'); row.appendChild(svg('file')); row.appendChild(el('span', 'n', d.name)); row.appendChild(el('span', 's', fmtSize(d.size || 0)))
+            if (canEdit) { const x = el('button', null, '×'); x.title = 'Dokument entfernen'; x.addEventListener('click', async () => { if (!(await confirmDlg('Dokument entfernen?', `„${d.name}“ aus dem Projekt entfernen.`))) return; try { await api(`/api/matters/${p.matterId}/documents/${d.id}`, { method: 'DELETE' }); await refreshProject() } catch (e) { toast(e.message) } }); row.appendChild(x) }
+            dc.appendChild(row)
+          }
+          if (canEdit) {
+            const inp = el('input'); inp.type = 'file'; inp.multiple = true; inp.hidden = true; inp.accept = '.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml'; inp.id = 'projFileInput'
+            inp.addEventListener('change', async () => { await uploadToProject(inp.files); inp.value = '' })
+            const b = el('button', 'btn ghost sm'); b.appendChild(svg('upload')); b.appendChild(document.createTextNode(' Dokumente hochladen')); b.style.marginTop = '10px'; b.addEventListener('click', () => inp.click())
+            dc.append(inp, b)
+            dc.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation() }); dc.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer?.files?.length) uploadToProject(e.dataTransfer.files) })
+          }
+        }
+        // members
+        const mc = $('projMembers'); if (mc) {
+          mc.innerHTML = ''; mc.appendChild(el('h3', null, `Mitglieder (${p.members.length + 1})`))
+          const row = (person, roleText) => { const r = el('div', 'pm-row'); r.appendChild(avatars([person], 1)); const w = el('div', 'who'); w.appendChild(el('b', null, person.name || 'Ich')); w.appendChild(el('span', null, person.email || '')); r.appendChild(w); r.appendChild(el('span', 'pill', roleText)); mc.appendChild(r) }
+          row({ name: p.owner?.name || me.user?.name || 'Ich', email: p.owner?.email || me.user?.email || '' }, ROLE_LABEL.owner)
+          for (const m of p.members) row(m, ROLE_LABEL[m.role])
+          if (isOwner) { const b = el('button', 'btn ghost sm'); b.appendChild(svg('share')); b.appendChild(document.createTextNode(' Teilen')); b.style.marginTop = '10px'; b.addEventListener('click', shareDialog); mc.appendChild(b) }
+        }
+      }
+      async function refreshProject() { if (!project) return; project = (await api('/api/projects/' + project.id)).project; fillProjectLists() }
+      async function uploadToProject(fileList) {
+        const files = [...fileList].filter((f) => DOC_RE.test(f.name)); if (!files.length) { toast('Nur PDF, Word und Text.'); return }
+        toast(`Lädt ${files.length} Dokument${files.length === 1 ? '' : 'e'} hoch…`, 6000)
+        const errs = []
+        for (const f of files) { try { const r = await api(`/api/matters/${project.matterId}/documents`, { method: 'POST', body: { files: [{ name: f.name, base64: await readAsBase64(f) }] } }); errs.push(...(r.errors || [])) } catch (e) { errs.push(`${f.name}: ${e.message}`) } }
+        await refreshProject()
+        toast(errs.length ? errs.slice(0, 2).join(' · ') : `${files.length} Dokument${files.length === 1 ? '' : 'e'} im Projekt.`, 4000)
+      }
+      async function loadDirectory() { try { directory = await api('/api/users/directory') } catch { directory = { enabled: false, users: [] } } return directory }
+      async function shareDialog() {
+        const p = project; if (!p) return
+        await loadDirectory()
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, `„${p.name}“ teilen`))
+        card.appendChild(el('div', 'md', 'Registrierte Kolleginnen und Kollegen hinzufügen. Bearbeiten: Fragen stellen, Dokumente hochladen, Anweisungen ändern. Lesen: Unterhaltungen und Dokumente ansehen.'))
+        if (!directory.enabled) { card.appendChild(el('div', 'ro-note', 'Teilen setzt Benutzerkonten voraus (Anmeldung ist auf diesem Server ausgeschaltet).')) }
+        else {
+          const taken = new Set(p.members.map((m) => m.userId))
+          const free = directory.users.filter((u) => !taken.has(u.id))
+          const add = el('div', 'share-add')
+          const sel = el('select'); sel.id = 'shareUser'; sel.setAttribute('aria-label', 'Person'); const o0 = el('option', null, free.length ? 'Person wählen …' : 'Alle registrierten Personen sind bereits Mitglied'); o0.value = ''; sel.appendChild(o0)
+          for (const u of free) { const o = el('option', null, `${u.name} · ${u.email}`); o.value = u.id; sel.appendChild(o) }
+          const role = el('select'); role.id = 'shareRole'; role.setAttribute('aria-label', 'Rolle'); for (const [v, t] of [['edit', 'Kann bearbeiten'], ['view', 'Kann lesen']]) { const o = el('option', null, t); o.value = v; role.appendChild(o) }
+          const go = el('button', 'btn', 'Hinzufügen'); go.id = 'shareAdd'; go.disabled = !free.length
+          go.addEventListener('click', async () => { if (!sel.value) { sel.focus(); return } go.disabled = true; try { project = (await api(`/api/projects/${p.id}/members`, { method: 'POST', body: { userId: sel.value, role: role.value } })).project; const u = directory.users.find((x) => x.id === sel.value); toast(`Geteilt mit ${u?.name || 'Kollegin/Kollege'}.`); fillProjectLists(); renderProjectHeaderSub(); shareDialog(); loadProjects() } catch (e) { toast(e.message); go.disabled = false } })
+          add.append(sel, role, go); card.appendChild(add)
+          if (!directory.users.length) card.appendChild(el('div', 'ro-note', 'Noch keine weiteren Konten. Administrator:innen legen sie unter Einstellungen → Benutzer an.'))
+        }
+        const list = el('div'); list.id = 'shareList'
+        const owner = el('div', 'pm-row'); owner.appendChild(avatars([{ name: p.owner?.name || me.user?.name, email: p.owner?.email || me.user?.email }], 1)); const ow = el('div', 'who'); ow.appendChild(el('b', null, p.owner?.name || me.user?.name || 'Ich')); ow.appendChild(el('span', null, p.owner?.email || me.user?.email || '')); owner.append(ow, el('span', 'pill', ROLE_LABEL.owner)); list.appendChild(owner)
+        for (const m of p.members) {
+          const r = el('div', 'pm-row'); r.dataset.member = m.userId; r.appendChild(avatars([m], 1)); const w = el('div', 'who'); w.appendChild(el('b', null, m.name)); w.appendChild(el('span', null, m.email)); r.appendChild(w)
+          const rs = el('select'); for (const [v, t] of [['edit', 'Kann bearbeiten'], ['view', 'Kann lesen']]) { const o = el('option', null, t); o.value = v; rs.appendChild(o) } rs.value = m.role
+          rs.addEventListener('change', async () => { try { project = (await api(`/api/projects/${p.id}/members/${m.userId}`, { method: 'PATCH', body: { role: rs.value } })).project; fillProjectLists(); toast('Rolle geändert.') } catch (e) { toast(e.message) } })
+          const x = el('button', 'rm', '×'); x.title = 'Zugriff entfernen'; x.addEventListener('click', async () => { try { project = (await api(`/api/projects/${p.id}/members/${m.userId}`, { method: 'DELETE' })).project; fillProjectLists(); renderProjectHeaderSub(); shareDialog(); loadProjects() } catch (e) { toast(e.message) } })
+          r.append(rs, x); list.appendChild(r)
+        }
+        card.appendChild(list)
+        const a = el('div', 'modal-actions'); const ok = el('button', 'btn', 'Fertig'); ok.addEventListener('click', closeDlg); a.appendChild(ok); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+      function renderProjectHeaderSub() { if (viewName === 'project' && project) { const sub = $('projectPage').querySelector('.page-head .sub'); if (sub) sub.textContent = [project.description, project.members.length ? `Geteilt mit ${project.members.map((m) => m.name).join(', ')}` : 'Nur für dich – über „Teilen“ für Kolleginnen und Kollegen freigeben'].filter(Boolean).join(' · ') } }
+      function startProjectConversation(text) {
+        const p = project
+        newConversation({ keepView: true, project: { id: p.id, name: p.name, role: p.role } })
+        renderAttachments()
+        sendMessage({ text })
+      }
+      // Project conversations are shared: saved with the project (debounced), opened fresh from the server.
+      const projectConvoTimers = new Map()
+      function syncProjectConvo(pid, c) {
+        clearTimeout(projectConvoTimers.get(c.id))
+        projectConvoTimers.set(c.id, setTimeout(async () => { projectConvoTimers.delete(c.id); try { await api(`/api/projects/${pid}/convos/${encodeURIComponent(c.id)}`, { method: 'PUT', body: c }) } catch (e) { if (e.status !== 401) toast('Unterhaltung konnte nicht im Projekt gespeichert werden: ' + e.message, 4000) } }, 500))
+      }
+      async function openProjectConversation(pid, cid) {
+        if (current?.id === cid && current.project?.id === pid && current.messages.length) { showView('assistant', 'projects'); showChat(); return }
+        let p = projectsCache.find((x) => x.id === pid) || (project?.id === pid ? project : null)
+        let c = null
+        try { if (!p) p = (await api('/api/projects/' + pid)).project; c = (await api(`/api/projects/${pid}/convos/${encodeURIComponent(cid)}`)).convo } catch (e) { toast(e.message); navigate(p ? '#/project/' + pid : '#/projects'); return }
+        if (dict.target === input) dictStop({ discard: true })
+        current = { ...c, project: { id: p.id, name: p.name, role: p.role }, sessionId: c.sessionId || uid(), aissThreadId: c.aissThreadId || null, msTarget: null, matter: null, messages: [...(c.messages || [])], history: [...(c.history || [])] }
+        pendingFiles = []; pendingMs = []
+        renderMsUi(); renderAttachments()
+        messages.innerHTML = ''
+        if (p.role === 'view') messages.appendChild(el('div', 'ro-note', `Nur Lesezugriff · geteilt von ${p.owner?.name || '–'}`))
+        for (const m of current.messages) { if (m.role === 'user') renderUser(m); else renderAssistantFinal(createAssistantCard(), m.data, { restored: true }) }
+        showView('assistant', 'projects'); showChat(); window.scrollTo(0, document.body.scrollHeight)
+      }
+
       // ---- questions about a matter ----
       function askAboutMatter(m, docIds = [], prefill = '') {
         const ctx = { id: m.id, name: m.name, docIds: docIds.slice(0, MAX_UPLOADS) }
@@ -3530,6 +3844,7 @@
         { chapter: 'Agenten', title: 'Fachagenten', sel: '#agentPage .wf', route: '#/agent/contract_review', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen folgen einem festen Ablauf nach österreichischem Recht: Angaben erfassen, Prüfraster bzw. Gliederung, Rechtsfragen klären, Word-Ergebnis – und der nächste Schritt per Klick.' },
         { chapter: 'Agenten', title: 'Due Diligence', sel: '#mattersPage .page-head', route: '#/dd', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Jedes Dokument wird nach Prüfbereichen analysiert; jeder Befund mit Zitat und Fundstelle, Ampel, Request List und Red-Flag-Report als Word und Excel.' },
         { chapter: 'Akten', title: 'Akten', sel: '#mattersPage .page-head', route: '#/matters', text: 'Dokumente eines Mandats an einem Ort: Fragen im Kontext des Akts, Review-Tabellen über viele Dokumente, Import aus SharePoint oder einem lokalen Ordner.' },
+        { chapter: 'Projekte', title: 'Projekte – im Team arbeiten', sel: '#projectsPage .page-head', route: '#/projects', text: 'Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Über „Teilen“ wählen Sie registrierte Kolleginnen und Kollegen aus einer Liste – mit Recht zum Bearbeiten oder nur zum Lesen. Alle Mitglieder sehen dieselben Unterhaltungen.' },
         { chapter: 'Skills', title: 'Skill-Bibliothek', sel: '#skillsPage .page-head', route: '#/skills', text: 'Eigene Skills mit Anweisungen, Eingabefeldern und Referenzdokumenten (Muster, Playbook, Vorlage) anlegen, als JSON exportieren und im Team teilen.' },
         { chapter: 'Verlauf', title: 'Verlauf', sel: '#historyBtn', route: 'home', text: 'Alle Gespräche – auf dem Server gespeichert und auf jedem Gerät verfügbar, auf dem Sie angemeldet sind.' },
         { chapter: 'Einstellungen', title: 'Quellen & Speichern', sel: '#cardSources', route: '#/settings', text: 'Standardziele für Ergebnisse, Microsoft-365-Konto, Websuche, Budget und Sitzungskosten. Tour und Erklärvideo auch hier unter Daten & Hilfe.' },
@@ -3637,7 +3952,7 @@
       // Explainer video (public/media; shown only when the file is deployed)
       // ------------------------------------------------------------------
       const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg', vtt: '/media/erklaervideo.vtt' }
-      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 10], ['Unterlagen', 58], ['Ordner', 76], ['Skills', 96], ['Agenten', 105], ['Due Diligence', 120], ['Akten & Einstellungen', 133]]
+      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 10], ['Unterlagen', 58], ['Ordner', 75], ['Skills', 96], ['Agenten', 105], ['Due Diligence', 120], ['Projekte', 133], ['Akten & Einstellungen', 151]]
       let videoAvailable = false
       async function checkVideo() {
         try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }
@@ -3710,6 +4025,7 @@
         try { convos = JSON.parse(localStorage.getItem(convoKey()) || '[]') } catch { convos = [] }
         renderSidebarRecent()
         try { const r = await api('/api/convos'); convos = r.convos || []; saveConvos() } catch {}
+        loadProjects()
         renderSidebarRecent()
       }
       function renderAccount() {

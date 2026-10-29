@@ -10,7 +10,7 @@ PRON = {
     'Rechtsrecherche': 'Rechts-Recherche', 'einer': 'ainer', 'analysiert': 'analüsiert', 'Datenräume': 'Daten-Räume',
     'hochgeladen': 'hoch-geladen', 'Eingabefeld': 'Eingabe-Feld', 'Rechtsgebiet': 'Rechts-Gebit',
     'Rechtsinformationssystem': 'Rechts-Informations-System', 'Fundstelle': 'Fund-Stelle', 'Fundstellen': 'Fund-Stellen',
-    'Unterlagen': 'Unter-Lagen', 'Fachagenten': 'Fach-Agenten', 'österreichisches': 'öster-reichisches', 'österreichischem': 'öster-reichischem',
+    'Unterlagen': 'Unter-Lagen', 'Unterhaltungen': 'Unter-Haltungen', 'Unterhaltung': 'Unter-Haltung', 'Bearbeiten': 'be-arbeiten', 'Fachagenten': 'Fach-Agenten', 'österreichisches': 'öster-reichisches', 'österreichischem': 'öster-reichischem',
 }
 def fix(t):
     for a, b in PRON.items(): t = re.sub(r'(?<![\w-])' + re.escape(a) + r'(?![\w-])', b, t)

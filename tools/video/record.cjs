@@ -47,17 +47,19 @@ const OVERLAY = () => {
     const spot = document.createElement('div'); spot.id = 'demoSpot'; document.body.appendChild(spot)
     const pill = document.createElement('div'); pill.id = 'demoPill'; document.body.appendChild(pill)
     const card = document.createElement('div'); card.id = 'demoCard'; document.body.appendChild(card)
-    let spotSel = null, pillT = 0
+    let spotSel = null, pillT = 0, shown = false
     const loop = () => {
-      if (spotSel) {
-        const els = [].concat(spotSel).map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent !== null)
-        if (els.length) {
-          const rs = els.map((e) => e.getBoundingClientRect()); const pad = 7
-          const l = Math.min(...rs.map((r) => r.left)) - pad, t = Math.min(...rs.map((r) => r.top)) - pad
-          const w = Math.max(...rs.map((r) => r.right)) - l + pad, h = Math.max(...rs.map((r) => r.bottom)) - t + pad
-          Object.assign(spot.style, { left: l + 'px', top: t + 'px', width: w + 'px', height: h + 'px', opacity: 1 })
-        } else spot.style.opacity = 0
-      } else spot.style.opacity = 0
+      const els = spotSel ? [].concat(spotSel).map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent !== null) : []
+      if (els.length) {
+        const rs = els.map((e) => e.getBoundingClientRect()); const pad = 7
+        const l = Math.min(...rs.map((r) => r.left)) - pad, t = Math.min(...rs.map((r) => r.top)) - pad
+        const w = Math.max(...rs.map((r) => r.right)) - l + pad, h = Math.max(...rs.map((r) => r.bottom)) - t + pad
+        // A highlight that appears jumps to its target; only moves between visible targets animate.
+        if (!shown) { spot.style.transition = 'opacity .35s'; void spot.offsetWidth }
+        Object.assign(spot.style, { left: l + 'px', top: t + 'px', width: w + 'px', height: h + 'px', opacity: 1 })
+        if (!shown) { void spot.offsetWidth; spot.style.transition = '' }
+        shown = true
+      } else { spot.style.opacity = 0; shown = false }
       requestAnimationFrame(loop)
     }
     loop()
@@ -82,12 +84,20 @@ async function docx(paragraphs) {
   for (const [s, p] of servers) await new Promise((r) => s.listen(p, r))
   const data = fs.mkdtempSync(path.join(DIR, 'data_'))
   let log = ''
-  const srv = spawn('node', ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), AUTH: 'off', DATA_DIR: data, OPENAI_API_KEY: 'sk-demo', OPENAI_BASE_URL: 'http://127.0.0.1:3951/v1', AISSOCIATE_BASE_URL: 'http://127.0.0.1:3952', AISSOCIATE_API_KEY: 'ck:demo', RIS_BASE_URL: 'http://127.0.0.1:3953', RIS_TIMEOUT_MS: '5000', MS_CLIENT_ID: 'demo', MS_CLIENT_SECRET: 'demo', AZURE_OPENAI_API_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
+  const srv = spawn('node', ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), AUTH: 'on', DATA_DIR: data, OPENAI_API_KEY: 'sk-demo', OPENAI_BASE_URL: 'http://127.0.0.1:3951/v1', AISSOCIATE_BASE_URL: 'http://127.0.0.1:3952', AISSOCIATE_API_KEY: 'ck:demo', RIS_BASE_URL: 'http://127.0.0.1:3953', RIS_TIMEOUT_MS: '5000', MS_CLIENT_ID: 'demo', MS_CLIENT_SECRET: 'demo', AZURE_OPENAI_API_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
   srv.stdout.on('data', (d) => (log += d)); srv.stderr.on('data', (d) => (log += d))
   for (let i = 0; i < 60; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break } catch {} await sleep(250) }
 
-  // ---- seed: one due diligence (run against the demo backends) and two Akten ----
-  const api = async (p, o = {}) => { const r = await fetch(BASE + p, { ...o, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': OWNER } }); const t = await r.text(); try { return JSON.parse(t) } catch { return t } }
+  // ---- seed: accounts (the narrator's firm), one due diligence, two Akten and a shared project ----
+  const jar = {}
+  const as = (who) => async (p, o = {}) => { const r = await fetch(BASE + p, { ...o, headers: { 'Content-Type': 'application/json', ...(jar[who] ? { cookie: jar[who] } : {}) } }); const sc = r.headers.get('set-cookie'); if (sc) jar[who] = sc.split(';')[0]; const t = await r.text(); try { return JSON.parse(t) } catch { return t } }
+  const api = as('maria')
+  await api('/api/auth/setup', { method: 'POST', body: JSON.stringify({ email: 'maria.berger@kanzlei-berger.at', name: 'Maria Berger', password: 'demo-passwort-2026' }) })
+  const users = {}
+  for (const [key, name, email] of [['thomas', 'Thomas Wagner', 'thomas.wagner@kanzlei-berger.at'], ['lisa', 'Lisa Steiner', 'lisa.steiner@kanzlei-berger.at'], ['paul', 'Paul Gruber', 'paul.gruber@kanzlei-berger.at']]) {
+    users[key] = (await api('/api/auth/users', { method: 'POST', body: JSON.stringify({ name, email, password: 'demo-passwort-2026' }) })).user
+    await as(key)('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password: 'demo-passwort-2026' }) })
+  }
   const b64 = (s) => Buffer.from(s).toString('base64')
   const dd = (await api('/api/matters', { method: 'POST', body: JSON.stringify({ name: 'Projekt Edelweiß', kind: 'dd', client: 'Käufer Holding AG', settings: { target: 'Alpentech GmbH', areas: ['vertraege', 'immobilien', 'arbeit'] } }) })).matter
   await api(`/api/matters/${dd.id}/documents`, { method: 'POST', body: JSON.stringify({ files: [
@@ -102,6 +112,13 @@ async function docx(paragraphs) {
     await api(`/api/matters/${m.id}/documents`, { method: 'POST', body: JSON.stringify({ files: files.map(([n, t]) => ({ name: n, base64: b64(t) })) }) })
   }
   void run
+  // shared project: instructions, a document, Thomas (edit) and Paul (read) as members, one conversation by Thomas
+  const proj = (await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: 'Mietrecht Huber – Geschäftslokal', description: 'Kündigung und Wertsicherung, Geschäftslokal Wien 7.', instructions: 'Wir vertreten die Mieterin Maria Huber e.U. Immer auf das MRG eingehen. Fristen nur als Prüfpunkt mit Rechtsgrundlage nennen. Antworten als Entwurf für ein Mandantenschreiben formulieren.' }) })).project
+  await api(`/api/matters/${proj.matterId}/documents`, { method: 'POST', body: JSON.stringify({ files: [{ name: 'Mietvertrag Neubaugasse 12.txt', base64: b64('Mietvertrag über das Geschäftslokal Wien 7., Neubaugasse 12. Punkt 7: Die Mieterin kann mit dreimonatiger Frist zum Quartalsende kündigen.') }, { name: 'Schreiben Hausverwaltung 2024-03.txt', base64: b64('Ankündigung der Indexanpassung nach VPI 2020.') }] }) })
+  await api(`/api/projects/${proj.id}/members`, { method: 'POST', body: JSON.stringify({ userId: users.thomas.id, role: 'edit' }) })
+  await api(`/api/projects/${proj.id}/members`, { method: 'POST', body: JSON.stringify({ userId: users.paul.id, role: 'view' }) })
+  const tc = { id: 'c_demo_thomas_0001', title: 'Kündigungsverzicht der Vermieterin', createdAt: Date.now() - 3600e3, updatedAt: Date.now() - 3600e3, messages: [{ role: 'user', text: 'Wie lange gilt der Kündigungsverzicht der Vermieterin?' }, { role: 'assistant', data: { answer: 'Laut Punkt 7 des Mietvertrags verzichtet die Vermieterin für die ersten fünf Jahre auf ihr Kündigungsrecht.' } }], history: [] }
+  await as('thomas')(`/api/projects/${proj.id}/convos/${tc.id}`, { method: 'PUT', body: JSON.stringify(tc) })
 
   // ---- folder of the client (written into the browser's origin-private file system) ----
   const folderFiles = [
@@ -116,6 +133,7 @@ async function docx(paragraphs) {
   const browser = await chromium.launch()
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5, locale: 'de-AT' })
   await ctx.addInitScript(([owner]) => { try { localStorage.setItem('aiss.owner.v1', owner); localStorage.setItem('aiss.tourSeen.v3', '1') } catch {} }, [OWNER])
+  { const [k, v] = jar.maria.split('='); await ctx.addCookies([{ name: k, value: v, domain: '127.0.0.1', path: '/' }]) }
   await ctx.addInitScript(OVERLAY)
   const page = await ctx.newPage()
   page.on('pageerror', (e) => console.log('pageerror', e.message))
@@ -299,9 +317,44 @@ async function docx(paragraphs) {
     await sleep(300)
     await spot('#matterPage .tbl-wrap')
   })
+  await scene('projects', async (at) => {
+    await spot(null)
+    await pill('6', 'Projekte')
+    await click('#navProjects')
+    await page.waitForSelector('#projectsPage .proj-card')
+    await spot('#projectsPage .proj-card')
+    await sleep(600)
+    await click('#projectsPage .proj-card')
+    await page.waitForSelector('#projConvos .pc-row')
+    await spot(['#projConvos'])
+    await moveTo('#projConvos .pc-row', { ms: 500 })
+    await sleep(500)
+    await spot('#projInstrSide')
+    await at(0.36)
+    await spot(null)
+    await click('#projShare')
+    await page.waitForSelector('#dlg.show #shareUser')
+    await sleep(450) // let the dialog finish its entrance before highlighting it
+    await spot('#dlg.show .modal-card')
+    // show the dropdown as a list (native popups are not part of the screen recording)
+    await page.evaluate(() => { const s = document.getElementById('shareUser'); s.size = Math.min(4, s.options.length); s.style.height = 'auto' })
+    await sleep(500)
+    await moveTo('#shareUser option:has-text("Lisa Steiner")', { ms: 600 })
+    await page.mouse.down(); await sleep(80); await page.mouse.up()
+    await page.selectOption('#shareUser', { label: [...(await page.$$eval('#shareUser option', (o) => o.map((x) => x.textContent)))].find((t) => /Lisa/.test(t)) })
+    await sleep(500)
+    await page.evaluate(() => { const s = document.getElementById('shareUser'); s.size = 1; s.style.height = '' })
+    await moveTo('#shareRole', { ms: 450 }); await sleep(300)
+    await click('#shareAdd')
+    await page.waitForFunction(() => document.querySelectorAll('#shareList .pm-row').length === 4)
+    await at(0.82)
+    await click('#dlg.show .modal-actions .btn')
+    await spot('#projMembers')
+    await page.locator('#projMembers').scrollIntoViewIfNeeded()
+  })
   await scene('matters', async (at) => {
     await spot(null)
-    await pill('6', 'Akten & Einstellungen')
+    await pill('7', 'Akten & Einstellungen')
     await click('#navMatters')
     await page.waitForSelector('#mattersPage .card.click')
     await spot('#mattersPage .cards')

@@ -1276,6 +1276,11 @@ app.delete('/api/auth/users/:id', async (req, res) => {
   for (const m of await store.listMatters(owner)) { if (!ddRuns.has(m.id)) await store.deleteMatter(m.id) }
   for (const sk of await store.listSkills(owner)) await store.deleteSkill(sk.id)
   await fsp.rm(convoDir(owner), { recursive: true, force: true })
+  // Projects of the account go with it; memberships elsewhere end.
+  for (const p of await store.listProjects()) {
+    if (p.ownerKey === owner) { if (p.matterId) { try { await store.deleteMatter(p.matterId) } catch {} } await store.deleteProject(p.id) }
+    else if ((p.members || []).some((m) => m.userId === u.id)) { p.members = p.members.filter((m) => m.userId !== u.id); await store.saveProject(p, { touch: false }) }
+  }
   await auth.remove(u.id); res.json({ ok: true })
 })
 // Data of the browser workspace from before the accounts (X-Owner-Key) moves to the signed-in user once.
@@ -1287,6 +1292,7 @@ app.post('/api/auth/claim', async (req, res) => {
   let matters = 0, skills = 0
   for (const m of await store.listMatters(key)) { m.ownerKey = owner; await store.saveMatter(m); matters++ }
   for (const sk of await store.listSkills(key)) { sk.ownerKey = owner; await store.saveSkill(sk); skills++ }
+  for (const pr of await store.listProjects((x) => x.ownerKey === key)) { pr.ownerKey = owner; pr.ownerUserId = req.user.id; await store.saveProject(pr, { touch: false }) }
   res.json({ matters, skills })
 })
 
@@ -1531,6 +1537,157 @@ app.delete('/api/convos', async (req, res) => {
   const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
   await fsp.rm(convoDir(owner), { recursive: true, force: true }); res.json({ ok: true })
 })
+// ---- projects: shared workspaces with instructions, documents (an internal matter), conversations and members ----
+const ROLE_RANK = { view: 1, edit: 2, owner: 3 }
+const PROJECT_CONVO_MAX = 300
+const projectOk = (id) => /^[\w-]{6,64}$/.test(String(id || ''))
+function projectRole(p, req) {
+  const owner = ownerOf(req)
+  if (!p || !owner) return null
+  if (p.ownerKey === owner) return 'owner'
+  if (!req.user) return null
+  const m = (p.members || []).find((x) => x.userId === req.user.id)
+  return m ? (m.role === 'view' ? 'view' : 'edit') : null
+}
+async function loadProject(req, res, need = 'view', id = req.params.id) {
+  if (!ownerOf(req)) { res.status(401).json({ error: 'Bitte anmelden.', auth: true }); return null }
+  let p = null
+  if (projectOk(id)) { try { p = await store.getProject(String(id)) } catch {} }
+  const role = projectRole(p, req)
+  if (!role) { res.status(404).json({ error: 'Projekt nicht gefunden.' }); return null }
+  if (ROLE_RANK[role] < ROLE_RANK[need]) { res.status(403).json({ error: need === 'owner' ? 'Das kann nur die Person, die das Projekt angelegt hat.' : 'Für dieses Projekt haben Sie nur Leserechte.' }); return null }
+  req.projectRole = role
+  return p
+}
+/** Access to a matter: its owner, or a member of the project the matter belongs to. */
+async function matterRole(m, req) {
+  const owner = ownerOf(req)
+  if (!m || !owner) return null
+  if (m.ownerKey === owner) return 'owner'
+  if (!m.projectId) return null
+  let p = null; try { p = await store.getProject(m.projectId) } catch {}
+  const r = projectRole(p, req)
+  return r === 'owner' ? 'edit' : r
+}
+const usersById = async () => { const map = new Map(); if (AUTH_ON) for (const u of await auth.list()) map.set(u.id, u); return map }
+async function projectView(p, req, { full = false } = {}) {
+  const users = await usersById()
+  let matter = null; if (p.matterId) { try { matter = await store.getMatter(p.matterId) } catch {} }
+  const convos = await store.listProjectConvos(p.id)
+  const ou = p.ownerUserId ? users.get(p.ownerUserId) : null
+  const v = {
+    id: p.id, name: p.name, description: p.description || '', instructions: p.instructions || '', createdAt: p.createdAt, updatedAt: p.updatedAt,
+    role: projectRole(p, req), matterId: p.matterId || null,
+    owner: ou ? { id: ou.id, name: ou.name, email: ou.email } : { id: null, name: '', email: '' },
+    members: (p.members || []).map((m) => { const u = users.get(m.userId); return u ? { userId: u.id, name: u.name, email: u.email, role: m.role === 'view' ? 'view' : 'edit', addedAt: m.addedAt } : null }).filter(Boolean),
+    documents: matter ? matter.documents.length : 0, conversations: convos.length,
+    lastActivity: Math.max(p.updatedAt || 0, convos[0]?.updatedAt || 0),
+  }
+  if (full) {
+    v.documentList = matter ? matter.documents.map((d) => ({ id: d.id, name: d.name, size: d.size, status: d.status, addedAt: d.addedAt || null, source: d.source || 'upload' })) : []
+    v.convos = convos.map((c) => ({ id: c.id, title: c.title || 'Unterhaltung', updatedAt: c.updatedAt, createdAt: c.createdAt, messages: (c.messages || []).length, createdBy: c.createdBy || null, createdByName: users.get(c.createdBy)?.name || '', updatedByName: users.get(c.updatedBy)?.name || '' }))
+  }
+  return v
+}
+// Registered colleagues for the share dropdown (name and e-mail only).
+app.get('/api/users/directory', async (req, res) => {
+  if (!AUTH_ON) return res.json({ enabled: false, users: [] })
+  if (!req.user) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  res.json({ enabled: true, users: (await auth.list()).filter((u) => !u.disabled && u.id !== req.user.id).map((u) => ({ id: u.id, name: u.name, email: u.email })) })
+})
+app.get('/api/projects', async (req, res) => {
+  if (!ownerOf(req)) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  const list = await store.listProjects((p) => Boolean(projectRole(p, req)))
+  res.json({ projects: await Promise.all(list.map((p) => projectView(p, req))) })
+})
+app.post('/api/projects', async (req, res) => {
+  const owner = ownerOf(req); if (!owner) return res.status(401).json({ error: 'Bitte anmelden.', auth: true })
+  const b = req.body || {}
+  const name = String(b.name || '').trim().slice(0, 120)
+  if (!name) return res.status(400).json({ error: 'Bitte einen Namen für das Projekt angeben.' })
+  const p = { id: JsonStore.newId('p'), ownerKey: owner, ownerUserId: req.user?.id || null, name, description: String(b.description || '').slice(0, 1000), instructions: String(b.instructions || '').slice(0, 8000), members: [], createdAt: Date.now() }
+  const m = newMatter({ ownerKey: owner, name: `Projekt: ${name}` }); m.projectId = p.id
+  await store.saveMatter(m)
+  p.matterId = m.id
+  await store.saveProject(p)
+  res.json({ project: await projectView(p, req, { full: true }) })
+})
+app.get('/api/projects/:id', async (req, res) => { const p = await loadProject(req, res); if (p) res.json({ project: await projectView(p, req, { full: true }) }) })
+app.patch('/api/projects/:id', async (req, res) => {
+  const p = await loadProject(req, res, 'edit'); if (!p) return
+  const b = req.body || {}
+  if (typeof b.name === 'string' && b.name.trim()) p.name = b.name.trim().slice(0, 120)
+  if (typeof b.description === 'string') p.description = b.description.slice(0, 1000)
+  if (typeof b.instructions === 'string') p.instructions = b.instructions.slice(0, 8000)
+  await store.saveProject(p)
+  if (p.matterId) { try { const m = await store.getMatter(p.matterId); if (m && m.name !== `Projekt: ${p.name}`) { m.name = `Projekt: ${p.name}`; await store.saveMatter(m) } } catch {} }
+  res.json({ project: await projectView(p, req, { full: true }) })
+})
+app.delete('/api/projects/:id', async (req, res) => {
+  const p = await loadProject(req, res, 'owner'); if (!p) return
+  if (p.matterId && ddRuns.has(p.matterId)) return res.status(409).json({ error: 'Im Projekt läuft gerade ein Vorgang – bitte kurz warten.' })
+  if (p.matterId) { try { await store.deleteMatter(p.matterId) } catch {} }
+  await store.deleteProject(p.id)
+  res.json({ ok: true })
+})
+// ---- members ----
+app.post('/api/projects/:id/members', async (req, res) => {
+  const p = await loadProject(req, res, 'owner'); if (!p) return
+  if (!AUTH_ON) return res.status(400).json({ error: 'Teilen setzt Konten voraus (AUTH).' })
+  const userId = String(req.body?.userId || ''), role = req.body?.role === 'view' ? 'view' : 'edit'
+  const u = await auth.get(userId).catch(() => null)
+  if (!u || u.disabled) return res.status(404).json({ error: 'Konto nicht gefunden.' })
+  if (u.id === p.ownerUserId || ownerKeyOfUser(u) === p.ownerKey) return res.status(400).json({ error: 'Das Projekt gehört bereits dieser Person.' })
+  p.members = p.members || []
+  const ex = p.members.find((m) => m.userId === u.id)
+  if (ex) ex.role = role; else p.members.push({ userId: u.id, role, addedAt: Date.now(), addedBy: req.user?.id || null })
+  await store.saveProject(p)
+  res.json({ project: await projectView(p, req, { full: true }) })
+})
+app.patch('/api/projects/:id/members/:userId', async (req, res) => {
+  const p = await loadProject(req, res, 'owner'); if (!p) return
+  const m = (p.members || []).find((x) => x.userId === req.params.userId); if (!m) return res.status(404).json({ error: 'Mitglied nicht gefunden.' })
+  m.role = req.body?.role === 'view' ? 'view' : 'edit'
+  await store.saveProject(p)
+  res.json({ project: await projectView(p, req, { full: true }) })
+})
+app.delete('/api/projects/:id/members/:userId', async (req, res) => {
+  // The owner removes anyone; a member may leave the project.
+  const self = req.user && req.user.id === req.params.userId
+  const p = await loadProject(req, res, self ? 'view' : 'owner'); if (!p) return
+  p.members = (p.members || []).filter((x) => x.userId !== req.params.userId)
+  await store.saveProject(p)
+  res.json(self ? { ok: true } : { project: await projectView(p, req, { full: true }) })
+})
+// ---- shared conversations of a project ----
+app.get('/api/projects/:id/convos', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return
+  const users = await usersById()
+  res.json({ convos: (await store.listProjectConvos(p.id)).slice(0, PROJECT_CONVO_MAX).map((c) => ({ ...c, createdByName: users.get(c.createdBy)?.name || '' })) })
+})
+app.get('/api/projects/:id/convos/:cid', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return
+  if (!convoOk(req.params.cid)) return res.status(400).json({ error: 'Ungültige ID.' })
+  const c = await store.getProjectConvo(p.id, req.params.cid)
+  if (!c) return res.status(404).json({ error: 'Unterhaltung nicht gefunden.' })
+  res.json({ convo: c })
+})
+app.put('/api/projects/:id/convos/:cid', async (req, res) => {
+  const p = await loadProject(req, res, 'edit'); if (!p) return
+  const id = String(req.params.cid || ''), c = req.body
+  if (!convoOk(id) || !c || typeof c !== 'object' || c.id !== id || !Array.isArray(c.messages)) return res.status(400).json({ error: 'Ungültiges Gespräch.' })
+  const prev = await store.getProjectConvo(p.id, id)
+  const doc = { ...c, project: { id: p.id, name: p.name }, createdBy: prev?.createdBy || req.user?.id || null, updatedBy: req.user?.id || null }
+  if (JSON.stringify(doc).length > CONVO_MAX_BYTES) return res.status(413).json({ error: 'Gespräch zu groß zum Speichern.' })
+  await store.saveProjectConvo(p.id, doc)
+  await store.saveProject(p)
+  res.json({ ok: true })
+})
+app.delete('/api/projects/:id/convos/:cid', async (req, res) => {
+  const p = await loadProject(req, res, 'edit'); if (!p) return
+  if (!convoOk(req.params.cid)) return res.status(400).json({ error: 'Ungültige ID.' })
+  await store.deleteProjectConvo(p.id, req.params.cid); res.json({ ok: true })
+})
 const matterSummary = (m) => ({
   id: m.id, name: m.name, kind: m.kind, client: m.client, createdAt: m.createdAt, updatedAt: m.updatedAt, settings: m.settings,
   documents: m.documents.length, analysed: m.documents.filter((d) => d.status === 'analysed').length,
@@ -1544,7 +1701,9 @@ async function loadMatter(req, res) {
   if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
   let m = null
   try { m = await store.getMatter(String(req.params.id || '')) } catch {}
-  if (!m || m.ownerKey !== owner) { res.status(404).json({ error: 'Akt nicht gefunden.' }); return null }
+  const role = await matterRole(m, req)
+  if (!role) { res.status(404).json({ error: 'Akt nicht gefunden.' }); return null }
+  if (role === 'view' && req.method !== 'GET') { res.status(403).json({ error: 'Für dieses Projekt haben Sie nur Leserechte.' }); return null }
   return m
 }
 const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 6) // upper bound; the run scales workers with the number of documents
@@ -1747,7 +1906,7 @@ app.get('/api/matters/:id/dd/estimate', async (req, res) => {
 app.get('/api/matters', async (req, res) => {
   const owner = ownerOf(req)
   if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
-  try { res.json({ matters: (await store.listMatters(owner)).map(matterSummary) }) } catch (e) { res.status(500).json({ error: e.message }) }
+  try { res.json({ matters: (await store.listMatters(owner)).filter((m) => !m.projectId).map(matterSummary) }) } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/matters', async (req, res) => {
   const owner = ownerOf(req)
@@ -1772,6 +1931,7 @@ app.patch('/api/matters/:id', async (req, res) => {
 })
 app.delete('/api/matters/:id', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
+  if (m.projectId) return res.status(409).json({ error: 'Die Dokumente eines Projekts werden mit dem Projekt gelöscht.' })
   if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Für diesen Akt läuft gerade ein Vorgang – zuerst pausieren.' })
   await store.deleteMatter(m.id)
   res.json({ ok: true })
@@ -1987,11 +2147,15 @@ app.post('/api/chat', async (req, res) => {
   // Ask for a token that outlives the job (jobs can run for many minutes); a refresh now still sets cookies.
   const msAuth = MS.clientId && wantsMs ? await msAccessToken(req, res, 30 * 60_000) : null
   // Questions about a matter (Akte): its analysis becomes context, chosen documents become attachments.
-  let matterReq = null, matterDocs = []
+  let matterReq = null, matterDocs = [], projReq = null
+  if (typeof body.projectId === 'string' && body.projectId) {
+    projReq = await loadProject(req, res, 'edit', body.projectId); if (!projReq) return
+    // Without an Akt of its own the question uses the project's documents.
+    if (!(typeof body.matterId === 'string' && body.matterId) && projReq.matterId) { try { const pm = await store.getMatter(projReq.matterId); if (pm?.documents.length) matterReq = pm } catch {} }
+  }
   if (typeof body.matterId === 'string' && body.matterId) {
-    const owner = ownerOf(req)
-    try { matterReq = owner ? await store.getMatter(body.matterId) : null } catch {}
-    if (!matterReq || matterReq.ownerKey !== owner) return res.status(404).json({ error: 'Akt nicht gefunden.' })
+    try { matterReq = await store.getMatter(body.matterId) } catch { matterReq = null }
+    if (!(await matterRole(matterReq, req))) return res.status(404).json({ error: 'Akt nicht gefunden.' })
     const ids = new Set((Array.isArray(body.matterDocIds) ? body.matterDocIds : []).map(String))
     matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
   }
@@ -2508,7 +2672,7 @@ app.post('/api/chat', async (req, res) => {
 
     // ---- 0b. matter context: the stored analysis (findings, summaries) and chosen documents ----
     if (matterReq) {
-      const sid = step('read', `Akt „${matterReq.name}“ wird eingebunden`)
+      const sid = step('read', matterReq.projectId ? `Projektdokumente „${projReq?.name || matterReq.name.replace(/^Projekt: /, '')}“ werden eingebunden` : `Akt „${matterReq.name}“ wird eingebunden`)
       matterCtx = matterContext(matterReq, 60_000)
       for (const d of matterDocs) {
         if (uploads.length >= MAX_UPLOADS || uploads.some((u) => u.name === d.name)) continue
@@ -2524,6 +2688,8 @@ app.post('/api/chat', async (req, res) => {
     if (folderReq) filesSrc = { kind: 'local', name: folderReq.name, count: folderReq.count }
     else if (matterReq && !matterDocs.length && matterReq.documents.length) filesSrc = { kind: 'akt', name: matterReq.name, count: matterReq.documents.length }
     if (skillRun) { await prepareSkill(skillRun); taskExtra = skillRun.block + (taskExtra ? '\n\n' + taskExtra : '') }
+    // Project instructions apply to every request in the project (like a standing brief).
+    if (projReq?.instructions?.trim()) taskExtra = `PROJEKT „${projReq.name}“ – ANWEISUNGEN FÜR ALLE ANFRAGEN IN DIESEM PROJEKT:\n${projReq.instructions.trim()}` + (taskExtra ? '\n\n' + taskExtra : '')
     // Skills the planner may choose by itself (only when nothing else steers this message).
     let skillCandidates = []
     if (!skillRun && !agentRun && !task) {
