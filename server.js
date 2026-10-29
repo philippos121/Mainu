@@ -6,6 +6,7 @@ import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import OpenAI from 'openai'
 import { Sandbox } from '@e2b/code-interpreter'
+import { LocalSandbox } from './lib/localSandbox.js'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
@@ -745,6 +746,10 @@ const UPLOAD_PART_CHARS = 24_000
 // ---------------------------------------------------------------------------
 // Sandbox (E2B) — only for the file tool
 // ---------------------------------------------------------------------------
+// SANDBOX=local runs generated code on this machine without isolation (development/demo only).
+const LOCAL_SANDBOX = process.env.SANDBOX === 'local'
+if (LOCAL_SANDBOX) console.warn('SANDBOX=local: generierter Code läuft OHNE Isolation auf diesem Rechner – nur für Entwicklung und Demo.')
+const createSandbox = () => (LOCAL_SANDBOX ? LocalSandbox.create() : Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS }))
 const chatSessions = new Map() // sessionId -> { sandbox, lastUsed }
 async function getChatSandbox(sessionId) {
   const existing = sessionId && chatSessions.get(sessionId)
@@ -754,7 +759,7 @@ async function getChatSandbox(sessionId) {
       chatSessions.delete(sessionId)
     }
   }
-  const sandbox = await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
+  const sandbox = await createSandbox()
   if (sessionId) chatSessions.set(sessionId, { sandbox, lastUsed: Date.now() })
   return sandbox
 }
@@ -1366,7 +1371,7 @@ app.get('/api/ms/browse', async (req, res) => {
 app.get('/api/health', async (req, res) => {
   let storeStats = null
   try { storeStats = await store.stats() } catch {}
-  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), msRedirectUri: MS.clientId ? msRedirectUri(req) : undefined, msTenant: MS.clientId ? MS.tenant : undefined, models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
+  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), sandbox: LOCAL_SANDBOX ? 'local' : 'e2b', aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), msRedirectUri: MS.clientId ? msRedirectUri(req) : undefined, msTenant: MS.clientId ? MS.tenant : undefined, models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -2279,12 +2284,12 @@ app.post('/api/chat', async (req, res) => {
   async function ensureSandbox() {
     if (sandboxReady) return
     sandboxStart = Date.now()
-    sandbox = persistent ? await getChatSandbox(sessionId) : await Sandbox.create({ apiKey: E2B_API_KEY, timeoutMs: SANDBOX_LIFETIME_MS })
+    sandbox = persistent ? await getChatSandbox(sessionId) : await createSandbox()
     for (const u of uploads) {
       const ab = u.buf.buffer.slice(u.buf.byteOffset, u.buf.byteOffset + u.buf.byteLength)
       await sandbox.files.write(`${WORKDIR}/${u.name}`, ab)
     }
-    try { await sandbox.runCode(DEPS_CODE, { timeoutMs: 180_000 }) } catch (e) { console.error('dep prep failed:', e?.message) }
+    if (!sandbox.local) try { await sandbox.runCode(DEPS_CODE, { timeoutMs: 180_000 }) } catch (e) { console.error('dep prep failed:', e?.message) }
     try { for (const e of await sandbox.files.list(WORKDIR)) if (e.type === 'file') before.set(e.path, e.size) } catch {}
     sandboxReady = true
   }
@@ -2664,7 +2669,7 @@ app.post('/api/chat', async (req, res) => {
     if (uploads.length) {
       const sid = step('read', `${uploads.length} Datei${uploads.length > 1 ? 'en' : ''} wird vorbereitet`)
       for (const u of uploads) uploadTexts.set(u.name, await extractText(u.name, u.buf))
-      stepDone(sid, { detail: uploads.map((u) => `${u.name} (${(uploadTexts.get(u.name).text.length / 1000).toFixed(0)}k Zeichen)`).join(', ') })
+      stepDone(sid, { detail: uploads.map((u) => { const n = uploadTexts.get(u.name).text.length; return `${u.name} (${n < 1000 ? n.toLocaleString('de-AT') : Math.round(n / 1000).toLocaleString('de-AT') + 'k'} Zeichen)` }).join(', ') })
     }
     // Documents of earlier turns of this conversation stay readable (and reach the knowledge base when a question refers to them).
     const prior = persistent ? sessionDocs.get(sessionId) : null

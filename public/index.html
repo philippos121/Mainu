@@ -698,7 +698,7 @@
       .tour-card .tc-keys { font-size: 11px; color: var(--faint); }
       @media (max-width: 640px) { .tour-card .tc-keys { display: none; } }
       .video-card { width: min(960px, calc(100vw - 24px)) !important; max-width: none !important; padding: 14px !important; }
-      .video-card video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #0e252e; border-radius: 10px; }
+      .video-card video { display: block; width: 100%; aspect-ratio: 16 / 10; max-height: calc(100vh - 170px); object-fit: contain; background: #0e252e; border-radius: 10px; }
       .video-card .vc-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 10px; }
       .video-card .vc-head h2 { margin: 0; font-size: 16px; }
       .video-card .vc-head .sp { flex: 1; }
@@ -822,7 +822,7 @@
               <div id="composerSlotHome"></div>
               <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können falsch sein und müssen vor Verwendung juristisch geprüft werden.</p>
               <div class="home-help" id="tourBanner" aria-label="Hilfe">
-                <button class="help-tile" id="tourVideo" type="button" hidden><span class="thumb"><img src="/media/erklaervideo.jpg" alt="" loading="lazy" /><span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span></span><span class="tx"><b>Erklärvideo</b><span>Alle Funktionen in unter drei Minuten</span></span></button>
+                <button class="help-tile" id="tourVideo" type="button" hidden><span class="thumb"><img src="/media/erklaervideo.jpg" alt="" loading="lazy" /><span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span></span><span class="tx"><b>Erklärvideo</b><span>Alle Funktionen in knapp vier Minuten</span></span></button>
                 <button class="help-tile" id="tourStart" type="button"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour</b><span>Schritt für Schritt direkt in der App</span></span><span class="new" id="tourNew" hidden>Neu hier?</span></button>
               </div>
             </div>
@@ -974,7 +974,7 @@
     <div class="pop-menu" id="saveMenu" role="menu" aria-label="Ergebnisse speichern" hidden></div>
     <div class="pop-menu help-menu" id="helpMenu" role="menu" aria-label="Hilfe" hidden>
       <div class="pm-sec"><b>Hilfe</b></div>
-      <button class="pm-item" id="helpVideo" role="menuitem" hidden><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span><span class="tx"><b>Erklärvideo ansehen</b><span>Alle Funktionen in unter drei Minuten</span></span></button>
+      <button class="pm-item" id="helpVideo" role="menuitem" hidden><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span><span class="tx"><b>Erklärvideo ansehen</b><span>Alle Funktionen in knapp vier Minuten</span></span></button>
       <button class="pm-item" id="helpTour" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour starten</b><span>Schritt für Schritt direkt in der App</span></span></button>
     </div>
 
@@ -3951,8 +3951,9 @@
       // ------------------------------------------------------------------
       // Explainer video (public/media; shown only when the file is deployed)
       // ------------------------------------------------------------------
-      const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg', vtt: '/media/erklaervideo.vtt' }
-      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 10], ['Unterlagen', 58], ['Ordner', 75], ['Skills', 96], ['Agenten', 105], ['Due Diligence', 120], ['Projekte', 133], ['Akten & Einstellungen', 151]]
+      // Captions are burned into the video (centred in a band below the picture).
+      const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg' }
+      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 10], ['Dateien & Code', 58], ['Unterlagen', 79], ['Ordner', 96], ['SharePoint', 116], ['Skills', 149], ['Agenten', 157], ['Due Diligence', 172], ['Projekte', 186], ['Akten & Einstellungen', 204]]
       let videoAvailable = false
       async function checkVideo() {
         try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }
@@ -3963,7 +3964,6 @@
         const head = el('div', 'vc-head'); head.appendChild(el('h2', null, 'Erklärvideo: AI:ssociate im Überblick')); head.appendChild(el('span', 'sp'))
         const x = el('button', 'mini', 'Schließen'); x.addEventListener('click', closeDlg); head.appendChild(x); card.appendChild(head)
         const v = document.createElement('video'); v.controls = true; v.preload = 'metadata'; v.poster = VIDEO.poster; v.src = VIDEO.src; v.playsInline = true
-        const tr = document.createElement('track'); tr.kind = 'captions'; tr.srclang = 'de'; tr.label = 'Deutsch'; tr.src = VIDEO.vtt; v.appendChild(tr)
         card.appendChild(v)
         const ch = el('div', 'vc-chaps'); for (const [label, t] of VIDEO_CHAPTERS) { const b = el('button', 'mini', label); b.addEventListener('click', () => { v.currentTime = t; v.play().catch(() => {}) }); ch.appendChild(b) }
         card.appendChild(ch)

@@ -19,16 +19,21 @@ in the tour and in the welcome banner. Run it again after visible UI changes.
    studio-quality voice use a cloud service (e.g. Azure AI Speech `de-AT-JonasNeural` /
    `de-AT-IngridNeural`) and write the clips to `audio/` with the same file names.
 
-2. **Recording** – `node record.cjs` starts `server.js` against the demo backends in
-   `mocks.cjs` (model, AI:ssociate and RIS with fixed, legally checked texts), seeds a due
-   diligence and two Akten, drives the real UI with Playwright (visible cursor, highlights,
-   chapter labels) and captures 1080p frames via the Chrome screencast. Each scene lasts
-   at least as long as its narration clip. Needs Playwright with Chromium.
+2. **Recording** – `LOCAL_SANDBOX_PYTHON=python3 node record.cjs` starts `server.js` against the
+   demo backends in `mocks.cjs`: model (incl. a "code model" that writes real python-docx /
+   openpyxl programs), AI:ssociate and RIS with fixed, legally checked texts, Microsoft
+   Entra login and Graph with a SharePoint library. Generated code runs in the local stand-in
+   sandbox (`SANDBOX=local`, needs python-docx and openpyxl), so the Word comments, Excel
+   files and letters in the video are real. It seeds accounts, a due diligence, two Akten
+   and a shared project, drives the real UI with Playwright (visible cursor, highlights,
+   chapter labels) and captures 1080p frames via the Chrome screencast. Each scene lasts at
+   least as long as its narration clip.
 
-3. **Assembly** – `node build.cjs` (needs ffmpeg) writes `out/erklaervideo.mp4` (H.264,
-   AAC, embedded German subtitles), `out/erklaervideo.jpg` (poster), `out/erklaervideo.vtt`
-   and `out/chapters.json`.
+3. **Assembly** – `node build.cjs` (needs ffmpeg with libass and the Inter font) writes
+   `out/erklaervideo.mp4` (1920×1200: the 1080p picture plus a 120 px band in which the
+   captions are burned in, centred), `out/erklaervideo.jpg` (poster),
+   `out/erklaervideo.vtt` and `out/chapters.json`.
 
-4. Copy `out/erklaervideo.{mp4,jpg,vtt}` to `public/media/` and update `VIDEO_CHAPTERS` in
+4. Copy `out/erklaervideo.{mp4,jpg}` to `public/media/` and update `VIDEO_CHAPTERS` in
    `public/index.html` from `out/chapters.json`. The app shows the video buttons only when
    `/media/erklaervideo.mp4` exists.

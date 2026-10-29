@@ -30,6 +30,12 @@
   "tts": "Die Antwort nennt ihre Fundstellen. Jede zitierte Norm wird automatisch im Rechtsinformationssystem des Bundes geprüft. Der grüne Haken heißt: im Ries bestätigt. Die Antwort lässt sich als Wörd exportieren, die Kosten stehen direkt darunter."
  },
  {
+  "id": "files",
+  "chapter": "Dateien & Code",
+  "text": "Der Assistent kann grundsätzlich alles: Er versteht jede Eingabe und liefert jedes Ergebnis – nicht nur Text, sondern fertige Dateien. Dafür schreibt er Programmcode und führt ihn in einer abgeschotteten Sandbox aus. Hier kommentiert er die Wertsicherungsklausel direkt im Word-Dokument und erstellt dazu eine Excel-Übersicht.",
+  "tts": "Der Assistent kann grundsätzlich alles: Er versteht jede Eingabe, und liefert jedes Ergebnis, nicht nur Text, sondern fertige Dateien. Dafür schreibt er Programmcode, und führt ihn in einer abgeschotteten Sändbox aus. Hier kommentiert er die Wertsicherungsklausel direkt im Wörd-Dokument, und erstellt dazu eine Ecksel Über-Sicht."
+ },
+ {
   "id": "add",
   "chapter": "Unterlagen",
   "text": "Unterlagen kommen über einen einzigen Knopf: Hinzufügen. „Dateien anhängen“ schickt sie mit der Frage mit – vom Computer oder direkt aus OneDrive und SharePoint. „Quelle verbinden“ heißt: Der Assistent sucht selbst, in einem lokalen Ordner oder in einem Akt.",
@@ -38,8 +44,20 @@
  {
   "id": "folder",
   "chapter": "Ordner",
-  "text": "Verbinden wir den Ordner einer Mandantin. Nichts wird vorab hochgeladen: Der Assistent durchsucht den Ordner, liest nur die Dateien, die er braucht, und sagt, wo er fündig wurde. Unter dem Eingabefeld steht, wohin Ergebnisse gespeichert werden – zurück in den Ordner, ohne etwas zu überschreiben.",
-  "tts": "Verbinden wir den Ordner einer Mandantin. Nichts wird vorab hochgeladen. Der Assistent durchsucht den Ordner, liest nur die Dateien, die er braucht, und sagt, wo er fündig wurde. Unter dem Eingabefeld steht, wohin Ergebnisse gespeichert werden: zurück in den Ordner, ohne etwas zu überschreiben."
+  "text": "Verbinden wir den Ordner einer Mandantin. Nichts wird vorab hochgeladen: Der Assistent durchsucht den Ordner, liest nur, was er braucht, und schreibt das Kündigungsschreiben. Nach der Antwort liegt die fertige Datei direkt im Ordner – neben dem Mietvertrag, ohne etwas zu überschreiben.",
+  "tts": "Verbinden wir den Ordner einer Mandantin. Nichts wird vorab hochgeladen. Der Assistent durchsucht den Ordner, liest nur, was er braucht, und schreibt das Kündigungsschreiben. Nach der Antwort liegt die fertige Datei direkt im Ordner, neben dem Mietvertrag, ohne etwas zu überschreiben."
+ },
+ {
+  "id": "sharepoint",
+  "chapter": "SharePoint",
+  "text": "Genauso mit SharePoint und OneDrive: Dokument aus der Bibliothek wählen und die Aufgabe stellen. Das Ergebnis wird automatisch zurückgeschrieben – nach der Antwort liegt die fertige Datei im selben SharePoint-Ordner wie das Original. Lokal und in der Cloud funktioniert das gleich.",
+  "tts": "Genauso mit Schärpoint und Wan-Dreif: Dokument aus der Bibliothek wählen, und die Aufgabe stellen. Das Ergebnis wird automatisch zurückgeschrieben. Nach der Antwort liegt die fertige Datei im selben Schärpoint-Ordner wie das Original. Lokal und in der Klaud funktioniert das gleich."
+ },
+ {
+  "id": "spproof",
+  "chapter": "SharePoint",
+  "text": "Zur Kontrolle: Im SharePoint-Ordner liegt jetzt neben dem Original die kommentierte Fassung.",
+  "tts": "Zur Kontrolle: Im Schärpoint-Ordner liegt jetzt, neben dem Original, die kommentierte Fassung."
  },
  {
   "id": "skills",

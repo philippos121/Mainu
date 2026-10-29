@@ -4,7 +4,7 @@ const { chromium } = require('playwright')
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { modelServer, kbServer, risServer } = require('./mocks.cjs')
+const { modelServer, kbServer, risServer, msLoginServer, msGraphServer } = require('./mocks.cjs')
 const ROOT = path.resolve(__dirname, '../..')
 const { Document, Packer, Paragraph } = require(path.join(ROOT, 'node_modules/docx'))
 
@@ -41,7 +41,8 @@ const OVERLAY = () => {
     const cur = document.createElement('div'); cur.id = 'demoCursor'
     cur.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 2l15 11-6.5 1.2L16 21l-3 1.4-3.6-6.8L4 20z" fill="#fff" stroke="#0e252e" stroke-width="1.5" stroke-linejoin="round"/></svg>'
     document.body.appendChild(cur)
-    document.addEventListener('mousemove', (e) => { cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px' }, true)
+    cur.style.opacity = 0 // hidden until the first move (no stray arrow in the corner of the intro)
+    document.addEventListener('mousemove', (e) => { cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px'; cur.style.opacity = 1 }, true)
     const ripple = (x, y) => { const r = document.createElement('div'); r.className = 'demo-ripple'; r.style.left = x + 'px'; r.style.top = y + 'px'; document.body.appendChild(r); setTimeout(() => r.remove(), 600) }
     document.addEventListener('mousedown', (e) => ripple(e.clientX, e.clientY), true)
     const spot = document.createElement('div'); spot.id = 'demoSpot'; document.body.appendChild(spot)
@@ -80,11 +81,16 @@ async function docx(paragraphs) {
 
 ;(async () => {
   fs.rmSync(FRAMES, { recursive: true, force: true }); fs.mkdirSync(FRAMES, { recursive: true })
-  const servers = [[modelServer(), 3951], [kbServer(), 3952], [risServer(), 3953]]
+  const spDocs = {
+    fa1: () => docx(['Rahmenliefervertrag zwischen Alpentech GmbH (Lieferantin) und Alpenstahl AG (Kundin)', 'Punkt 1: Gegenstand ist die Lieferung von Präzisionsteilen nach Einzelabrufen.', 'Punkt 4: Die Preise gelten für zwölf Monate ab Vertragsabschluss.', 'Punkt 9.2: Die Haftung der Kundin ist mit dem jährlichen Auftragswert begrenzt.', 'Punkt 12.3: Bei einem Wechsel der Kontrolle über die Lieferantin ist die Kundin berechtigt, den Vertrag mit sofortiger Wirkung zu kündigen.']),
+    fa2: () => docx(['Geschäftsführervertrag', 'Punkt 6: Im Fall eines Kontrollwechsels steht der Geschäftsführerin eine Abfertigung in Höhe von 24 Monatsentgelten zu.']),
+  }
+  const graph = msGraphServer({ docx: async (id) => Buffer.from(await spDocs[id](), 'base64') })
+  const servers = [[modelServer(), 3951], [kbServer(), 3952], [risServer(), 3953], [msLoginServer(), 3954], [graph, 3955]]
   for (const [s, p] of servers) await new Promise((r) => s.listen(p, r))
   const data = fs.mkdtempSync(path.join(DIR, 'data_'))
   let log = ''
-  const srv = spawn('node', ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), AUTH: 'on', DATA_DIR: data, OPENAI_API_KEY: 'sk-demo', OPENAI_BASE_URL: 'http://127.0.0.1:3951/v1', AISSOCIATE_BASE_URL: 'http://127.0.0.1:3952', AISSOCIATE_API_KEY: 'ck:demo', RIS_BASE_URL: 'http://127.0.0.1:3953', RIS_TIMEOUT_MS: '5000', MS_CLIENT_ID: 'demo', MS_CLIENT_SECRET: 'demo', AZURE_OPENAI_API_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
+  const srv = spawn('node', ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), AUTH: 'on', DATA_DIR: data, OPENAI_API_KEY: 'sk-demo', OPENAI_BASE_URL: 'http://127.0.0.1:3951/v1', AISSOCIATE_BASE_URL: 'http://127.0.0.1:3952', AISSOCIATE_API_KEY: 'ck:demo', RIS_BASE_URL: 'http://127.0.0.1:3953', RIS_TIMEOUT_MS: '5000', MS_CLIENT_ID: 'demo', MS_CLIENT_SECRET: 'demo', MS_LOGIN_BASE_URL: 'http://127.0.0.1:3954', MS_GRAPH_BASE_URL: 'http://127.0.0.1:3955', MS_REDIRECT_URI: `${BASE}/api/ms/callback`, SANDBOX: 'local', LOCAL_SANDBOX_PYTHON: process.env.LOCAL_SANDBOX_PYTHON || 'python3', AZURE_OPENAI_API_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
   srv.stdout.on('data', (d) => (log += d)); srv.stderr.on('data', (d) => (log += d))
   for (let i = 0; i < 60; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break } catch {} await sleep(250) }
 
@@ -129,6 +135,9 @@ async function docx(paragraphs) {
     { path: 'Notizen/Telefonnotiz 2024-04-02.txt', b64: b64('Mandantin fragt, ob sie das Lokal vorzeitig aufgeben kann.') },
   ]
 
+  const wordDoc = path.join(DIR, 'Mietvertrag Neubaugasse.docx')
+  fs.writeFileSync(wordDoc, Buffer.from(await docx(['Mietvertrag über das Geschäftslokal Wien 7., Neubaugasse 12', 'Punkt 1: Mietgegenstand ist das Geschäftslokal im Erdgeschoß samt Lagerraum.', 'Punkt 3: Das Mietverhältnis beginnt am 1. März 2021 und wird auf unbestimmte Zeit geschlossen.', 'Punkt 5: Wertsicherung. Der Hauptmietzins ist nach dem VPI 2020 wertgesichert.', 'Punkt 7: Die Mieterin kann unter Einhaltung einer dreimonatigen Frist zum Ende jedes Kalendervierteljahres kündigen.', 'Punkt 9: Änderungen bedürfen der Schriftform.']), 'base64'))
+
   // ---- browser ----
   const browser = await chromium.launch()
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5, locale: 'de-AT' })
@@ -137,6 +146,7 @@ async function docx(paragraphs) {
   await ctx.addInitScript(OVERLAY)
   const page = await ctx.newPage()
   page.on('pageerror', (e) => console.log('pageerror', e.message))
+  await page.goto(BASE + '/api/ms/login', { waitUntil: 'networkidle' }) // demo Entra login → back with ?ms=connected
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(() => window.__demo.card(`<div class="logo"><img src="/aissociate-logo.png" alt=""></div><div class="tag">Playground</div><h1>Die Funktionen im Überblick</h1><p>Juristische KI für österreichisches Recht – Recherche, Dokumente, Fachagenten und Due Diligence.</p>`))
   await sleep(900)
@@ -160,7 +170,7 @@ async function docx(paragraphs) {
   const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
   async function moveTo(sel, { dx = 0, dy = 0, ms = 650 } = {}) {
     const loc = page.locator(sel).first()
-    await loc.scrollIntoViewIfNeeded().catch(() => {})
+    await loc.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {})
     const b = await loc.boundingBox(); if (!b) { console.log('no box', sel); return }
     const x = b.x + b.width / 2 + dx, y = b.y + b.height / 2 + dy
     const steps = Math.max(10, Math.round(ms / 16)), sx = mx, sy = my
@@ -183,6 +193,7 @@ async function docx(paragraphs) {
     else console.log(`scene ${id} ran ${(-rest).toFixed(1)}s past its narration`)
     sceneNo++
   }
+  const tagPanel = (title, id) => page.evaluate(([t, i]) => { const ps = [...document.querySelectorAll('.msg-ai .panel')].filter((p) => (p.querySelector('.panel-title')?.textContent || '').startsWith(t)); const p = ps.at(-1); if (p) { p.id = i; p.scrollIntoView({ block: 'center' }) } return Boolean(p) }, [title, id])
   const pill = (no, text) => page.evaluate(([a, b]) => window.__demo.pill(a, b), [no, text])
 
   // ---- scenes ----
@@ -226,9 +237,30 @@ async function docx(paragraphs) {
     await spot('.msg-ai .actions')
     await moveTo('.msg-ai .actions button:has-text("Word")', { ms: 600 }).catch(() => {})
   })
+  await scene('files', async (at) => {
+    await spot(null)
+    await pill('2', 'Dateien & Code')
+    await click('#sbNew')
+    await sleep(400)
+    await click('#addBtn')
+    const chooser = page.waitForEvent('filechooser')
+    await click('#attachBtn')
+    await (await chooser).setFiles(wordDoc)
+    await page.waitForSelector('#attachList .chip')
+    await spot('#attachList')
+    await click('#input')
+    await type('Kommentiere die Wertsicherungsklausel direkt im Word-Dokument und erstelle eine Excel-Übersicht aller Vertragspunkte.', 22)
+    await sleep(200); await page.keyboard.press('Enter')
+    await spot('.msg-ai:last-child .steps')
+    await page.waitForSelector('.msg-ai .actions', { timeout: 90000 })
+    await sleep(300)
+    await tagPanel('Dateien', 'demoFiles')
+    await spot('#demoFiles')
+    await moveTo('#demoFiles .file-link >> nth=1', { ms: 600 }).catch(() => {})
+  })
   await scene('add', async (at) => {
     await spot(null)
-    await pill('2', 'Unterlagen hinzufügen')
+    await pill('3', 'Unterlagen hinzufügen')
     await click('#sbNew')
     await sleep(500)
     await click('#addBtn')
@@ -262,19 +294,68 @@ async function docx(paragraphs) {
     await spot('#attachList')
     await at(0.18)
     await click('#input')
-    await type('Welche Kündigungsregeln enthält der Mietvertrag Wien?', 36)
+    await type('Erstelle auf Basis des Mietvertrags Wien ein Kündigungsschreiben an die Vermieterin.', 24)
     await sleep(250); await page.keyboard.press('Enter')
     await spot('.msg-ai:last-child .steps')
-    await page.waitForSelector('.msg-ai .actions', { timeout: 60000 })
+    await page.waitForSelector('.msg-ai .actions', { timeout: 90000 })
+    await page.waitForSelector('.msg-ai .folder-save', { timeout: 10000 }).catch(() => {})
+    await sleep(600)
+    await tagPanel('Dateien', 'demoSaved')
+    await spot('#demoSaved')
+    await moveTo('#demoSaved .folder-save', { ms: 600 }).catch(() => {})
+    await at(0.85)
+    await spot('#attachList .chip.folder')
+    await moveTo('#attachList .chip.folder', { ms: 600 })
+  })
+  await scene('sharepoint', async (at) => {
+    await spot(null)
+    await click('#sbNew')
     await sleep(300)
-    await spot('.msg-ai .answer')
-    await at(0.78)
-    await spot('#saveLine')
-    await moveTo('#saveLine', { ms: 600 })
+    // the local folder of the previous scene is disconnected first (its chip's ×)
+    if (await page.$('#attachList .chip.folder button')) { await click('#attachList .chip.folder button'); await sleep(300) }
+    await click('#addBtn')
+    await click('#msBtn')
+    await page.waitForSelector('#msModal.show .ms-tab')
+    await click('#msModal .ms-tab:has-text("SharePoint")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Kanzlei Berger")')
+    await spot('#msModal .modal-card')
+    await click('#msModal .ms-row:has-text("Kanzlei Berger")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Dokumente")'); await click('#msModal .ms-row:has-text("Dokumente")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Alpentech")'); await click('#msModal .ms-row:has-text("Alpentech")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Liefervertrag")'); await click('#msModal .ms-row:has-text("Liefervertrag")')
+    await click('#msModal .ms-foot .btn:not(.ghost)')
+    await page.waitForSelector('#attachList .chip')
+    await spot(['#attachList', '#saveLine'])
+    await click('#input')
+    await type('Kommentiere die Haftungsklausel direkt im Dokument.', 26)
+    await sleep(200); await page.keyboard.press('Enter')
+    await spot('.msg-ai:last-child .steps')
+    await page.waitForSelector('.msg-ai .actions', { timeout: 90000 })
+    await sleep(500)
+    await tagPanel('Microsoft 365', 'demoSync')
+    await spot('#demoSync')
+    await moveTo('#demoSync a >> nth=0', { ms: 600 }).catch(() => {})
+  })
+  await scene('spproof', async () => {
+    // proof: the commented version now sits next to the original in SharePoint
+    await spot(null)
+    await click('#addBtn')
+    await click('#msBtn')
+    await page.waitForSelector('#msModal.show .ms-tab')
+    await click('#msModal .ms-tab:has-text("SharePoint")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Kanzlei Berger")'); await click('#msModal .ms-row:has-text("Kanzlei Berger")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Dokumente")'); await click('#msModal .ms-row:has-text("Dokumente")')
+    await page.waitForSelector('#msModal .ms-row:has-text("Alpentech")'); await click('#msModal .ms-row:has-text("Alpentech")')
+    await page.waitForSelector('#msModal .ms-row:has-text("_kommentiert")')
+    await spot('#msModal .ms-list')
+    await moveTo('#msModal .ms-row:has-text("_kommentiert")', { ms: 600 })
+    await sleep(1600)
+    await page.keyboard.press('Escape')
+    await spot(null)
   })
   await scene('skills', async (at) => {
     await spot(null)
-    await pill('3', 'Skills')
+    await pill('4', 'Skills')
     await click('#input')
     await page.keyboard.type('/')
     await page.waitForSelector('#dlg.show .skill-pick', { timeout: 5000 }).catch(() => {})
@@ -287,7 +368,7 @@ async function docx(paragraphs) {
     await spot(null)
   })
   await scene('agents', async (at) => {
-    await pill('4', 'Fachagenten')
+    await pill('5', 'Fachagenten')
     await click('#navAgentReview')
     await page.waitForSelector('#agentPage .wf')
     await spot('#agentPage .wf')
@@ -300,7 +381,7 @@ async function docx(paragraphs) {
   })
   await scene('dd', async (at) => {
     await spot(null)
-    await pill('5', 'Due Diligence')
+    await pill('6', 'Due Diligence')
     await click('#navDd')
     await page.waitForSelector('#mattersPage .card.click')
     await spot('#mattersPage .card.click')
@@ -319,7 +400,7 @@ async function docx(paragraphs) {
   })
   await scene('projects', async (at) => {
     await spot(null)
-    await pill('6', 'Projekte')
+    await pill('7', 'Projekte')
     await click('#navProjects')
     await page.waitForSelector('#projectsPage .proj-card')
     await spot('#projectsPage .proj-card')
@@ -354,7 +435,7 @@ async function docx(paragraphs) {
   })
   await scene('matters', async (at) => {
     await spot(null)
-    await pill('7', 'Akten & Einstellungen')
+    await pill('8', 'Akten & Einstellungen')
     await click('#navMatters')
     await page.waitForSelector('#mattersPage .card.click')
     await spot('#mattersPage .cards')
@@ -364,7 +445,7 @@ async function docx(paragraphs) {
     await click('#navSettings')
     await page.locator('#cardSources').scrollIntoViewIfNeeded()
     await spot('#cardSources')
-    await moveTo('#swFolderSave', { ms: 600 }); await sleep(400); await moveTo('#msConnectBtn', { ms: 500 })
+    await moveTo('#swFolderSave', { ms: 600 }); await sleep(400); await moveTo('#kvMsAccount', { ms: 500 })
   })
   await scene('outro', async () => {
     await spot(null)
