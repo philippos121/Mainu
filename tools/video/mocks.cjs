@@ -83,8 +83,8 @@ function modelServer() {
       output = [msg(JSON.stringify({ facts: '', excerpts: [] }))]
     } else if (/entscheide als JSON/.test(instr)) {
       const ask = inputText.split('ANFRAGE:').pop()
-      const doc = /Kündigung|Wertsicherung|Haftungsklausel/.test(ask)
-      const title = /Wertsicherung/.test(ask) ? 'Wertsicherung kommentiert + Übersicht' : /Haftungsklausel/.test(ask) ? 'Haftungsklausel Liefervertrag' : 'Kündigungsschreiben Neubaugasse 12'
+      const doc = /Kündigung|Wertsicherung|Haftungsklausel|Tabellarische Übersicht/.test(ask)
+      const title = /Tabellarische Übersicht/.test(ask) ? 'Übersicht Mietverträge' : /Wertsicherung/.test(ask) ? 'Wertsicherung kommentiert + Übersicht' : /Haftungsklausel/.test(ask) ? 'Haftungsklausel Liefervertrag' : 'Kündigungsschreiben Neubaugasse 12'
       output = [msg(JSON.stringify(doc
         ? { mode: 'document', legal_area: 'civil', scope: '', questions: [], difficulty: 'easy', needs_document_context: false, skill: '', jurisdiction: 'AT', title }
         : { mode: 'legal', legal_area: 'civil', scope: '', questions: ['Wann verjähren Schadenersatzansprüche nach österreichischem Recht?'], difficulty: 'hard', needs_document_context: false, skill: '', jurisdiction: 'AT', title: 'Verjährung von Schadenersatzansprüchen' }))]
@@ -97,7 +97,7 @@ function modelServer() {
       output = [msg('```python\n' + pythonFor(wanted) + '\n```')]
     } else if (/Dokumentaufgabe/.test(instr)) {
       const prev = j.previous_response_id ? chain.get(j.previous_response_id) : null
-      const sc = prev?.sc || (/Wertsicherung/.test(inputText) ? 'word' : /Haftungsklausel/.test(inputText) ? 'sp' : 'letter')
+      const sc = prev?.sc || (/Tabellarische Übersicht/.test(inputText) ? 'table' : /Wertsicherung/.test(inputText) ? 'word' : /Haftungsklausel/.test(inputText) ? 'sp' : 'letter')
       const st = prev ? prev.st : 0
       const outText = (j.input || []).filter((x) => x.type === 'function_call_output').map((x) => x.output).join('\n')
       const call = (name, args) => [{ type: 'function_call', id: 'fc_' + name, call_id: 'call_' + name + Date.now(), name, arguments: JSON.stringify(args) }]
@@ -105,6 +105,9 @@ function modelServer() {
       if (sc === 'word') {
         if (st === 0) output = call('create_or_edit_file', { task: 'Kommentar zur Wertsicherungsklausel (Punkt 5) direkt im Word-Dokument einfügen und eine Excel-Übersicht aller Vertragspunkte erstellen.', output_files: ['Mietvertrag Neubaugasse_kommentiert.docx', 'Vertragspunkte.xlsx'] })
         else output = [msg('**Erledigt**\n\nIm Word-Dokument steht zur Wertsicherungsklausel (Punkt 5) jetzt ein Kommentar: Bezugsmonat und Schwellenwert fehlen; da die Mieterin Unternehmerin ist, gilt § 6 KSchG nicht – die Klausel ist nach § 879 Abs 3 ABGB zu prüfen. Die Excel-Übersicht listet alle Vertragspunkte. Beide Dateien stehen unten zum Download bereit.')]
+      } else if (sc === 'table') {
+        if (st === 0) output = call('create_or_edit_file', { task: 'Tabellarische Übersicht der beiden Mietverträge: je Vertrag eine Zeile mit Mietgegenstand, Mietzins, Wertsicherung, Kündigung.', output_files: ['Übersicht Mietverträge.xlsx'] })
+        else output = [msg('**Übersicht erstellt**\n\nDie Excel-Datei stellt beide Mietverträge gegenüber. Auffällig:\n\n- **Kündigung:** Neubaugasse drei Monate zum Quartalsende, Lager Simmering sechs Monate zum Jahresende.\n- **Wertsicherung:** beide nach VPI 2020, beim Lager mit 5 % Schwellenwert.\n- **Kündigungsverzicht** der Vermieterin nur in der Neubaugasse (fünf Jahre).')]
       } else if (sc === 'sp') {
         if (st === 0) output = call('create_or_edit_file', { task: 'Kommentar zur Haftungsbegrenzung (Punkt 9.2) direkt im Word-Dokument einfügen.', output_files: ['Liefervertrag Alpenstahl_kommentiert.docx'] })
         else output = [msg('**Kommentar eingefügt**\n\nZur Haftungsbegrenzung in Punkt 9.2 steht im Dokument ein Kommentar mit Formulierungsvorschlag: Ausnahme für Vorsatz und krass grobe Fahrlässigkeit ergänzen (§ 879 ABGB). Die kommentierte Fassung liegt im SharePoint-Ordner neben dem Original.')]
@@ -185,7 +188,22 @@ letter = ${JSON.stringify(LETTER)}
 sources = [f for f in os.listdir('.') if f.lower().endswith('.docx') and '_kommentiert' not in f]
 done = []
 for w in wanted:
-    if w.lower().endswith('.xlsx'):
+    if w.startswith('Übersicht') and w.lower().endswith('.xlsx'):
+        cols = ['Vertrag', 'Mietgegenstand', 'Mietzins', 'Wertsicherung', 'Kündigung']
+        wb = Workbook(); ws = wb.active; ws.title = 'Übersicht'
+        ws.append(cols)
+        for c in ws[1]:
+            c.font = Font(bold=True, color='FFFFFF'); c.fill = PatternFill('solid', fgColor='0E7C8A')
+        for f in sorted(sources):
+            paras = [p.text for p in Document(f).paragraphs]
+            pick = lambda k: next((re.sub(r'^Punkt [0-9.]+:\s*', '', t) for t in paras if k.lower() in t.lower() and t.startswith('Punkt')), 'nicht geregelt')
+            ws.append([f[:-5], pick('Mietgegenstand'), pick('Mietzins'), pick('wertgesichert'), pick('kündigen')])
+        for col, wd in zip('ABCDE', (26, 34, 26, 34, 52)): ws.column_dimensions[col].width = wd
+        for row in ws.iter_rows(min_row=2):
+            for c in row: c.alignment = Alignment(wrap_text=True, vertical='top')
+        ws.freeze_panes = 'A2'; ws.auto_filter.ref = ws.dimensions
+        wb.save(w)
+    elif w.lower().endswith('.xlsx'):
         src = Document(sources[0])
         wb = Workbook(); ws = wb.active; ws.title = 'Vertragspunkte'
         ws.append(['Punkt', 'Regelung', 'Hinweis'])

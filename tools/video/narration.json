@@ -68,20 +68,20 @@
  {
   "id": "skills",
   "chapter": "Skills",
-  "text": "Mit Skills wenden Sie die Arbeitsweise Ihrer Kanzlei an, etwa für einen Mandantenbrief. Ein Schrägstrich im Eingabefeld genügt.",
-  "tts": "Mit Skills wenden Sie die Arbeitsweise Ihrer Kanzlei an, etwa für einen Mandantenbrief. Ein Schrägstrich im Eingabefeld genügt."
+  "text": "Mit Skills wenden Sie die Arbeitsweise Ihrer Kanzlei an – vom Zusammenfassen über die tabellarische Übersicht bis zum Mandantenbrief. Alle Skills stehen im Menü unter „Skills“; oder Sie tippen einen Schrägstrich ins Eingabefeld.",
+  "tts": "Mit Skills wenden Sie die Arbeitsweise Ihrer Kanzlei an, vom Zusammenfassen über die tabellarische Übersicht bis zum Mandantenbrief. Alle Skills stehen im Menü unter Skills. Oder Sie tippen einen Schrägstrich ins Eingabefeld."
  },
  {
   "id": "agents",
-  "chapter": "Agenten",
-  "text": "Für größere Aufgaben gibt es Fachagenten: Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen. Jeder folgt einem festen Ablauf nach österreichischem Recht – vom Erfassen bis zum fertigen Word-Dokument.",
-  "tts": "Für größere Aufgaben gibt es Fachagenten: Vertragsprüfung, Vertrag entwerfen, und Schriftsatz entwerfen. Jeder folgt einem festen Ablauf nach österreichischem Recht, vom Erfassen bis zum fertigen Wörd-Dokument."
+  "chapter": "Spezialagenten",
+  "text": "Neben dem allgemeinen Agenten gibt es Spezialagenten für größere Aufgaben: Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen. Jeder folgt einem festen Ablauf nach österreichischem Recht – vom Erfassen bis zum fertigen Word-Dokument.",
+  "tts": "Neben dem allgemeinen Agenten gibt es Spezialagenten für größere Aufgaben: Vertragsprüfung, Vertrag entwerfen, und Schriftsatz entwerfen. Jeder folgt einem festen Ablauf nach österreichischem Recht, vom Erfassen bis zum fertigen Wörd-Dokument."
  },
  {
   "id": "dd",
   "chapter": "Due Diligence",
-  "text": "Die Due Diligence analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel; dazu kommen Request List und Red-Flag-Report als Word und Excel.",
-  "tts": "Die Dschuh Dilidschens analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel. Dazu kommen Riekwest-List und Red Fläg Riport, als Wörd und Ecksel."
+  "text": "Die Due Diligence analysiert ganze Datenräume; auf derselben Seite liegen auch Ihre übrigen Akten. Jeder Befund steht mit Zitat und Fundstelle in der Ampel; dazu kommen Request List und Red-Flag-Report als Word und Excel.",
+  "tts": "Die Dschuh Dilidschens analysiert ganze Datenräume. Auf derselben Seite liegen auch Ihre übrigen Akten. Jeder Befund steht mit Zitat und Fundstelle in der Ampel. Dazu kommen Riekwest-List und Red Fläg Riport, als Wörd und Ecksel."
  },
  {
   "id": "projects",
@@ -90,14 +90,20 @@
   "tts": "Mit Projekten arbeiten Sie im Team: Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Über Teilen wählen Sie registrierte Kolleginnen und Kollegen aus der Liste, mit Recht zum Bearbeiten, oder nur zum Lesen. Alle Mitglieder sehen dieselben Unterhaltungen."
  },
  {
-  "id": "matters",
-  "chapter": "Akten & Einstellungen",
-  "text": "In Akten sammeln Sie die Dokumente eines Mandats und stellen Fragen im Kontext des Akts. Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Microsoft 365.",
-  "tts": "In Akten sammeln Sie die Dokumente eines Mandats, und stellen Fragen im Kontext des Akts. Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Maikrosoft dreihundertfünfundsechzig."
+  "id": "projdocs",
+  "chapter": "Projekte",
+  "text": "Auf die Projektdokumente wenden Sie Skills mit einem Klick an: Dokumente anhaken, „Tabellarische Übersicht“ wählen, Excel oder Word – und die fertige Tabelle liegt in der Unterhaltung. Ebenso: Dokumente zusammenfassen, zwei Versionen vergleichen oder Fragen dazu stellen.",
+  "tts": "Auf die Projektdokumente wenden Sie Skills mit einem Klick an: Dokumente anhaken, tabellarische Übersicht wählen, Ecksel oder Wörd, und die fertige Tabelle liegt in der Unterhaltung. Ebenso: Dokumente zusammenfassen, zwei Versionen vergleichen, oder Fragen dazu stellen."
+ },
+ {
+  "id": "settings",
+  "chapter": "Einstellungen",
+  "text": "Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Microsoft 365.",
+  "tts": "Unter Einstellungen legen Sie fest, wohin Ergebnisse gehen, und verbinden Maikrosoft dreihundertfünfundsechzig."
  },
  {
   "id": "outro",
-  "chapter": "Akten & Einstellungen",
+  "chapter": "Einstellungen",
   "text": "Die Feature-Tour unter „Einstellungen → Daten & Hilfe“ führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit AI:ssociate!",
   "tts": "Die Fietscha-Tur unter Einstellungen, Daten und Hilfe, führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit Essouschi-ejt!"
  }
