@@ -11,7 +11,7 @@ PRON = {
     'hochgeladen': 'hoch-geladen', 'Eingabefeld': 'Eingabe-Feld', 'Rechtsgebiet': 'Rechts-Gebit',
     'Rechtsinformationssystem': 'Rechts-Informations-System', 'Fundstelle': 'Fund-Stelle', 'Fundstellen': 'Fund-Stellen',
     'Unterlagen': 'Unter-Lagen', 'Unterhaltungen': 'Unter-Haltungen', 'Unterhaltung': 'Unter-Haltung', 'Bearbeiten': 'be-arbeiten', 'Kündigungsschreiben': 'Kündigungs-Schreiben', 'Wertsicherungsklausel': 'Wert-Sicherungs-Klausel', 'Fachagenten': 'Fach-Agenten', 'österreichisches': 'öster-reichisches', 'österreichischem': 'öster-reichischem',
-    'diktieren': 'diktiren', 'Übersicht': 'Über-Sicht', 'tabellarische': 'tabbe-lahrische', 'allgemeinen': 'allge-meinen', 'Seite': 'Saite', 'übrigen': 'ühbrigen', 'anhaken': 'an-haaken', 'Einstellungen': 'Ain-Stellungen', 'Spezialagenten': 'Spezial-Agenten', 'einmal': 'ainmal', 'Satzzeichen': 'Satz-Zeichen', 'Paragraf': 'Paragraaf', 'Paragrafenzeichen': 'Para-Graafen-Zeichen',
+    'diktieren': 'diktiren', 'Übersicht': 'Über-Sicht', 'tabellarische': 'tabbe-lahrische', 'allgemeinen': 'allge-meinen', 'Allgemeiner': 'Allge-meiner', 'oben': 'ohben', 'Seite': 'Saite', 'übrigen': 'ühbrigen', 'anhaken': 'an-haaken', 'Einstellungen': 'Ain-Stellungen', 'Spezialagenten': 'Spezial-Agenten', 'einmal': 'ainmal', 'Satzzeichen': 'Satz-Zeichen', 'Paragraf': 'Paragraaf', 'Paragrafenzeichen': 'Para-Graafen-Zeichen',
 }
 def fix(t):
     for a, b in PRON.items(): t = re.sub(r'(?<![\w-])' + re.escape(a) + r'(?![\w-])', b, t)

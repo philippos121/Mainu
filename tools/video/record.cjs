@@ -270,10 +270,22 @@ async function docx(paragraphs) {
     await spot('.msg-ai .actions')
     await moveTo('.msg-ai .actions button:has-text("Word")', { ms: 600 }).catch(() => {})
   })
+  await scene('newq', async (at) => {
+    await spot('#chatNewBtn')
+    await moveTo('#chatNewBtn', { ms: 700 })
+    await at(0.3)
+    await spot('#navGeneral')
+    await moveTo('#navGeneral', { ms: 700 })
+    await at(0.62)
+    await spot(['#sbHistSec', '#sbRecent'])
+    await moveTo('#sbRecent .nav-item', { ms: 600 })
+    await at(0.88)
+    await spot(null)
+    await click('#navGeneral')
+  })
   await scene('files', async (at) => {
     await spot(null)
     await pill('2', 'Dateien & Code')
-    await click('#sbNew')
     await sleep(400)
     await click('#addBtn')
     const chooser = page.waitForEvent('filechooser')
@@ -294,7 +306,7 @@ async function docx(paragraphs) {
   await scene('add', async (at) => {
     await spot(null)
     await pill('3', 'Unterlagen hinzufügen')
-    await click('#sbNew')
+    await click('#chatNewBtn')
     await sleep(500)
     await click('#addBtn')
     await spot('#addBtn')
@@ -342,7 +354,7 @@ async function docx(paragraphs) {
   })
   await scene('sharepoint', async (at) => {
     await spot(null)
-    await click('#sbNew')
+    await click('#navGeneral')
     await sleep(300)
     // the local folder of the previous scene is disconnected first (its chip's ×)
     if (await page.$('#attachList .chip.folder button')) { await click('#attachList .chip.folder button'); await sleep(300) }

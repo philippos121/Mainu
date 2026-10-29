@@ -849,7 +849,7 @@
               <div id="composerSlotHome"></div>
               <p class="disclaimer">Antworten von AI:ssociate sind KI-generiert, können falsch sein und müssen vor Verwendung juristisch geprüft werden.</p>
               <div class="home-help" id="tourBanner" aria-label="Hilfe">
-                <button class="help-tile" id="tourVideo" type="button" hidden><span class="thumb"><img src="/media/erklaervideo.jpg" alt="" loading="lazy" /><span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span></span><span class="tx"><b>Erklärvideo</b><span>Alle Funktionen in viereinhalb Minuten</span></span></button>
+                <button class="help-tile" id="tourVideo" type="button" hidden><span class="thumb"><img src="/media/erklaervideo.jpg" alt="" loading="lazy" /><span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span></span><span class="tx"><b>Erklärvideo</b><span>Alle Funktionen in knapp fünf Minuten</span></span></button>
                 <button class="help-tile" id="tourStart" type="button"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour</b><span>Schritt für Schritt direkt in der App</span></span><span class="new" id="tourNew" hidden>Neu hier?</span></button>
               </div>
             </div>
@@ -1001,7 +1001,7 @@
     <div class="pop-menu" id="saveMenu" role="menu" aria-label="Ergebnisse speichern" hidden></div>
     <div class="pop-menu help-menu" id="helpMenu" role="menu" aria-label="Hilfe" hidden>
       <div class="pm-sec"><b>Hilfe</b></div>
-      <button class="pm-item" id="helpVideo" role="menuitem" hidden><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span><span class="tx"><b>Erklärvideo ansehen</b><span>Alle Funktionen in viereinhalb Minuten</span></span></button>
+      <button class="pm-item" id="helpVideo" role="menuitem" hidden><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span><span class="tx"><b>Erklärvideo ansehen</b><span>Alle Funktionen in knapp fünf Minuten</span></span></button>
       <button class="pm-item" id="helpTour" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour starten</b><span>Schritt für Schritt direkt in der App</span></span></button>
     </div>
 
@@ -4057,7 +4057,7 @@
       // ------------------------------------------------------------------
       // Captions are burned into the video (centred in a band below the picture).
       const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg' }
-      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 10], ['Diktat', 29], ['Antwort & Quellen', 44], ['Dateien & Code', 72], ['Unterlagen', 94], ['Ordner', 111], ['SharePoint', 131], ['Skills', 164], ['Spezialagenten', 179], ['Due Diligence', 195], ['Projekte', 213], ['Einstellungen', 247]]
+      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 10], ['Diktat', 30], ['Antwort & Quellen', 44], ['Dateien & Code', 87], ['Unterlagen', 108], ['Ordner', 125], ['SharePoint', 145], ['Skills', 178], ['Spezialagenten', 193], ['Due Diligence', 209], ['Projekte', 226], ['Einstellungen', 261]]
       let videoAvailable = false
       async function checkVideo() {
         try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }

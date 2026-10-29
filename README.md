@@ -94,12 +94,12 @@ due diligence, Akten, projects, skill library, history and "Quellen & Speichern"
 the pages it explains, puts a spotlight on the element, places its card next to
 it and is driven with Weiter/Zurück or the arrow keys (Esc ends it).
 
-The explainer video (`public/media/erklaervideo.mp4`, 4:28 min, 1920×1200: the app
+The explainer video (`public/media/erklaervideo.mp4`, 4:42 min, 1920×1200: the app
 in 1080p with German narration and captions burned in, centred in a band below
 the picture; chapter buttons) also opens from the tour's first and last step. It
 shows, among others, dictating a question (spoken punctuation, "Paragraf" → §), that the assistant edits a Word document and produces Excel
 files by generating code in a sandbox, that results land in the connected
-local folder or in the SharePoint folder of the source file, the skills in the
+local folder or in the SharePoint folder of the source file, starting a new question (app bar, "Allgemeiner Agent"), the skills in the
 menu and a one-click "Tabellarische Übersicht" (Excel) on two project documents. `tools/video/` rebuilds
 it from the real UI (see its README).
 

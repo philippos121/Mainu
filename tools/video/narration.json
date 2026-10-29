@@ -36,6 +36,12 @@
   "tts": "Die Antwort nennt ihre Fundstellen. Jede zitierte Norm wird automatisch im Rechtsinformationssystem des Bundes geprüft. Der grüne Haken heißt: im Ries bestätigt. Die Antwort lässt sich als Wörd exportieren, die Kosten stehen direkt darunter."
  },
  {
+  "id": "newq",
+  "chapter": "Antwort & Quellen",
+  "text": "Für die nächste Frage klicken Sie oben rechts auf „Neue Frage“ – oder im Menü auf „Allgemeiner Agent“: Jeder Klick darauf beginnt eine neue Frage. Frühere Gespräche bleiben im Verlauf.",
+  "tts": "Für die nächste Frage klicken Sie oben rechts auf: Neue Frage. Oder im Menü auf: Allgemeiner Agent. Jeder Klick darauf beginnt eine neue Frage. Frühere Gespräche bleiben im Verlauf."
+ },
+ {
   "id": "files",
   "chapter": "Dateien & Code",
   "text": "Der Assistent kann grundsätzlich alles: Er versteht jede Eingabe und liefert jedes Ergebnis – nicht nur Text, sondern fertige Dateien. Dafür schreibt er Programmcode und führt ihn in einer abgeschotteten Sandbox aus. Hier kommentiert er die Wertsicherungsklausel direkt im Word-Dokument und erstellt dazu eine Excel-Übersicht.",
