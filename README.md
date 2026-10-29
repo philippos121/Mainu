@@ -239,6 +239,12 @@ or something general:
 | legal question | fast model answers directly, ≤ 3 web searches for references | **AI:ssociate** knowledge base, **one** request (several numbered questions inside if needed), answer shown as is |
 | document / other task | fast model (document text inline, file generation in the sandbox) | AI:ssociate first (one request) when legal questions are involved, then the main model builds the deliverable |
 
+The knowledge base covers Austrian law only: questions on **German** (or other
+foreign) law – the research workflow with "Deutschland", or a free question the
+planner tags `jurisdiction: DE|other` – go to the main model with web search
+(primary sources such as gesetze-im-internet.de, dejure.org, BGH), never to
+AI:ssociate, and the RIS check is skipped for them.
+
 Every cited § / Geschäftszahl is verified against the RIS. The optional
 review of knowledge-base answers is off by default (`REVIEW_ANSWERS=on`).
 **Due Diligence** (menu) runs the fixed pipeline below; review tables live

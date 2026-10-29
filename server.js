@@ -799,9 +799,10 @@ const PLAN_SCHEMA = {
     difficulty: { type: 'string', enum: ['easy', 'hard'] },
     needs_document_context: { type: 'boolean' },
     skill: { type: 'string' },
+    jurisdiction: { type: 'string', enum: ['AT', 'DE', 'other'] },
     title: { type: 'string' },
   },
-  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'needs_document_context', 'skill', 'title'],
+  required: ['mode', 'legal_area', 'scope', 'questions', 'difficulty', 'needs_document_context', 'skill', 'jurisdiction', 'title'],
 }
 const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Analysiere die Anfrage (inkl. Gesprächsverlauf und ggf. Dokumenttext) und entscheide als JSON:
 - mode: "legal" = Rechtsfrage, Rechtsauskunft, Recherche, Prüfung eines Sachverhalts (→ juristische Wissensdatenbank). "document" = hochgeladene Dateien analysieren/bearbeiten, Dateien (Word/Excel/PDF) erzeugen, Dokumente vergleichen, Entwürfe als Datei. "general" = ohne Rechtsrecherche lösbar: Umformulieren, Übersetzen, Zusammenfassen von eingefügtem Text, Small Talk, Rückfrage, Folgefrage, die allein aus dem Verlauf beantwortbar ist.
@@ -810,6 +811,7 @@ const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichisc
 - questions: 1 bis ${KB_MAX_QUESTIONS} KONKRETE, KOMPAKTE Fragen an die juristische Wissensdatenbank (je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten; eigenständig, keine Verweise wie "siehe oben"; auf Deutsch). Zerlege die Anfrage nur dann in mehrere Fragen, wenn sie wirklich mehrere Rechtsfragen enthält – sonst genau eine. Bei mode "document": die Rechtsfragen, die für die Bearbeitung des Dokuments geklärt sein müssen (z. B. Zulässigkeit einer konkreten Klausel, Rechtsfolge, Frist); rein redaktionelle Dokumentaufgaben (Zusammenfassen, Vergleichen, Formatieren) → leere Liste. Bei mode "general": leere Liste.
 - needs_document_context: true, sobald sich eine Frage an die Wissensdatenbank auf den Inhalt eines Dokuments oder Akts bezieht (hochgeladen, früher im Gespräch hochgeladen, aus einem Ordner oder Akt), z. B. „Ist diese Klausel wirksam?“, „Was gilt nach Punkt 7?“, „Ist der Vertrag kündbar?“. Die Wissensdatenbank sieht die Dokumente NICHT – bei true wird ihr der einschlägige Wortlaut automatisch mitgeschickt. Formuliere die Fragen trotzdem eigenständig (Klausel kurz benennen, z. B. „die Haftungsbeschränkung in Punkt 9“). false bei abstrakten Rechtsfragen ohne Dokumentbezug.
 - difficulty: "hard" = schwere Aufgabe. Bei Rechtsfragen: Recherche in Normen und Judikatur nötig (Spezialmaterie, Judikaturlage, mehrere verschränkte Rechtsfragen, Rechtsfolgen/Fristen im Detail, Sachverhalt mit Dokumenten) → geht an die juristische Wissensdatenbank. Bei Dokument-/sonstigen Aufgaben: umfangreiche Dokumentbearbeitung (klauselweise Kommentierung, Vertragsentwurf, Redline, komplexe Excel-Auswertung), mehrschichtige Argumentation, lange Texte, mehrere große Dokumente. "easy" = einfache Rechtsfrage, die mit gesichertem Grundwissen und einer kurzen Websuche beantwortbar ist, bzw. kurze Entwürfe, Zusammenfassungen, Umformulierungen, einfache Dateien.
+- jurisdiction: "DE", wenn ausdrücklich nach deutschem Recht gefragt wird (z. B. „nach deutschem Recht“, „in Deutschland“, BGB/HGB/StGB für einen deutschen Sachverhalt); "other" bei anderem ausländischem Recht (z. B. Schweiz, Italien); sonst "AT" (österreichisches Recht, auch EU-Recht mit Österreich-Bezug). Die Wissensdatenbank kennt nur österreichisches Recht.
 - skill: die id eines unten angebotenen Skills, wenn die Anfrage EINDEUTIG dessen Einsatzzweck entspricht (z. B. „mach daraus einen Brief an die Mandantin“ → Mandantenbrief); sonst "". Ohne angebotene Skills immer "".
 - title: prägnanter Titel (max. 6 Wörter) für die Verlaufsliste.`
 // The fast model picks the verbatim passages the knowledge base needs (it never sees the documents itself).
@@ -853,6 +855,10 @@ const easyLegalInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für �
 
 const directInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Die juristische Wissensdatenbank ist gerade nicht verfügbar. Beantworte die Rechtsfrage selbst: ${webClause(web)}. Antworte strukturiert in Markdown: **Kurzantwort**, **Rechtliche Grundlagen** (§, Gesetz; Gericht, Datum, Geschäftszahl), **Beurteilung**, **Ergebnis / Empfehlung**. ${web ? 'Belege mit Links. ' : ''}Nie Fundstellen erfinden; Unsicheres kennzeichnen.`
 
+const FOREIGN_LABEL = { DE: 'deutsches Recht', other: 'ausländisches Recht' }
+// German (or other foreign) law: the knowledge base only covers Austrian law, so the main model researches with web search.
+const foreignLawInstructions = (j, web) => `Du bist AI:ssociate, KI-Assistent für Rechtsanwältinnen und Rechtsanwälte. Beantworte die Rechtsfrage nach ${j === 'DE' ? 'DEUTSCHEM Recht (BGB, HGB, StGB, ZPO usw. der Bundesrepublik Deutschland)' : 'dem ausländischen Recht, nach dem gefragt wird'} – NICHT nach österreichischem Recht. ${web ? `Recherchiere mit der Websuche in Primärquellen${j === 'DE' ? ' (gesetze-im-internet.de, dejure.org, bundesgerichtshof.de, bundesverfassungsgericht.de, openjur.de)' : ' (amtliche Gesetzes- und Entscheidungsdatenbanken)'} und belege jede Norm und Entscheidung mit Link.` : 'Eine Websuche ist nicht verfügbar: Fundstellen nur nennen, wenn du dir sicher bist, Unsicheres ausdrücklich kennzeichnen.'} Struktur in Markdown: **Kurzantwort**, **Rechtsgrundlagen** (§, Gesetz), **Rechtsprechung** (Gericht, Datum, Aktenzeichen), **Begründung**; Unterschiede zum österreichischen Recht nur, wenn danach gefragt ist. Fristen nicht berechnen, nur als Prüfpunkt mit Rechtsgrundlage nennen. Nie Fundstellen erfinden.`
+
 const GENERAL_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte. Erledige die Aufgabe direkt, präzise und in der Sprache der Nutzerin (Markdown, keine Floskeln). Keine Rechtsrecherche nötig; falls doch eine Rechtsfrage enthalten ist, beantworte sie nach bestem Wissen und weise darauf hin, dass dafür keine Datenbankrecherche erfolgte.`
 
 const docInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für österreichische Rechtsanwältinnen und Rechtsanwälte, und bearbeitest eine Dokumentaufgabe mit wenigen, gezielten Schritten.
@@ -885,6 +891,7 @@ const TASK_PRESETS = {
     text: `Rechtsrecherche${jurisdiction ? ` (${jurisdiction})` : ''}${depth ? `, ${depth}` : ''}: ${question}`,
     extra: `AUFGABE: Rechtsrecherche. Rechtsordnung: ${jurisdiction || 'Österreich'}. Tiefe: ${depth || 'ausführlich'}.`,
     forceMode: 'legal',
+    foreign: jurisdiction === 'Deutschland' ? 'DE' : null,
   }),
   contract_review: ({ perspective, focus, output, notes }) => ({
     text: `Vertragsprüfung${perspective ? ` aus Sicht ${perspective}` : ''}${focus ? ` – Fokus: ${focus}` : ''} – Ergebnis: ${output || 'Kommentare im Word-Dokument'}${notes ? `\nHinweise: ${notes}` : ''}`,
@@ -2184,6 +2191,7 @@ app.post('/api/chat', async (req, res) => {
   let forceMode = null
   let forceDifficulty = null // specialist agents fix the difficulty of a phase
   let kbAllowed = true // a later agent phase builds on the legal answers of the first one
+  let foreignLaw = null // 'DE' | 'other': not Austrian law → no knowledge base, main model with web search
   let agentRun = null
   if (task && typeof task === 'object' && task.type === 'agent') {
     agentRun = buildAgentTask(task)
@@ -2198,6 +2206,7 @@ app.post('/api/chat', async (req, res) => {
     prompt = prompt || t.text
     taskExtra = t.extra
     forceMode = t.forceMode
+    if (t.foreign) { foreignLaw = t.foreign; kbAllowed = false }
   }
   // A skill picked for this message (standard or of the workspace): binding instructions, inputs, reference documents.
   const owner = ownerOf(req)
@@ -2762,9 +2771,11 @@ app.post('/api/chat', async (req, res) => {
     if (!kbAllowed) plan.questions = []
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]
     if (plan.mode === 'general') plan.questions = []
+    if (!foreignLaw && plan.mode !== 'general' && (plan.jurisdiction === 'DE' || plan.jurisdiction === 'other')) foreignLaw = plan.jurisdiction
+    if (foreignLaw) { kbAllowed = false; plan.questions = []; if (plan.mode === 'legal') plan.difficulty = 'hard' }
     heavy = plan.difficulty === 'hard'
     workModel = heavy ? MODEL_MAIN : MODEL_FAST
-    const areaLabel = LEGAL_AREA_LABEL[plan.legal_area] || 'allgemein'
+    const areaLabel = foreignLaw ? FOREIGN_LABEL[foreignLaw] : (LEGAL_AREA_LABEL[plan.legal_area] || 'allgemein')
     stepDone(pid, { detail: `${plan.mode === 'legal' ? `Rechtsfrage · ${areaLabel}${plan.scope ? ' (' + plan.scope + ')' : ''}` : plan.mode === 'document' ? 'Dokumentaufgabe' : 'Allgemeine Aufgabe'}${plan.questions.length ? ` · ${plan.questions.length} Frage${plan.questions.length > 1 ? 'n' : ''} an AI:ssociate` : ''}${heavy ? ' · komplexe Aufgabe' : ''}` })
     for (const [i, q] of plan.questions.entries()) { const qs = step('question', `Frage ${plan.questions.length > 1 ? i + 1 + ': ' : ''}${q.slice(0, 220)}`, { model: MODEL_FAST }); stepDone(qs) }
     const usedModels = () => Object.keys(ctx.usage.byModel)
@@ -2775,7 +2786,17 @@ app.post('/api/chat', async (req, res) => {
     let answer = ''
     let verdict = null
     try {
-      if (plan.mode === 'legal' && !heavy) {
+      if (plan.mode === 'legal' && foreignLaw) {
+        // German / foreign law: the main model researches with web search (the knowledge base is Austrian).
+        const web = WEB_SEARCH_ENABLED && !webSearchRejected
+        const sid = step('think', `Recherche im ${foreignLaw === 'DE' ? 'deutschen' : 'ausländischen'} Recht${web ? ' mit Websuche' : ''}`, { model: MODEL_MAIN })
+        const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: foreignLawInstructions(foreignLaw, web), effort: EFFORT_MAIN, maxOut: 12_000, input: [...histInput, { role: 'user', content: userContent }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? MAX_WEB_SEARCHES : undefined })
+        collectWebCitations(resp)
+        emitWebSteps(resp)
+        stepDone(sid, { detail: ctx.usage.webSearchCalls ? `${ctx.usage.webSearchCalls} Websuche${ctx.usage.webSearchCalls > 1 ? 'n' : ''}` : 'ohne Websuche' })
+        verdict = 'web'
+        answer = (resp.output_text || '').trim()
+      } else if (plan.mode === 'legal' && !heavy) {
         // Easy legal question: answered directly on the fast model with a short web search.
         const sid = step('think', 'Antwort wird formuliert', { model: workModel })
         const resp = await callModel(ctx, { model: workModel, instructions: easyLegalInstructions(useWeb), effort: EFFORT_PLAN, maxOut: 6000, input: [...histInput, { role: 'user', content: userContent }], tools: useWeb ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: useWeb ? MAX_WEB_SEARCHES : undefined })
@@ -2860,7 +2881,8 @@ app.post('/api/chat', async (req, res) => {
 
     // ---- 3. verification (deterministic, against RIS, bounded by a deadline) ----
     let verification = null
-    if (plan.mode !== 'general') {
+    if (foreignLaw && plan.mode !== 'general') { const vid = step('verify', 'RIS-Prüfung'); stepDone(vid, { detail: `entfällt – das RIS enthält nur österreichisches Recht` }) }
+    else if (plan.mode !== 'general') {
       assertAlive()
       const vid = step('verify', 'Zitate werden gegen das RIS geprüft')
       try {
