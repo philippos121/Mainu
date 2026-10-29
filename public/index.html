@@ -1633,12 +1633,19 @@
         $('dictHint').hidden = !(on && dict.target === input)
         if (on && dict.target === input) $('dictHint').textContent = `Diktat läuft${dict.local ? ' · auf dem Gerät' : ''} – „Punkt“, „Komma“, „neue Zeile“ werden umgesetzt. Enter sendet, Strg + M beendet.`
       }
+      /**
+       * Stops at once: the text seen so far (including the interim part) is kept, the engine is
+       * aborted and its late events are ignored. Waiting for the browser's "end" event left the
+       * button stuck on "Stopp" when that event came late or never.
+       */
       function dictStop({ discard = false } = {}) {
-        if (!dict.rec && !dict.want) return
+        const r = dict.rec
+        if (!r && !dict.want) return
         dict.want = false
         if (discard) dict.target = null
-        try { dict.rec?.stop() } catch {}
-        if (!dict.rec) dictCleanup()
+        dictCleanup()
+        if (r) { r.onresult = r.onerror = r.onend = r.onstart = r.onaudiostart = null; try { r.abort() } catch { try { r.stop() } catch {} } }
+        if (dict.local) guard(false)
       }
       function dictCleanup() {
         if (dict.target && dict.interim) { dict.base += dictFormat(dict.interim, dict.base); dict.interim = ''; dictShow() }
@@ -1654,7 +1661,7 @@
         }
         r.onresult = (e) => {
           if (dict.local) guard(false)
-          if (!dict.target) return
+          if (r !== dict.rec || !dict.target) return
           let interim = ''
           for (let i = e.resultIndex; i < e.results.length; i++) {
             const txt = e.results[i][0].transcript
@@ -1664,11 +1671,13 @@
         }
         r.onerror = (e) => {
           if (dict.local) guard(false)
+          if (r !== dict.rec) return
           const msg = { 'not-allowed': 'Mikrofon-Zugriff wurde nicht erlaubt (Adressleiste → Website-Einstellungen).', 'service-not-allowed': 'Die Spracherkennung ist in diesem Browser gesperrt.', 'audio-capture': 'Kein Mikrofon gefunden.', network: 'Spracherkennung nicht erreichbar – Internetverbindung prüfen oder „Nur auf dem Gerät“ einrichten.', 'language-not-supported': 'Diese Sprache wird von der Spracherkennung nicht unterstützt.' }[e.error]
           if (msg) { dict.fatal = true; dict.want = false; toast(msg, 5000) }
         }
         r.onend = () => {
           if (dict.local) guard(false)
+          if (r !== dict.rec) return
           // Chrome ends continuous recognition after silence or ~1 minute: keep going while wanted.
           if (dict.want && !dict.fatal && dict.restarts < 30 && dict.target) { dict.restarts++; if (dict.interim) { dict.base += dictFormat(dict.interim, dict.base); dict.interim = '' } try { dict.rec = dictStartRec(); return } catch {} }
           dictCleanup()
