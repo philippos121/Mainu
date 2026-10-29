@@ -46,9 +46,8 @@ question ──▶ fast model: mode, legal area, difficulty, 0–3 compact quest
   mobile, wordmark on desktop), centred logo, "Wählen Sie eine Wissensdatenbank"
   list (Automatisch / Zivilrecht / Strafrecht / Steuerrecht / Öffentliches Recht
   with Bundesland; the choice pins the legal area, "Automatisch" lets the planner
-  detect it), template chips (Rechtsrecherche, Versionen vergleichen,
-  Zusammenfassen as forms; Vertragsprüfung, Vertrag entwerfen, Schriftsatz
-  entwerfen open their agents), the "Frage AI:ssociate." composer with the chosen
+  detect it), template chips (Rechtsrecherche as a form; Vertragsprüfung,
+  Vertrag entwerfen, Schriftsatz entwerfen open their agents; Skills), the "Frage AI:ssociate." composer with the chosen
   knowledge base as a chip, one "Hinzufügen" button and Skills, disclaimer.
   Conversation
   history (browser-local), feature tour, agent steps without code, sources with
@@ -111,7 +110,12 @@ projects; the project page has a box for a new question, the shared
 conversations (with who started and who last continued them), the instructions
 (applied to every request in the project, like a standing brief), the documents
 (stored in an internal Akt, searched by the assistant with the Akt tools) and the
-members. "Teilen" (owner) offers a dropdown of all registered, active accounts
+members. The documents card sits under the question box: tick documents (none =
+all) and apply a skill with one click – Tabellarische Übersicht (Excel or Word),
+Zusammenfassen, Versionen vergleichen (exactly two), Sachverhaltschronologie or
+any other skill via "Weitere Skills …" – or ask a question about the ticked ones.
+Up to five ticked documents go in as attachments (text extracted on first use),
+otherwise the agent searches all project documents itself. "Teilen" (owner) offers a dropdown of all registered, active accounts
 (`GET /api/users/directory`, name and e-mail only) and a role: *Kann bearbeiten*
 (ask, upload, edit instructions) or *Kann lesen* (read conversations and
 documents; the composer is read-only). Members can leave; only the owner shares,
@@ -194,8 +198,11 @@ result (answer, Word, Excel), knowledge base (by difficulty, always, never) and
 legal area. It applies to one message: picked with the "Skills" button or by
 typing "/" in the composer (with a form for its inputs), or chosen by the
 planner when a request clearly matches a skill marked "automatisch" (shown as
-"Skill: … · automatisch" on the answer). Eleven standard skills ship with the
-app (Mandantenbrief, Aktenvermerk, Sachverhaltschronologie, Rechtsgutachten,
+"Skill: … · automatisch" on the answer). All skills are also listed in the
+sidebar under "Skills" (folded by default; one click applies a skill) and on the
+project documents. A select field `format` (Excel / Word) lets the user pick the
+result format per run. Fourteen standard skills ship with the app (Zusammenfassen,
+Tabellarische Übersicht, Versionen vergleichen – formerly forms –, Mandantenbrief, Aktenvermerk, Sachverhaltschronologie, Rechtsgutachten,
 Playbook-Abgleich, Gegenargumente, Übersetzung Rechtsenglisch, Bescheidanalyse,
 Steuerliche Erstbeurteilung, Schreiben an die Gegenseite, Executive Summary);
 they are read-only and can be adapted as a copy. Own skills belong to the
@@ -254,8 +261,11 @@ inside the Akt (tabs), the form-driven templates above the composer
 ## App shell, Akten, Due Diligence, Review-Tabellen
 
 The UI is an app shell: teal app bar plus a sidebar (drawer behind the
-hamburger on mobile) with Assistent, the agents (Due Diligence, Vertragsprüfung,
-Vertrag entwerfen, Schriftsatz entwerfen), Alle Akten, Verlauf and Einstellungen; hash routes such as `#/matter/<id>/findings`. Matters ("Akten") hold documents (upload or import of
+hamburger on mobile) with Allgemeiner Agent, Spezialagenten (Due Diligence,
+Vertragsprüfung, Vertrag entwerfen, Schriftsatz entwerfen), Skills (foldable),
+Projekte, Verlauf and Einstellungen. Akten have no menu entry of their own: the
+Due Diligence page lists the due diligences and, below, any other Akten
+(`#/matters` redirects there); hash routes such as `#/matter/<id>/findings`. Matters ("Akten") hold documents (upload or import of
 files and whole folders from OneDrive/SharePoint), their extracted text, the
 analysis results, review tables and reports. Everything long-running is a
 server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),

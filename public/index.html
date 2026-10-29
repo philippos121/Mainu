@@ -53,6 +53,17 @@
       .nav-item .cnt { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 1px 7px; }
       .nav-item .cnt.soft { background: transparent; color: var(--faint); font-weight: 600; font-size: 10.5px; letter-spacing: .02em; }
       .sb-sec.sb-hist { margin-top: 22px; opacity: .8; }
+      .sb-fold { width: calc(100% - 16px); border: none; background: none; cursor: pointer; font-family: inherit; padding: 4px 0; border-radius: 6px; }
+      .sb-fold:hover { color: var(--text); }
+      .sb-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .sb-fold .cnt { margin-left: 6px; font-size: 10px; letter-spacing: 0; background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 0 6px; }
+      .sb-fold svg { width: 13px; height: 13px; margin-left: auto; transition: transform .15s; }
+      .sb-fold[aria-expanded="true"] svg { transform: rotate(90deg); }
+      .sb-skills .nav-item { color: var(--faint); font-weight: 500; font-size: 13px; padding: 6px 10px; }
+      .sb-skills .nav-item span.t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sb-skills .nav-item.active { color: var(--accent); }
+      .sb-skills .nav-item svg { width: 15px; height: 15px; }
+      .sb-skills .nav-item.sb-manage { color: var(--accent); }
       .sb-recent .nav-item { color: var(--faint); }
       .sb-recent .nav-item.active { color: var(--accent); }
       .nav-item.active .cnt { background: rgba(14,124,138,0.16); color: var(--accent); }
@@ -437,6 +448,15 @@
       .pd-row .s { color: var(--faint); font-size: 12px; white-space: nowrap; }
       .pd-row button { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 15px; }
       .pd-row button:hover { color: var(--err); }
+      label.pd-row { cursor: pointer; }
+      .pd-row input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); flex: 0 0 auto; cursor: pointer; }
+      .pd-head { display: flex; align-items: center; gap: 8px; }
+      .pd-head .mini { margin-left: auto; }
+      .pd-acts { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+      .pd-acts .pd-lbl { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 7px; }
+      .pd-acts .pd-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+      .pd-acts .mini { display: inline-flex; align-items: center; gap: 4px; }
+      .pd-acts .mini svg { width: 14px; height: 14px; color: var(--accent); }
       .pm-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
       .pm-row:first-of-type { border-top: none; }
       .pm-row .avs .av { width: 30px; height: 30px; font-size: 11.5px; }
@@ -786,18 +806,20 @@
         </div>
         <button class="btn full sb-new" id="sbNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Neue Frage</button>
         <nav class="sb-nav">
-          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Assistent</a>
-          <div class="sb-sec">Agenten</div>
+          <a class="nav-item" data-nav="assistant" href="#/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>Allgemeiner Agent</a>
+          <div class="sb-sec">Spezialagenten</div>
           <a class="nav-item" data-nav="dd" href="#/dd" id="navDd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M12 8v4M12 15h.01"/></svg>Due Diligence<span class="cnt" id="cntDd" hidden></span></a>
           <a class="nav-item" data-nav="agent:contract_review" href="#/agent/contract_review" id="navAgentReview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg>Vertragsprüfung</a>
           <a class="nav-item" data-nav="agent:contract_draft" href="#/agent/contract_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>Vertrag entwerfen</a>
           <a class="nav-item" data-nav="agent:brief_draft" href="#/agent/brief_draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/></svg>Schriftsatz entwerfen</a>
-          <a class="nav-item" data-nav="skills" href="#/skills" id="navSkills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Skills<span class="cnt" id="cntSkills" hidden></span></a>
+          <button class="sb-sec sb-fold" id="sbSkillsToggle" type="button" aria-expanded="false" aria-controls="sbSkillList">Skills<span class="cnt" id="cntSkillsAll" hidden></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+          <div class="sb-skills" id="sbSkillList" hidden>
+            <div id="sbSkillItems"></div>
+            <a class="nav-item sb-manage" data-nav="skills" href="#/skills" id="navSkills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Skills verwalten<span class="cnt" id="cntSkills" hidden></span></a>
+          </div>
           <div class="sb-sec">Projekte</div>
           <a class="nav-item" data-nav="projects" href="#/projects" id="navProjects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>Alle Projekte<span class="cnt" id="cntProjects" hidden></span></a>
           <div class="sb-recent sb-proj" id="sbProjects"></div>
-          <div class="sb-sec">Akten</div>
-          <a class="nav-item" data-nav="matters" href="#/matters" id="navMatters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Alle Akten<span class="cnt" id="cntMatters" hidden></span></a>
           <div class="sb-sec sb-hist" id="sbHistSec" hidden>Verlauf <a href="#/history">Alle</a></div>
           <div class="sb-recent" id="sbRecent"></div>
         </nav>
@@ -1210,13 +1232,13 @@
       $('historyBtn').addEventListener('click', () => navigate('#/history'))
       costPill.addEventListener('click', () => navigate('#/settings'))
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); closeTask(); closeMs(); closeDlg(); endTour() } })
-      const VIEW_TITLES = { assistant: 'Assistent', matters: 'Akten', dd: 'Due Diligence', skills: 'Skills', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt', projects: 'Projekte', project: 'Projekt' }
+      const VIEW_TITLES = { assistant: 'Allgemeiner Agent', matters: 'Akten', dd: 'Due Diligence', skills: 'Skills', history: 'Verlauf', settings: 'Einstellungen', matter: 'Akt', projects: 'Projekte', project: 'Projekt' }
       function navigate(hash) { if (location.hash === hash) router(); else location.hash = hash }
       function setTitle(parts) { mainTitle.innerHTML = ''; parts.forEach((p, i) => mainTitle.appendChild(el('span', i < parts.length - 1 ? 'crumb' : '', p))) }
       function showView(name, nav) {
         viewName = name
         document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === name))
-        const navKey = nav || (name === 'matter' ? (matter?.kind === 'dd' ? 'dd' : 'matters') : name === 'project' || (name === 'assistant' && current?.project) ? 'projects' : name)
+        const navKey = nav || (name === 'matter' ? 'dd' : name === 'project' || (name === 'assistant' && current?.project) ? 'projects' : name)
         if (name !== 'project') stopProjectPolling()
         document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === navKey))
         closeSidebar(); window.scrollTo(0, 0)
@@ -1230,13 +1252,13 @@
         if (v === 'project' && seg[1]) { if (seg[2] === 'chat' && seg[3]) await openProjectConversation(seg[1], seg[3]); else await openProject(seg[1]); return }
         if (v === 'agent' && seg[1]) { showView('agent', 'agent:' + seg[1]); await renderAgent(seg[1]); return }
         if (v === 'workflows') { location.hash = '#/assistant'; return }
-        if (v === 'tables') { location.hash = '#/matters'; return }
+        // Akten live with the due diligences (one list); old links keep working.
+        if (v === 'tables' || v === 'matters') { location.hash = '#/dd'; return }
         if (!(v in VIEW_TITLES) || v === 'matter' || v === 'project') { location.hash = '#/assistant'; return }
         showView(v === 'dd' ? 'matters' : v, v)
         if (v === 'assistant') { if (current?.messages.length) showChat(); else showHome() }
         else setTitle([VIEW_TITLES[v]])
-        if (v === 'matters') renderMatters('all')
-        if (v === 'dd') renderMatters('dd')
+        if (v === 'dd') renderMatters()
         if (v === 'history') renderHistory()
         if (v === 'projects') renderProjects()
         if (v === 'skills') renderSkills()
@@ -1251,17 +1273,13 @@
           { k: 'question', label: 'Rechtsfrage', type: 'textarea', required: true, ph: 'z. B. Kann der Vermieter bei befristetem Mietvertrag nach MRG vorzeitig kündigen, wenn …?' },
           { k: 'jurisdiction', label: 'Rechtsordnung', type: 'select', opts: ['Österreich', 'Österreich + EU-Recht', 'EU-Recht', 'Deutschland'] },
           { k: 'depth', label: 'Tiefe', type: 'select', opts: ['ausführlich', 'kurz'] } ] },
-        compare: { title: 'Versionen vergleichen', desc: 'Zwei Fassungen hochladen: Delta-Ansicht (rot/grün) als HTML und Word plus juristische Bewertung der Änderungen.', icon: 'compare', needsFiles: true, minFiles: 2, fields: [ { k: 'notes', label: 'Hinweise (optional)', type: 'textarea', ph: 'Worauf soll besonders geachtet werden?' } ] },
-        summary: { title: 'Zusammenfassen', desc: 'Memo, Kurzfassung oder mandantentaugliche Zusammenfassung hochgeladener Dokumente.', icon: 'summary', needsFiles: true, fields: [
-          { k: 'style', label: 'Stil', type: 'select', opts: ['Juristisches Memo', 'Kurzfassung (10 Sätze)', 'Für Mandanten verständlich'] },
-          { k: 'question', label: 'Schwerpunkt (optional)', type: 'text', ph: 'z. B. Haftungsfragen, Zahlungsmodalitäten' } ] },
       }
       // The workflow forms live behind the template chips above the composer (structured inputs, fixed outputs).
       // Specialist agents get their own guided page; the short templates stay forms.
       const AGENT_CHIPS = { contract_review: ['Vertragsprüfung', 'contract', 'Klauselweise Prüfung nach österreichischem Recht'], contract_draft: ['Vertrag entwerfen', 'draft', 'Term Sheet → Gliederung → Word-Entwurf'], brief_draft: ['Schriftsatz entwerfen', 'brief', 'Klage, Rechtsmittel, Beschwerde im österreichischen Aufbau'] }
       function renderActions() {
         const c = $('homeChips'); if (!c) return; c.innerHTML = ''
-        const order = [['wf', 'research'], ['agent', 'contract_review'], ['agent', 'contract_draft'], ['agent', 'brief_draft'], ['wf', 'compare'], ['wf', 'summary']]
+        const order = [['wf', 'research'], ['agent', 'contract_review'], ['agent', 'contract_draft'], ['agent', 'brief_draft']]
         for (const [kind, key] of order) {
           const b = el('button')
           if (kind === 'wf') { const w = WORKFLOWS[key]; b.dataset.wf = key; b.title = w.desc; b.appendChild(svg(w.icon)); b.appendChild(el('span', null, w.title)); b.addEventListener('click', () => openTask(key)) }
@@ -2247,7 +2265,7 @@
       // ------------------------------------------------------------------
       // Sending (SSE)
       // ------------------------------------------------------------------
-      async function sendMessage({ text, task = null, taskTitle = null, agent = false }) {
+      async function sendMessage({ text, task = null, taskTitle = null, agent = false, projectDocs = null }) {
         if (busy) return
         if (!current) newConversation({ keepView: true })
         if (msState.connected && (pendingMs.length || current.msTarget)) {
@@ -2264,7 +2282,7 @@
         showView('assistant'); showChat(); { const h = current.project ? `#/project/${current.project.id}/chat/${current.id}` : '#/chat/' + current.id; if (location.hash !== h) history.replaceState(null, '', h) }
         const skillReq = pendingSkill ? { id: pendingSkill.id, params: pendingSkill.params || {} } : null; const skillName = pendingSkill?.name || null; if (pendingSkill) { pendingSkill = null; renderAttachments() }
         const folderMeta = localFolder ? { name: localFolder.name, count: localFolder.entries.length, sample: localFolder.entries.slice(0, 150).map((e) => e.path) } : null
-        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name)], taskTitle, agent, matterName: matterCtx?.name || null, folder: folderMeta?.name || null, skill: skillName }
+        const um = { role: 'user', text, files: [...uploads.map((f) => f.name), ...msFiles.map((f) => f.name), ...(projectDocs?.names || [])], taskTitle, agent, matterName: matterCtx?.name || null, folder: folderMeta?.name || null, skill: skillName }
         current.messages.push(um); renderUser(um)
         const ui = createAssistantCard(); scrollBottom()
         let finalData = null
@@ -2287,7 +2305,7 @@
         let hardFail = false
         try {
           activeAbort = new AbortController()
-          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: saveTargets({ msContext: msFiles.length > 0 }).ms, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || null, matterDocIds: matterCtx?.docIds || [], projectId: current.project?.id || null, localFolder: folderMeta, skill: skillReq }) })
+          const resp = await fetch('/api/chat', { method: 'POST', signal: activeAbort.signal, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': ownerKey }, body: JSON.stringify({ jobId, prompt: task ? '' : text, task, history: current.history, sessionId: current.sessionId, aissThreadId: current.aissThreadId || null, webSearch: settings.webSearch, legalArea: settings.kb !== 'auto' ? settings.kb : null, scope: settings.kb === 'public' && settings.scope ? settings.scope : null, files: uploads.map((f) => ({ name: f.name, base64: f.base64 })), msFiles: msFiles.map((f) => ({ driveId: f.driveId, itemId: f.itemId, name: f.name })), msSync: msState.connected ? { enabled: saveTargets({ msContext: msFiles.length > 0 }).ms, saveAnswer: settings.msSaveAnswer !== false, ...(current.msTarget || {}) } : null, matterId: matterCtx?.id || projectDocs?.matterId || null, matterDocIds: matterCtx?.docIds || projectDocs?.ids || [], projectId: current.project?.id || null, localFolder: folderMeta, skill: skillReq }) })
           if (resp.status === 401) showAuthScreen('login', 'Bitte anmelden, um fortzufahren.')
           if (!resp.ok || !resp.body) { hardFail = true; let msg = resp.status === 413 ? 'Anhänge zu groß – zusammen höchstens 28 MB.' : 'Anfrage fehlgeschlagen (' + resp.status + ')'; try { msg = (await resp.json()).error || msg } catch {} throw new Error(msg) }
           await readSse(resp, handle)
@@ -2727,7 +2745,26 @@
         try { const r = await api('/api/skills'); skillsCache = r.skills || []; skillOptions = r.options || null } catch (e) { if (!skillsCache.length) toast('Skills nicht ladbar: ' + e.message) }
         const own = skillsCache.filter((x) => !x.builtin).length
         $('cntSkills').hidden = !own; $('cntSkills').textContent = own
+        renderSidebarSkills()
         return skillsCache
+      }
+      // Sidebar: every skill one click away, folded by default (the choice is remembered per browser).
+      const LS_SB_SKILLS = 'aiss.sbSkillsOpen'
+      function setSkillsFold(open) {
+        $('sbSkillsToggle').setAttribute('aria-expanded', String(open)); $('sbSkillList').hidden = !open
+        try { localStorage.setItem(LS_SB_SKILLS, open ? '1' : '') } catch {}
+      }
+      $('sbSkillsToggle').addEventListener('click', () => setSkillsFold($('sbSkillList').hidden))
+      try { if (localStorage.getItem(LS_SB_SKILLS)) setSkillsFold(true) } catch {}
+      function renderSidebarSkills() {
+        const box = $('sbSkillItems'); box.innerHTML = ''
+        $('cntSkillsAll').hidden = !skillsCache.length; $('cntSkillsAll').textContent = skillsCache.length
+        for (const sk of skillsCache) {
+          const b = el('button', 'nav-item'); b.type = 'button'; b.dataset.skill = sk.id; b.title = sk.description || sk.name
+          b.appendChild(svg(sk.icon || 'skill')); b.appendChild(el('span', 't', sk.name))
+          b.addEventListener('click', () => { closeSidebar(); pickSkill(sk) })
+          box.appendChild(b)
+        }
       }
       const OUT_DE = { auto: 'Ergebnis automatisch', answer: 'Antwort', docx: 'Word', xlsx: 'Excel' }
       const KB_DE = { auto: 'Wissensdatenbank nach Bedarf', always: 'immer Wissensdatenbank', never: 'ohne Wissensdatenbank' }
@@ -2738,8 +2775,9 @@
         renderAttachments(); setTimeout(() => input.focus(), 50)
         toast(`Skill „${sk.name}“ gilt für die nächste Nachricht.`)
       }
-      function pickSkill(sk) { if (sk.fields?.length) skillParamsForm(sk, {}); else { closeDlg(); useSkill(sk) } }
-      async function openSkillPicker(filter = '') {
+      // onUse(skill, params) decides where the skill goes: by default into the next chat message.
+      function pickSkill(sk, onUse = useSkill) { if (sk.fields?.length) skillParamsForm(sk, {}, onUse); else { closeDlg(); onUse(sk, {}) } }
+      async function openSkillPicker(filter = '', onUse = useSkill) {
         await loadSkills()
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
         card.appendChild(el('h2', null, 'Skill wählen'))
@@ -2756,7 +2794,7 @@
             const b = el('button', 'fold-opt'); b.dataset.skill = sk.id
             const i = el('span', 'ico'); i.appendChild(svg(sk.icon || 'skill')); const t = el('span'); t.appendChild(el('b', null, sk.name)); t.appendChild(el('span', 'd', sk.description || '')); b.append(i, t)
             const tag = el('span', 'pill ' + (sk.builtin ? '' : 'teal'), sk.builtin ? 'Standard' : 'Kanzlei'); tag.style.marginLeft = 'auto'; tag.style.flex = '0 0 auto'; b.appendChild(tag)
-            b.addEventListener('click', () => pickSkill(sk)); list.appendChild(b)
+            b.addEventListener('click', () => pickSkill(sk, onUse)); list.appendChild(b)
           }
         }
         q.addEventListener('input', draw); q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const first = list.querySelector('.fold-opt'); if (first) { e.preventDefault(); first.click() } } })
@@ -2765,7 +2803,7 @@
         a.append(lib, el('span', 'sp'), c); card.appendChild(a)
         draw(); $('dlg').classList.add('show'); setTimeout(() => { if (!card.contains(document.activeElement)) q.focus() }, 30)
       }
-      function skillParamsForm(sk, values = {}) {
+      function skillParamsForm(sk, values = {}, onUse = useSkill) {
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
         card.appendChild(el('h2', null, sk.name)); card.appendChild(el('div', 'md', sk.description || ''))
         const inputs = {}
@@ -2779,12 +2817,12 @@
           c.dataset.skillField = f.k; inputs[f.k] = c; fld.appendChild(c); card.appendChild(fld)
           if (f.type === 'textarea') addFieldMic(fld, c)
         }
-        const a = el('div', 'modal-actions'); const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', () => openSkillPicker())
+        const a = el('div', 'modal-actions'); const back = el('button', 'btn ghost', 'Zurück'); back.addEventListener('click', () => openSkillPicker('', onUse))
         const ok = el('button', 'btn', 'Übernehmen')
         ok.addEventListener('click', () => {
           const params = {}
           for (const f of sk.fields) { const v = String(inputs[f.k].value || '').trim(); if (f.required && !v) { toast(`Bitte „${f.label}“ ausfüllen.`); inputs[f.k].focus(); return } if (v) params[f.k] = v }
-          closeDlg(); useSkill(sk, params)
+          closeDlg(); onUse(sk, params)
         })
         a.append(back, el('span', 'sp'), ok); card.appendChild(a)
         $('dlg').classList.add('show'); setTimeout(() => { if (!card.contains(document.activeElement)) Object.values(inputs)[0]?.focus() }, 30)
@@ -3009,19 +3047,23 @@
       const areaLabel = (k) => ddConfig?.areas.find((a) => a.key === k)?.label || (k === 'none' || !k ? 'Allgemein' : k)
       async function loadDdConfig() { if (!ddConfig) { try { ddConfig = await api('/api/dd/config') } catch { ddConfig = { areas: [], presets: [], limits: {} } } } return ddConfig }
       async function loadMatters() { try { mattersCache = (await api('/api/matters')).matters } catch (e) { mattersCache = []; toast(e.message) } updateMatterCounts(); return mattersCache }
-      function updateMatterCounts() { const n = mattersCache.length, d = mattersCache.filter((m) => m.kind === 'dd').length; $('cntMatters').hidden = !n; $('cntMatters').textContent = n; $('cntDd').hidden = !d; $('cntDd').textContent = d }
+      function updateMatterCounts() { const d = mattersCache.filter((m) => m.kind === 'dd').length; $('cntDd').hidden = !d; $('cntDd').textContent = d }
 
-      async function renderMatters(filter) {
+      async function renderMatters() {
         const page = $('mattersPage'); page.innerHTML = ''
-        const isDd = filter === 'dd'
-        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, isDd ? 'Due Diligence' : 'Akten')); hl.appendChild(el('div', 'sub', isDd ? 'Datenraum analysieren, Red Flags mit Zitat und Fundstelle, Bericht als Word und Excel.' : 'Dokumente einer Causa sammeln, analysieren und Fragen im Kontext des Akts stellen.')); head.appendChild(hl)
-        const acts = el('div', 'acts'); const bNew = el('button', 'btn', isDd ? 'Neue Due Diligence' : 'Neuer Akt'); bNew.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); acts.appendChild(bNew); if (!isDd) { const bDd = el('button', 'btn ghost', 'Neue Due Diligence'); bDd.addEventListener('click', () => openMatterWizard('dd')); acts.appendChild(bDd) } head.appendChild(acts); page.appendChild(head)
+        const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, 'Due Diligence')); hl.appendChild(el('div', 'sub', 'Datenraum analysieren, Red Flags mit Zitat und Fundstelle, Bericht als Word und Excel.')); head.appendChild(hl)
+        const acts = el('div', 'acts'); const bNew = el('button', 'btn', 'Neue Due Diligence'); bNew.addEventListener('click', () => openMatterWizard('dd')); acts.appendChild(bNew); head.appendChild(acts); page.appendChild(head)
         const grid = el('div', 'cards'); grid.appendChild(el('div', 'recent-empty', 'Lädt…')); page.appendChild(grid)
         await loadDdConfig(); await loadMatters()
-        const items = mattersCache.filter((m) => !isDd || m.kind === 'dd')
+        const dds = mattersCache.filter((m) => m.kind === 'dd'), akten = mattersCache.filter((m) => m.kind !== 'dd')
         grid.innerHTML = ''
-        if (!items.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, isDd ? 'Noch keine Due Diligence' : 'Noch keine Akten')); e.appendChild(document.createTextNode(isDd ? 'Lege eine Due Diligence an, lade den Datenraum hoch (oder importiere ihn aus SharePoint) und starte die Analyse.' : 'Lege einen Akt an und lade Dokumente hoch – Analyse, Review-Tabellen und Fragen zum Akt stehen dann bereit.')); const b = el('button', 'btn', isDd ? 'Due Diligence anlegen' : 'Akt anlegen'); b.addEventListener('click', () => openMatterWizard(isDd ? 'dd' : 'matter')); e.appendChild(b); grid.appendChild(e); return }
-        for (const m of items) grid.appendChild(matterCard(m))
+        if (!dds.length) { const e = el('div', 'empty'); e.style.gridColumn = '1 / -1'; e.appendChild(el('b', null, 'Noch keine Due Diligence')); e.appendChild(document.createTextNode('Lege eine Due Diligence an, lade den Datenraum hoch (oder importiere ihn aus SharePoint) und starte die Analyse.')); const b = el('button', 'btn', 'Due Diligence anlegen'); b.addEventListener('click', () => openMatterWizard('dd')); e.appendChild(b); grid.appendChild(e) }
+        for (const m of dds) grid.appendChild(matterCard(m))
+        // Akten without a due diligence (older ones, or created as a chat source) stay reachable here.
+        if (akten.length) {
+          const h = el('div', 'sec-lbl', 'Weitere Akten'); h.style.margin = '22px 0 8px'; page.appendChild(h)
+          const g2 = el('div', 'cards'); for (const m of akten) g2.appendChild(matterCard(m)); page.appendChild(g2)
+        }
       }
       function matterCard(m) {
         const c = el('div', 'card click'); c.addEventListener('click', () => navigate(`#/matter/${m.id}`))
@@ -3086,7 +3128,7 @@
         if (matter?.id !== id) { $('matterPage').innerHTML = '<div class="recent-empty">Lädt…</div>'; matter = null }
         showView('matter')
         try { matter = (await api(`/api/matters/${id}`)).matter } catch (e) { $('matterPage').innerHTML = ''; const b = el('div', 'empty'); b.appendChild(el('b', null, 'Akt nicht gefunden')); b.appendChild(document.createTextNode(e.message)); $('matterPage').appendChild(b); setTitle(['Akten', 'Nicht gefunden']); return }
-        document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (matter.kind === 'dd' ? 'dd' : 'matters')))
+        document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === 'dd'))
         renderMatter()
         if (matter.job.running && matter.job.jobId) followMatterJob(matter.job.jobId)
       }
@@ -3095,9 +3137,9 @@
 
       function renderMatter() {
         const m = matter; if (!m || viewName !== 'matter') return
-        setTitle([m.kind === 'dd' ? 'Due Diligence' : 'Akten', m.name])
+        setTitle(['Due Diligence', m.name])
         const page = $('matterPage'); page.innerHTML = ''
-        const back = el('a', 'back', '‹ ' + (m.kind === 'dd' ? 'Due Diligence' : 'Alle Akten')); back.href = m.kind === 'dd' ? '#/dd' : '#/matters'; page.appendChild(back)
+        const back = el('a', 'back', '‹ Due Diligence'); back.href = '#/dd'; page.appendChild(back)
         const head = el('div', 'page-head'); const hl = el('div'); hl.appendChild(el('h1', null, m.name))
         const sub = []; if (m.settings?.reference) sub.push('AZ ' + m.settings.reference); if (m.client) sub.push('Mandant: ' + m.client); if (m.settings?.target) sub.push('Ziel: ' + m.settings.target); if (m.kind === 'dd') sub.push(`${m.settings.transaction === 'asset' ? 'Asset Deal' : 'Share Deal'} · ${m.settings.perspective === 'seller' ? 'Verkäufersicht' : 'Käufersicht'} · Wesentlichkeit ${fmtEur(m.settings.materialityEur)}`); sub.push(`${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'}`)
         hl.appendChild(el('div', 'sub', sub.join(' · '))); head.appendChild(hl)
@@ -3185,7 +3227,7 @@
         if (m.kind === 'dd') item('Einstellungen der DD', () => openMatterSettings())
         if (m.findings.length || m.executive) item('Alles neu analysieren', async () => { if (await confirmDlg('Neu analysieren', 'Alle Befunde, Bereichszusammenfassungen und das Executive Summary werden verworfen und aus den Dokumenten neu erstellt (Token-Kosten!).', { ok: 'Neu analysieren' })) startDd({ reanalyse: true }) })
         if (m.documents.some((d) => d.status === 'error')) item('Fehlgeschlagene Dokumente erneut lesen', () => startDd({ retryErrors: true }))
-        item('Akt löschen', async () => { if (await confirmDlg('Akt löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akt gelöscht.'); matter = null; await loadMatters(); navigate(m.kind === 'dd' ? '#/dd' : '#/matters') } catch (e) { toast(e.message) } } }, true)
+        item('Akt löschen', async () => { if (await confirmDlg('Akt löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akt gelöscht.'); matter = null; await loadMatters(); navigate('#/dd') } catch (e) { toast(e.message) } } }, true)
         card.appendChild(list)
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', closeDlg); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
@@ -3556,6 +3598,7 @@
       // Projects: shared workspaces (instructions, documents, conversations, members)
       // ------------------------------------------------------------------
       let projectsCache = [], project = null, projectPoll = 0, directory = null
+      const projDocSel = new Set() // documents ticked on the project page
       const ROLE_LABEL = { owner: 'Eigentümer:in', edit: 'Bearbeiten', view: 'Lesen' }
       const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?'
       const AV_COLORS = ['#0e7c8a', '#b36a00', '#5b6bbf', '#2e8b57', '#a2477a', '#6b7a8f']
@@ -3655,13 +3698,15 @@
         const ask = el('div', 'card proj-ask'); ask.appendChild(el('h3', null, 'Neue Unterhaltung im Projekt'))
         if (canEdit) {
           const ta = el('textarea'); ta.id = 'projAsk'; ta.placeholder = `Frage zum Projekt „${p.name}“ – Anweisungen und Dokumente des Projekts gelten automatisch.`
-          const row = el('div', 'row'); row.appendChild(el('span', 'hint', p.documents ? `${p.documents} Projektdokument${p.documents === 1 ? '' : 'e'} durchsuchbar · Enter sendet` : 'Enter sendet'))
+          const row = el('div', 'row'); const hint = el('span', 'hint'); hint.id = 'projAskHint'; row.appendChild(hint)
           row.appendChild(el('span', 'sp')); const go = el('button', 'btn', 'Fragen'); go.id = 'projAskGo'; row.appendChild(go)
-          const start = () => { const t = ta.value.trim(); if (!t) { ta.focus(); return } startProjectConversation(t) }
+          const start = () => { const t = ta.value.trim(); if (!t) { ta.focus(); return } startProjectConversation(t, { docIds: [...projDocSel] }) }
           go.addEventListener('click', start); ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); start() } })
           ask.append(ta, row); addFieldMic(ask, ta)
         } else ask.appendChild(el('div', 'md', 'Du kannst die Unterhaltungen und Dokumente dieses Projekts lesen. Neue Fragen stellen Mitglieder mit Bearbeitungsrecht.'))
         left.appendChild(ask)
+        // documents (with one-click skills) right under the question box
+        const docs = el('div', 'card'); docs.id = 'projDocs'; left.appendChild(docs)
         const convCard = el('div', 'card'); convCard.id = 'projConvos'; left.appendChild(convCard)
         // instructions
         const ins = el('div', 'card'); ins.appendChild(el('h3', null, 'Anweisungen'))
@@ -3669,8 +3714,6 @@
         ins.appendChild(it)
         if (canEdit) { const sv = el('button', 'mini', 'Speichern'); sv.id = 'projInstrSave'; sv.style.marginTop = '8px'; sv.addEventListener('click', async () => { sv.disabled = true; try { project = (await api('/api/projects/' + p.id, { method: 'PATCH', body: { instructions: it.value } })).project; toast('Anweisungen gespeichert – gelten ab der nächsten Frage.') } catch (e) { toast(e.message) } sv.disabled = false }); ins.appendChild(sv) }
         right.appendChild(ins)
-        // documents
-        const docs = el('div', 'card'); docs.id = 'projDocs'; right.appendChild(docs)
         // members
         const mem = el('div', 'card'); mem.id = 'projMembers'; right.appendChild(mem)
         fillProjectLists()
@@ -3694,22 +3737,32 @@
             cc.appendChild(row)
           }
         }
-        // documents
+        // documents: pick some (or none = all) and apply a skill or ask about them
         const dc = $('projDocs'); if (dc) {
-          dc.innerHTML = ''; dc.appendChild(el('h3', null, `Dokumente (${p.documentList.length})`))
-          if (!p.documentList.length) dc.appendChild(el('div', 'recent-empty', canEdit ? 'Dokumente hochladen – der Assistent durchsucht sie bei jeder Frage im Projekt selbst.' : 'Keine Dokumente.'))
-          for (const d of p.documentList) {
-            const row = el('div', 'pd-row'); row.appendChild(svg('file')); row.appendChild(el('span', 'n', d.name)); row.appendChild(el('span', 's', fmtSize(d.size || 0)))
-            if (canEdit) { const x = el('button', null, '×'); x.title = 'Dokument entfernen'; x.addEventListener('click', async () => { if (!(await confirmDlg('Dokument entfernen?', `„${d.name}“ aus dem Projekt entfernen.`))) return; try { await api(`/api/matters/${p.matterId}/documents/${d.id}`, { method: 'DELETE' }); await refreshProject() } catch (e) { toast(e.message) } }); row.appendChild(x) }
+          dc.innerHTML = ''
+          const docsAll = p.documentList
+          for (const id of [...projDocSel]) if (!docsAll.some((d) => d.id === id)) projDocSel.delete(id)
+          const h = el('h3', 'pd-head', `Dokumente (${docsAll.length})`)
+          if (canEdit && docsAll.length > 1) { const all = el('button', 'mini', projDocSel.size === docsAll.length ? 'Auswahl aufheben' : 'Alle auswählen'); all.id = 'projDocAll'; all.addEventListener('click', () => { if (projDocSel.size === docsAll.length) projDocSel.clear(); else docsAll.forEach((d) => projDocSel.add(d.id)); fillProjectLists() }); h.appendChild(all) }
+          dc.appendChild(h)
+          if (!docsAll.length) dc.appendChild(el('div', 'recent-empty', canEdit ? 'Dokumente hochladen – danach mit einem Klick zusammenfassen, tabellarisch gegenüberstellen, vergleichen oder Fragen dazu stellen.' : 'Keine Dokumente.'))
+          for (const d of docsAll) {
+            const row = el('label', 'pd-row'); row.dataset.doc = d.id
+            if (canEdit) { const cb = el('input'); cb.type = 'checkbox'; cb.checked = projDocSel.has(d.id); cb.setAttribute('aria-label', d.name + ' auswählen'); cb.addEventListener('change', () => { if (cb.checked) projDocSel.add(d.id); else projDocSel.delete(d.id); fillProjectLists(); $('projDocs')?.querySelector(`[data-doc="${d.id}"] input`)?.focus() }); row.appendChild(cb) }
+            row.appendChild(svg('file')); row.appendChild(el('span', 'n', d.name)); row.appendChild(el('span', 's', fmtSize(d.size || 0)))
+            if (canEdit) { const x = el('button', null, '×'); x.type = 'button'; x.title = 'Dokument entfernen'; x.addEventListener('click', async (e) => { e.preventDefault(); if (!(await confirmDlg('Dokument entfernen?', `„${d.name}“ aus dem Projekt entfernen.`))) return; try { await api(`/api/matters/${p.matterId}/documents/${d.id}`, { method: 'DELETE' }); projDocSel.delete(d.id); await refreshProject() } catch (err) { toast(err.message) } }); row.appendChild(x) }
             dc.appendChild(row)
           }
+          if (canEdit && docsAll.length) dc.appendChild(projectDocActions(docsAll))
           if (canEdit) {
             const inp = el('input'); inp.type = 'file'; inp.multiple = true; inp.hidden = true; inp.accept = '.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml'; inp.id = 'projFileInput'
             inp.addEventListener('change', async () => { await uploadToProject(inp.files); inp.value = '' })
             const b = el('button', 'btn ghost sm'); b.appendChild(svg('upload')); b.appendChild(document.createTextNode(' Dokumente hochladen')); b.style.marginTop = '10px'; b.addEventListener('click', () => inp.click())
             dc.append(inp, b)
-            dc.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation() }); dc.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer?.files?.length) uploadToProject(e.dataTransfer.files) })
+            if (!dc.dataset.drop) { dc.dataset.drop = '1'; dc.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation() }); dc.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer?.files?.length) uploadToProject(e.dataTransfer.files) }) }
           }
+          const hint = $('projAskHint')
+          if (hint) hint.textContent = projDocSel.size ? `Frage zu ${projDocSel.size} ausgewählten Dokument${projDocSel.size === 1 ? '' : 'en'} · Enter sendet` : docsAll.length ? `${docsAll.length} Projektdokument${docsAll.length === 1 ? '' : 'e'} durchsuchbar · Enter sendet` : 'Enter sendet'
         }
         // members
         const mc = $('projMembers'); if (mc) {
@@ -3719,6 +3772,39 @@
           for (const m of p.members) row(m, ROLE_LABEL[m.role])
           if (isOwner) { const b = el('button', 'btn ghost sm'); b.appendChild(svg('share')); b.appendChild(document.createTextNode(' Teilen')); b.style.marginTop = '10px'; b.addEventListener('click', shareDialog); mc.appendChild(b) }
         }
+      }
+      // Skills offered directly on the project documents (standard skills; "Weitere Skills" opens the library).
+      const PROJ_DOC_SKILLS = ['std_tabelle', 'std_zusammenfassung', 'std_vergleich', 'std_chronologie']
+      function projectDocActions(docsAll) {
+        const box = el('div', 'pd-acts'); box.id = 'projDocActs'
+        const picked = docsAll.filter((d) => projDocSel.has(d.id))
+        const target = picked.length ? picked : docsAll
+        box.appendChild(el('div', 'pd-lbl', picked.length ? `Mit ${picked.length} ausgewählten Dokument${picked.length === 1 ? '' : 'en'}:` : `Mit ${docsAll.length === 1 ? 'dem Dokument' : `allen ${docsAll.length} Dokumenten`}:`))
+        const btns = el('div', 'pd-btns')
+        const ask = el('button', 'mini'); ask.dataset.act = 'ask'; ask.appendChild(svg('question')); ask.appendChild(document.createTextNode(' Fragen stellen'))
+        ask.addEventListener('click', () => { const ta = $('projAsk'); ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); ta.focus() })
+        btns.appendChild(ask)
+        for (const id of PROJ_DOC_SKILLS) {
+          const sk = skillsCache.find((x) => x.id === id); if (!sk) continue
+          const b = el('button', 'mini'); b.dataset.skill = id; b.title = sk.description; b.appendChild(svg(sk.icon || 'skill')); b.appendChild(document.createTextNode(' ' + sk.name))
+          b.addEventListener('click', () => applySkillToProjectDocs(sk, target))
+          btns.appendChild(b)
+        }
+        const more = el('button', 'mini'); more.dataset.act = 'more'; more.appendChild(svg('skill')); more.appendChild(document.createTextNode(' Weitere Skills …'))
+        more.addEventListener('click', () => openSkillPicker('', (sk, params) => runProjectSkill(sk, params, target)))
+        btns.appendChild(more)
+        box.appendChild(btns)
+        return box
+      }
+      function applySkillToProjectDocs(sk, docs) {
+        if (sk.id === 'std_vergleich' && docs.length !== 2) { toast('Bitte genau zwei Fassungen auswählen (Häkchen links).', 4000); return }
+        pickSkill(sk, (s, params) => runProjectSkill(s, params, docs))
+      }
+      function runProjectSkill(sk, params, docs) {
+        const extra = $('projAsk')?.value.trim()
+        const all = docs.length === project.documentList.length && docs.length > MAX_UPLOADS
+        const text = `${sk.name}: ${all ? `alle ${docs.length} Projektdokumente` : docs.map((d) => d.name).join(', ')}${extra ? `\n${extra}` : ''}`
+        startProjectConversation(text, { skill: { id: sk.id, name: sk.name, params }, docIds: docs.map((d) => d.id) })
       }
       async function refreshProject() { if (!project) return; project = (await api('/api/projects/' + project.id)).project; fillProjectLists() }
       async function uploadToProject(fileList) {
@@ -3763,11 +3849,19 @@
         $('dlg').classList.add('show')
       }
       function renderProjectHeaderSub() { if (viewName === 'project' && project) { const sub = $('projectPage').querySelector('.page-head .sub'); if (sub) sub.textContent = [project.description, project.members.length ? `Geteilt mit ${project.members.map((m) => m.name).join(', ')}` : 'Nur für dich – über „Teilen“ für Kolleginnen und Kollegen freigeben'].filter(Boolean).join(' · ') } }
-      function startProjectConversation(text) {
+      /**
+       * Starts a project conversation. docIds: chosen project documents – up to MAX_UPLOADS go in as
+       * attachments; none (or more) leave the agent to search all project documents itself.
+       */
+      function startProjectConversation(text, { skill = null, docIds = [] } = {}) {
         const p = project
         newConversation({ keepView: true, project: { id: p.id, name: p.name, role: p.role } })
+        if (skill) pendingSkill = skill
         renderAttachments()
-        sendMessage({ text })
+        const docs = p.documentList.filter((d) => docIds.includes(d.id))
+        const projectDocs = docs.length && docs.length <= MAX_UPLOADS ? { matterId: p.matterId, ids: docs.map((d) => d.id), names: docs.map((d) => d.name) } : null
+        projDocSel.clear()
+        sendMessage({ text, projectDocs })
       }
       // Project conversations are shared: saved with the project (debounced), opened fresh from the server.
       const projectConvoTimers = new Map()
@@ -3831,20 +3925,20 @@
       // route (page to show first), menu (keep the "Hinzufügen" menu open), demoSave (show the
       // "Ergebnisse →" line with an example), nav (sidebar item: opens the drawer on phones).
       const TOUR = [
-        { chapter: 'Willkommen', title: 'Willkommen bei AI:ssociate', route: 'home', welcome: true, text: 'In etwa zwei Minuten durch alle Funktionen: Fragen stellen, Unterlagen hinzufügen, Skills, Fachagenten, Due Diligence und Akten. Mit den Pfeiltasten weiterblättern, Esc beendet die Tour.' },
+        { chapter: 'Willkommen', title: 'Willkommen bei AI:ssociate', route: 'home', welcome: true, text: 'In etwa zwei Minuten durch alle Funktionen: Fragen stellen, Unterlagen hinzufügen, Skills, Spezialagenten, Due Diligence und Projekte. Mit den Pfeiltasten weiterblättern, Esc beendet die Tour.' },
         { chapter: 'Fragen', title: 'Wissensdatenbank wählen', sel: '#kbList', route: 'home', text: '„Automatisch“ erkennt das Rechtsgebiet aus der Frage. Wer es weiß, wählt Zivil-, Straf-, Steuer- oder öffentliches Recht – beim öffentlichen Recht mit Bundesland, damit das Landesrecht passt.' },
-        { chapter: 'Fragen', title: 'Vorlagen', sel: '#homeChips', route: 'home', text: 'Häufige Aufgaben mit einem Klick: Rechtsrecherche, Versionen vergleichen und Zusammenfassen öffnen ein kurzes Formular; Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen starten die Fachagenten.' },
+        { chapter: 'Fragen', title: 'Vorlagen', sel: '#homeChips', route: 'home', text: 'Häufige Aufgaben mit einem Klick: Rechtsrecherche öffnet ein kurzes Formular; Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen starten die Spezialagenten; „Skills“ öffnet die Skill-Auswahl.' },
         { chapter: 'Fragen', title: 'Frage stellen', sel: '#composer', route: 'home', html: ['Frage eintippen und mit <b>Enter</b> senden (Umschalt + Enter für eine neue Zeile) – oder mit dem <b>Mikrofon</b> diktieren.', 'Sie sehen live, was passiert: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.', 'Folgefragen bleiben im Gespräch – auch zu bereits angehängten Dokumenten.'] },
         { chapter: 'Unterlagen', title: 'Hinzufügen', sel: '#addBtn', route: 'home', text: 'Ein Knopf für alle Unterlagen. Die Zahl daneben zeigt, wie viel gerade angehängt oder verbunden ist.' },
         { chapter: 'Unterlagen', title: 'Dateien anhängen', sel: ['#attachBtn', '#msBtn'], route: 'home', menu: true, html: ['<b>Von diesem Computer</b> – PDF, Word, Excel, Text; auch per Drag & Drop.', '<b>Aus OneDrive / SharePoint</b> – nach der Microsoft-Anmeldung direkt aus den Bibliotheken der Kanzlei.', 'Angehängte Dateien werden mit der Frage geschickt.'] },
         { chapter: 'Unterlagen', title: 'Quelle verbinden', sel: ['#folderBtn', '#matterBtn'], route: 'home', menu: true, html: ['<b>Lokaler Ordner</b> – der Assistent durchsucht ihn selbst und liest nur, was er braucht; nichts wird vorab hochgeladen.', '<b>Akt</b> – alle Dokumente eines Akts auf dem Server, auch auf anderen Geräten.', 'Zuletzt verwendete Ordner und Akten stehen darunter für einen Klick bereit.'] },
         { chapter: 'Unterlagen', title: 'Ergebnisse →', sel: '#saveLine', route: 'home', demoSave: true, text: 'Zeigt, wohin erzeugte Dateien (Word, Excel, PDF) gespeichert werden: automatisch dorthin, woher die Unterlagen kommen – in den lokalen Ordner oder nach SharePoint, nie überschreibend. Ein Klick ändert das Ziel für dieses Gespräch.' },
-        { chapter: 'Skills', title: 'Skills anwenden', sel: '#skillBtn', route: 'home', text: 'Wiederverwendbare Arbeitsanweisungen der Kanzlei – etwa Chronologie, Honorarnote oder Mandantenbrief. Hier wählen oder einfach „/“ ins Eingabefeld tippen; passende Skills wendet der Assistent auch selbst an.' },
+        { chapter: 'Skills', title: 'Skills anwenden', sel: '#skillBtn', route: 'home', text: 'Wiederverwendbare Arbeitsanweisungen – etwa Zusammenfassen, Tabellarische Übersicht (Excel oder Word), Versionen vergleichen oder Mandantenbrief. Hier wählen oder einfach „/“ ins Eingabefeld tippen; passende Skills wendet der Assistent auch selbst an.' },
         { chapter: 'Antworten', title: 'Antworten, denen Sie folgen können', route: 'home', html: ['<b>Fundstellen</b> aus der Wissensdatenbank, verlinkt ins RIS.', '<b>RIS-Prüfung</b>: jede zitierte Norm und Entscheidung wird gegen das Rechtsinformationssystem geprüft – ✓ bestätigt, ⚠ außer Kraft oder nicht gefunden.', '<b>Dateien</b> als Word, Excel oder PDF, Export der Antwort als Word.', '<b>Kosten</b> – genau ausgewiesen je Antwort.'] },
-        { chapter: 'Agenten', title: 'Fachagenten', sel: '#agentPage .wf', route: '#/agent/contract_review', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen folgen einem festen Ablauf nach österreichischem Recht: Angaben erfassen, Prüfraster bzw. Gliederung, Rechtsfragen klären, Word-Ergebnis – und der nächste Schritt per Klick.' },
+        { chapter: 'Agenten', title: 'Spezialagenten', sel: '#agentPage .wf', route: '#/agent/contract_review', text: 'Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen folgen einem festen Ablauf nach österreichischem Recht: Angaben erfassen, Prüfraster bzw. Gliederung, Rechtsfragen klären, Word-Ergebnis – und der nächste Schritt per Klick.' },
         { chapter: 'Agenten', title: 'Due Diligence', sel: '#mattersPage .page-head', route: '#/dd', text: 'Ganzen Datenraum hochladen oder aus SharePoint importieren. Jedes Dokument wird nach Prüfbereichen analysiert; jeder Befund mit Zitat und Fundstelle, Ampel, Request List und Red-Flag-Report als Word und Excel.' },
-        { chapter: 'Akten', title: 'Akten', sel: '#mattersPage .page-head', route: '#/matters', text: 'Dokumente eines Mandats an einem Ort: Fragen im Kontext des Akts, Review-Tabellen über viele Dokumente, Import aus SharePoint oder einem lokalen Ordner.' },
-        { chapter: 'Projekte', title: 'Projekte – im Team arbeiten', sel: '#projectsPage .page-head', route: '#/projects', text: 'Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Über „Teilen“ wählen Sie registrierte Kolleginnen und Kollegen aus einer Liste – mit Recht zum Bearbeiten oder nur zum Lesen. Alle Mitglieder sehen dieselben Unterhaltungen.' },
+        { chapter: 'Projekte', title: 'Projekte – im Team arbeiten', sel: '#projectsPage .page-head', route: '#/projects', text: 'Ein Projekt bündelt Anweisungen, Dokumente und Unterhaltungen. Auf die Projektdokumente wenden Sie Skills mit einem Klick an – Tabellarische Übersicht in Excel oder Word, Zusammenfassen, Versionen vergleichen – oder stellen Fragen dazu. Über „Teilen“ wählen Sie registrierte Kolleginnen und Kollegen aus einer Liste.' },
+        { chapter: 'Skills', title: 'Skills im Menü', sel: '#sbSkillsToggle', nav: true, route: 'home', text: 'Alle Skills stehen auch im Menü links – unter „Skills“ aufklappen und mit einem Klick anwenden. Darüber: der allgemeine Agent und die Spezialagenten.' },
         { chapter: 'Skills', title: 'Skill-Bibliothek', sel: '#skillsPage .page-head', route: '#/skills', text: 'Eigene Skills mit Anweisungen, Eingabefeldern und Referenzdokumenten (Muster, Playbook, Vorlage) anlegen, als JSON exportieren und im Team teilen.' },
         { chapter: 'Verlauf', title: 'Verlauf', sel: '#historyBtn', route: 'home', text: 'Alle Gespräche – auf dem Server gespeichert und auf jedem Gerät verfügbar, auf dem Sie angemeldet sind.' },
         { chapter: 'Einstellungen', title: 'Quellen & Speichern', sel: '#cardSources', route: '#/settings', text: 'Standardziele für Ergebnisse, Microsoft-365-Konto, Websuche, Budget und Sitzungskosten. Tour und Erklärvideo auch hier unter Daten & Hilfe.' },

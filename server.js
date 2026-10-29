@@ -15,7 +15,7 @@ import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, r
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
 import { agentsForClient, buildAgentTask } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
-import { BUILTIN_SKILLS, SKILL_OUTPUTS, SKILL_KB, SKILL_AREAS, SKILL_LIMITS, normalizeSkill, skillBlock, skillView } from './lib/skills.js'
+import { BUILTIN_SKILLS, SKILL_OUTPUTS, SKILL_KB, SKILL_AREAS, SKILL_LIMITS, normalizeSkill, skillBlock, skillOutput, skillView } from './lib/skills.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -899,19 +899,9 @@ const TASK_PRESETS = {
 Vorgehen: Dokument lesen (read_document) → klauselweise prüfen; strittige Rechtsfragen gebündelt in EINEM ask_aissociate-Aufruf klären → für jede problematische Stelle eine konkrete, klausel-spezifische Anmerkung (Problem, Risiko, Verbesserungsvorschlag) → ${/word|kommentar/i.test(output || 'Kommentare') ? 'mit create_or_edit_file die Kommentare als echte Word-Kommentare (Autor AI:ssociate) an genau diesen Absätzen einfügen (Mapping Absatztext → Kommentartext wörtlich in task übergeben) und die kommentierte .docx zurückgeben' : /excel|tabelle/i.test(output) ? 'mit create_or_edit_file eine Excel-Risikotabelle (Klausel, Zitat, Risiko, Ampel, Empfehlung) erzeugen' : 'ein strukturiertes Prüfmemo verfassen'} → Antwort mit Ampel-Übersicht der wichtigsten Risiken.`,
     forceMode: 'document',
   }),
-  compare: ({ notes }) => ({
-    text: `Dokumentvergleich der hochgeladenen Versionen (Delta-Ansicht + Zusammenfassung)${notes ? `\nHinweise: ${notes}` : ''}`,
-    extra: `AUFGABE: Vergleiche die zwei hochgeladenen Dokumentversionen. Lies beide (read_document). Erzeuge mit create_or_edit_file (1) delta.html mit rot/grün-Hervorhebung und (2) delta.docx (Zusätze grün, Streichungen rot durchgestrichen). Antworte mit einer juristisch bewerteten Zusammenfassung der wesentlichen Änderungen (was hat sich materiell geändert, Risiko für welche Seite).`,
-    forceMode: 'document',
-  }),
   draft: ({ doc_type, parties, facts, extra }) => ({
     text: `Entwurf: ${doc_type || 'Dokument'}${parties ? ` – Parteien: ${parties}` : ''}\nSachverhalt/Vorgaben: ${facts || '–'}${extra ? `\nWeitere Vorgaben: ${extra}` : ''}`,
     extra: `AUFGABE: Entwurf eines Dokuments vom Typ „${doc_type || 'Schriftstück'}“ nach österreichischem Recht. Parteien: ${parties || 'siehe Sachverhalt'}. Kläre Formerfordernisse, Zuständigkeit, Fristen und zwingende Inhalte in EINEM ask_aissociate-Aufruf. Dann den vollständigen Text ausformulieren (Struktur, Rubrum/Überschriften, Klauseln, Platzhalter in eckigen Klammern für fehlende Daten) und mit create_or_edit_file als .docx (sauber formatiert) ausgeben. In der Antwort: Aufbau, getroffene Annahmen, Prüfpunkte für die Anwältin.`,
-    forceMode: 'document',
-  }),
-  summary: ({ style, question }) => ({
-    text: `Zusammenfassung (${style || 'Memo'}) der hochgeladenen Datei(en)${question ? ` – Schwerpunkt: ${question}` : ''}`,
-    extra: `AUFGABE: Fasse die hochgeladenen Dokumente zusammen. Stil: ${style || 'juristisches Memo (Sachverhalt, rechtliche Würdigung, Fazit)'}. ${question ? `Schwerpunkt: ${question}.` : ''} Zuerst lesen (read_document). Konkrete Fakten, Daten, Beträge, Fristen und Parteien wiedergeben; keine Floskeln. ask_aissociate nur, wenn eine rechtliche Würdigung verlangt ist.`,
     forceMode: 'document',
   }),
 }
@@ -2169,7 +2159,7 @@ app.post('/api/chat', async (req, res) => {
     try { matterReq = await store.getMatter(body.matterId) } catch { matterReq = null }
     if (!(await matterRole(matterReq, req))) return res.status(404).json({ error: 'Akt nicht gefunden.' })
     const ids = new Set((Array.isArray(body.matterDocIds) ? body.matterDocIds : []).map(String))
-    matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
+    matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['new', 'extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
   }
   const job = newJob(jobId)
   job.owner = ownerOf(req)
@@ -2601,6 +2591,7 @@ app.post('/api/chat', async (req, res) => {
   /** Loads a skill's reference documents, hands matching templates to the sandbox and builds its prompt block. */
   async function prepareSkill(run) {
     const sk = run.skill
+    const out = skillOutput(sk, run.params)
     const sid = step('skill', `Skill: ${sk.name}${run.auto ? ' (automatisch gewählt)' : ''}`)
     const refs = []
     for (const f of sk.files || []) {
@@ -2608,13 +2599,13 @@ app.post('/api/chat', async (req, res) => {
       refs.push({ name: f.name, text })
       // A Word/Excel reference of a skill that produces that format is a template: it goes to the sandbox.
       const ext = (f.name.split('.').pop() || '').toLowerCase()
-      if ((sk.output === 'docx' && ext === 'docx') || (sk.output === 'xlsx' && ext === 'xlsx')) {
+      if ((out === 'docx' && ext === 'docx') || (out === 'xlsx' && ext === 'xlsx')) {
         const buf = await store.getFile(sk.id, f.file)
         if (buf && uploads.length < MAX_UPLOADS) { const n = sanitizeName('Vorlage_' + f.name); if (!uploads.some((u) => u.name === n)) { uploads.push({ name: n, buf }); uploadTexts.set(n, { text, template: true }); if (sandboxReady) { await sandbox.files.write(`${WORKDIR}/${n}`, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)); try { for (const e of await sandbox.files.list(WORKDIR)) if (e.name === n) before.set(e.path, e.size) } catch {} } } }
       }
     }
     run.block = skillBlock(sk, run.params, refs)
-    stepDone(sid, { detail: [sk.builtin ? 'Standard-Skill' : 'Kanzlei-Skill', refs.length ? `${refs.length} Referenzdokument${refs.length > 1 ? 'e' : ''}` : '', { docx: 'Ergebnis: Word', xlsx: 'Ergebnis: Excel', answer: 'Ergebnis: Antwort' }[sk.output] || ''].filter(Boolean).join(' · ') })
+    stepDone(sid, { detail: [sk.builtin ? 'Standard-Skill' : 'Kanzlei-Skill', refs.length ? `${refs.length} Referenzdokument${refs.length > 1 ? 'e' : ''}` : '', { docx: 'Ergebnis: Word', xlsx: 'Ergebnis: Excel', answer: 'Ergebnis: Antwort' }[out] || ''].filter(Boolean).join(' · ') })
     if (!sk.builtin) { sk.uses = (sk.uses || 0) + 1; store.saveSkill(sk).catch(() => {}) }
   }
 
@@ -2690,13 +2681,13 @@ app.post('/api/chat', async (req, res) => {
       matterCtx = matterContext(matterReq, 60_000)
       for (const d of matterDocs) {
         if (uploads.length >= MAX_UPLOADS || uploads.some((u) => u.name === d.name)) continue
-        const text = await store.getText(matterReq.id, d.id)
+        const text = await aktText(d) // text of freshly uploaded (project) documents is extracted now
         const buf = d.file ? await store.getFile(matterReq.id, d.file) : null
         if (!text || !buf) continue
         uploads.push({ name: d.name, buf })
         uploadTexts.set(d.name, { text, pages: d.pages })
       }
-      stepDone(sid, { detail: `${matterReq.documents.length} Dokumente, ${matterReq.findings.length} Befunde${matterDocs.length ? ` · ${matterDocs.length} Dokument${matterDocs.length > 1 ? 'e' : ''} angehängt` : ''}` })
+      stepDone(sid, { detail: `${matterReq.documents.length} Dokumente${matterReq.projectId ? '' : `, ${matterReq.findings.length} Befunde`}${matterDocs.length ? ` · ${matterDocs.length} Dokument${matterDocs.length > 1 ? 'e' : ''} angehängt` : ''}` })
     }
     // A folder the agent searches itself: the local folder of the browser, else all documents of the Akt (none picked).
     if (folderReq) filesSrc = { kind: 'local', name: folderReq.name, count: folderReq.count }
@@ -2760,7 +2751,8 @@ app.post('/api/chat', async (req, res) => {
     }
     if (skillRun) {
       const sk = skillRun.skill
-      if (sk.output === 'docx' || sk.output === 'xlsx') plan.mode = 'document'
+      const out = skillOutput(sk, skillRun.params)
+      if (out === 'docx' || out === 'xlsx') plan.mode = 'document'
       if (sk.kb === 'never') kbAllowed = false
       if (sk.kb === 'always' && plan.mode !== 'general') { plan.difficulty = 'hard'; if (!plan.questions.length) plan.questions = [prompt.slice(0, 1200)] }
       if (sk.legalArea && sk.legalArea !== 'auto' && !pickedArea) { plan.legal_area = sk.legalArea; if (sk.legalArea !== 'public') plan.scope = '' }
