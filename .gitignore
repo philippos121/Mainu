@@ -16,3 +16,7 @@ tools/video/frames.txt
 tools/video/subs.srt
 tools/video/*.onnx*
 tools/video/voice.tgz
+
+tools/video/venv/
+tools/video/tts_models--*/
+tools/video/vits.zip

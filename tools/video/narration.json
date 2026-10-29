@@ -3,7 +3,7 @@
   "id": "intro",
   "chapter": "Überblick",
   "text": "AI:ssociate Playground – juristische KI für österreichisches Recht. In wenigen Minuten zeigen wir Ihnen die wichtigsten Funktionen.",
-  "tts": "Essouschi-eit Plejgraund: juristische Ka-I für österreichisches Recht. In wenigen Minuten zeigen wir Ihnen die wichtigsten Funktionen."
+  "tts": "Essouschi-ejt Plejgraund: juristische Ka-I für österreichisches Recht. In wenigen Minuten zeigen wir Ihnen die wichtigsten Funktionen."
  },
  {
   "id": "kb",
@@ -33,7 +33,7 @@
   "id": "add",
   "chapter": "Unterlagen",
   "text": "Unterlagen kommen über einen einzigen Knopf: Hinzufügen. „Dateien anhängen“ schickt sie mit der Frage mit – vom Computer oder direkt aus OneDrive und SharePoint. „Quelle verbinden“ heißt: Der Assistent sucht selbst, in einem lokalen Ordner oder in einem Akt.",
-  "tts": "Unterlagen kommen über einen einzigen Knopf: Hinzufügen. Dateien anhängen schickt sie mit der Frage mit, vom Computer oder direkt aus Wandreif und Schärpoint. Quelle verbinden heißt: Der Assistent sucht selbst, in einem lokalen Ordner oder in einem Akt."
+  "tts": "Unterlagen kommen über einen einzigen Knopf: Hinzufügen. Dateien anhängen schickt sie mit der Frage mit, vom Computer oder direkt aus Wan-Dreif und Schärpoint. Quelle verbinden heißt: Der Assistent sucht selbst, in einem lokalen Ordner oder in einem Akt."
  },
  {
   "id": "folder",
@@ -57,7 +57,7 @@
   "id": "dd",
   "chapter": "Due Diligence",
   "text": "Die Due Diligence analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel; dazu kommen Request List und Red-Flag-Report als Word und Excel.",
-  "tts": "Die Dschuh Dilidschens analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel. Dazu kommen Riekwest-List und Rett-Fläg-Riport, als Wörd und Exel."
+  "tts": "Die Dschuh Dilidschens analysiert ganze Datenräume. Jeder Befund steht mit Zitat und Fundstelle in der Ampel. Dazu kommen Riekwest-List und Red Fläg Riport, als Wörd und Ecksel."
  },
  {
   "id": "matters",
@@ -69,6 +69,6 @@
   "id": "outro",
   "chapter": "Akten & Einstellungen",
   "text": "Die Feature-Tour unter „Einstellungen → Daten & Hilfe“ führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit AI:ssociate!",
-  "tts": "Die Fietscha-Tur unter Einstellungen, Daten und Hilfe, führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit Essouschi-eit!"
+  "tts": "Die Fietscha-Tur unter Einstellungen, Daten und Hilfe, führt Sie jederzeit Schritt für Schritt durch alle Funktionen. Viel Erfolg mit Essouschi-ejt!"
  }
 ]

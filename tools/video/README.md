@@ -4,13 +4,20 @@ Reproducible pipeline for the explainer video shown under Einstellungen → Date
 in the tour and in the welcome banner. Run it again after visible UI changes.
 
 1. **Narration** – `narration.json` holds per scene the caption text (`text`) and a
-   phonetic variant for the speech engine (`tts`, e.g. "Essouschi-eit" for AI:ssociate).
-   Offline German voice: [Piper](https://github.com/rhasspy/piper) with
-   `voice-de-thorsten-low` (GitHub release v0.0.2):
+   phonetic variant for the speech engine (`tts`, e.g. "Essouschi-ejt" for AI:ssociate,
+   "Schärpoint", "Ecksel"). Voice: Coqui TTS with the German Thorsten VITS model (22 kHz,
+   from the coqui-ai/TTS GitHub release `v0.7.0_models`). `tts_coqui.py` also fixes words
+   the gruut grapheme-to-phoneme guesser gets wrong (`PRON`); check new texts with
+   `--phonemes` before rendering.
 
-       pip install piper-tts
-       curl -L -o voice.tgz https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-de-thorsten-low.tar.gz && tar -xzf voice.tgz
-       mkdir -p audio && python3 tts.py de-thorsten-low.onnx      # → audio/*.wav, audio/durations.json
+       python3 -m venv venv && venv/bin/pip install coqui-tts torch torchaudio torchcodec "gruut[de]"
+       curl -L -o vits.zip https://github.com/coqui-ai/TTS/releases/download/v0.7.0_models/tts_models--de--thorsten--vits.zip && unzip vits.zip
+       mkdir -p audio && venv/bin/python tts_coqui.py tts_models--de--thorsten--vits --phonemes   # review
+       venv/bin/python tts_coqui.py tts_models--de--thorsten--vits                                # → audio/*.wav, audio/durations.json
+
+   `tts.py` (Piper, `voice-de-thorsten-low`) is the older, lighter fallback. For an Austrian
+   studio-quality voice use a cloud service (e.g. Azure AI Speech `de-AT-JonasNeural` /
+   `de-AT-IngridNeural`) and write the clips to `audio/` with the same file names.
 
 2. **Recording** – `node record.cjs` starts `server.js` against the demo backends in
    `mocks.cjs` (model, AI:ssociate and RIS with fixed, legally checked texts), seeds a due

@@ -46,7 +46,7 @@ const args = ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe
 scenes.forEach((s) => args.push('-i', path.join(DIR, 'audio', s.id + '.wav')))
 args.push('-i', path.join(DIR, 'subs.srt'))
 const filt = scenes.map((s, i) => `[${i + 1}:a]aresample=48000,adelay=${Math.round(s.at * 1000)}:all=1[a${i}]`).join(';') +
-  `;${scenes.map((_, i) => `[a${i}]`).join('')}amix=inputs=${scenes.length}:normalize=0,highpass=f=70,acompressor=threshold=0.25:ratio=2.5:attack=10:release=200,volume=1.5,alimiter=limit=0.89:level=false,apad,atrim=0:${total.toFixed(2)}[aout]` +
+  `;${scenes.map((_, i) => `[a${i}]`).join('')}amix=inputs=${scenes.length}:normalize=0,highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,apad,atrim=0:${total.toFixed(2)}[aout]` +
   `;[0:v]fps=30,scale=1920:1080:flags=lanczos,format=yuv420p[vout]`
 args.push('-filter_complex', filt, '-map', '[vout]', '-map', '[aout]', '-map', `${scenes.length + 1}:s`,
   '-c:v', 'libx264', '-preset', 'slow', '-crf', '24', '-tune', 'stillimage', '-g', '60',
