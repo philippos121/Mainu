@@ -26,7 +26,9 @@ in the tour and in the welcome banner. Run it again after visible UI changes.
    sandbox (`SANDBOX=local`, needs python-docx and openpyxl), so the Word comments, Excel
    files and letters in the video are real. It seeds accounts, a due diligence, two Akten
    and a shared project, drives the real UI with Playwright (visible cursor, highlights,
-   chapter labels) and captures 1080p frames via the Chrome screencast. Each scene lasts at
+   chapter labels) and captures 1080p frames via the Chrome screencast. Headless Chromium has
+   no microphone, so a scripted speech engine replaces `SpeechRecognition` for the dictation
+   scene (the app's own formatting turns "Komma" into "," and "Paragraf" into §). Each scene lasts at
    least as long as its narration clip.
 
 3. **Assembly** – `node build.cjs` (needs ffmpeg with libass and the Inter font) writes

@@ -144,6 +144,17 @@ async function docx(paragraphs) {
   await ctx.addInitScript(([owner]) => { try { localStorage.setItem('aiss.owner.v1', owner); localStorage.setItem('aiss.tourSeen.v3', '1') } catch {} }, [OWNER])
   { const [k, v] = jar.maria.split('='); await ctx.addCookies([{ name: k, value: v, domain: '127.0.0.1', path: '/' }]) }
   await ctx.addInitScript(OVERLAY)
+  // headless Chromium has no microphone: a scripted speech engine plays the dictation (the app's own formatting runs on it)
+  await ctx.addInitScript(() => {
+    class DemoRec {
+      constructor() { this.results = []; window.__rec = this }
+      start() { this.running = true }
+      stop() { this.abort() }
+      abort() { if (!this.running) return; this.running = false; setTimeout(() => this.onend && this.onend(), 10) }
+      say(t, final) { const alt = [{ transcript: t }]; alt.isFinal = final; const i = this.results.length; this.results.push(alt); this.onresult && this.onresult({ resultIndex: i, results: this.results }); this.results = this.results.filter((r) => r.isFinal) }
+    }
+    window.SpeechRecognition = window.webkitSpeechRecognition = DemoRec
+  })
   const page = await ctx.newPage()
   page.on('pageerror', (e) => console.log('pageerror', e.message))
   await page.goto(BASE + '/api/ms/login', { waitUntil: 'networkidle' }) // demo Entra login → back with ?ms=connected
@@ -215,11 +226,29 @@ async function docx(paragraphs) {
     await moveTo('#homeChips button >> nth=0', { ms: 500 }); await sleep(500)
     await moveTo('#homeChips button >> nth=4', { ms: 700 })
   })
+  await scene('dictate', async (at) => {
+    await spot(null)
+    await click('#dictBtn')
+    await page.waitForSelector('#dlg.show')
+    await spot('#dlgCard')
+    await sleep(1600)
+    await click('#dlg .modal-actions .btn:not(.ghost)')
+    await spot('#composer')
+    await sleep(500)
+    // words arrive as the engine hears them; each finished phrase is formatted ("Komma" → ",", "Paragraf" → "§")
+    const speak = async (words, pace = 260) => {
+      for (let i = 1; i <= words.length; i++) { await page.evaluate((t) => window.__rec.say(t, false), words.slice(0, i).join(' ')); await sleep(pace + Math.random() * 120) }
+      await sleep(350); await page.evaluate((t) => window.__rec.say(t, true), words.join(' '))
+    }
+    await speak('Wann verjähren Schadenersatzansprüche nach Paragraf 1489 ABGB Komma'.split(' '))
+    await sleep(700)
+    await speak('und ab wann läuft die Frist Fragezeichen'.split(' '))
+    await at(0.92)
+    await click('#dictBtn')
+  })
   await scene('ask', async (at) => {
     await spot(null)
-    await click('#input')
-    await type('Wann verjähren Schadenersatzansprüche nach österreichischem Recht?')
-    await sleep(300); await page.keyboard.press('Enter')
+    await click('#sendBtn')
     await moveTo('#messages', { dy: 40, ms: 500 })
     await at(0.5)
     await spot('.msg-ai .steps')

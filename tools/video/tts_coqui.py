@@ -11,6 +11,7 @@ PRON = {
     'hochgeladen': 'hoch-geladen', 'Eingabefeld': 'Eingabe-Feld', 'Rechtsgebiet': 'Rechts-Gebit',
     'Rechtsinformationssystem': 'Rechts-Informations-System', 'Fundstelle': 'Fund-Stelle', 'Fundstellen': 'Fund-Stellen',
     'Unterlagen': 'Unter-Lagen', 'Unterhaltungen': 'Unter-Haltungen', 'Unterhaltung': 'Unter-Haltung', 'Bearbeiten': 'be-arbeiten', 'Kündigungsschreiben': 'Kündigungs-Schreiben', 'Wertsicherungsklausel': 'Wert-Sicherungs-Klausel', 'Fachagenten': 'Fach-Agenten', 'österreichisches': 'öster-reichisches', 'österreichischem': 'öster-reichischem',
+    'diktieren': 'diktiren', 'einmal': 'ainmal', 'Satzzeichen': 'Satz-Zeichen', 'Paragraf': 'Paragraaf', 'Paragrafenzeichen': 'Para-Graafen-Zeichen',
 }
 def fix(t):
     for a, b in PRON.items(): t = re.sub(r'(?<![\w-])' + re.escape(a) + r'(?![\w-])', b, t)

@@ -86,8 +86,8 @@ function modelServer() {
       const doc = /Kündigung|Wertsicherung|Haftungsklausel/.test(ask)
       const title = /Wertsicherung/.test(ask) ? 'Wertsicherung kommentiert + Übersicht' : /Haftungsklausel/.test(ask) ? 'Haftungsklausel Liefervertrag' : 'Kündigungsschreiben Neubaugasse 12'
       output = [msg(JSON.stringify(doc
-        ? { mode: 'document', legal_area: 'civil', scope: '', questions: [], difficulty: 'easy', needs_document_context: false, skill: '', title }
-        : { mode: 'legal', legal_area: 'civil', scope: '', questions: ['Wann verjähren Schadenersatzansprüche nach österreichischem Recht?'], difficulty: 'hard', needs_document_context: false, skill: '', title: 'Verjährung von Schadenersatzansprüchen' }))]
+        ? { mode: 'document', legal_area: 'civil', scope: '', questions: [], difficulty: 'easy', needs_document_context: false, skill: '', jurisdiction: 'AT', title }
+        : { mode: 'legal', legal_area: 'civil', scope: '', questions: ['Wann verjähren Schadenersatzansprüche nach österreichischem Recht?'], difficulty: 'hard', needs_document_context: false, skill: '', jurisdiction: 'AT', title: 'Verjährung von Schadenersatzansprüchen' }))]
     } else if (/einfache Rechtsfrage direkt/.test(instr)) {
       output = [{ type: 'web_search_call', id: 'ws_e', status: 'completed', action: { type: 'search', query: 'Befristung Geschäftsraummiete § 29 MRG' } }, msg('**Kurzantwort**\n\nEine Befristung ist nach § 29 MRG nur durchsetzbar, wenn sie schriftlich vereinbart wurde; für Geschäftsräumlichkeiten gilt keine Mindestdauer.', [{ type: 'url_citation', url: 'https://www.ris.bka.gv.at/eli/bgbl/1981/520/P29', title: 'RIS – § 29 MRG', start_index: 0, end_index: 5 }])]
     } else if (/Du schreibst EIN vollständiges Python-Skript/.test(instr)) {

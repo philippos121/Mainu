@@ -18,14 +18,20 @@
   "tts": "Darunter liegen Vorlagen für häufige Aufgaben, von der Rechtsrecherche bis zum Schriftsatz."
  },
  {
+  "id": "dictate",
+  "chapter": "Diktat",
+  "text": "Fragen können Sie auch diktieren: Mikrofon antippen, einmal zustimmen und sprechen. Gesprochene Satzzeichen wie „Komma“ oder „Fragezeichen“ werden umgesetzt, und aus dem gesprochenen „Paragraf“ wird das Zeichen §.",
+  "tts": "Fragen können Sie auch diktieren: Mikrofon antippen, einmal zustimmen, und sprechen. Gesprochene Satzzeichen wie Komma oder Fragezeichen werden umgesetzt, und aus dem gesprochenen Wort Paragraf wird das Paragrafenzeichen."
+ },
+ {
   "id": "ask",
-  "chapter": "Fragen",
-  "text": "Stellen wir eine Frage. Während die Antwort entsteht, sehen Sie jeden Schritt: das Rechtsgebiet, die Anfrage an die Wissensdatenbank und die Prüfung der Fundstellen.",
-  "tts": "Stellen wir eine Frage. Während die Antwort entsteht, sehen Sie jeden Schritt: das Rechtsgebiet, die Anfrage an die Wissensdatenbank, und die Prüfung der Fundstellen."
+  "chapter": "Antwort & Quellen",
+  "text": "Abschicken – während die Antwort entsteht, sehen Sie jeden Schritt: das Rechtsgebiet, die Anfrage an die Wissensdatenbank und die Prüfung der Fundstellen.",
+  "tts": "Abschicken. Während die Antwort entsteht, sehen Sie jeden Schritt: das Rechtsgebiet, die Anfrage an die Wissensdatenbank, und die Prüfung der Fundstellen."
  },
  {
   "id": "answer",
-  "chapter": "Fragen",
+  "chapter": "Antwort & Quellen",
   "text": "Die Antwort nennt ihre Fundstellen. Jede zitierte Norm wird automatisch im Rechtsinformationssystem des Bundes geprüft – der grüne Haken heißt: im RIS bestätigt. Die Antwort lässt sich als Word exportieren; die Kosten stehen direkt darunter.",
   "tts": "Die Antwort nennt ihre Fundstellen. Jede zitierte Norm wird automatisch im Rechtsinformationssystem des Bundes geprüft. Der grüne Haken heißt: im Ries bestätigt. Die Antwort lässt sich als Wörd exportieren, die Kosten stehen direkt darunter."
  },
