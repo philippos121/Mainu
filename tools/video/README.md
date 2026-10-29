@@ -3,21 +3,13 @@
 Reproducible pipeline for the explainer video shown under Einstellungen → Daten & Hilfe,
 in the tour and in the welcome banner. Run it again after visible UI changes.
 
-1. **Narration** – `narration.json` holds per scene the caption text (`text`) and a
-   phonetic variant for the speech engine (`tts`, e.g. "Essouschi-ejt" for AI:ssociate,
-   "Schärpoint", "Ecksel"). Voice: Coqui TTS with the German Thorsten VITS model (22 kHz,
-   from the coqui-ai/TTS GitHub release `v0.7.0_models`). `tts_coqui.py` also fixes words
-   the gruut grapheme-to-phoneme guesser gets wrong (`PRON`); check new texts with
-   `--phonemes` before rendering.
+The video has no sound: each scene opens with a white slide (chapter, title, one or two
+short sentences), then shows the real UI.
 
-       python3 -m venv venv && venv/bin/pip install coqui-tts torch torchaudio torchcodec "gruut[de]"
-       curl -L -o vits.zip https://github.com/coqui-ai/TTS/releases/download/v0.7.0_models/tts_models--de--thorsten--vits.zip && unzip vits.zip
-       mkdir -p audio && venv/bin/python tts_coqui.py tts_models--de--thorsten--vits --phonemes   # review
-       venv/bin/python tts_coqui.py tts_models--de--thorsten--vits                                # → audio/*.wav, audio/durations.json
-
-   `tts.py` (Piper, `voice-de-thorsten-low`) is the older, lighter fallback. For an Austrian
-   studio-quality voice use a cloud service (e.g. Azure AI Speech `de-AT-JonasNeural` /
-   `de-AT-IngridNeural`) and write the clips to `audio/` with the same file names.
+1. **Scenes** – `scenes.json` holds per scene the chapter, the slide's `title` and `text`,
+   and `dur`, the planned length of the screen part in seconds (actions are spread over it;
+   a scene that waits for a result runs longer). `slide: false` skips the slide (the scene
+   continues the previous one). A slide stays up for about 1 s plus 0.22 s per word.
 
 2. **Recording** – `LOCAL_SANDBOX_PYTHON=python3 node record.cjs` starts `server.js` against the
    demo backends in `mocks.cjs`: model (incl. a "code model" that writes real python-docx /
@@ -26,15 +18,12 @@ in the tour and in the welcome banner. Run it again after visible UI changes.
    sandbox (`SANDBOX=local`, needs python-docx and openpyxl), so the Word comments, Excel
    files and letters in the video are real. It seeds accounts, a due diligence, two Akten
    and a shared project, drives the real UI with Playwright (visible cursor, highlights,
-   chapter labels) and captures 1080p frames via the Chrome screencast. Headless Chromium has
+   text slides) and captures 1080p frames via the Chrome screencast. Headless Chromium has
    no microphone, so a scripted speech engine replaces `SpeechRecognition` for the dictation
-   scene (the app's own formatting turns "Komma" into "," and "Paragraf" into §). Each scene lasts at
-   least as long as its narration clip.
+   scene.
 
-3. **Assembly** – `node build.cjs` (needs ffmpeg with libass and the Inter font) writes
-   `out/erklaervideo.mp4` (1920×1200: the 1080p picture plus a 120 px band in which the
-   captions are burned in, centred), `out/erklaervideo.jpg` (poster),
-   `out/erklaervideo.vtt` and `out/chapters.json`.
+3. **Assembly** – `node build.cjs` (needs ffmpeg) writes `out/erklaervideo.mp4` (1920×1080,
+   no audio track), `out/erklaervideo.jpg` (poster: the title slide) and `out/chapters.json`.
 
 4. Copy `out/erklaervideo.{mp4,jpg}` to `public/media/` and update `VIDEO_CHAPTERS` in
    `public/index.html` from `out/chapters.json`. The app shows the video buttons only when

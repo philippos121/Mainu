@@ -1,5 +1,5 @@
 // Records the explainer video: real server.js + UI against demo backends, CDP screencast frames,
-// scenes paced by the narration clips. Writes frames/ and timeline.json.
+// each scene opens with a white text slide (scenes.json). Writes frames/ and timeline.json.
 const { chromium } = require('playwright')
 const { spawn } = require('child_process')
 const fs = require('fs')
@@ -10,8 +10,9 @@ const { Document, Packer, Paragraph } = require(path.join(ROOT, 'node_modules/do
 
 const DIR = __dirname
 const FRAMES = path.join(DIR, 'frames')
-const DUR = JSON.parse(fs.readFileSync(path.join(DIR, 'audio/durations.json'), 'utf8'))
-const NARR = JSON.parse(fs.readFileSync(path.join(DIR, 'narration.json'), 'utf8'))
+const SCENES = JSON.parse(fs.readFileSync(path.join(DIR, 'scenes.json'), 'utf8'))
+// reading time of a slide: a short pause plus ~0.22 s per word (title and text); slide: false = none
+const readTime = (s) => Math.max(3, 1.0 + (s.title + ' ' + s.text).split(/\s+/).length * 0.22)
 const PORT = 3950, BASE = `http://127.0.0.1:${PORT}`
 const OWNER = 'w_demo0000000000000000000000000001'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -26,16 +27,13 @@ const OVERLAY = () => {
       .demo-ripple { position: fixed; z-index: 99999; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 3px solid rgba(243,146,0,.9); pointer-events: none; animation: demoRip .5s ease-out forwards; }
       @keyframes demoRip { from { transform: scale(.3); opacity: 1 } to { transform: scale(1.6); opacity: 0 } }
       #demoSpot { position: fixed; z-index: 99990; pointer-events: none; border-radius: 12px; box-shadow: 0 0 0 3px rgba(243,146,0,.95), 0 0 0 9999px rgba(14,37,46,.42); opacity: 0; transition: opacity .35s, left .4s ease, top .4s ease, width .4s ease, height .4s ease; }
-      #demoPill { position: fixed; z-index: 99995; right: 22px; top: 68px; transform: translate(0, -8px); background: #0e3c46; color: #fff; font: 700 13px/1 'Plus Jakarta Sans', system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 9px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(14,37,46,.3); opacity: 0; transition: opacity .35s, transform .35s; pointer-events: none; }
-      #demoPill b { color: #f39200; margin-right: 8px; }
-      #demoPill.show { opacity: 1; transform: translate(0, 0); }
-      #demoCard { position: fixed; inset: 0; z-index: 99998; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; background: radial-gradient(1200px 600px at 50% 40%, #13606c 0%, #0e3c46 55%, #0a2a31 100%); color: #fff; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; text-align: center; opacity: 0; transition: opacity .6s; pointer-events: none; }
-      #demoCard.show { opacity: 1; }
-      #demoCard .logo { background: #fff; border-radius: 18px; padding: 18px 28px; box-shadow: 0 18px 50px rgba(0,0,0,.25); }
-      #demoCard .logo img { height: 54px; display: block; }
-      #demoCard h1 { margin: 6px 0 0; font-size: 40px; font-weight: 800; letter-spacing: -.01em; }
-      #demoCard p { margin: 0; font-size: 19px; color: rgba(255,255,255,.82); max-width: 760px; line-height: 1.45; }
-      #demoCard .tag { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #f39200; font-weight: 800; }
+      #demoSlide { position: fixed; inset: 0; z-index: 100002; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 0 120px; background: #fff; text-align: center; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; opacity: 0; transition: opacity .45s; pointer-events: none; }
+      #demoSlide.show { opacity: 1; }
+      #demoSlide .logo img { height: 58px; display: block; margin-bottom: 14px; }
+      #demoSlide .ch { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: #f39200; font-weight: 800; }
+      #demoSlide h1 { margin: 0; font-size: 40px; line-height: 1.15; font-weight: 800; letter-spacing: -.01em; color: #0e3c46; }
+      #demoSlide .bar { width: 56px; height: 4px; border-radius: 2px; background: #f39200; }
+      #demoSlide p { margin: 0; max-width: 820px; font-size: 22px; line-height: 1.5; color: #3d5359; }
     `
     document.head.appendChild(st)
     const cur = document.createElement('div'); cur.id = 'demoCursor'
@@ -46,9 +44,8 @@ const OVERLAY = () => {
     const ripple = (x, y) => { const r = document.createElement('div'); r.className = 'demo-ripple'; r.style.left = x + 'px'; r.style.top = y + 'px'; document.body.appendChild(r); setTimeout(() => r.remove(), 600) }
     document.addEventListener('mousedown', (e) => ripple(e.clientX, e.clientY), true)
     const spot = document.createElement('div'); spot.id = 'demoSpot'; document.body.appendChild(spot)
-    const pill = document.createElement('div'); pill.id = 'demoPill'; document.body.appendChild(pill)
-    const card = document.createElement('div'); card.id = 'demoCard'; document.body.appendChild(card)
-    let spotSel = null, pillT = 0, shown = false
+    const slide = document.createElement('div'); slide.id = 'demoSlide'; document.body.appendChild(slide)
+    let spotSel = null, shown = false
     const loop = () => {
       const els = spotSel ? [].concat(spotSel).map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent !== null) : []
       if (els.length) {
@@ -67,9 +64,8 @@ const OVERLAY = () => {
     window.__demo = {
       ripple,
       spot(sel) { spotSel = sel },
-      pill(no, text) { pill.innerHTML = `<b>${no}</b>${text}`; pill.classList.add('show'); clearTimeout(pillT); pillT = setTimeout(() => pill.classList.remove('show'), 3200) },
-      card(html) { card.innerHTML = html; card.classList.add('show') },
-      hideCard() { card.classList.remove('show') },
+      slide(s) { const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]); slide.innerHTML = (s.logo ? '<div class="logo"><img src="/aissociate-logo.png" alt=""></div>' : `<div class="ch">${esc(s.chapter)}</div>`) + `<h1>${esc(s.title)}</h1><div class="bar"></div><p>${esc(s.text)}</p>`; slide.classList.add('show') },
+      hideSlide() { slide.classList.remove('show') },
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot()
@@ -163,7 +159,7 @@ async function docx(paragraphs) {
   page.on('pageerror', (e) => console.log('pageerror', e.message))
   await page.goto(BASE + '/api/ms/login', { waitUntil: 'networkidle' }) // demo Entra login → back with ?ms=connected
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.evaluate(() => window.__demo.card(`<div class="logo"><img src="/aissociate-logo.png" alt=""></div><div class="tag">Playground</div><h1>Die Funktionen im Überblick</h1><p>Juristische KI für österreichisches Recht – Recherche, Dokumente, Spezialagenten und Due Diligence.</p>`))
+  await page.evaluate((s) => window.__demo.slide({ ...s, logo: true }), SCENES[0])
   await sleep(900)
 
   const frames = []
@@ -198,25 +194,30 @@ async function docx(paragraphs) {
   const timeline = []
   let sceneNo = 0
   async function scene(id, fn) {
-    const s = NARR.find((x) => x.id === id)
+    const s = SCENES.find((x) => x.id === id)
+    const cardStart = now()
+    // the text slide first (the intro slide is already up), then the screen scene
+    if (s.slide !== false) {
+      if (id !== 'intro') { await page.evaluate((x) => window.__demo.slide(x), { ...s, logo: id === 'outro' }); await sleep(450) }
+      await sleep(readTime(s) * 1000)
+      if (id !== 'outro') { await page.evaluate(() => window.__demo.hideSlide()); await sleep(450) }
+    }
     const start = now()
-    timeline.push({ id, start: start - t0, dur: DUR[id], chapter: s.chapter, text: s.text })
-    const at = async (frac) => { const t = start + DUR[id] * frac - now(); if (t > 0) await sleep(t * 1000) }
+    timeline.push({ id, start: cardStart - t0, chapter: s.chapter, title: s.title })
+    const at = async (frac) => { const t = start + s.dur * frac - now(); if (t > 0) await sleep(t * 1000) }
     await fn(at)
-    const rest = start + DUR[id] + 0.8 - now()
+    const rest = start + s.dur + 0.6 - now()
     if (rest > 0) await sleep(rest * 1000)
-    else console.log(`scene ${id} ran ${(-rest).toFixed(1)}s past its narration`)
+    else if (s.dur) console.log(`scene ${id} ran ${(-rest).toFixed(1)}s past its planned ${s.dur}s`)
     sceneNo++
   }
   const tagPanel = (title, id) => page.evaluate(([t, i]) => { const ps = [...document.querySelectorAll('.msg-ai .panel')].filter((p) => (p.querySelector('.panel-title')?.textContent || '').startsWith(t)); const p = ps.at(-1); if (p) { p.id = i; p.scrollIntoView({ block: 'center' }) } return Boolean(p) }, [title, id])
-  const pill = (no, text) => page.evaluate(([a, b]) => window.__demo.pill(a, b), [no, text])
 
   // ---- scenes ----
   await scene('intro', async () => {})
-  await page.evaluate(() => window.__demo.hideCard()); await sleep(700)
 
   await scene('kb', async (at) => {
-    await pill('1', 'Fragen stellen')
+    await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0) })
     await spot('#kbList')
     await moveTo('#kbList', { dx: -150, dy: -40 })
     await at(0.45)
@@ -285,7 +286,6 @@ async function docx(paragraphs) {
   })
   await scene('files', async (at) => {
     await spot(null)
-    await pill('2', 'Dateien & Code')
     await sleep(400)
     await click('#addBtn')
     const chooser = page.waitForEvent('filechooser')
@@ -305,7 +305,6 @@ async function docx(paragraphs) {
   })
   await scene('add', async (at) => {
     await spot(null)
-    await pill('3', 'Unterlagen hinzufügen')
     await click('#chatNewBtn')
     await sleep(500)
     await click('#addBtn')
@@ -400,7 +399,6 @@ async function docx(paragraphs) {
   })
   await scene('skills', async (at) => {
     await spot(null)
-    await pill('4', 'Skills')
     await click('#sbSkillsToggle')
     await page.waitForSelector('#sbSkillItems .nav-item')
     // the menu scrolls: bring the skills to the top and highlight the part that is visible
@@ -425,7 +423,6 @@ async function docx(paragraphs) {
     await spot(null)
   })
   await scene('agents', async (at) => {
-    await pill('5', 'Spezialagenten')
     await spot(['.nav-item[data-nav="assistant"]', '#navDd', '#navAgentReview', '.nav-item[data-nav="agent:brief_draft"]'])
     await moveTo('.nav-item[data-nav="assistant"]', { ms: 500 }); await sleep(600)
     await moveTo('#navAgentReview', { ms: 500 }); await sleep(500)
@@ -442,7 +439,6 @@ async function docx(paragraphs) {
   })
   await scene('dd', async (at) => {
     await spot(null)
-    await pill('6', 'Due Diligence')
     await click('#navDd')
     await page.waitForSelector('#mattersPage .card.click')
     await spot('#mattersPage .card.click')
@@ -465,7 +461,6 @@ async function docx(paragraphs) {
   })
   await scene('projects', async (at) => {
     await spot(null)
-    await pill('7', 'Projekte')
     await click('#navProjects')
     await page.waitForSelector('#projectsPage .proj-card')
     await spot('#projectsPage .proj-card')
@@ -521,16 +516,13 @@ async function docx(paragraphs) {
   })
   await scene('settings', async (at) => {
     await spot(null)
-    await pill('8', 'Einstellungen')
     await click('#navSettings')
     await page.locator('#cardSources').scrollIntoViewIfNeeded()
     await spot('#cardSources')
     await moveTo('#swFolderSave', { ms: 600 }); await sleep(400); await moveTo('#kvMsAccount', { ms: 500 })
   })
-  await scene('outro', async () => {
-    await spot(null)
-    await page.evaluate(() => window.__demo.card(`<div class="logo"><img src="/aissociate-logo.png" alt=""></div><h1>Jetzt ausprobieren</h1><p>Feature-Tour jederzeit unter <b>Einstellungen → Daten &amp; Hilfe</b>.</p>`))
-  })
+  await spot(null)
+  await scene('outro', async () => {})
   await sleep(1500)
   await cdp.send('Page.stopScreencast')
   await sleep(300)

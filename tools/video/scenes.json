@@ -1,0 +1,137 @@
+[
+ {
+  "id": "intro",
+  "chapter": "Überblick",
+  "title": "AI:ssociate Playground",
+  "text": "Juristische KI für österreichisches Recht – die wichtigsten Funktionen in wenigen Minuten.",
+  "dur": 0
+ },
+ {
+  "id": "kb",
+  "chapter": "Fragen",
+  "title": "Wissensdatenbank und Vorlagen",
+  "text": "„Automatisch“ erkennt das Rechtsgebiet aus der Frage – oder Sie geben es fest vor. Darunter: Vorlagen für häufige Aufgaben.",
+  "dur": 7
+ },
+ {
+  "id": "templates",
+  "chapter": "Fragen",
+  "title": "",
+  "text": "",
+  "dur": 4.5,
+  "slide": false
+ },
+ {
+  "id": "dictate",
+  "chapter": "Diktat",
+  "title": "Diktieren",
+  "text": "Mikrofon antippen, einmal zustimmen und die Frage sprechen.",
+  "dur": 11
+ },
+ {
+  "id": "ask",
+  "chapter": "Antwort & Quellen",
+  "title": "Frage stellen",
+  "text": "Während die Antwort entsteht, sehen Sie jeden Schritt: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.",
+  "dur": 7
+ },
+ {
+  "id": "answer",
+  "chapter": "Antwort & Quellen",
+  "title": "Geprüfte Fundstellen",
+  "text": "Jede zitierte Norm wird im Rechtsinformationssystem des Bundes geprüft – der grüne Haken heißt: im RIS bestätigt. Export als Word, die Kosten direkt darunter.",
+  "dur": 10
+ },
+ {
+  "id": "newq",
+  "chapter": "Antwort & Quellen",
+  "title": "Neue Frage",
+  "text": "Oben rechts „Neue Frage“ oder im Menü „Allgemeiner Agent“ – jeder Klick beginnt eine neue Frage. Frühere Gespräche bleiben im Verlauf.",
+  "dur": 8
+ },
+ {
+  "id": "files",
+  "chapter": "Dateien & Code",
+  "title": "Fertige Dateien statt nur Text",
+  "text": "Der Assistent schreibt Programmcode und führt ihn in einer abgeschotteten Sandbox aus. Hier: Kommentar direkt im Word-Dokument und eine Excel-Übersicht dazu.",
+  "dur": 14
+ },
+ {
+  "id": "add",
+  "chapter": "Unterlagen",
+  "title": "Unterlagen hinzufügen",
+  "text": "Ein Knopf für alles: Dateien anhängen – vom Computer, aus OneDrive oder SharePoint – oder eine Quelle verbinden: lokaler Ordner oder Akt.",
+  "dur": 10
+ },
+ {
+  "id": "folder",
+  "chapter": "Ordner",
+  "title": "Lokaler Ordner",
+  "text": "Nichts wird vorab hochgeladen. Der Assistent durchsucht den Ordner, liest nur, was er braucht – und legt das fertige Schreiben direkt in den Ordner.",
+  "dur": 14
+ },
+ {
+  "id": "sharepoint",
+  "chapter": "SharePoint",
+  "title": "SharePoint & OneDrive",
+  "text": "Dokument aus der Bibliothek wählen und die Aufgabe stellen. Das Ergebnis wird automatisch zurückgeschrieben – neben das Original im SharePoint-Ordner.",
+  "dur": 14
+ },
+ {
+  "id": "spproof",
+  "chapter": "SharePoint",
+  "title": "",
+  "text": "",
+  "dur": 5,
+  "slide": false
+ },
+ {
+  "id": "skills",
+  "chapter": "Skills",
+  "title": "Skills",
+  "text": "Die Arbeitsweise Ihrer Kanzlei als wiederverwendbare Anweisung – vom Zusammenfassen bis zum Mandantenbrief. Im Menü unter „Skills“ oder mit „/“ im Eingabefeld.",
+  "dur": 10
+ },
+ {
+  "id": "agents",
+  "chapter": "Spezialagenten",
+  "title": "Spezialagenten",
+  "text": "Vertragsprüfung, Vertrag entwerfen und Schriftsatz entwerfen – jeweils ein fester Ablauf nach österreichischem Recht bis zum fertigen Word-Dokument.",
+  "dur": 9
+ },
+ {
+  "id": "dd",
+  "chapter": "Due Diligence",
+  "title": "Due Diligence",
+  "text": "Ganze Datenräume analysieren: Befunde mit Zitat und Fundstelle in der Ampel, Request List und Red-Flag-Report. Auf derselben Seite: Ihre übrigen Akten.",
+  "dur": 12
+ },
+ {
+  "id": "projects",
+  "chapter": "Projekte",
+  "title": "Projekte",
+  "text": "Anweisungen, Dokumente und Unterhaltungen an einem Ort – geteilt mit registrierten Kolleginnen und Kollegen, zum Bearbeiten oder nur zum Lesen.",
+  "dur": 13
+ },
+ {
+  "id": "projdocs",
+  "chapter": "Projekte",
+  "title": "Skills auf Projektdokumente",
+  "text": "Dokumente anhaken, „Tabellarische Übersicht“ wählen – Excel oder Word. Ebenso: zusammenfassen, Versionen vergleichen, Fragen stellen.",
+  "dur": 12
+ },
+ {
+  "id": "settings",
+  "chapter": "Einstellungen",
+  "title": "Einstellungen",
+  "text": "Wohin Ergebnisse gespeichert werden, Microsoft 365, Websuche und Kosten.",
+  "dur": 6
+ },
+ {
+  "id": "outro",
+  "chapter": "Einstellungen",
+  "title": "Viel Erfolg mit AI:ssociate",
+  "text": "Feature-Tour und dieses Video finden Sie jederzeit auf der Startseite und über das ? oben rechts.",
+  "dur": 0
+ }
+]
