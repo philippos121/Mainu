@@ -168,7 +168,43 @@ def setup(doc):
     field(foot, 'NUMPAGES')
 
 
-def head(doc, adressat, az):
+# ---- page 1 of a brief: the Rubrum is spread over the page instead of sticking to the top ----
+LINE_PT = 15.2                                       # one line of Arial 11 at 1.15 spacing
+PAGE_PT = (29.7 - 2.5 - 2.0) / 2.54 * 72 - 40        # usable height of page 1 minus footer and safety
+
+
+def _lines(text, chars):
+    return max(1, -(-len(text) // chars))
+
+
+def spread(adressat, az, rows, items):
+    """Extra space (pt) after the addressee, between parties, before wegen/Streitwert and before the title."""
+    h = LINE_PT * max(len(adressat) or 3, len(az)) + 10
+    party_gaps = value_gaps = 0
+    for i, (kind, label, value) in enumerate(rows):
+        vals = [x.strip() for x in value.split(';') if x.strip()] or ['']
+        h += LINE_PT * max(sum(_lines(v, 58) for v in vals), _lines(label, 22))
+        if i and kind == 'PARTEI' and not label.lower().startswith('vertreten'):
+            party_gaps += 1
+            h += 8
+        elif i and kind != 'PARTEI':
+            value_gaps += 1
+            h += 4
+    h += 36 + 22  # title
+    h += sum(LINE_PT * _lines(t, 90) + 4 for k, t in items if k == 'UNTERTITEL')
+    h += sum(22 for k, _ in items if k == 'BEILAGEN')
+    free = max(0.0, PAGE_PT - h)
+    weights = {'head': 2.0, 'party': 1.0 * party_gaps, 'values': 1.2 if value_gaps else 0.0, 'title': 2.4}
+    total = sum(weights.values()) or 1
+    caps = {'head': 80, 'party': 30, 'values': 30, 'title': 120}
+    out = {}
+    for k, w in weights.items():
+        share = free * w / total
+        out[k] = min(caps[k], share / party_gaps if k == 'party' and party_gaps else share)
+    return out
+
+
+def head(doc, adressat, az, after=10):
     """Addressee top left (court in bold), file number top right."""
     t = doc.add_table(rows=1, cols=2)
     borderless(t)
@@ -182,10 +218,10 @@ def head(doc, adressat, az):
         fmt(p, after=0)
         runs(p, line, bold=i == court)
     cell_text(right, az, align=WD_ALIGN_PARAGRAPH.RIGHT)
-    fmt(doc.add_paragraph(), after=10)
+    fmt(doc.add_paragraph(), after=after)
 
 
-def parties(doc, rows):
+def parties(doc, rows, party_extra=0, value_extra=0):
     """Rubrum table: label | details (lines split at ';')."""
     t = doc.add_table(rows=0, cols=2)
     borderless(t)
@@ -196,7 +232,8 @@ def parties(doc, rows):
         cell_text(r[1], lines, bold_first=(kind == 'PARTEI' and not label.lower().startswith('vertreten')))
         new_block = i > 0 and (kind != 'PARTEI' or not label.lower().startswith('vertreten'))
         if new_block:
-            gap = 12 if kind == 'WEGEN' or (kind != 'PARTEI' and rows[i - 1][0] == 'PARTEI') else 4 if kind != 'PARTEI' else 8
+            first_value = kind != 'PARTEI' and rows[i - 1][0] == 'PARTEI'
+            gap = 12 + value_extra if first_value else 12 if kind == 'WEGEN' else 4 if kind != 'PARTEI' else 8 + party_extra
             for c in r:
                 c.paragraphs[0].paragraph_format.space_before = Pt(gap)
     widths(t, LABEL_W, VALUE_W)
@@ -275,7 +312,6 @@ def first_page_title(doc, items, size=14, before=36):
 def render_brief(doc, items):
     adressat = [t for k, t in items if k == 'ADRESSAT']
     az = [t for k, t in items if k == 'AZ' and t]
-    head(doc, adressat, az)
     rows = []
     for k, t in items:
         label, bar, value = t.partition('|')
@@ -284,9 +320,11 @@ def render_brief(doc, items):
         elif k in ('WEGEN', 'STREITWERT', 'RUBRUM'):
             default = {'WEGEN': 'wegen:', 'STREITWERT': 'Streitwert:', 'RUBRUM': ''}[k]
             rows.append((k, label.strip() if bar else default, value.strip() if bar else t))
+    sp = spread(adressat, az, rows, items)
+    head(doc, adressat, az, after=10 + sp['head'])
     if rows:
-        parties(doc, rows)
-    first_page_title(doc, items)
+        parties(doc, rows, party_extra=sp['party'], value_extra=sp['values'])
+    first_page_title(doc, items, before=36 + sp['title'])
     body = Body(doc)
     for k, t in items:
         if k not in RUBRUM_KEYS and k not in ('TITEL', 'UNTERTITEL', 'BEILAGEN'):
