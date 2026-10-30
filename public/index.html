@@ -1012,6 +1012,7 @@
 
     <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
     <input type="file" id="folderInput" multiple hidden webkitdirectory />
+    <input type="file" id="ddFolderInput" multiple hidden webkitdirectory />
     <input type="file" id="skillFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.rtf,.html,.htm,.xlsx" />
     <input type="file" id="skillImportInput" hidden accept=".json,application/json" />
     <div class="modal" id="msModal"><div class="modal-card ms-card" id="msCard"></div></div>
@@ -2784,7 +2785,7 @@
             const flush = async () => { if (!batch.length) return; const r = await api(`/api/matters/${m.id}/documents`, { method: 'POST', body: { files: batch } }); added += r.added?.length || 0; errors.push(...(r.errors || [])); batch = []; bytes = 0 }
             for (const e of list) {
               if (batch.length >= 20 || bytes + e.size > 18 * 1048576) await flush()
-              batch.push({ name: e.path.replace(/\//g, ' - '), base64: await readAsBase64(await e.get()) }); bytes += e.size
+              batch.push({ name: e.path.split('/').pop(), folder: [localFolder?.name || '', ...e.path.split('/').slice(0, -1)].filter(Boolean).join('/'), base64: await readAsBase64(await e.get()) }); bytes += e.size
               done++; bar.style.width = Math.round(done / list.length * 100) + '%'; msg.textContent = `${done} / ${list.length} · ${e.path}`
             }
             await flush()
@@ -3397,12 +3398,15 @@
       // ---- documents ----
       let docSelection = new Set()
       function renderDocuments(body, m) {
-        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente hierher ziehen</b> oder klicken zum Auswählen · PDF, Word, Text · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
+        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente oder ganze Ordner hierher ziehen</b> (samt Unterordnern) oder klicken zum Auswählen · PDF, Word, Text · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
         dz.addEventListener('click', () => $('matterFileInput').click())
         dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over') }); dz.addEventListener('dragleave', () => dz.classList.remove('over'))
-        dz.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('over'); if (e.dataTransfer?.files?.length) uploadToMatter(e.dataTransfer.files) })
+        dz.addEventListener('drop', async (e) => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('over'); const items = await droppedFiles(e.dataTransfer); if (items.length) uploadToMatter(items) })
         body.appendChild(dz)
         const tb = el('div', 'toolbar')
+        const bF = el('button', 'btn ghost sm', ''); bF.id = 'ddFilesBtn'; bF.appendChild(svg('computer')); bF.appendChild(document.createTextNode('Dateien')); bF.addEventListener('click', () => $('matterFileInput').click()); tb.appendChild(bF)
+        const bL = el('button', 'btn ghost sm', ''); bL.id = 'ddFolderBtn'; bL.title = 'Einen Ordner von diesem Computer samt Unterordnern hochladen (die Ordnerstruktur bleibt erhalten)'; bL.appendChild(svg('localfolder')); bL.appendChild(document.createTextNode('Lokaler Ordner (mit Unterordnern)')); bL.addEventListener('click', () => pickDdFolder()); tb.appendChild(bL)
+        if (localFolder) { const bC = el('button', 'btn ghost sm', ''); bC.id = 'ddLocalBtn'; bC.title = 'Den im Assistenten verbundenen Ordner in diesen Akt übernehmen'; bC.appendChild(svg('localfolder')); bC.appendChild(document.createTextNode(`„${localFolder.name}“ übernehmen`)); bC.addEventListener('click', () => uploadToMatter(localFolder.entries.map((x) => ({ entry: x, folder: [localFolder.name, ...x.path.split('/').slice(0, -1)].join('/') })))); tb.appendChild(bC) }
         const bMs = el('button', 'btn ghost sm', ''); bMs.appendChild(svg('cloud')); bMs.appendChild(document.createTextNode('Aus OneDrive / SharePoint importieren')); bMs.addEventListener('click', () => importFromMs()); tb.appendChild(bMs)
         tb.appendChild(el('span', 'sp'))
         const sel = [...docSelection].filter((id) => m.documents.some((d) => d.id === id))
@@ -3417,7 +3421,7 @@
         const tb2 = el('tbody')
         for (const d of m.documents) {
           const tr = el('tr'); const c0 = el('td'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = docSelection.has(d.id); cb.addEventListener('change', () => { if (cb.checked) docSelection.add(d.id); else docSelection.delete(d.id); renderMatter() }); c0.appendChild(cb); tr.appendChild(c0)
-          const n = el('td', 'n'); n.appendChild(document.createTextNode(d.title || d.name)); n.appendChild(el('span', 'sub', `${d.title ? d.name + ' · ' : ''}${fmtSize(d.size)}${d.pages ? ` · ${d.pages} S.` : ''}${d.source === 'ms' ? ' · Microsoft 365' : ''}${d.note ? ' · ' + d.note : ''}`)); tr.appendChild(n)
+          const n = el('td', 'n'); n.appendChild(document.createTextNode(d.title || d.name)); n.appendChild(el('span', 'sub', `${d.folder ? d.folder + ' / ' : ''}${d.title ? d.name + ' · ' : ''}${fmtSize(d.size)}${d.pages ? ` · ${d.pages} S.` : ''}${d.source === 'ms' ? ' · Microsoft 365' : ''}${d.note ? ' · ' + d.note : ''}`)); tr.appendChild(n)
           tr.appendChild(el('td', null, d.docType || '–')); tr.appendChild(el('td', null, d.area ? areaLabel(d.area) : '–'))
           const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.difficulty === 'hard') cs.appendChild(el('span', 'pill orange', 'komplex')); if (d.legal) cs.appendChild(el('span', 'pill teal', d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche')); tr.appendChild(cs)
           const cf = el('td', 'c'); if (d.flags?.red || d.flags?.amber) { if (d.flags.red) cf.appendChild(el('span', 'pill red', String(d.flags.red))); if (d.flags.amber) cf.appendChild(el('span', 'pill amber', String(d.flags.amber))) } else cf.textContent = d.status === 'analysed' ? '–' : ''; tr.appendChild(cf)
@@ -3431,22 +3435,71 @@
         t.appendChild(tb2); wrap.appendChild(t); body.appendChild(wrap)
       }
       $('matterFileInput').addEventListener('change', async () => { await uploadToMatter($('matterFileInput').files); $('matterFileInput').value = '' })
-      async function uploadToMatter(fileList) {
+      /** Dropped files and folders, folders read recursively ({ file, folder }; folder = path of the subfolder). */
+      async function droppedFiles(dt) {
+        const out = []
+        const entries = [...(dt?.items || [])].map((it) => (it.kind === 'file' && it.webkitGetAsEntry ? it.webkitGetAsEntry() : null)).filter(Boolean)
+        if (!entries.length) return [...(dt?.files || [])].map((f) => ({ file: f, folder: '' }))
+        const readAll = (reader) => new Promise((resolve) => { const all = []; const next = () => reader.readEntries((batch) => { if (!batch.length) resolve(all); else { all.push(...batch); next() } }, () => resolve(all)); next() })
+        const walk = async (entry, dir, depth) => {
+          if (out.length >= FOLDER_MAX_ENTRIES || entry.name.startsWith('.') || entry.name.startsWith('~$') || FOLDER_SKIP.has(entry.name)) return
+          if (entry.isFile) { const f = await new Promise((r) => entry.file(r, () => r(null))); if (f) out.push({ file: f, folder: dir }) }
+          else if (entry.isDirectory && depth < 12) { const sub = dir ? `${dir}/${entry.name}` : entry.name; for (const c of await readAll(entry.createReader())) await walk(c, sub, depth + 1) }
+        }
+        for (const en of entries) await walk(en, '', 0)
+        return out
+      }
+      /** A local folder with all subfolders: File System Access where available, else a folder input. */
+      async function pickDdFolder() {
+        if (window.showDirectoryPicker) {
+          let h
+          try { h = await window.showDirectoryPicker({ id: 'aiss-dd', mode: 'read' }) } catch (e) { if (e?.name !== 'AbortError') toast('Ordner konnte nicht geöffnet werden: ' + (e?.message || e)); return }
+          const st = $('uploadStatus'); if (st) st.textContent = `Ordner „${h.name}“ wird eingelesen…`
+          const entries = []
+          try { await walkDir(h, '', entries, 0) } catch (e) { toast('Ordner nicht vollständig lesbar: ' + (e?.message || e)) }
+          uploadToMatter(entries.map((x) => ({ entry: x, folder: [h.name, ...x.path.split('/').slice(0, -1)].join('/') })))
+          return
+        }
+        $('ddFolderInput').click()
+      }
+      $('ddFolderInput').addEventListener('change', () => {
+        const files = [...$('ddFolderInput').files].filter((f) => !f.name.startsWith('.') && !f.name.startsWith('~$'))
+        $('ddFolderInput').value = ''
+        uploadToMatter(files.map((f) => ({ file: f, folder: (f.webkitRelativePath || '').split('/').slice(0, -1).join('/') })))
+      })
+      /** Uploads Files or { file | entry, folder } items in batches, keeping the subfolder of each document. */
+      async function uploadToMatter(list) {
         if (!matter) return
-        const files = [...fileList].filter((f) => DOC_RE.test(f.name))
-        const skipped = fileList.length - files.length
+        const all = [...list].map((x) => (x instanceof File ? { file: x, folder: '' } : x))
+        const name = (x) => x.file ? x.file.name : x.entry.path.split('/').pop()
+        const items = all.filter((x) => DOC_RE.test(name(x)))
+        const skipped = all.length - items.length
+        const limit = Math.max(0, (ddConfig?.limits?.maxDocs || 300) - (matter.documents?.length || 0))
+        const over = Math.max(0, items.length - limit); items.length = Math.min(items.length, limit)
         const maxBytes = ddConfig?.limits?.maxDocBytes || 30 * 1048576
         const st = () => $('uploadStatus')
-        let done = 0; const errors = []
-        for (const f of files) {
-          if (st()) st().textContent = `Lädt hoch: ${done + 1} / ${files.length} – ${f.name}`
-          if (f.size > maxBytes) { errors.push(`${f.name}: zu groß`); done++; continue }
-          try { const r = await api(`/api/matters/${matter.id}/documents`, { method: 'POST', body: { files: [{ name: f.name, base64: await readAsBase64(f) }] } }); errors.push(...(r.errors || [])) } catch (e) { errors.push(`${f.name}: ${e.message}`) }
-          done++
+        // One request after the other (each saves the whole Akt), several files per request.
+        let done = 0, ok = 0, batch = [], bytes = 0; const errors = []
+        const flush = async () => {
+          if (!batch.length) return
+          try { const r = await api(`/api/matters/${matter.id}/documents`, { method: 'POST', body: { files: batch } }); ok += r.added?.length || 0; errors.push(...(r.errors || [])) } catch (e) { errors.push(`${batch.length} Datei${batch.length > 1 ? 'en' : ''}: ${e?.message || e}`) }
+          batch = []; bytes = 0
         }
+        for (const x of items) {
+          if (st()) st().textContent = `Lädt hoch: ${done + 1} / ${items.length} – ${x.folder ? x.folder + '/' : ''}${name(x)}`
+          const f = x.file || (await x.entry.get().catch(() => null))
+          done++
+          if (!f) { errors.push(`${name(x)}: nicht lesbar`); continue }
+          if (f.size > maxBytes) { errors.push(`${f.name}: zu groß`); continue }
+          if (batch.length >= 10 || bytes + f.size > 20 * 1048576) await flush()
+          let base64; try { base64 = await readAsBase64(f) } catch { errors.push(`${f.name}: nicht lesbar`); continue }
+          batch.push({ name: f.name, folder: x.folder || '', base64 }); bytes += f.size
+        }
+        await flush()
         await reloadMatter(); await loadMatters()
         if (skipped) errors.push(`${skipped} Datei${skipped > 1 ? 'en' : ''} übersprungen (nur PDF, Word, Text)`)
-        toast(errors.length ? `${files.length - errors.length} hochgeladen · ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? ' …' : ''}` : `${files.length} Dokument${files.length === 1 ? '' : 'e'} hochgeladen.`, 4000)
+        if (over) errors.push(`${over} über der Grenze von ${ddConfig?.limits?.maxDocs || 300} Dokumenten`)
+        toast(errors.length ? `${ok} hochgeladen · ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? ' …' : ''}` : `${ok} Dokument${ok === 1 ? '' : 'e'} hochgeladen.`, 5000)
       }
       function importFromMs() {
         if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }

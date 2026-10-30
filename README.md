@@ -150,6 +150,14 @@ the source file), else download; per conversation it can be set to the local
 folder, a SharePoint / OneDrive folder or download only. Settings → "Quellen &
 Speichern" holds the defaults.
 
+Documents of a due diligence (or Akt) come from files, a whole local folder with
+all subfolders ("Lokaler Ordner (mit Unterordnern)": File System Access API, else a
+folder input), folders dragged onto the drop zone (read recursively), the folder
+connected in the assistant ("… übernehmen") or OneDrive / SharePoint. Each document
+keeps its subfolder (`folder`, e.g. `Datenraum/02 Verträge/Kunden`), so equal file
+names in different folders stay apart; uploads run one request after the other in
+batches of up to 10 files / 20 MB (parallel requests would overwrite the Akt).
+
 ## Local folders and Akten as searchable sources
 
 "Lokaler Ordner" in the "Hinzufügen" menu connects a local folder (File System Access API;

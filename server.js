@@ -1750,14 +1750,17 @@ function startMatterJob(m, kind, runner) {
   })()
   return job.id
 }
-async function addDocumentFromBuffer(m, { name, buf, source, ms }) {
+async function addDocumentFromBuffer(m, { name, buf, source, ms, folder = '' }) {
   if (m.documents.length >= DD_MAX_DOCS) throw new Error(`Höchstens ${DD_MAX_DOCS} Dokumente je Akt.`)
   if (buf.length > DD_MAX_DOC_BYTES) throw new Error(`überschreitet ${Math.round(DD_MAX_DOC_BYTES / 1048576)} MB`)
   const safe = path.basename(String(name)).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 200)
   if (!DOC_EXT.test(safe)) throw new Error('Dateityp nicht unterstützt (PDF, Word, Text)')
-  const dup = m.documents.find((d) => d.name === safe && d.size === buf.length)
+  // Subfolder of a data room (e.g. "Datenraum/03 Verträge"), so equal names in different folders stay apart.
+  const dir = String(folder || '').replace(/\\/g, '/').split('/').map((x) => x.trim().replace(/[^\w.\- ()äöüÄÖÜß&,]/g, '_')).filter((x) => x && x !== '.' && x !== '..').join('/').slice(0, 300)
+  const dup = m.documents.find((d) => d.name === safe && d.size === buf.length && (d.folder || '') === dir)
   if (dup) return { doc: dup, duplicate: true }
   const d = newDocument({ name: safe, size: buf.length, source, ms, no: nextNo(m, 'doc') })
+  if (dir) d.folder = dir
   d.file = await store.putFile(m.id, d.id, safe.split('.').pop(), buf)
   m.documents.push(d)
   return { doc: d, duplicate: false }
@@ -1958,7 +1961,7 @@ app.post('/api/matters/:id/documents', async (req, res) => {
     try {
       const buf = Buffer.from(f.base64, 'base64')
       if (!buf.length) throw new Error('leere Datei')
-      const r = await addDocumentFromBuffer(m, { name: f.name, buf, source: 'upload' })
+      const r = await addDocumentFromBuffer(m, { name: f.name, buf, source: 'upload', folder: typeof f.folder === 'string' ? f.folder : '' })
       if (r.duplicate) errors.push(`${f.name}: bereits im Akt`); else added.push(r.doc)
     } catch (e) { errors.push(`${f.name}: ${e.message}`) }
   }
