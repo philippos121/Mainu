@@ -88,6 +88,7 @@
       .mainbar-right { display: flex; align-items: center; gap: 4px; }
       .ab-new { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 13px 0 10px; margin-right: 4px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.32); background: rgba(255,255,255,0.12); color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
       .ab-new[hidden] { display: none; }
+      .pm-item.off .tx b, .pm-item.off .ico { opacity: .55; }
       .ab-new:hover { background: rgba(255,255,255,0.22); }
       .ab-new:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
       .ab-new svg { width: 15px; height: 15px; }
@@ -1476,7 +1477,7 @@
       function applyComposerMode() {
         const ro = current?.project?.role === 'view'
         input.disabled = ro
-        input.placeholder = ro ? 'Nur Lesezugriff – dieses Projekt ist mit Ihnen zum Lesen geteilt.' : 'Frage AI:ssociate.'
+        input.placeholder = ro ? 'Nur Lesezugriff – dieses Projekt ist mit Ihnen zum Lesen geteilt.' : pendingSkill ? `Ihre Frage bzw. Aufgabe für „${pendingSkill.name}“ …` : 'Frage AI:ssociate.'
         for (const id of ['addBtn', 'skillBtn', 'dictBtn']) $(id).disabled = ro
       }
       function renderAttachments() {
@@ -1607,8 +1608,10 @@
       // ---- "Hinzufügen": one entry point for uploads, Microsoft 365, local folder and project ----
       function openAddMenu(anchor) {
         const ms = $('msBtn')
-        ms.hidden = !msState.configured
-        $('msItemSub').textContent = msState.connected ? (msState.account?.email || 'verbunden') + (pendingMs.length ? ` · ${pendingMs.length} gewählt` : '') : 'Anmeldung erforderlich'
+        // Always offered; without a Microsoft app on the server it says so (the click explains).
+        ms.hidden = false
+        ms.classList.toggle('off', !msState.configured)
+        $('msItemSub').textContent = !msState.configured ? 'auf diesem Server noch nicht eingerichtet' : msState.connected ? (msState.account?.email || 'verbunden') + (pendingMs.length ? ` · ${pendingMs.length} gewählt` : '') : 'Anmeldung erforderlich'
         const nUp = pendingFiles.length
         $('attachItemSub').textContent = nUp ? `${plural(nUp, 'Datei', 'Dateien')} angehängt – weitere hinzufügen` : 'PDF, Word, Excel, Text – auch per Drag & Drop'
         $('folderItemSub').textContent = localFolder ? `Verbunden: ${localFolder.name} – Optionen` : 'bleibt auf dem Gerät, nichts wird vorab hochgeladen'
@@ -1921,6 +1924,8 @@
       function submit() {
         if (dict.target === input) { if (dict.interim) { dict.base += dictFormat(dict.interim, dict.base); dict.interim = ''; dictShow() } dictStop({ discard: true }) }
         const text = input.value.trim()
+        // A skill needs something to work on: the question in the chat, files or a connected source.
+        if (!text && pendingSkill && !pendingFiles.length && !pendingMs.length && !localFolder && !current?.matter && !current?.project) { toast(`Bitte die Frage bzw. Aufgabe für „${pendingSkill.name}“ eingeben.`); input.focus(); return }
         if ((!text && !pendingFiles.length && !pendingMs.length && !pendingSkill) || busy) return
         sendMessage({ text: text || (pendingSkill && !pendingFiles.length && !pendingMs.length ? `Skill „${pendingSkill.name}“ anwenden.` : 'Bitte die angehängten Dokumente analysieren und das Wesentliche zusammenfassen.') })
       }
@@ -1963,7 +1968,7 @@
       $('swFolderSave').addEventListener('click', () => { settings.folderSave = settings.folderSave === false; saveSettings(); setSwitch('swFolderSave', settings.folderSave !== false); renderSaveLine() })
       msBtn.addEventListener('click', () => {
         closePop()
-        if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
+        if (!msState.configured) { toast('OneDrive / SharePoint ist auf diesem Server noch nicht eingerichtet – die Administration hinterlegt die Microsoft-App (MS_CLIENT_ID bzw. MICROSOFT_CLIENT_ID).', 6000); return }
         if (!msState.connected) { openMsConnect(); return }
         openMsPicker({ mode: 'attach' })
       })
@@ -4131,7 +4136,7 @@
       // ------------------------------------------------------------------
       // Captions are burned into the video (centred in a band below the picture).
       const VIDEO = { src: '/media/erklaervideo.mp4', poster: '/media/erklaervideo.jpg' }
-      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 5], ['Diktat', 24], ['Antwort & Quellen', 40], ['Dateien & Code', 88], ['Unterlagen', 110], ['Ordner', 128], ['SharePoint', 152], ['Skills', 192], ['Spezialagenten', 209], ['Due Diligence', 225], ['Projekte', 244], ['Einstellungen', 283]]
+      const VIDEO_CHAPTERS = [['Überblick', 0], ['Fragen', 5], ['Diktat', 24], ['Antwort & Quellen', 40], ['Dateien & Code', 87], ['Unterlagen', 110], ['Ordner', 128], ['SharePoint', 152], ['Skills', 192], ['Spezialagenten', 209], ['Due Diligence', 225], ['Projekte', 244], ['Einstellungen', 283]]
       let videoAvailable = false
       async function checkVideo() {
         try { videoAvailable = (await fetch(VIDEO.src, { method: 'HEAD', cache: 'no-store' })).ok } catch { videoAvailable = false }

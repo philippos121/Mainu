@@ -313,8 +313,8 @@ async function docx(paragraphs) {
     await spot(['#attachBtn', '#msBtn'])
     await moveTo('#attachBtn', { ms: 500 }); await sleep(600); await moveTo('#msBtn', { ms: 400 })
     await at(0.62)
-    await spot(['#folderBtn', '#matterBtn'])
-    await moveTo('#folderBtn', { ms: 500 }); await sleep(700); await moveTo('#matterBtn', { ms: 400 })
+    await spot(['#folderBtn', '#projectSrcBtn'])
+    await moveTo('#folderBtn', { ms: 500 }); await sleep(700); await moveTo('#projectSrcBtn', { ms: 400 })
   })
   await scene('folder', async (at) => {
     await spot(null)
