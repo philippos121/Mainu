@@ -196,9 +196,15 @@ the facts. There is no Mahnklage type: a Klage that seeks only payment of up to
 75.000 EUR is a Mahnklage (§ 244 ZPO) – the form shows a hint and the agent,
 instead of drafting, points to filing it directly in the ERV (structured form, not
 a full-text Klage), lists the form data and checks the exceptions of § 244 Abs 2
-ZPO. The Word brief is laid out by `lib/brief_layout.py` (copied into the sandbox
-as `.aiss/brief_layout.py`): the model writes the text with line markers
-(`[ADRESSAT]`, `[PARTEI] Klagende Partei: | …`, `[WEGEN]`, `[STREITWERT]`,
+ZPO. Every Schriftsatz – from the agent, the general assistant, a skill or a project
+conversation – is laid out by `lib/brief_layout.py` (copied into every sandbox as
+`.aiss/brief_layout.py`; the code model uses it whenever the task carries the
+markers). The agent adds the Rubrum of each type (e.g. Berufung: lodged with the
+Erstgericht, roles in brackets, Berufungsinteresse; EV: gefährdete Partei / Gegner
+der gefährdeten Partei; Exekution: betreibende / verpflichtete Partei;
+Bescheidbeschwerde: to the belangte Behörde „zur Vorlage an das
+Verwaltungsgericht“; Anzeige: to the Staatsanwaltschaft). The model writes the text with line markers
+(`[ADRESSAT]`, `[PARTEI] Klagende Partei: | …`, `[WEGEN]`, `[STREITWERT]`, `[RUBRUM] Label: | …`,
 `[TITEL]`, `[H]`, `[P]`, `[BEWEIS]`, `[ANTRAG]`, `[SCHLUSS]`), the module sets the
 Rubrum (addressee, party table, wegen, Streitwert, title), numbered paragraphs,
 indented "Beweis:" blocks and Begehren, signature line, page numbers and yellow

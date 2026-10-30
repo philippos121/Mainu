@@ -9,6 +9,7 @@ the Rubrum and the formatting are the same in every brief:
     [PARTEI] vertreten durch: | Kanzlei; Anschrift; Code (Vollmacht erteilt gemäß § 30 Abs 2 ZPO)
     [PARTEI] Beklagte Partei: | …
     [WEGEN] EUR 18.400,-- s.A.   [STREITWERT] EUR 18.400,--
+    [RUBRUM] Berufungsinteresse: | EUR 18.400,--      (any further Rubrum line)
     [TITEL] KLAGE                [UNTERTITEL] …            [BEILAGEN] ./A bis ./F
     [H] I. Sachverhalt           [P] 1. …                  [BEWEIS] ./A Rechnung; PV; Zeuge …
     [ANTRAG] Die beklagte Partei ist schuldig, …
@@ -30,7 +31,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
-MARKERS = ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'TITEL', 'UNTERTITEL', 'BEILAGEN', 'H', 'P', 'BEWEIS', 'ANTRAG', 'SCHLUSS')
+MARKERS = ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'RUBRUM', 'TITEL', 'UNTERTITEL', 'BEILAGEN', 'H', 'P', 'BEWEIS', 'ANTRAG', 'SCHLUSS')
 LINE = re.compile(r'^\s*\[(%s)\]\s?(.*)$' % '|'.join(MARKERS))
 PLACEHOLDER = re.compile(r'(\[[^\[\]]*\])')
 FONT = 'Arial'
@@ -184,7 +185,7 @@ def parties(doc, rows):
         cell_text(r[1], lines, bold_first=(kind == 'PARTEI' and not label.lower().startswith('vertreten')))
         new_block = i > 0 and (kind != 'PARTEI' or not label.lower().startswith('vertreten'))
         if new_block:
-            gap = 12 if kind in ('WEGEN',) else 8
+            gap = 12 if kind == 'WEGEN' or (kind != 'PARTEI' and rows[i - 1][0] == 'PARTEI') else 4 if kind != 'PARTEI' else 8
             for c in r:
                 c.paragraphs[0].paragraph_format.space_before = Pt(gap)
     widths(t, LABEL_W, VALUE_W)
@@ -199,17 +200,16 @@ def render(text, path, title=None):
     head(doc, adressat, az)
     rows = []
     for k, t in items:
+        label, bar, value = t.partition('|')
         if k == 'PARTEI':
-            label, _, value = t.partition('|')
             rows.append(('PARTEI', label.strip(), value.strip()))
-        elif k == 'WEGEN':
-            rows.append(('WEGEN', 'wegen:', t))
-        elif k == 'STREITWERT':
-            rows.append(('STREITWERT', 'Streitwert:', t))
+        elif k in ('WEGEN', 'STREITWERT', 'RUBRUM'):
+            default = {'WEGEN': 'wegen:', 'STREITWERT': 'Streitwert:', 'RUBRUM': ''}[k]
+            rows.append((k, label.strip() if bar else default, value.strip() if bar else t))
     if rows:
         parties(doc, rows)
     for k, t in items:
-        if k in ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT'):
+        if k in ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'RUBRUM'):
             continue
         if k == 'TITEL':
             p = fmt(doc.add_paragraph(), before=24, after=4, align=WD_ALIGN_PARAGRAPH.CENTER, keep_next=True)
@@ -244,7 +244,7 @@ def render(text, path, title=None):
                     p.add_run().add_break(WD_BREAK.LINE)
                 runs(p, it)
         elif k == 'ANTRAG':
-            lead = bool(re.fullmatch(r'[A-ZÄÖÜ ]{4,}:?', t))  # e.g. "URTEILSBEGEHREN:"
+            lead = bool(re.fullmatch(r'[A-ZÄÖÜ ]{4,}[:,]?', t))  # e.g. "URTEILSBEGEHREN:"
             runs(fmt(doc.add_paragraph(), after=6, align=WD_ALIGN_PARAGRAPH.LEFT if lead else WD_ALIGN_PARAGRAPH.JUSTIFY, left=1.5, right=1.5, spacing=1.5, keep_next=lead), t, bold=lead)
         elif k == 'SCHLUSS':
             place, _, who = t.partition('|')
