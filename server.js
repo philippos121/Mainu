@@ -11,7 +11,7 @@ import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
-import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
+import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, DD_HARD_IN, DD_HARD_OUT } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
 import { agentsForClient, buildAgentTask, BRIEF_MARKUP, CONTRACT_MARKUP } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
@@ -1717,16 +1717,17 @@ async function loadMatter(req, res) {
   if (role === 'view' && req.method !== 'GET') { res.status(403).json({ error: 'Für dieses Projekt haben Sie nur Leserechte.' }); return null }
   return m
 }
-const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 6) // upper bound; the run scales workers with the number of documents
+const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 24) // model calls of one due diligence running side by side
 const ddDeps = (send) => ({
   store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY, kbContextChars: KB_CONTEXT_CHARS,
   verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send,
-  // Per document: hard legal questions go to the knowledge base in one request; easy ones are
-  // answered on the fast model with a short web search (same routing as the general agent).
+  // Per document: legal questions are answered by the model with a web search in the RIS; the
+  // knowledge base only for very hard questions (lib/dd.js decides, a few per run).
   askKnowledgeBase: AISSOCIATE_API_KEY ? async ({ question, legalArea }) => { const r = await askAissociate({ question: KB_BRIEF + question, legalArea: LEGAL_AREAS[legalArea] ? legalArea : 'civil', scope: '', threadId: null }); return { answer: r.answer, sources: r.sources } } : null,
-  answerEasyLegal: async (ctx, { question }) => {
+  answerEasyLegal: async (ctx, { question, ris = false }) => {
     const web = WEB_SEARCH_ENABLED && !webSearchRejected
-    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(web), effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? MAX_WEB_SEARCHES : undefined })
+    const risHint = ris && web ? ' Suche bevorzugt im RIS (ris.bka.gv.at: Bundes- und Landesrecht in der geltenden Fassung, Judikatur von OGH, VwGH, VfGH) und belege mit RIS-Links.' : ''
+    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(web) + risHint, effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? MAX_WEB_SEARCHES : undefined })
     const sources = []
     for (const o of resp.output || []) if (o.type === 'message') for (const part of o.content || []) for (const ann of part.annotations || []) if (ann.type === 'url_citation' && ann.url && !sources.some((x) => x.url === ann.url)) sources.push({ title: ann.title || ann.url, url: ann.url })
     return { answer: resp.output_text || '', sources }
@@ -1768,7 +1769,7 @@ async function addDocumentFromBuffer(m, { name, buf, source, ms, folder = '' }) 
 const FINDING_FIELDS = ['title', 'description', 'quote', 'location', 'recommendation', 'severity', 'area', 'dealImpact', 'norms', 'docId']
 const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
-app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
 
 // ---- skills: reusable instruction packages of the workspace (plus the standard skills) ----
 async function findSkill(owner, id) {
@@ -1914,7 +1915,7 @@ app.delete('/api/matters/:id/findings/:fid', async (req, res) => {
 app.get('/api/matters/:id/dd/estimate', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
   const p = priceFor(MODEL_EXTRACT)
-  res.json({ estimate: estimateRun(m, p.in, p.out), usage: m.job.usage, budgetTokens: m.settings.budgetTokens, budgetOutTokens: m.settings.budgetOutTokens })
+  res.json({ estimate: estimateRun(m, p.in, p.out, DD_CONCURRENCY), usage: m.job.usage, budgetTokens: m.settings.budgetTokens, budgetOutTokens: m.settings.budgetOutTokens })
 })
 
 app.get('/api/matters', async (req, res) => {

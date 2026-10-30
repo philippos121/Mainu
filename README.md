@@ -323,28 +323,32 @@ server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),
 can be paused, and survives closed browser tabs.
 
 **Due diligence** (`lib/ddconfig.js`, `lib/dd.js`, `lib/report.js`) is an
-explicit pipeline, not an agent: Text → per-document triage on the fast model
-(type, area, difficulty) → per-document analysis (easy: fast model, hard: main
-model; strict JSON schema: type, area, parties, key terms, findings with quote +
-location + severity + recommendation + norms, questions, and 0–3 compact legal
-questions with their difficulty) → per document the same legal routing as the
-assistant: easy legal questions → fast model with web search, hard ones →
-AI:ssociate in **one** request per document (questions numbered inside) →
-synthesis per review area (the per-document legal answers are combined) →
-executive summary → RIS verification of every cited norm → Word Red-Flag-Report
-+ Excel workbook from fixed templates. Documents are analysed in parallel (2 / 4 /
-6 workers for up to 5 / 20 / more documents, cap `DD_CONCURRENCY`); the budget
-per due diligence is 10,000,000 input and 1,000,000 output tokens by default
-(selectable per matter), counted over all model calls plus an estimate for the
-knowledge-base requests. Every finding has a stable id (F-001),
+explicit pipeline, not an agent, built for speed: Text (extracted 6 at a time) →
+every document split into large sections (150,000 characters, at most 8 per
+document) → every section of every document analysed side by side through one
+pool of model calls (`DD_CONCURRENCY`, default 24) on the extraction model at low
+reasoning effort, no separate sorting call (strict JSON schema: type, area,
+parties, key terms, findings with quote + location + severity + recommendation +
+norms, questions, 0–3 compact legal questions with their difficulty) → legal
+questions of documents with red/amber findings answered by the model with a web
+search focused on the RIS; AI:ssociate only for "very hard" questions of red
+findings, at most `DD_MAX_KB_CALLS` (default 5) per run → synthesis of all review
+areas in parallel → executive summary → RIS verification of every cited norm →
+Word Red-Flag-Report + Excel workbook from fixed templates. A hard limit of
+100,000,000 input and 10,000,000 output tokens per due diligence (all runs
+together; `DD_MAX_INPUT_TOKENS` / `DD_MAX_OUTPUT_TOKENS`) cannot be raised in the
+UI: every call reserves its estimated tokens before it starts, so parallel calls
+cannot overshoot; at the limit the run pauses with a clear message. The
+confirmation before a run is one line (documents, minutes, cost) with details
+folded away. Every finding has a stable id (F-001),
 a document id (D-001), a deal-impact instrument, an evidence status (the quote
 is located in the document text: belegt / teilweise / unbelegt) and a review
 state (offen / freigegeben / geändert / verworfen, grade override, note,
 manual findings). Rejected findings leave the report; the cover carries
 "Entwurf" until every red/amber finding is reviewed. A cost/time estimate is
-shown before every run; documents are analysed a few at a time with retries. Review areas, typical documents, red-flag
-catalogues and standard requests are versioned code. A token budget per matter
-stops the run cleanly ("pausiert"); new documents are added incrementally.
+shown before every run; calls are retried (rate limits get one more try after a
+pause). Review areas, typical documents, red-flag catalogues and standard
+requests are versioned code; new documents are added incrementally.
 
 **Review tables**: user-defined columns (presets: Vertragsübersicht,
 Dienstverträge, Mietverträge, Fristen, Steuerbescheide) extracted per document
