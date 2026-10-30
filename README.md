@@ -135,10 +135,14 @@ the chat request takes `projectId`.
 
 One "Hinzufügen" button (composer and agent pages) opens a menu with two groups:
 **Dateien anhängen** – from this computer or from OneDrive / SharePoint, sent with
-the question – and **Quelle verbinden** – a local folder or an Akt, which the
-assistant searches itself. Recently used folders (directory handles kept in
-IndexedDB, permission asked again on click) and Akten are offered for one click.
-Above the input, a context bar groups the chips into "Durchsucht" (folder, Akt)
+the question – and **Quelle verbinden** – a local folder or a project, which the
+assistant searches itself. A project as source (`matterId` of the project's
+internal Akt) brings its documents and its instructions into the conversation,
+which stays in the personal history; inside a project conversation the entry is
+hidden. Akten have no menu entry any more (questions about a due diligence start
+from its page). Recently used folders (directory handles kept in IndexedDB,
+permission asked again on click) and projects are offered for one click.
+Above the input, a context bar groups the chips into "Durchsucht" (folder, project)
 and "Angehängt" (files with their origin; three or more are folded into one
 chip). Below the input, "Ergebnisse →" names where generated files go: by
 default back to the source (folder next to the source file, SharePoint folder of

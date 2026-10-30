@@ -2169,6 +2169,8 @@ app.post('/api/chat', async (req, res) => {
     if (!(await matterRole(matterReq, req))) return res.status(404).json({ error: 'Akt nicht gefunden.' })
     const ids = new Set((Array.isArray(body.matterDocIds) ? body.matterDocIds : []).map(String))
     matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['new', 'extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
+    // A project picked as source ("Hinzufügen → Projekt"): its instructions apply as well.
+    if (matterReq.projectId && !projReq) { try { const pr = await store.getProject(matterReq.projectId); if (pr && projectRole(pr, req)) projReq = pr } catch {} }
   }
   const job = newJob(jobId)
   job.owner = ownerOf(req)

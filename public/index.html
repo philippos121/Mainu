@@ -999,7 +999,7 @@
       <button class="pm-item" id="msBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97H7Z"/></svg></span><span class="tx"><b>Aus OneDrive / SharePoint</b><span id="msItemSub">Anmeldung erforderlich</span></span></button>
       <div class="pm-sec"><b>Quelle verbinden</b><span>der Assistent durchsucht sie selbst</span></div>
       <button class="pm-item" id="folderBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="2.6"/><path d="m14 15.4 2 2"/></svg></span><span class="tx"><b>Lokaler Ordner</b><span id="folderItemSub">bleibt auf dem Gerät, nichts wird vorab hochgeladen</span></span></button>
-      <button class="pm-item" id="matterBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="tx"><b>Akt</b><span id="matterItemSub">Dokumente auf dem Server</span></span></button>
+      <button class="pm-item" id="projectSrcBtn" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span><span class="tx"><b>Projekt</b><span id="projectItemSub">Dokumente und Anweisungen eines Projekts</span></span></button>
       <div id="addRecent"></div>
     </div>
     <div class="pop-menu" id="saveMenu" role="menu" aria-label="Ergebnisse speichern" hidden></div>
@@ -1429,8 +1429,9 @@
       }
       function matterChip() {
         const m = current.matter, n = m.docIds?.length || 0
-        const c = chipEl('ctx-src matter', 'matter', m.name, n ? plural(n, 'Dokument', 'Dokumente') : 'Akt', () => { current.matter = null; persistCurrent(); renderAttachments() }, 'Akt entfernen')
-        c.title = 'Akt: der Assistent durchsucht seine Dokumente. Klicken für Optionen.'
+        const kind = m.project ? 'Projekt' : 'Akt'
+        const c = chipEl('ctx-src ' + (m.project ? 'project' : 'matter'), m.project ? 'project' : 'matter', m.name, n ? plural(n, 'Dokument', 'Dokumente') : kind, () => { current.matter = null; persistCurrent(); renderAttachments() }, kind + ' entfernen')
+        c.title = m.project ? 'Projekt: der Assistent durchsucht seine Dokumente, die Anweisungen des Projekts gelten. Klicken für Optionen.' : 'Akt: der Assistent durchsucht seine Dokumente. Klicken für Optionen.'
         c.addEventListener('click', openMatterChipDialog)
         return c
       }
@@ -1487,13 +1488,14 @@
         attachBtn.classList.toggle('on', pendingFiles.length > 0)
         msBtn.classList.toggle('on', pendingMs.length > 0)
         $('folderBtn').classList.toggle('on', Boolean(localFolder))
-        $('matterBtn').classList.toggle('on', Boolean(current?.matter))
+        $('projectSrcBtn').classList.toggle('on', Boolean(current?.matter?.project))
         renderAgentDocs()
         renderSaveLine()
         updateSend()
       }
       function openMatterChipDialog() {
         const m = current?.matter; if (!m) return
+        if (m.project) { openProjectSourceDialog(); return }
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.remove('wide')
         card.appendChild(el('h2', null, `Akt „${m.name}“`))
         card.appendChild(el('div', 'md', m.docIds?.length ? `Fragen beziehen sich auf ${plural(m.docIds.length, 'ausgewähltes Dokument', 'ausgewählte Dokumente')} dieses Akts.` : 'Der Assistent durchsucht die Dokumente dieses Akts selbst und liest nur, was er für die Antwort braucht.'))
@@ -1504,6 +1506,51 @@
         card.appendChild(opts)
         const a = el('div', 'modal-actions'); const x = el('button', 'btn ghost', 'Akt entfernen'); x.addEventListener('click', () => { current.matter = null; persistCurrent(); closeDlg(); renderAttachments() }); const ok = el('button', 'btn', 'Fertig'); ok.addEventListener('click', closeDlg); a.append(x, el('span', 'sp'), ok); card.appendChild(a)
         $('dlg').classList.add('show')
+      }
+      // ---- a project as source: its documents are searched, its instructions apply (the conversation stays personal) ----
+      function openProjectSourceDialog() {
+        const m = current?.matter; if (!m?.project) return
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.remove('wide')
+        card.appendChild(el('h2', null, `Projekt „${m.name}“`))
+        card.appendChild(el('div', 'md', 'Der Assistent durchsucht die Dokumente dieses Projekts selbst und beachtet seine Anweisungen. Das Gespräch bleibt in Ihrem Verlauf.'))
+        const opts = el('div', 'fold-opts')
+        const opt = (icon, title, desc, onClick) => { const b = el('button', 'fold-opt'); const i = el('span', 'ico'); i.appendChild(svg(icon)); const t = el('span'); t.appendChild(el('b', null, title)); t.appendChild(el('span', 'd', desc)); b.append(i, t); b.addEventListener('click', onClick); opts.appendChild(b) }
+        opt('project', 'Projekt öffnen', 'Dokumente, Anweisungen und gemeinsame Unterhaltungen.', () => { closeDlg(); navigate('#/project/' + m.project) })
+        opt('search', 'Anderes Projekt wählen', 'Die Quelle dieses Gesprächs wechseln.', () => { closeDlg(); pickProjectSource() })
+        card.appendChild(opts)
+        const a = el('div', 'modal-actions'); const x = el('button', 'btn ghost', 'Projekt entfernen'); x.addEventListener('click', () => { current.matter = null; persistCurrent(); closeDlg(); renderAttachments() }); const ok = el('button', 'btn', 'Fertig'); ok.addEventListener('click', closeDlg); a.append(x, el('span', 'sp'), ok); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+      async function pickProjectSource() {
+        await loadProjects()
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.remove('wide')
+        card.appendChild(el('h2', null, 'Projekt verbinden'))
+        card.appendChild(el('div', 'md', 'Der Assistent durchsucht die Dokumente des Projekts und beachtet seine Anweisungen.'))
+        const list = el('div', 'fold-opts'); list.id = 'projectSrcList'; list.style.cssText = 'max-height:50vh;overflow:auto'
+        if (!projectsCache.length) list.appendChild(el('div', 'ms-empty', 'Noch kein Projekt – unter „Alle Projekte“ anlegen.'))
+        for (const p of [...projectsCache].sort((a, b) => b.lastActivity - a.lastActivity)) {
+          const b = el('button', 'fold-opt'); b.dataset.project = p.id
+          const i = el('span', 'ico'); i.appendChild(svg(p.role === 'owner' ? 'project' : 'share'))
+          const t = el('span'); t.appendChild(el('b', null, p.name)); t.appendChild(el('span', 'd', [`${p.documents} Dokument${p.documents === 1 ? '' : 'e'}`, p.role === 'owner' ? (p.members.length ? `geteilt mit ${p.members.length}` : 'eigenes Projekt') : `von ${p.owner?.name || '–'}`].join(' · ')))
+          b.append(i, t); b.addEventListener('click', () => { closeDlg(); useProjectSource(p) }); list.appendChild(b)
+        }
+        card.appendChild(list)
+        const a = el('div', 'modal-actions'); const n = el('button', 'btn ghost', 'Projekte verwalten'); n.addEventListener('click', () => { closeDlg(); navigate('#/projects') }); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); a.append(n, el('span', 'sp'), c); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+      function useProjectSource(p) {
+        if (!p?.matterId) { toast('Projekt nicht verfügbar.'); return }
+        if (!current) newConversation({ keepView: true })
+        current.matter = { id: p.matterId, name: p.name, docIds: [], project: p.id }
+        persistCurrent(); rememberRecent('project', { id: p.id, name: p.name }); renderAttachments()
+        if (current.messages.length && viewName === 'assistant') showChat()
+        toast(`Projekt „${p.name}“ verbunden – der Assistent durchsucht seine Dokumente.`)
+      }
+      async function useRecentProject(r) {
+        await loadProjects()
+        const p = projectsCache.find((x) => x.id === r.id)
+        if (!p) { toast('Projekt nicht mehr verfügbar.'); return }
+        useProjectSource(p)
       }
       async function pickMatterSource() {
         await loadMatters()
@@ -1557,7 +1604,7 @@
         })
       }
 
-      // ---- "Hinzufügen": one entry point for uploads, Microsoft 365, local folder and Akt ----
+      // ---- "Hinzufügen": one entry point for uploads, Microsoft 365, local folder and project ----
       function openAddMenu(anchor) {
         const ms = $('msBtn')
         ms.hidden = !msState.configured
@@ -1565,7 +1612,9 @@
         const nUp = pendingFiles.length
         $('attachItemSub').textContent = nUp ? `${plural(nUp, 'Datei', 'Dateien')} angehängt – weitere hinzufügen` : 'PDF, Word, Excel, Text – auch per Drag & Drop'
         $('folderItemSub').textContent = localFolder ? `Verbunden: ${localFolder.name} – Optionen` : 'bleibt auf dem Gerät, nichts wird vorab hochgeladen'
-        $('matterItemSub').textContent = current?.matter ? `Verbunden: ${current.matter.name} – Optionen` : 'Dokumente auf dem Server, auch für die Due Diligence'
+        // In a project conversation the project already is the source.
+        $('projectSrcBtn').hidden = Boolean(current?.project)
+        $('projectItemSub').textContent = current?.matter?.project ? `Verbunden: ${current.matter.name} – Optionen` : 'Dokumente und Anweisungen eines Projekts'
         renderAddRecent()
         showPop($('addMenu'), anchor)
       }
@@ -1573,9 +1622,9 @@
       addBtn.addEventListener('click', () => { if (openPop?.anchor === addBtn) closePop(); else openAddMenu(addBtn) })
       const menuAction = (fn) => () => { closePop(); fn() }
       attachBtn.addEventListener('click', menuAction(() => fileInput.click()))
-      $('matterBtn').addEventListener('click', menuAction(() => (current?.matter ? openMatterChipDialog() : pickMatterSource())))
+      $('projectSrcBtn').addEventListener('click', menuAction(() => (current?.matter?.project ? openProjectSourceDialog() : pickProjectSource())))
 
-      // recently used folders (directory handles in IndexedDB, per account) and Akten (localStorage)
+      // recently used folders (directory handles in IndexedDB, per account) and projects (localStorage)
       const RECENT_MAX = 3
       const recentKey = (kind) => `aiss.recent.${kind}.${convoScope || 'local'}`
       function rememberRecent(kind, item) {
@@ -1612,12 +1661,12 @@
       function renderAddRecent() {
         const box = $('addRecent'); box.innerHTML = ''
         const folders = window.showDirectoryPicker ? recentList('folder').filter((f) => f.name !== localFolder?.name) : []
-        const matters = recentList('matter').filter((m) => m.id !== current?.matter?.id)
-        if (!folders.length && !matters.length) return
+        const projects = current?.project ? [] : recentList('project').filter((p) => p.id !== current?.matter?.project)
+        if (!folders.length && !projects.length) return
         box.appendChild(el('div', 'pm-sep')); box.appendChild(el('div', 'pm-sec')).appendChild(el('b', null, 'Zuletzt verwendet'))
         const row = (icon, title, sub, fn) => { const b = el('button', 'pm-item sm'); b.setAttribute('role', 'menuitem'); const i = el('span', 'ico'); i.appendChild(svg(icon)); const t = el('span', 'tx'); t.appendChild(el('b', null, title)); t.appendChild(el('span', null, sub)); b.append(i, t); b.addEventListener('click', menuAction(fn)); box.appendChild(b) }
         for (const f of folders) row('localfolder', f.name, 'Lokaler Ordner – erneut verbinden', () => reopenRecentFolder(f.name))
-        for (const m of matters) row('matter', m.name, 'Akt', () => useMatter(m))
+        for (const p of projects) row('project', p.name, 'Projekt', () => useRecentProject(p))
       }
 
       // ---- "Ergebnisse →": where generated files go (per conversation; default: back to the source) ----
@@ -3055,7 +3104,7 @@
         if (busy) { toast('Bitte warten, bis die laufende Antwort fertig ist.'); return }
         const params = {}
         for (const f of a.fields) { const v = String(inputs[f.k].value || '').trim(); if (f.required && !v) { toast(`Bitte „${f.label}“ ausfüllen.`); inputs[f.k].focus(); return } if (v) params[f.k] = v }
-        if (a.needsDocuments && !pendingFiles.length && !pendingMs.length && !localFolder && !current?.matter) { toast('Bitte den Vertrag hochladen, einen Ordner verbinden oder einen Akt wählen.', 4000); return }
+        if (a.needsDocuments && !pendingFiles.length && !pendingMs.length && !localFolder && !current?.matter) { toast('Bitte den Vertrag hochladen, einen Ordner oder ein Projekt verbinden.', 4000); return }
         // A fresh conversation per run; attachments chosen on this page travel along.
         const keep = { files: pendingFiles.slice(), ms: pendingMs.slice(), matter: current?.matter || null }
         newConversation({ keepView: true, matterCtx: keep.matter })
@@ -3966,7 +4015,7 @@
         { chapter: 'Fragen', title: 'Frage stellen', sel: '#composer', route: 'home', html: ['Frage eintippen und mit <b>Enter</b> senden (Umschalt + Enter für eine neue Zeile) – oder mit dem <b>Mikrofon</b> diktieren.', 'Sie sehen live, was passiert: Rechtsgebiet, Anfrage an die Wissensdatenbank, Prüfung der Fundstellen.', 'Folgefragen bleiben im Gespräch – auch zu bereits angehängten Dokumenten.'] },
         { chapter: 'Unterlagen', title: 'Hinzufügen', sel: '#addBtn', route: 'home', text: 'Ein Knopf für alle Unterlagen. Die Zahl daneben zeigt, wie viel gerade angehängt oder verbunden ist.' },
         { chapter: 'Unterlagen', title: 'Dateien anhängen', sel: ['#attachBtn', '#msBtn'], route: 'home', menu: true, html: ['<b>Von diesem Computer</b> – PDF, Word, Excel, Text; auch per Drag & Drop.', '<b>Aus OneDrive / SharePoint</b> – nach der Microsoft-Anmeldung direkt aus den Bibliotheken der Kanzlei.', 'Angehängte Dateien werden mit der Frage geschickt.'] },
-        { chapter: 'Unterlagen', title: 'Quelle verbinden', sel: ['#folderBtn', '#matterBtn'], route: 'home', menu: true, html: ['<b>Lokaler Ordner</b> – der Assistent durchsucht ihn selbst und liest nur, was er braucht; nichts wird vorab hochgeladen.', '<b>Akt</b> – alle Dokumente eines Akts auf dem Server, auch auf anderen Geräten.', 'Zuletzt verwendete Ordner und Akten stehen darunter für einen Klick bereit.'] },
+        { chapter: 'Unterlagen', title: 'Quelle verbinden', sel: ['#folderBtn', '#projectSrcBtn'], route: 'home', menu: true, html: ['<b>Lokaler Ordner</b> – der Assistent durchsucht ihn selbst und liest nur, was er braucht; nichts wird vorab hochgeladen.', '<b>Projekt</b> – die Dokumente eines Projekts auf dem Server; seine Anweisungen gelten mit, das Gespräch bleibt in Ihrem Verlauf.', 'Zuletzt verwendete Ordner und Projekte stehen darunter für einen Klick bereit.'] },
         { chapter: 'Unterlagen', title: 'Ergebnisse →', sel: '#saveLine', route: 'home', demoSave: true, text: 'Zeigt, wohin erzeugte Dateien (Word, Excel, PDF) gespeichert werden: automatisch dorthin, woher die Unterlagen kommen – in den lokalen Ordner oder nach SharePoint, nie überschreibend. Ein Klick ändert das Ziel für dieses Gespräch.' },
         { chapter: 'Skills', title: 'Skills anwenden', sel: '#skillBtn', route: 'home', text: 'Wiederverwendbare Arbeitsanweisungen – etwa Zusammenfassen, Tabellarische Übersicht (Excel oder Word), Versionen vergleichen oder Mandantenbrief. Hier wählen oder einfach „/“ ins Eingabefeld tippen; passende Skills wendet der Assistent auch selbst an.' },
         { chapter: 'Antworten', title: 'Antworten, denen Sie folgen können', route: 'home', html: ['<b>Fundstellen</b> aus der Wissensdatenbank, verlinkt ins RIS.', '<b>RIS-Prüfung</b>: jede zitierte Norm und Entscheidung wird gegen das Rechtsinformationssystem geprüft – ✓ bestätigt, ⚠ außer Kraft oder nicht gefunden.', '<b>Dateien</b> als Word, Excel oder PDF, Export der Antwort als Word.', '<b>Kosten</b> – genau ausgewiesen je Antwort.'] },
