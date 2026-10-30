@@ -179,14 +179,30 @@ documents (upload, folder, Microsoft 365, Akt) and its reference material: the
 review grid of 16 points (parties and representation, Gewährleistung, Haftung,
 § 879 ABGB / § 6 KSchG, Pönale § 1336 ABGB, Laufzeit, § 1396a ABGB, DSGVO, KartG,
 Form and Gebühren nach § 33 GebG, Rechtswahl and Gerichtsstand), 17 contract types
-with their mandatory law, form and fee notes, and 14 kinds of pleadings (Klage
-§ 226 ZPO, Mahnklage, Einspruch, Klagebeantwortung, Berufung, Rekurs, Revision,
+with their mandatory law, form and fee notes, and 13 kinds of pleadings (Klage
+§ 226 ZPO, Einspruch, Klagebeantwortung, Berufung, Rekurs, Revision,
 einstweilige Verfügung, Exekutionsantrag, Bescheidbeschwerde § 9 VwGVG, Revision
 an den VwGH, Privatbeteiligung). A run has phases (review → redline; outline →
 draft → self-check; legal analysis and outline → draft → counter-arguments); the
 answer shows the next step as a button, and the next phase builds on the
 conversation. Later phases do not ask the knowledge base again, drafting phases
-run on the main model. `GET /api/agents` serves the configuration;
+run on the main model.
+
+**Schriftsatz entwerfen** takes form, structure and procedure from the model's
+knowledge of Austrian practice (current figures such as Wertgrenzen or fees via
+web search); the knowledge base is not asked up front – the model may ask
+AI:ssociate once (`ask_aissociate`) only for a concrete legal question raised by
+the facts. There is no Mahnklage type: a Klage that seeks only payment of up to
+75.000 EUR is a Mahnklage (§ 244 ZPO) – the form shows a hint and the agent,
+instead of drafting, points to filing it directly in the ERV (structured form, not
+a full-text Klage), lists the form data and checks the exceptions of § 244 Abs 2
+ZPO. The Word brief is laid out by `lib/brief_layout.py` (copied into the sandbox
+as `.aiss/brief_layout.py`): the model writes the text with line markers
+(`[ADRESSAT]`, `[PARTEI] Klagende Partei: | …`, `[WEGEN]`, `[STREITWERT]`,
+`[TITEL]`, `[H]`, `[P]`, `[BEWEIS]`, `[ANTRAG]`, `[SCHLUSS]`), the module sets the
+Rubrum (addressee, party table, wegen, Streitwert, title), numbered paragraphs,
+indented "Beweis:" blocks and Begehren, signature line, page numbers and yellow
+placeholders. `GET /api/agents` serves the configuration;
 `POST /api/chat` takes `task: { type: 'agent', agent, phase, params }`.
 
 ## Skills

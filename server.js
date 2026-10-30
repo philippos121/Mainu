@@ -2415,10 +2415,15 @@ app.post('/api/chat', async (req, res) => {
   }
   async function toolCreateFile(args, stepId) {
     await ensureSandbox()
+    // A layout module of the agent phase (e.g. the Austrian brief layout), in a hidden folder so it is no result file.
+    if (agentRun?.layout && /^[\w-]+\.py$/.test(agentRun.layout)) {
+      try { const src = await fsp.readFile(path.join(__dirname, 'lib', agentRun.layout)); await sandbox.files.write(`${WORKDIR}/.aiss/${agentRun.layout}`, src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength)) } catch (e) { console.error('layout module:', e?.message) }
+    }
     const task = String(args.task || '')
     const wanted = Array.isArray(args.output_files) ? args.output_files.map(String) : []
     const uploadLine = uploads.length ? `Hochgeladene Dateien in /home/user: ${uploads.map((u) => u.name).join(', ')}.` : 'Keine hochgeladenen Dateien.'
-    let input = [{ role: 'user', content: `${uploadLine}\nGewünschte Ausgabedateien: ${wanted.join(', ') || 'passend benennen'}.\n\nAUFGABE:\n${task}` }]
+    // An agent phase may fix the layout (e.g. the Austrian brief format); it goes along with every file task.
+    let input = [{ role: 'user', content: `${uploadLine}\nGewünschte Ausgabedateien: ${wanted.join(', ') || 'passend benennen'}.\n\nAUFGABE:\n${task}${agentRun?.fileSpec ? `\n\n${agentRun.fileSpec}` : ''}` }]
     let prevId
     let lastOut = ''
     let newFiles = []
@@ -2615,9 +2620,11 @@ app.post('/api/chat', async (req, res) => {
     let text = ''
     // read_document for every document whose text is not inline (long uploads, documents of earlier turns).
     const readable = [...uploadTexts.keys()].filter((n) => !(inlineAll && uploads.some((u) => u.name === n)))
-    const kbTool = Boolean(filesSrc && heavy && kbAllowed && AISSOCIATE_API_KEY && aissCalls === 0)
+    const kbOnDemand = agentRun?.kbMode === 'tool'
+    const kbTool = Boolean((filesSrc || kbOnDemand) && heavy && kbAllowed && AISSOCIATE_API_KEY && aissCalls === 0)
     const baseTools = [TOOL_FILE, ...(readable.length ? [TOOL_READ_DOCUMENT] : []), ...(filesSrc ? TOOLS_FILES : []), ...(kbTool ? [TOOL_ASK_AISSOCIATE_CTX] : [])]
-    const instructions = docInstructions(useWeb) + (filesSrc ? filesInstructions({ local: filesSrc.kind === 'local', name: filesSrc.name, count: filesSrc.count, kbTool }) : '')
+    const instructions = docInstructions(useWeb) + (filesSrc ? filesInstructions({ local: filesSrc.kind === 'local', name: filesSrc.name, count: filesSrc.count, kbTool }) : '') +
+      (kbTool && !filesSrc ? `\n- ask_aissociate: höchstens EIN Aufruf, nur für konkrete Rechtsfragen, die sich aus dem Vorbringen ergeben und nicht gesichert zu beantworten sind; den einschlägigen Sachverhalt in context mitgeben. Nicht für Aufbau, Form oder allgemeine Verfahrensfragen.` : '')
     // Folder searches need a few more steps (search → read → maybe a second search → deliverable).
     const maxSteps = filesSrc ? DOC_MAX_STEPS + 6 : DOC_MAX_STEPS
     for (let i = 1; i <= maxSteps; i++) {
@@ -2761,6 +2768,8 @@ app.post('/api/chat', async (req, res) => {
     // Without the knowledge base a legal question is answered directly (as an easy one).
     if (!kbAllowed && plan.mode === 'legal') plan.difficulty = 'easy'
     if (!kbAllowed) plan.questions = []
+    // Agent phases with kb 'tool': no questions up front – the model asks once itself, if the facts raise one.
+    if (agentRun?.kbMode === 'tool') plan.questions = []
     if (plan.mode === 'legal' && !plan.questions.length) plan.questions = [prompt]
     if (plan.mode === 'general') plan.questions = []
     if (!foreignLaw && plan.mode !== 'general' && (plan.jurisdiction === 'DE' || plan.jurisdiction === 'other')) foreignLaw = plan.jurisdiction
