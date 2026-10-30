@@ -1,0 +1,13 @@
+{
+  "akt": "Beispiel – Erwartung eines Reviewers für einen Akt (Muster, keine echten Daten)",
+  "targets": { "highRecall": 100, "recall": 80, "redPrecision": 80, "duplicates": 0, "traps": 0, "evidence": 100, "maxWords": 15000 },
+  "themes": [
+    { "match": "kontrollwechsel|change.of.control", "grade": "red", "label": "Kontrollwechselklausel im Finanzierungsvertrag" },
+    { "match": "gewerberechtliche[rn]? geschäftsführer", "grade": "red", "label": "Funktionsträger laut Bescheid weggefallen" },
+    { "match": "beschluss ohne alle gesellschafter", "grade": "amber", "label": "Umlaufbeschluss ohne alle Gesellschafter" }
+  ],
+  "traps": [
+    { "match": "reverse.?charge", "label": "Reverse Charge bei Bauleistungen ohne Hinweis auf Fehler" },
+    { "match": "vinkulierung|aufgriffsrecht", "label": "Vinkulierung, obwohl alle Gesellschafter verkaufen" }
+  ]
+}

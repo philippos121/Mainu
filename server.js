@@ -12,8 +12,13 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { PDFDocument } from 'pdf-lib'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
-import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, DD_HARD_IN, DD_HARD_OUT } from './lib/dd.js'
-import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
+import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, skipDoc, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
+import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES } from './lib/ddconfig.js'
+import { sha256, unpackArchive, parseEml, parseMsg, ARCHIVE_RE, MAIL_RE, reconcile } from './lib/inventory.js'
+import { SearchIndex } from './lib/search.js'
+import { buildRegister } from './lib/facts.js'
+import { effectiveGrade, liveTheme, buildThemes, overallAssessment } from './lib/severity.js'
+import ExcelJS from 'exceljs'
 import { agentsForClient, buildAgentTask, BRIEF_MARKUP, CONTRACT_MARKUP } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
 import { BUILTIN_SKILLS, SKILL_OUTPUTS, SKILL_KB, SKILL_AREAS, SKILL_LIMITS, normalizeSkill, skillBlock, skillOutput, skillView } from './lib/skills.js'
@@ -89,7 +94,7 @@ const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
 const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
 const DD_MAX_DOC_BYTES = Number(process.env.DD_MAX_DOC_BYTES || 30 * 1024 * 1024)
 const DD_MAX_CONCURRENT = Number(process.env.DD_MAX_CONCURRENT || 2)
-const DOC_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp)$/i
+const DOC_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp|xlsx|eml|msg|zip|7z)$/i
 
 // Sandbox (only used by the file tool).
 const WORKDIR = '/home/user'
@@ -226,7 +231,8 @@ class BudgetExceeded extends Error {}
  * (models that reject `reasoning`, hosted web_search, max_tool_calls or
  * structured output).
  */
-async function callModel(ctx, { model, instructions, input, tools, toolChoice, effort, prevId, maxOut, text, maxToolCalls }) {
+const temperatureRejected = new Set()
+async function callModel(ctx, { model, instructions, input, tools, toolChoice, effort, prevId, maxOut, text, maxToolCalls, temperature }) {
   // Per-question budgets by default; long-running matter jobs bring their own limits.
   const remainingOut = (ctx.limits?.outMax ?? MAX_OUTPUT_TOKENS) - ctx.usage.outTok
   const remainingIn = (ctx.limits?.inMax ?? MAX_INPUT_TOKENS) - ctx.usage.inTok
@@ -242,6 +248,8 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     ...(effort ? { reasoning: { effort } } : {}),
     ...(prevId ? { previous_response_id: prevId } : {}),
     ...(text ? { text } : {}),
+    // Temperature 0 for reproducible due-diligence results; models that reject it run without (remembered).
+    ...(temperature != null && !temperatureRejected.has(model) ? { temperature } : {}),
   }
   // Transient failures (429, 5xx, network) are retried with backoff – a data
   // room of 300 documents must not lose a document to one rate-limit burst.
@@ -266,6 +274,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     const p2 = { ...params }
     let changed = false
     if (p2.max_tool_calls && /max_tool_calls/i.test(msg)) { delete p2.max_tool_calls; changed = true }
+    if (p2.temperature != null && /temperature/i.test(msg)) { delete p2.temperature; temperatureRejected.add(model); changed = true }
     if (p2.reasoning && /reasoning/i.test(msg)) { delete p2.reasoning; changed = true }
     if (p2.tools && /web_search/i.test(msg)) { webSearchRejected = true; console.warn(`web search rejected by ${model}: disabled for this process`); p2.tools = p2.tools.filter((t) => !String(t.type).startsWith('web_search')); if (!p2.tools.length) { delete p2.tools; delete p2.tool_choice; delete p2.max_tool_calls }; changed = true }
     if (p2.text && /text|format|schema/i.test(msg)) { delete p2.text; changed = true }
@@ -735,7 +744,7 @@ const OCR_ENABLED = process.env.OCR !== 'off'
 const OCR_PAGES_PER_CALL = Number(process.env.OCR_PAGES_PER_CALL || 10)
 const OCR_MAX_PAGES = Number(process.env.OCR_MAX_PAGES || 400)
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i
-const OCR_INSTRUCTIONS = `Du bist ein präziser OCR-Dienst einer österreichischen Rechtsanwaltskanzlei. Transkribiere den gesamten sichtbaren Text wörtlich und vollständig in der Reihenfolge der Seiten – auch Kopf- und Fußzeilen, Stempel, Randvermerke und handschriftliche Ergänzungen (als [handschriftlich: …]). Jede Seite beginnt mit einer eigenen Zeile „--- Seite N ---“. Tabellen als Markdown-Tabellen. Nichts zusammenfassen, nichts ergänzen, nichts übersetzen, keine Kommentare; Unleserliches als [unleserlich]. Antworte nur mit dem transkribierten Text.`
+const OCR_INSTRUCTIONS = `Du bist ein präziser OCR-Dienst einer österreichischen Rechtsanwaltskanzlei. Transkribiere den gesamten sichtbaren Text wörtlich und vollständig in der Reihenfolge der Seiten – auch Kopf- und Fußzeilen, Randvermerke, Stempel (als [Stempel: …]) und handschriftliche Ergänzungen, Unterschriften und Paraphen (als [handschriftlich: …]). Jede Seite beginnt mit einer eigenen Zeile „--- Seite N ---“. Tabellen als Markdown-Tabellen. Nichts zusammenfassen, nichts ergänzen, nichts übersetzen, keine Kommentare; Unleserliches als [unleserlich]. Antworte nur mit dem transkribierten Text.`
 /** A PDF whose text layer is (nearly) empty: under ~80 visible characters per page. */
 const needsOcr = (text, pages) => String(text || '').replace(/\s+/g, '').length < Math.max(1, pages || 1) * 80
 function ocrPool(n) {
@@ -786,6 +795,9 @@ async function extractText(name, buf, { ctx = null } = {}) {
       return await ocrDocument(ctx, name, buf)
     }
     if (ext === 'docx') { const r = await mammoth.extractRawText({ buffer: buf }); return { text: r.value || '' } }
+    if (ext === 'xlsx') { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf); const parts = []; wb.eachSheet((ws) => { const rows = []; ws.eachRow({ includeEmpty: false }, (row) => { if (rows.length < 5000) rows.push(row.values.slice(1).map((v) => (v && typeof v === 'object' ? (v.result ?? v.text ?? (v.richText ? v.richText.map((x) => x.text).join('') : v instanceof Date ? v.toISOString().slice(0, 10) : '')) : v ?? '')).map((v) => String(v).replace(/[;\n]+/g, ' ')).join(';')) }); parts.push(`--- Blatt ${ws.name} ---\n${rows.join('\n')}`) }); return { text: parts.join('\n\n') } }
+    if (ext === 'eml') return { text: parseEml(buf).text }
+    if (ext === 'msg') return { text: parseMsg(buf).text }
     if (['txt', 'md', 'csv', 'json', 'xml', 'rtf'].includes(ext)) return { text: buf.toString('utf8') }
     if (['html', 'htm'].includes(ext)) return { text: htmlToText(buf.toString('utf8')) }
   } catch (e) {
@@ -1755,11 +1767,11 @@ app.delete('/api/projects/:id/convos/:cid', async (req, res) => {
 const matterSummary = (m) => ({
   id: m.id, name: m.name, kind: m.kind, client: m.client, createdAt: m.createdAt, updatedAt: m.updatedAt, settings: m.settings,
   documents: m.documents.length, analysed: m.documents.filter((d) => d.status === 'analysed').length,
-  red: m.findings.filter((f) => f.severity === 'red').length, amber: m.findings.filter((f) => f.severity === 'amber').length,
+  red: (m.themes || []).filter((t) => liveTheme(t) && effectiveGrade(t) === 'red').length, amber: (m.themes || []).filter((t) => liveTheme(t) && effectiveGrade(t) === 'amber').length,
   status: m.job?.status || 'idle', stage: m.job?.stage || null, progress: m.job?.progress || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null,
   assessment: m.executive?.overall_assessment || null, reports: (m.reports || []).length, tables: (m.tables || []).length,
 })
-const matterView = (m) => ({ ...m, ownerKey: undefined, job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
+const matterView = (m) => ({ ...m, ownerKey: undefined, inventory: reconcile(m), job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
 async function loadMatter(req, res) {
   const owner = ownerOf(req)
   if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
@@ -1777,10 +1789,12 @@ const ddDeps = (send) => ({
   // Per document: legal questions are answered by the model with a web search in the RIS; the
   // knowledge base only for very hard questions (lib/dd.js decides, a few per run).
   askKnowledgeBase: AISSOCIATE_API_KEY ? async ({ question, legalArea }) => { const r = await askAissociate({ question: KB_BRIEF + question, legalArea: LEGAL_AREAS[legalArea] ? legalArea : 'civil', scope: '', threadId: null }); return { answer: r.answer, sources: r.sources } } : null,
-  answerEasyLegal: async (ctx, { question, ris = false }) => {
+  cache: { get: (k) => store.getCache(k), set: (k, v) => store.putCache(k, v) },
+  searchIndex: (m) => aktIndex(m),
+  answerEasyLegal: async (ctx, { question, ris = false, maxSearches = MAX_WEB_SEARCHES }) => {
     const web = WEB_SEARCH_ENABLED && !webSearchRejected
     const risHint = ris && web ? ' Suche bevorzugt im RIS (ris.bka.gv.at: Bundes- und Landesrecht in der geltenden Fassung, Judikatur von OGH, VwGH, VfGH) und belege mit RIS-Links.' : ''
-    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(web) + risHint, effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? MAX_WEB_SEARCHES : undefined })
+    const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(web) + risHint, effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? maxSearches : undefined })
     const sources = []
     for (const o of resp.output || []) if (o.type === 'message') for (const part of o.content || []) for (const ann of part.annotations || []) if (ann.type === 'url_citation' && ann.url && !sources.some((x) => x.url === ann.url)) sources.push({ title: ann.title || ann.url, url: ann.url })
     return { answer: resp.output_text || '', sources }
@@ -1804,25 +1818,88 @@ function startMatterJob(m, kind, runner) {
   })()
   return job.id
 }
-async function addDocumentFromBuffer(m, { name, buf, source, ms, folder = '' }) {
-  if (m.documents.length >= DD_MAX_DOCS) throw new Error(`Höchstens ${DD_MAX_DOCS} Dokumente je Akt.`)
-  if (buf.length > DD_MAX_DOC_BYTES) throw new Error(`überschreitet ${Math.round(DD_MAX_DOC_BYTES / 1048576)} MB`)
+/**
+ * Adds a file to the inventory of an Akt. Archives (.zip, .7z) are unpacked and e-mails (.eml, .msg)
+ * contribute their attachments – every part is a document with a reference to its parent. Duplicates
+ * (same SHA-256) and files over the limits stay in the inventory as "übersprungen" with the reason.
+ */
+async function addDocumentFromBuffer(m, { name, buf, source, ms, folder = '', parent = null, depth = 0 }) {
   const safe = path.basename(String(name)).replace(/[^\w.\- ()äöüÄÖÜß]/g, '_').slice(0, 200)
-  if (!DOC_EXT.test(safe)) throw new Error('Dateityp nicht unterstützt (PDF, Word, Text)')
   // Subfolder of a data room (e.g. "Datenraum/03 Verträge"), so equal names in different folders stay apart.
   const dir = String(folder || '').replace(/\\/g, '/').split('/').map((x) => x.trim().replace(/[^\w.\- ()äöüÄÖÜß&,]/g, '_')).filter((x) => x && x !== '.' && x !== '..').join('/').slice(0, 300)
-  const dup = m.documents.find((d) => d.name === safe && d.size === buf.length && (d.folder || '') === dir)
-  if (dup) return { doc: dup, duplicate: true }
-  const d = newDocument({ name: safe, size: buf.length, source, ms, no: nextNo(m, 'doc') })
-  if (dir) d.folder = dir
+  if (m.documents.length >= DD_MAX_DOCS * 4) throw new Error('Inventar voll')
+  const known = DOC_EXT.test(safe)
+  if (!known && !parent) throw new Error('Dateityp nicht unterstützt (PDF, Word, Excel, Text, Bilder, E-Mails, ZIP/7z)')
+  const hash = buf ? sha256(buf) : ''
+  const same = hash && m.documents.find((d) => d.sha256 === hash && d.name === safe && (d.folder || '') === dir && (d.parent || null) === parent)
+  if (same) return { doc: same, duplicate: true }
+  const d = newDocument({ name: safe, size: buf?.length || 0, source, ms, no: nextNo(m, 'doc') })
+  d.sha256 = hash; if (dir) d.folder = dir; if (parent) d.parent = parent
+  if (!known) { skipDoc(d, 'unsupported'); m.documents.push(d); return { doc: d, duplicate: false } }
+  const docs = m.documents.filter((x) => !x.container).length
+  if (ARCHIVE_RE.test(safe)) {
+    d.container = true; d.status = 'unpacked'
+    m.documents.push(d)
+    if (depth >= 3) { d.note = 'zu tief verschachtelt – nicht entpackt'; return { doc: d, duplicate: false } }
+    let parts
+    try { parts = await unpackArchive(safe, buf, { maxFileBytes: DD_MAX_DOC_BYTES }) } catch (e) { d.container = false; skipDoc(d, 'failed', 'Archiv nicht lesbar: ' + String(e?.message || e).slice(0, 80)); return { doc: d, duplicate: false } }
+    const base = [dir, safe.replace(/\.(zip|7z)$/i, '')].filter(Boolean).join('/')
+    for (const part of parts) {
+      const sub = [base, part.folder].filter(Boolean).join('/')
+      if (part.tooLarge || !part.buf) { const x = newDocument({ name: part.name, size: part.size, source, no: nextNo(m, 'doc') }); x.folder = sub; x.parent = d.id; skipDoc(x, 'limit', `größer als ${Math.round(DD_MAX_DOC_BYTES / 1048576)} MB`); m.documents.push(x); continue }
+      try { await addDocumentFromBuffer(m, { name: part.name, buf: part.buf, source, folder: sub, parent: d.id, depth: depth + 1 }) } catch {}
+    }
+    d.note = `${parts.length} Datei${parts.length === 1 ? '' : 'en'} entpackt`
+    return { doc: d, duplicate: false, parts: parts.length }
+  }
+  // Over the limits: listed in the inventory as skipped, the file is not stored.
+  if (docs >= DD_MAX_DOCS) { skipDoc(d, 'limit', `mehr als ${DD_MAX_DOCS} Dokumente`); m.documents.push(d); return { doc: d, duplicate: false } }
+  if (buf.length > DD_MAX_DOC_BYTES) { skipDoc(d, 'limit', `größer als ${Math.round(DD_MAX_DOC_BYTES / 1048576)} MB`); m.documents.push(d); return { doc: d, duplicate: false } }
+  const twin = m.documents.find((x) => x.sha256 === hash && x.file && !x.duplicateOf)
+  if (twin) { d.duplicateOf = twin.id; skipDoc(d, 'duplicate', `von ${twin.no}`) }
   d.file = await store.putFile(m.id, d.id, safe.split('.').pop(), buf)
   m.documents.push(d)
+  // E-mails: the message is a document; its attachments become documents of their own.
+  if (MAIL_RE.test(safe) && depth < 3 && !twin) {
+    try {
+      const mail = /\.eml$/i.test(safe) ? parseEml(buf) : parseMsg(buf)
+      for (const a of mail.attachments) { try { await addDocumentFromBuffer(m, { name: a.name, buf: a.buf, source, folder: [dir, safe].filter(Boolean).join('/'), parent: d.id, depth: depth + 1 }) } catch {} }
+    } catch (e) { d.note = 'Anhänge nicht lesbar: ' + String(e?.message || e).slice(0, 80) }
+  }
   return { doc: d, duplicate: false }
+}
+// Per-Akt search index (full text, optionally vectors), rebuilt when the documents change.
+const DD_EMBED_MODEL = process.env.DD_EMBED_MODEL || ''
+const aktIndexes = new Map()
+async function aktIndex(m) {
+  const docs = m.documents.filter((d) => !d.container && !d.duplicateOf && (['read', 'extracted', 'analysed'].includes(d.status) || (d.status === 'skipped' && d.skipReason === 'secondary' && d.textChars)))
+  const sig = crypto.createHash('md5').update(docs.map((d) => `${d.id}:${d.textHash}:${d.role}`).join('|')).digest('hex')
+  const hit = aktIndexes.get(m.id)
+  if (hit?.signature === sig) return hit
+  const idx = new SearchIndex()
+  for (const d of docs) idx.add(d, await store.getText(m.id, d.id))
+  idx.signature = sig
+  if (DD_EMBED_MODEL && idx.passages.length) {
+    try {
+      const u = m.job.usage
+      await idx.embedAll(async (texts) => { const r = await getOpenAI().embeddings.create({ model: DD_EMBED_MODEL, input: texts }); if (u) u.inTok += r.usage?.total_tokens || Math.ceil(texts.join('').length / 4); return r.data.map((x) => x.embedding) })
+      idx.embed = async (q) => (await getOpenAI().embeddings.create({ model: DD_EMBED_MODEL, input: [q] })).data[0].embedding
+    } catch (e) { console.warn('embeddings unavailable:', e?.message || e) }
+  }
+  if (aktIndexes.size > 20) aktIndexes.delete(aktIndexes.keys().next().value)
+  aktIndexes.set(m.id, idx)
+  return idx
+}
+/** Theme rebuild after a review operation (no model calls; the calibration of the last run is kept). */
+function rethemeLocal(m) {
+  const r = buildThemes(m, [...(m.themes || []), ...(m.orphanThemes || [])], { carry: true })
+  m.themes = r.themes; m.orphanThemes = r.orphans
+  if (m.executive) m.executive.overall_assessment = overallAssessment(m.themes)
 }
 const FINDING_FIELDS = ['title', 'description', 'quote', 'location', 'recommendation', 'severity', 'area', 'dealImpact', 'norms', 'docId']
 const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
-app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
 
 // ---- skills: reusable instruction packages of the workspace (plus the standard skills) ----
 async function findSkill(owner, id) {
@@ -1921,6 +1998,16 @@ app.patch('/api/matters/:id/findings/:fid', async (req, res) => {
   const f = m.findings.find((x) => x.id === req.params.fid)
   if (!f) return res.status(404).json({ error: 'Befund nicht gefunden.' })
   const b = req.body || {}
+  // Evidence of a theme: move the finding to another theme or remove it as evidence.
+  if ('themeId' in b || b.removeFromTheme || b.restoreTheme) {
+    const ops = (m.themeOps ||= { assign: {}, merges: {}, manual: [] })
+    if (b.removeFromTheme) ops.assign[f.key] = 'removed'
+    else if (b.restoreTheme) delete ops.assign[f.key]
+    else { const t = findTheme(m, String(b.themeId)); if (!t) return res.status(404).json({ error: 'Thema nicht gefunden.' }); ops.assign[f.key] = t.key }
+    rethemeLocal(m)
+    await store.saveMatter(m)
+    return res.json({ finding: f, themes: m.themes })
+  }
   f.review ||= { status: 'open', severity: null, note: '', ts: null }
   if (b.review && typeof b.review === 'object') {
     if (REVIEW_STATUS.includes(b.review.status)) f.review.status = b.review.status
@@ -1953,6 +2040,7 @@ app.post('/api/matters/:id/findings', async (req, res) => {
   f.review = { status: 'accepted', severity: null, note: String(b.note || '').slice(0, 1000), ts: Date.now() }
   f.evidence = f.quote ? locateQuote(await store.getText(m.id, d.id), f.quote).status : 'unverified'
   m.findings.push(f)
+  if (m.version >= 2) rethemeLocal(m)
   await store.saveMatter(m)
   res.json({ finding: f })
 })
@@ -2030,6 +2118,9 @@ app.delete('/api/matters/:id/documents/:docId', async (req, res) => {
   const [d] = m.documents.splice(i, 1)
   m.findings = m.findings.filter((f) => f.docId !== d.id)
   for (const t of m.tables || []) t.rows = (t.rows || []).filter((r) => r.docId !== d.id)
+  // Parts of an archive or e-mail stay in the Akt on their own; themes lose the evidence of this document.
+  for (const x of m.documents) { if (x.parent === d.id) x.parent = null; if (x.duplicateOf === d.id) { x.duplicateOf = null; if (x.skipReason === 'duplicate') { x.status = 'new'; x.skipReason = ''; x.note = '' } } }
+  if (m.version >= 2) rethemeLocal(m)
   try { await store.deleteDocument(m.id, d.id, d.file) } catch {}
   await store.saveMatter(m)
   res.json({ ok: true, documents: m.documents })
@@ -2112,17 +2203,122 @@ app.post('/api/matters/:id/import-ms', async (req, res) => {
   res.json({ jobId })
 })
 
+// ---- inventory: role and legal subject set by the reviewer ----
+app.patch('/api/matters/:id/documents/:docId', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Während eines laufenden Vorgangs nicht möglich.' })
+  const d = m.documents.find((x) => x.id === req.params.docId)
+  if (!d || d.container) return res.status(404).json({ error: 'Dokument nicht gefunden.' })
+  const b = req.body || {}
+  if (LEGAL_SUBJECTS.includes(b.subject)) { d.subject = b.subject; d.subjectBy = 'Prüfer' }
+  if (DOC_ROLES.includes(b.role) && b.role !== d.role) {
+    const was = d.role
+    d.role = b.role; d.roleBy = 'Prüfer'
+    // A secondary source is not analysed; a document that is no longer one goes through extraction and analysis.
+    if (b.role === 'Sekundärquelle' && !m.settings.secondaryAsHypotheses && d.status !== 'skipped') { skipDoc(d, 'secondary', 'vom Prüfer als Sekundärquelle eingestuft'); m.findings = m.findings.filter((f) => f.docId !== d.id || f.source === 'manual') }
+    else if (was === 'Sekundärquelle' && d.skipReason === 'secondary') { d.status = d.textChars ? 'read' : 'new'; d.skipReason = ''; d.note = '' }
+  }
+  await store.saveMatter(m)
+  res.json({ document: d, inventory: reconcile(m) })
+})
+
+// ---- facts register: reviewer corrections (recompute from the crosscheck afterwards) ----
+app.post('/api/matters/:id/facts/corrections', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Während eines laufenden Vorgangs nicht möglich.' })
+  const b = req.body || {}
+  if (!['edit', 'delete', 'add'].includes(b.action)) return res.status(400).json({ error: 'Aktion fehlt.' })
+  if (b.action !== 'add' && !(m.facts?.entries || []).some((e) => e.id === b.factId)) return res.status(404).json({ error: 'Fakt nicht gefunden.' })
+  if (b.action === 'add' && !FACT_TYPES[b.type]) return res.status(400).json({ error: 'Faktentyp fehlt.' })
+  const str = (v, n = 200) => (typeof v === 'string' ? v.slice(0, n) : undefined)
+  const c = { id: JsonStore.newId('fc'), action: b.action, factId: b.action === 'add' ? undefined : String(b.factId), type: b.action === 'add' ? b.type : undefined, subject: str(b.subject), attribute: str(b.attribute), value: str(b.value, 400), counterparty: str(b.counterparty), validFrom: str(b.validFrom, 10), validTo: str(b.validTo, 10), amount: b.amount === '' || b.amount == null ? (b.action === 'add' ? null : undefined) : Number(b.amount), flags: Array.isArray(b.flags) ? b.flags.filter((x) => FACT_FLAGS.includes(x)) : undefined, note: str(b.note, 500) || '', by: req.user?.name || '', ts: Date.now() }
+  if (c.action === 'add') c.id = `K-${String((m.factCorrections || []).filter((x) => x.action === 'add').length + 1).padStart(3, '0')}`
+  ;(m.factCorrections ||= []).push(c)
+  m.facts = buildRegister(m)
+  m.job.recompute = 5
+  await store.saveMatter(m)
+  res.json({ facts: m.facts, corrections: m.factCorrections })
+})
+app.delete('/api/matters/:id/facts/corrections/:cid', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  m.factCorrections = (m.factCorrections || []).filter((c) => c.id !== req.params.cid)
+  m.facts = buildRegister(m); m.job.recompute = 5
+  await store.saveMatter(m)
+  res.json({ facts: m.facts, corrections: m.factCorrections })
+})
+
+// ---- themes: review, create, merge, split ----
+const findTheme = (m, id) => (m.themes || []).find((t) => t.id === id) || (m.orphanThemes || []).find((t) => t.id === id)
+app.patch('/api/matters/:id/themes/:tid', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const t = findTheme(m, req.params.tid)
+  if (!t) return res.status(404).json({ error: 'Thema nicht gefunden.' })
+  const b = req.body || {}, r = (t.review ||= { status: 'open', grade: null, instrument: null, note: '', ts: null })
+  if (REVIEW_STATUS.includes(b.status)) r.status = b.status
+  if ('grade' in b) { r.grade = ['red', 'amber', 'green'].includes(b.grade) ? b.grade : null; if (r.status === 'open' || r.status === 'accepted') r.status = 'modified' }
+  if ('instrument' in b) { r.instrument = DEAL_IMPACTS.includes(b.instrument) ? b.instrument : null; if (r.status === 'open' || r.status === 'accepted') r.status = 'modified' }
+  if (typeof b.note === 'string') r.note = b.note.slice(0, 2000)
+  if (typeof b.title === 'string' && b.title.trim()) { r.title = b.title.trim().slice(0, 200); t.title = r.title; if (r.status === 'open') r.status = 'modified' }
+  if (typeof b.description === 'string') { r.description = b.description.slice(0, 4000); t.description = r.description; if (r.status === 'open') r.status = 'modified' }
+  r.ts = Date.now(); r.by = req.user?.name || ''
+  if (t.orphaned && b.dismiss) m.orphanThemes = (m.orphanThemes || []).filter((x) => x.id !== t.id)
+  if (m.executive) m.executive.overall_assessment = overallAssessment(m.themes)
+  await store.saveMatter(m)
+  res.json({ theme: t, overall: m.executive?.overall_assessment || null })
+})
+app.post('/api/matters/:id/themes', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const b = req.body || {}
+  if (!String(b.title || '').trim()) return res.status(400).json({ error: 'Titel fehlt.' })
+  const ops = (m.themeOps ||= { assign: {}, merges: {}, manual: [] })
+  const key = `M-${JsonStore.newId('t')}`
+  ops.manual.push({ key, title: String(b.title).trim().slice(0, 200), description: String(b.description || '').slice(0, 4000), area: DD_AREA_KEYS.includes(b.area) ? b.area : 'none', grade: ['red', 'amber', 'green'].includes(b.grade) ? b.grade : 'amber', review: { status: 'accepted', grade: ['red', 'amber', 'green'].includes(b.grade) ? b.grade : 'amber', instrument: DEAL_IMPACTS.includes(b.instrument) ? b.instrument : null, note: String(b.note || '').slice(0, 2000), ts: Date.now() } })
+  for (const fid of Array.isArray(b.findingIds) ? b.findingIds : []) { const f = m.findings.find((x) => x.id === fid); if (f) ops.assign[f.key] = key }
+  rethemeLocal(m)
+  await store.saveMatter(m)
+  res.json({ theme: m.themes.find((t) => t.key === key), themes: m.themes })
+})
+app.post('/api/matters/:id/themes/:tid/merge', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const t = findTheme(m, req.params.tid), into = findTheme(m, String(req.body?.into || ''))
+  if (!t || !into || t === into) return res.status(400).json({ error: 'Ziel-Thema wählen.' })
+  const ops = (m.themeOps ||= { assign: {}, merges: {}, manual: [] })
+  ops.merges[t.key] = into.key
+  for (const f of m.findings) if (ops.assign[f.key] === t.key) ops.assign[f.key] = into.key
+  rethemeLocal(m)
+  await store.saveMatter(m)
+  res.json({ themes: m.themes })
+})
+app.post('/api/matters/:id/themes/:tid/split', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const t = findTheme(m, req.params.tid)
+  const ids = (Array.isArray(req.body?.findingIds) ? req.body.findingIds : []).filter((id) => t?.findingIds.includes(id))
+  if (!t || !ids.length || ids.length >= t.findingIds.length) return res.status(400).json({ error: 'Befunde für das neue Thema wählen (nicht alle).' })
+  const ops = (m.themeOps ||= { assign: {}, merges: {}, manual: [] })
+  const first = m.findings.find((f) => f.id === ids[0])
+  const key = `M-${JsonStore.newId('t')}`
+  ops.manual.push({ key, title: String(req.body?.title || first?.title || 'Abgespaltenes Thema').slice(0, 200), description: first?.description || '', area: first?.area || t.area, grade: first?.severity || 'amber' })
+  for (const id of ids) { const f = m.findings.find((x) => x.id === id); if (f) ops.assign[f.key] = key }
+  rethemeLocal(m)
+  await store.saveMatter(m)
+  res.json({ themes: m.themes })
+})
+
 // ---- due diligence run / pause / report ----
 app.post('/api/matters/:id/dd/run', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
   if (!m.documents.length) return res.status(400).json({ error: 'Der Akt enthält noch keine Dokumente.' })
+  const opts = {}
   if (req.body?.reanalyse && !ddRuns.has(m.id)) {
-    for (const d of m.documents) if (d.status === 'analysed') d.status = 'extracted'
-    m.findings = []; m.areaSummaries = {}; m.executive = null; m.verification = null
+    // Everything from the extraction on, without the cache; reviews stay with their theme keys.
+    for (const d of m.documents) if (['extracted', 'analysed'].includes(d.status)) d.status = 'read'
+    m.findings = m.findings.filter((f) => f.source === 'manual'); m.areaSummaries = {}; m.executive = null; m.verification = null; m.calibrationMemo = null
+    opts.reanalyse = true
   }
-  if (req.body?.retryErrors && !ddRuns.has(m.id)) for (const d of m.documents) if (d.status === 'error') { d.status = 'new'; d.note = '' }
+  if (req.body?.retryErrors && !ddRuns.has(m.id)) for (const d of m.documents) if ((d.status === 'error' || (d.status === 'skipped' && ['failed', 'unreadable', 'budget'].includes(d.skipReason))) && d.file) { d.status = 'new'; d.note = ''; d.skipReason = '' }
+  if (Number(req.body?.fromStage) === 5) opts.fromStage = 5
   let jobId
-  try { jobId = startMatterJob(m, 'dd', (deps) => runDd(m, deps)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
+  try { jobId = startMatterJob(m, 'dd', (deps) => runDd(m, deps, opts)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
   if (!jobId) return res.status(409).json({ error: 'Für diesen Akt läuft bereits ein Vorgang.' })
   res.json({ jobId })
 })
@@ -2135,6 +2331,7 @@ app.post('/api/matters/:id/dd/pause', async (req, res) => {
 app.post('/api/matters/:id/report', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
   if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Bitte warten, bis der laufende Vorgang beendet ist.' })
+  if (REPORT_TYPES[req.body?.type]) m.settings.reportType = req.body.type
   try { const names = await buildReports(m, ddDeps(() => {})); res.json({ reports: m.reports, created: names }) } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.get('/api/matters/:id/reports/:file', async (req, res) => {
@@ -2225,7 +2422,7 @@ app.post('/api/chat', async (req, res) => {
     try { matterReq = await store.getMatter(body.matterId) } catch { matterReq = null }
     if (!(await matterRole(matterReq, req))) return res.status(404).json({ error: 'Akt nicht gefunden.' })
     const ids = new Set((Array.isArray(body.matterDocIds) ? body.matterDocIds : []).map(String))
-    matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['new', 'extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
+    matterDocs = matterReq.documents.filter((d) => ids.has(d.id) && ['new', 'read', 'extracted', 'analysed'].includes(d.status)).slice(0, MAX_UPLOADS)
     // A project picked as source ("Hinzufügen → Projekt"): its instructions apply as well.
     if (matterReq.projectId && !projReq) { try { const pr = await store.getProject(matterReq.projectId); if (pr && projectRole(pr, req)) projReq = pr } catch {} }
   }
@@ -2578,7 +2775,7 @@ app.post('/api/chat', async (req, res) => {
         const buf = await store.getFile(matterReq.id, d.file)
         const r = buf ? await extractText(d.name, buf, { ctx }) : null
         text = r && !r.unsupported ? r.text : ''
-        if (text.trim()) { await store.putText(matterReq.id, d.id, text); if (d.status === 'new') { d.status = 'extracted'; d.textChars = text.length; d.pages = r.pages ?? null; if (r.ocr) d.ocr = true; aktDirty = true } }
+        if (text.trim()) { await store.putText(matterReq.id, d.id, text); if (d.status === 'new') { d.status = 'read'; d.textChars = text.length; d.pages = r.pages ?? null; if (r.ocr) d.ocr = true; aktDirty = true } }
       }
     } catch (e) { console.error('akt text failed:', e?.message) }
     aktTexts.set(d.id, text)
@@ -2758,6 +2955,14 @@ app.post('/api/chat', async (req, res) => {
     if (matterReq) {
       const sid = step('read', matterReq.projectId ? `Projektdokumente „${projReq?.name || matterReq.name.replace(/^Projekt: /, '')}“ werden eingebunden` : `Akt „${matterReq.name}“ wird eingebunden`)
       matterCtx = matterContext(matterReq, 60_000)
+      // Questions about a due diligence also search the full text of the Akt.
+      if (!matterReq.projectId && matterReq.kind === 'dd' && matterReq.documents.length) {
+        try {
+          const idx = await aktIndex(matterReq)
+          const hits = idx.search(prompt, { k: 8, qvec: idx.embed ? await idx.embed(prompt).catch(() => null) : null })
+          if (hits.length) matterCtx = `FUNDSTELLEN IM AKT (Volltextsuche zur Frage):\n${hits.map((h) => `[${h.docNo} ${h.docName}${h.page ? ', S. ' + h.page : ''}] ${h.text.replace(/\s+/g, ' ').slice(0, 900)}`).join('\n')}\n\n${matterCtx}`.slice(0, 70_000)
+        } catch (e) { console.warn('akt search failed:', e?.message || e) }
+      }
       for (const d of matterDocs) {
         if (uploads.length >= MAX_UPLOADS || uploads.some((u) => u.name === d.name)) continue
         const text = await aktText(d) // text of freshly uploaded (project) documents is extracted now
@@ -2766,7 +2971,7 @@ app.post('/api/chat', async (req, res) => {
         uploads.push({ name: d.name, buf })
         uploadTexts.set(d.name, { text, pages: d.pages })
       }
-      stepDone(sid, { detail: `${matterReq.documents.length} Dokumente${matterReq.projectId ? '' : `, ${matterReq.findings.length} Befunde`}${matterDocs.length ? ` · ${matterDocs.length} Dokument${matterDocs.length > 1 ? 'e' : ''} angehängt` : ''}` })
+      stepDone(sid, { detail: `${matterReq.documents.length} Dokumente${matterReq.projectId ? '' : `, ${(matterReq.themes || []).filter(liveTheme).length} Themen`}${matterDocs.length ? ` · ${matterDocs.length} Dokument${matterDocs.length > 1 ? 'e' : ''} angehängt` : ''}` })
     }
     // A folder the agent searches itself: the local folder of the browser, else all documents of the Akt (none picked).
     if (folderReq) filesSrc = { kind: 'local', name: folderReq.name, count: folderReq.count }

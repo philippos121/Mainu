@@ -332,33 +332,63 @@ analysis results, review tables and reports. Everything long-running is a
 server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),
 can be paused, and survives closed browser tabs.
 
-**Due diligence** (`lib/ddconfig.js`, `lib/dd.js`, `lib/report.js`) is an
-explicit pipeline, not an agent, built for speed: Text (extracted 6 at a time) →
-every document split into large sections (150,000 characters, at most 8 per
-document) → every section of every document analysed side by side through one
-pool of model calls (`DD_CONCURRENCY`, default 24) on the extraction model at low
-reasoning effort, no separate sorting call (strict JSON schema: type, area,
-parties, key terms, findings with quote + location + severity + recommendation +
-norms, questions, 0–3 compact legal questions with their difficulty) → legal
-questions of documents with red/amber findings answered by the model with a web
-search focused on the RIS; AI:ssociate only for "very hard" questions of red
-findings, at most `DD_MAX_KB_CALLS` (default 5) per run → synthesis of all review
-areas in parallel → executive summary → RIS verification of every cited norm →
-Word Red-Flag-Report + Excel workbook from fixed templates. A hard limit of
-100,000,000 input and 10,000,000 output tokens per due diligence (all runs
-together; `DD_MAX_INPUT_TOKENS` / `DD_MAX_OUTPUT_TOKENS`) cannot be raised in the
-UI: every call reserves its estimated tokens before it starts, so parallel calls
-cannot overshoot; at the limit the run pauses with a clear message. The
-confirmation before a run is one line (documents, minutes, cost) with details
-folded away. Every finding has a stable id (F-001),
-a document id (D-001), a deal-impact instrument, an evidence status (the quote
-is located in the document text: belegt / teilweise / unbelegt) and a review
-state (offen / freigegeben / geändert / verworfen, grade override, note,
-manual findings). Rejected findings leave the report; the cover carries
-"Entwurf" until every red/amber finding is reviewed. A cost/time estimate is
-shown before every run; calls are retried (rate limits get one more try after a
-pause). Review areas, typical documents, red-flag catalogues and standard
-requests are versioned code; new documents are added incrementally.
+**Due diligence** (`lib/dd.js` orchestration; `lib/inventory.js`, `lib/facts.js`,
+`lib/crosscheck.js`, `lib/severity.js`, `lib/search.js`, `lib/report.js`; catalogues
+and schemas in `lib/ddconfig.js`) is an explicit pipeline, not an agent. Principles:
+the Akt context comes before single documents (facts first, then analysis); only
+original documents are evidence (secondary sources such as audit reports, memos or
+third-party opinions give at most hypotheses); "nicht nachgewiesen" is checked
+across the whole Akt; findings are merged into themes; the grade follows rules
+from features and is then calibrated; the result is measurable (`eval/`).
+
+| Stage | What happens | Model |
+|---|---|---|
+| 0 Inventar | SHA-256 across the Akt (duplicates are kept in the inventory as "übersprungen: Duplikat"), archives (.zip/.7z) and e-mails (.eml/.msg) unpacked on upload – every part a document with its parent; role from the file name | – |
+| 1 Text | PDF, Word, Excel, text, e-mail; scans and images by OCR (handwriting `[handschriftlich: …]`, stamps `[Stempel: …]`); hash of the normalised text (content duplicates); role (Originalunterlage, Sekundärquelle, Entwurf, Plan/Zeichnung, Datenblatt) and legal subject (Zielgesellschaft, Gesellschafter, Vorbetreiber, Dritter) by rules from the first page, else one call on the first 3,000 characters; secondary sources are not analysed (`DD_SECONDARY_AS_HYPOTHESES` or the setting reads them as hypotheses) | extraction, low |
+| 2 Fakten | one call per document (long ones in 150,000-character sections): shareholders, organs, Prokura, deaths, functionaries named in permits, permits, sites, contracts (change of control), payments to shareholders, key figures, resolutions, third-party rights – each fact with a verbatim quote; facts whose quote is not in the text are dropped. Lock: stage 3 starts only when every document is extracted | extraction, low |
+| 3 Faktenregister | merged across the Akt, Firmenbuch and annual accounts take precedence, contradictions kept; the compact Akt context (< `DD_CONTEXT_MAX_TOKENS`, 4,000) and the document list | – |
+| 4 Analyse | every document with the Akt context and the document list; findings carry features (kind: Mangel / Lücke / Hinweis, amount, affected party, curable before closing, core prerequisite, instrument), no grade; findings whose quote is not in the text are discarded | extraction, medium |
+| 5 Crosscheck | Akt rules (functionary dead or gone → check the deadline of the governing law, no deadline calculation; change of control in a share deal; expiry before Stichtag/closing; payments to shareholders without a contract or above it; resolution without all registered shareholders); Nachweis-Abgleich of every "Lücke" in the search index (found → discarded with the location); hypotheses confirmed in an original or kept at most yellow "unbestätigt"; exclusion catalogue; grade by rules | extraction, low (proof checks) |
+| 6 Themen | findings merged by a stable key (rule, subject, counterparty); borderline pairs decided by one short call | main, low |
+| 7 Rechtsprüfung | every red theme to AI:ssociate ("Ist der Befund unter diesen Fakten rechtlich zutreffend und noch relevant?"), yellow ones by web search (RIS first, ≤ 3 searches); one calibration call over all red and yellow themes (merge / downgrade / discard / exceptional upgrade, each with a reason); a log warning above `DD_RED_WARN` (12) red themes | AI:ssociate, fast + web, main |
+| 8 Summary | area summaries (≤ 6 requests, ≤ 4 missing documents) and the executive summary from the themes and the key figures; overall assessment by rules ("Abbruch erwägen" only for a theme with Abbruch; "unter Bedingungen fortführen" for a red theme with CP; otherwise "fortführen mit Garantien und Freistellungen") | main |
+| 9 RIS | the norms of the themes verified | – |
+| 10 Bericht | Red-Flag-Bericht (default; red and yellow themes, ≤ 180 words each, ≤ 15,000 words) or Vollbericht (plus green themes and a summary per document); Excel: Themen, Befunde (features, grade before/after calibration), Fakten, Dokumente, Nachfragen, Bereiche, Hinweise | – |
+
+Severity rules, in order: exclusion catalogue → no finding; affected party not the
+target → at most yellow (unless the rule allows it); only a secondary source → at
+most yellow, "unbestätigt"; red for an established defect above the materiality
+threshold or at a core prerequisite; red for a gap at a core prerequisite that the
+Nachweis-Abgleich did not find; yellow otherwise; green for checked/unremarkable;
+a theme takes the highest grade of its evidence. Core prerequisites and the
+exclusion catalogue are code in `lib/ddconfig.js` (branch-neutral).
+
+Every stage writes a checkpoint and counts tokens and cost; model results are
+cached per SHA-256 and prompt version (`DATA_DIR/cache`, also across Akten) and
+requested with temperature 0. A re-run processes stages 0–2 (and 4) only for new
+documents and recomputes the whole Akt from stage 3; corrections in the Fakten
+tab offer "Neu bewerten", which recomputes from stage 5 without analysing a
+document again. The hard limit of 100,000,000 input and 10,000,000 output tokens per
+due diligence (all runs together; `DD_MAX_INPUT_TOKENS` / `DD_MAX_OUTPUT_TOKENS`)
+cannot be raised in the UI: every call reserves its estimated tokens before it
+starts, so parallel calls (`DD_CONCURRENCY`, default 24) cannot overshoot; at the
+limit the run pauses with a clear message. Uploads: at most 300 documents
+(archive parts included) and 30 MB per file (`DD_MAX_DOCS`, `DD_MAX_DOC_BYTES`);
+anything over stays in the inventory as "übersprungen". The index shows four
+numbers – in der Quelle / aufgenommen / analysiert / übersprungen – and "alle
+analysiert" only when nothing was skipped. A matter is stored in parts
+(documents, findings, themes, facts, tables): a save writes only what changed.
+The per-Akt search index is BM25 full text; with `DD_EMBED_MODEL` vectors are
+added (counted against the limit). Questions about the Akt get the facts
+register, the themes and the best passages of the full-text search.
+
+Tabs: Übersicht, Inventar (role and legal subject editable), Dokumente, Fakten
+(corrections, contradictions), Themen (approve / change / discard, grade and
+instrument, note, edit, merge, split, new theme; calibration reason and legal
+check shown; reviews survive re-runs by theme key, themes that disappear stay
+visible as "verwaist"), Befunde (features; move to another theme or remove as
+evidence), Nachfragen, Tabellen (duplicates skipped), Berichte, Protokoll. The
+report carries "Entwurf" until every red and yellow theme is reviewed.
 
 **Review tables**: user-defined columns (presets: Vertragsübersicht,
 Dienstverträge, Mietverträge, Fristen, Steuerbescheide) extracted per document
@@ -395,6 +425,9 @@ Matter routes: `GET/POST /api/matters`, `GET/PATCH/DELETE /api/matters/:id`,
 `GET /api/matters/:id/reports/:file`, `POST /api/matters/:id/tables`,
 `GET /api/matters/:id/tables/:tid/xlsx`, `POST /api/matters/:id/sync`,
 `PATCH/POST/DELETE /api/matters/:id/findings[/:fid]`, `GET /api/matters/:id/dd/estimate`,
+`PATCH /api/matters/:id/documents/:docId` (role, legal subject),
+`POST/DELETE /api/matters/:id/facts/corrections[/:cid]`, `PATCH/POST /api/matters/:id/themes[/:tid]`,
+`POST /api/matters/:id/themes/:tid/merge|split`, `POST /api/matters/:id/dd/run` with `{ fromStage: 5 }`,
 `GET /api/dd/config`; `POST /api/chat` accepts `matterId` + `matterDocIds`.
 
 ## Run locally

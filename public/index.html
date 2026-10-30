@@ -1036,7 +1036,7 @@
       const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v3', LS_OWNER = 'aiss.owner.v1'
       const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024, MAX_TOTAL_UPLOAD_BYTES = 28 * 1024 * 1024 // base64 of 28 MB stays under the server's 40 MB JSON limit
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
-      const DOC_RE = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp)$/i // images and scanned PDFs are read by OCR
+      const DOC_RE = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp|xlsx|eml|msg|zip|7z)$/i // images and scanned PDFs are read by OCR; archives and e-mails are unpacked
 
       let settings = { webSearch: true, msSync: true, msSaveAnswer: true, kb: 'auto', scope: '', folderSave: true }
       try { settings = { ...settings, ...JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}') } } catch {}
@@ -3136,11 +3136,16 @@
       const REV_DE = { open: 'offen', accepted: 'freigegeben', modified: 'geändert', rejected: 'verworfen' }
       const IMPACT_DE = { CP: 'Condition Precedent', Garantie: 'Garantie', Freistellung: 'Freistellung', Kaufpreis: 'Kaufpreis / Escrow', Abbruch: 'Abbruchempfehlung', Nachfrage: 'Nachfrage', keine: '–' }
       const EVID_DE = { verified: ['Zitat belegt', 'green'], partial: ['Zitat teilweise belegt', 'amber'], unverified: ['Zitat nicht im Text gefunden', 'red'] }
-      const sevOf = (f) => (f.review?.severity && SEV_RANK[f.review.severity] != null ? f.review.severity : f.severity)
-      const isRejected = (f) => f.review?.status === 'rejected'
+      const sevOf = (f) => (f.review?.severity && SEV_RANK[f.review.severity] != null ? f.review.severity : f.severity) || 'info'
+      const isRejected = (f) => f.review?.status === 'rejected' || Boolean(f.excluded) || Boolean(f.discarded)
+      const gradeT = (t) => t.review?.grade || t.gradeCalibrated || t.gradeComputed
+      const liveT = (t) => !t.discarded && !t.mergedInto && !t.orphaned && t.review?.status !== 'rejected'
+      const KIND_DE = { mangel: 'Mangel', luecke: 'Lücke', hinweis: 'Hinweis' }
+      const QUELLE_DE = { einzelanalyse: 'Einzelanalyse', akt_regel: 'Akt-Regel', hypothese: 'Hypothese', manual: 'manuell' }
       const SEV_RANK = { red: 0, amber: 1, green: 2, info: 3 }
-      const STAGES = [['extract', 'Text'], ['analyse', 'Analyse'], ['synthesize', 'Bereiche'], ['summary', 'Summary'], ['verify', 'RIS'], ['report', 'Bericht']]
-      const DOC_STATUS = { new: ['neu', ''], extracted: ['Text', 'teal'], analysed: ['analysiert', 'green'], error: ['Fehler', 'red'] }
+      const STAGES = [['inventory', 'Inventar'], ['text', 'Text'], ['extract', 'Fakten'], ['facts', 'Register'], ['analyse', 'Analyse'], ['crosscheck', 'Crosscheck'], ['themes', 'Themen'], ['legal', 'Rechtsprüfung'], ['summary', 'Summary'], ['verify', 'RIS'], ['report', 'Bericht']]
+      const DOC_STATUS = { new: ['neu', ''], inventoried: ['inventarisiert', ''], read: ['Text gelesen', 'teal'], extracted: ['Fakten erfasst', 'teal'], analysed: ['analysiert', 'green'], skipped: ['übersprungen', 'amber'], unpacked: ['entpackt', ''], error: ['Fehler', 'red'] }
+      const MATTER_TABS = ['overview', 'inventory', 'documents', 'facts', 'themes', 'findings', 'requests', 'tables', 'reports', 'log']
       const areaLabel = (k) => ddConfig?.areas.find((a) => a.key === k)?.label || (k === 'none' || !k ? 'Allgemein' : k)
       async function loadDdConfig() { if (!ddConfig) { try { ddConfig = await api('/api/dd/config') } catch { ddConfig = { areas: [], presets: [], limits: {} } } } return ddConfig }
       async function loadMatters() { try { mattersCache = (await api('/api/matters')).matters } catch (e) { mattersCache = []; toast(e.message) } updateMatterCounts(); return mattersCache }
@@ -3176,6 +3181,20 @@
         return c
       }
 
+      /** Fields of the due diligence v2: Firmenbuchnummer, Stichtag, Closing, sellers, report type, secondary sources. */
+      function ddExtraFields(form, field, s = {}) {
+        const fn = el('input'); fn.placeholder = 'z. B. 123456a'; fn.value = s.targetFn || ''
+        const st = el('input'); st.type = 'date'; st.value = s.stichtag || ''
+        const cl = el('input'); cl.type = 'date'; cl.value = s.closing || ''
+        const sellers = el('select'); for (const [v, l] of [['all', 'Alle Gesellschafter verkaufen'], ['partial', 'Nicht alle Gesellschafter verkaufen']]) { const o = el('option', null, l); o.value = v; o.selected = (s.sellers || 'all') === v; sellers.appendChild(o) }
+        const rt = el('select'); for (const [v, l] of Object.entries(ddConfig?.reportTypes || { redflag: 'Red-Flag-Bericht', full: 'Vollbericht' })) { const o = el('option', null, l); o.value = v; o.selected = (s.reportType || 'redflag') === v; rt.appendChild(o) }
+        const hy = el('input'); hy.type = 'checkbox'; hy.checked = Boolean(s.secondaryAsHypotheses); const hyl = el('label'); hyl.className = 'check1'; hyl.append(hy, document.createTextNode('Sekundärquellen (Prüfberichte, Memos, Gutachten Dritter) als Hypothesen lesen – nur im Akt belegte Punkte werden Befunde'))
+        const r1 = el('div', 'field-row'); r1.append(field('Firmenbuchnummer', fn), field('Stichtag', st, 'Bezugsdatum für Befristungen und Ausschüttungen')); form.appendChild(r1)
+        const r2 = el('div', 'field-row'); r2.append(field('Closing (geplant)', cl), field('Verkäufer', sellers)); form.appendChild(r2)
+        form.appendChild(field('Berichtsart', rt, 'Red-Flag-Bericht: nur rote und gelbe Themen (15–30 Seiten). Vollbericht: zusätzlich grüne Themen und eine Zusammenfassung je Dokument.'))
+        form.appendChild(field('Sekundärquellen', hyl))
+        return () => ({ targetFn: fn.value.trim(), stichtag: st.value, closing: cl.value, sellers: sellers.value, reportType: rt.value, secondaryAsHypotheses: hy.checked })
+      }
       // ---- wizard ----
       async function openMatterWizard(kind) {
         await loadDdConfig()
@@ -3188,7 +3207,7 @@
         const client = el('input'); client.placeholder = 'Mandant (optional)'
         const reference = el('input'); reference.placeholder = 'z. B. 2026/0417'
         form.appendChild(field('Bezeichnung *', name)); const r0 = el('div', 'field-row'); r0.appendChild(field('Mandant', client)); r0.appendChild(field('Aktenzeichen', reference)); form.appendChild(r0)
-        let target, trans, persp, mat, kb, areaBoxes = []
+        let target, trans, persp, mat, kb, extra = () => ({}), areaBoxes = []
         if (kind === 'dd') {
           target = el('input'); target.placeholder = 'Zielunternehmen'
           trans = el('select'); for (const [v, l] of [['share', 'Share Deal (Anteilskauf)'], ['asset', 'Asset Deal (Betriebserwerb)']]) { const o = el('option', null, l); o.value = v; trans.appendChild(o) }
@@ -3196,11 +3215,12 @@
           mat = el('input'); mat.type = 'number'; mat.value = '50000'; mat.min = '0'; mat.step = '1000'
           form.appendChild(field('Zielunternehmen', target))
           const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); form.appendChild(row)
-          const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeitsschwelle (EUR)', mat, 'Beträge darunter werden höchstens als grün/Hinweis eingestuft.')); form.appendChild(row2)
+          const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeitsschwelle (EUR)', mat, 'Ein festgestellter Mangel darüber ist rot; darunter höchstens gelb.')); form.appendChild(row2)
+          extra = ddExtraFields(form, field)
           const ch = el('div', 'checks')
           for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = true; cb.value = a.key; areaBoxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
           form.appendChild(field('Prüfbereiche', ch, 'Rechts-DD und Tax-DD; abwählen, was nicht beauftragt ist.'))
-          kb = el('input'); kb.type = 'checkbox'; kb.checked = true; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtsfragen je Dokument klären: per Websuche im RIS, nur sehr schwere Fragen an die AI:ssociate-Wissensdatenbank (wenige je Analyse)')); form.appendChild(field('Wissensdatenbank', kbl))
+          kb = el('input'); kb.type = 'checkbox'; kb.checked = true; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtsprüfung der Themen: jedes rote Thema an die AI:ssociate-Wissensdatenbank, gelbe per Websuche im RIS')); form.appendChild(field('Rechtsprüfung', kbl))
         }
         const act = el('div', 'modal-actions'); const cancel = el('button', 'btn ghost', 'Abbrechen'); cancel.type = 'button'; cancel.addEventListener('click', closeTask); const go = el('button', 'btn', 'Anlegen'); go.type = 'submit'; act.append(cancel, go); form.appendChild(act)
         form.addEventListener('submit', async (e) => {
@@ -3208,7 +3228,7 @@
           if (!name.value.trim()) { name.focus(); return }
           go.disabled = true
           try {
-            const settings = kind === 'dd' ? { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, knowledgeBase: kb.checked, areas: areaBoxes.filter((b) => b.checked).map((b) => b.value) } : { reference: reference.value.trim() }
+            const settings = kind === 'dd' ? { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value) || 50000, knowledgeBase: kb.checked, areas: areaBoxes.filter((b) => b.checked).map((b) => b.value), ...extra() } : { reference: reference.value.trim() }
             const r = await api('/api/matters', { method: 'POST', body: { name: name.value.trim(), kind, client: client.value.trim(), settings } })
             closeTask(); toast(kind === 'dd' ? 'Due Diligence angelegt – jetzt Dokumente hinzufügen.' : 'Akt angelegt.')
             await loadMatters(); navigate(`#/matter/${r.matter.id}/documents`)
@@ -3220,7 +3240,7 @@
       // ---- detail ----
       async function openMatter(id, tab) {
         await loadDdConfig()
-        matterTab = tab && ['overview', 'documents', 'findings', 'requests', 'tables', 'reports', 'log'].includes(tab) ? tab : 'overview'
+        matterTab = tab && MATTER_TABS.includes(tab) ? tab : 'overview'
         if (matter?.id !== id) { $('matterPage').innerHTML = '<div class="recent-empty">Lädt…</div>'; matter = null }
         showView('matter')
         try { matter = (await api(`/api/matters/${id}`)).matter } catch (e) { $('matterPage').innerHTML = ''; const b = el('div', 'empty'); b.appendChild(el('b', null, 'Akt nicht gefunden')); b.appendChild(document.createTextNode(e.message)); $('matterPage').appendChild(b); setTitle(['Akten', 'Nicht gefunden']); return }
@@ -3244,7 +3264,7 @@
         const bAsk = el('button', 'btn ghost sm', 'Frage zum Akt'); bAsk.addEventListener('click', () => askAboutMatter(m)); acts.appendChild(bAsk)
         const bAdd = el('button', 'btn ghost sm', 'Dokumente hinzufügen'); bAdd.addEventListener('click', () => { setTab('documents'); setTimeout(() => $('matterFileInput').click(), 50) }); acts.appendChild(bAdd)
         if (running) { const bP = el('button', 'btn orange sm', m.job.pauseRequested ? 'Wird pausiert…' : 'Pausieren'); bP.disabled = Boolean(m.job.pauseRequested); bP.addEventListener('click', pauseMatterJob); acts.appendChild(bP) }
-        else { const newDocs = m.documents.filter((d) => d.status === 'new' || d.status === 'extracted' || (d.status === 'error' && /kein text|gescannt|ocr/i.test(d.note || ''))).length; const bR = el('button', 'btn sm', m.job.status === 'paused' ? 'Analyse fortsetzen' : m.findings.length || m.executive ? (newDocs ? `Analyse aktualisieren (${newDocs} neu)` : 'Analyse aktualisieren') : 'Analyse starten'); bR.disabled = !m.documents.length; bR.addEventListener('click', () => startDd({})); acts.appendChild(bR) }
+        else { const newDocs = m.documents.filter((d) => !d.container && (['new', 'read', 'extracted'].includes(d.status) || (d.status === 'skipped' && ['failed', 'unreadable', 'budget'].includes(d.skipReason)))).length; const bR = el('button', 'btn sm', m.job.status === 'paused' ? 'Analyse fortsetzen' : m.findings.length || m.executive ? (newDocs ? `Analyse aktualisieren (${newDocs} neu)` : 'Analyse aktualisieren') : 'Analyse starten'); bR.disabled = !m.documents.length; bR.addEventListener('click', () => startDd({})); acts.appendChild(bR) }
         const more = el('button', 'iconbtn', ''); more.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'; more.title = 'Mehr'; more.addEventListener('click', () => matterMenu(more)); acts.appendChild(more)
         head.appendChild(acts); page.appendChild(head)
 
@@ -3253,11 +3273,14 @@
 
         // tabs
         const tabs = el('div', 'tabs')
-        const T = [['overview', 'Übersicht'], ['documents', 'Dokumente', m.documents.length], ['findings', 'Befunde', m.findings.filter((f) => !isRejected(f)).length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['log', 'Protokoll']]
+        const T = [['overview', 'Übersicht'], ['inventory', 'Inventar', m.inventory?.source], ['documents', 'Dokumente', m.documents.filter((d) => !d.container).length], ['facts', 'Fakten', (m.facts?.entries || []).length], ['themes', 'Themen', (m.themes || []).filter(liveT).length], ['findings', 'Befunde', m.findings.filter((f) => !isRejected(f)).length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['log', 'Protokoll']]
         for (const [k, l, n] of T) { const b = el('button', 'tab' + (matterTab === k ? ' active' : ''), l); if (n) b.appendChild(el('span', 'cnt', String(n))); b.addEventListener('click', () => setTab(k)); tabs.appendChild(b) }
         page.appendChild(tabs)
         const body = el('div'); page.appendChild(body)
         if (matterTab === 'overview') renderOverview(body, m)
+        else if (matterTab === 'inventory') renderInventory(body, m)
+        else if (matterTab === 'facts') renderFacts(body, m)
+        else if (matterTab === 'themes') renderThemes(body, m)
         else if (matterTab === 'documents') renderDocuments(body, m)
         else if (matterTab === 'findings') renderFindings(body, m)
         else if (matterTab === 'requests') renderRequests(body, m)
@@ -3308,7 +3331,7 @@
         try { est = (await api(`/api/matters/${m.id}/dd/estimate`)).estimate } catch {}
         if (est && est.documents) {
           const txt = `${est.documents} Dokument${est.documents === 1 ? '' : 'e'} · ca. ${est.minutes} Min. · ≈ ${fmtUsd(est.usd)} · läuft im Hintergrund, jederzeit pausierbar.`
-          const details = `${est.chunks} Abschnitte parallel · geschätzt ${fmtTok(est.inTok)} Eingabe- / ${fmtTok(est.outTok)} Ausgabe-Tokens · harte Grenze ${fmtTok(est.limitIn)} / ${fmtTok(est.limitOut)} · Rechtsfragen per Websuche im RIS${est.kbCalls ? `, höchstens ${est.kbCalls} sehr schwere an AI:ssociate` : ''}.`
+          const details = `${est.chunks} Abschnitte je für Fakten und Analyse, parallel · höchstens ${fmtTok(est.inTok)} Eingabe- / ${fmtTok(est.outTok)} Ausgabe-Tokens (bereits verarbeitete Dokumente aus dem Zwischenspeicher, dann weniger) · harte Grenze ${fmtTok(est.limitIn)} / ${fmtTok(est.limitOut)} · rote Themen an AI:ssociate (geschätzt ${est.kbCalls}), gelbe per Websuche im RIS.`
           if (!(await confirmDlg(opts.reanalyse ? 'Alles neu analysieren?' : 'Analyse starten?', txt, { ok: 'Starten', danger: false, details }))) return
         }
         try { const r = await api(`/api/matters/${m.id}/dd/run`, { method: 'POST', body: opts }); toast('Analyse gestartet.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) }
@@ -3322,8 +3345,9 @@
         const item = (label, fn, danger) => { const b = el('button', 'btn ghost full' + (danger ? ' danger' : ''), label); if (danger) { b.style.color = 'var(--err)'; b.style.borderColor = 'rgba(217,45,32,0.35)' } b.addEventListener('click', () => { closeDlg(); fn() }); list.appendChild(b) }
         item('Umbenennen', async () => { const v = await promptDlg('Akt umbenennen', '', { value: m.name }); if (v && v.trim()) { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { name: v.trim() } }); await reloadMatter(); loadMatters() } })
         if (m.kind === 'dd') item('Einstellungen der DD', () => openMatterSettings())
-        if (m.findings.length || m.executive) item('Alles neu analysieren', async () => { if (await confirmDlg('Neu analysieren', 'Alle Befunde, Bereichszusammenfassungen und das Executive Summary werden verworfen und aus den Dokumenten neu erstellt (Token-Kosten!).', { ok: 'Neu analysieren' })) startDd({ reanalyse: true }) })
-        if (m.documents.some((d) => d.status === 'error')) item('Fehlgeschlagene Dokumente erneut lesen', () => startDd({ retryErrors: true }))
+        if (m.findings.length || m.executive) item('Alles neu analysieren', async () => { if (await confirmDlg('Neu analysieren', 'Fakten, Befunde, Themen und Zusammenfassungen werden ohne Zwischenspeicher neu erstellt (Token-Kosten!). Review-Entscheidungen bleiben an ihren Themen.', { ok: 'Neu analysieren' })) startDd({ reanalyse: true }) })
+        if (m.documents.some((d) => d.status === 'error' || (d.status === 'skipped' && ['failed', 'unreadable', 'budget'].includes(d.skipReason)))) item('Fehlgeschlagene Dokumente erneut lesen', () => startDd({ retryErrors: true }))
+        if ((m.themes || []).length) item('Neu bewerten (ab Crosscheck)', () => startDd({ fromStage: 5 }))
         item('Akt löschen', async () => { if (await confirmDlg('Akt löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akt gelöscht.'); matter = null; await loadMatters(); navigate('#/dd') } catch (e) { toast(e.message) } } }, true)
         card.appendChild(list)
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', closeDlg); a.appendChild(c); card.appendChild(a)
@@ -3339,68 +3363,226 @@
         const persp = el('select'); for (const [v, l] of [['buyer', 'Käufer'], ['seller', 'Verkäufer']]) { const o = el('option', null, l); o.value = v; o.selected = s.perspective === v; persp.appendChild(o) }
         const mat = el('input'); mat.type = 'number'; mat.value = s.materialityEur
         const reference = el('input'); reference.value = s.reference || ''
-        const kb = el('input'); kb.type = 'checkbox'; kb.checked = s.knowledgeBase !== false; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtsfragen je Dokument klären (Websuche im RIS; AI:ssociate nur bei sehr schweren Fragen)'))
+        const kb = el('input'); kb.type = 'checkbox'; kb.checked = s.knowledgeBase !== false; const kbl = el('label'); kbl.className = 'check1'; kbl.append(kb, document.createTextNode('Rechtsprüfung der Themen (rote an AI:ssociate, gelbe per Websuche im RIS)'))
         const ch = el('div', 'checks'); const boxes = []
         for (const a of ddConfig.areas) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = s.areas.includes(a.key); cb.value = a.key; boxes.push(cb); l.append(cb, document.createTextNode(a.label)); ch.appendChild(l) }
         card.appendChild(field('Zielunternehmen', target)); const row = el('div', 'field-row'); row.appendChild(field('Transaktion', trans)); row.appendChild(field('Perspektive', persp)); card.appendChild(row)
-        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); card.appendChild(row2); card.appendChild(field('Aktenzeichen', reference)); card.appendChild(field('Prüfbereiche', ch)); card.appendChild(field('Wissensdatenbank', kbl))
+        const row2 = el('div', 'field-row'); row2.appendChild(field('Wesentlichkeit (EUR)', mat)); row2.appendChild(field('Aktenzeichen', reference)); card.appendChild(row2)
+        const field3 = (label, ctl, hint) => { const f = field(label, ctl); if (hint) f.appendChild(el('div', 'hint', hint)); return f }
+        const extra = ddExtraFields(card, field3, s)
+        card.appendChild(field('Prüfbereiche', ch)); card.appendChild(field('Rechtsprüfung', kbl))
         const hint = el('div', 'hint', `Bisher verbraucht: ${fmtTok(m.job.usage?.inTok || 0)} Eingabe- / ${fmtTok(m.job.usage?.outTok || 0)} Ausgabe-Tokens (inkl. geschätzter AI:ssociate-Tokens)${m.job.cost ? ` ≈ ${fmtUsd(m.job.cost.totalUsd)}` : ''}. Änderungen wirken auf die nächste Analyse.`); hint.style.fontSize = '12px'; hint.style.color = 'var(--faint)'; card.appendChild(hint)
-        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), knowledgeBase: kb.checked, areas: boxes.filter((b) => b.checked).map((b) => b.value) } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern'); g.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { settings: { target: target.value.trim(), reference: reference.value.trim(), transaction: trans.value, perspective: persp.value, materialityEur: Number(mat.value), knowledgeBase: kb.checked, areas: boxes.filter((b) => b.checked).map((b) => b.value), ...extra() } } }); closeDlg(); await reloadMatter(); toast('Gespeichert.') } catch (e) { toast(e.message) } }); a.append(c, g); card.appendChild(a)
         $('dlg').classList.add('show')
       }
 
       // ---- overview ----
       function renderOverview(body, m) {
-        const red = m.findings.filter((f) => !isRejected(f) && sevOf(f) === 'red').length, amber = m.findings.filter((f) => !isRejected(f) && sevOf(f) === 'amber').length
-        const analysed = m.documents.filter((d) => d.status === 'analysed').length
+        const themes = (m.themes || []).filter(liveT)
+        const red = themes.filter((t) => gradeT(t) === 'red').length, amber = themes.filter((t) => gradeT(t) === 'amber').length
+        const inv = m.inventory || {}
         const stats = el('div', 'stats')
         const stat = (k, v, cls, onClick) => { const s = el('div', 'stat' + (onClick ? ' click' : '')); s.appendChild(el('div', 'k', k)); s.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), String(v))); if (onClick) s.addEventListener('click', onClick); return s }
-        const openRv = m.findings.filter((f) => !isRejected(f) && ['red', 'amber'].includes(sevOf(f)) && (f.review?.status || 'open') === 'open').length
-        stats.appendChild(stat('Dokumente', `${analysed} / ${m.documents.length}`, '', () => setTab('documents')))
-        stats.appendChild(stat('Rote Befunde', red, 'red', () => { findingFilter.sev = 'red'; setTab('findings') }))
-        stats.appendChild(stat('Gelbe Befunde', amber, 'amber', () => { findingFilter.sev = 'amber'; setTab('findings') }))
+        const openRv = themes.filter((t) => ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length
+        stats.appendChild(stat('Dokumente analysiert', `${inv.analysed ?? 0} / ${inv.source ?? m.documents.length}`, inv.skipped ? 'amber' : '', () => setTab('inventory')))
+        stats.appendChild(stat('Rote Themen', red, 'red', () => { themeFilter.grade = 'red'; setTab('themes') }))
+        stats.appendChild(stat('Gelbe Themen', amber, 'amber', () => { themeFilter.grade = 'amber'; setTab('themes') }))
         stats.appendChild(stat('Nachfragen', requestList(m).length, '', () => setTab('requests')))
         if (m.executive?.overall_assessment) stats.appendChild(stat('Gesamteinschätzung', m.executive.overall_assessment, 'sm'))
-        if (m.findings.length) stats.appendChild(stat('Review offen', openRv, openRv ? 'amber' : '', () => { findingFilter.review = 'open'; findingFilter.sev = 'all'; setTab('findings') }))
+        if (themes.length) stats.appendChild(stat('Review offen', openRv, openRv ? 'amber' : '', () => { themeFilter.grade = 'open'; setTab('themes') }))
         body.appendChild(stats)
-        if (!m.documents.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Dokumente')); e.appendChild(document.createTextNode('Lade den Datenraum hoch oder importiere ihn aus OneDrive/SharePoint – PDF, Word und Textdateien, auch ganze Ordner.')); const b = el('button', 'btn', 'Dokumente hinzufügen'); b.addEventListener('click', () => setTab('documents')); e.appendChild(b); body.appendChild(e); return }
-        if (!m.executive && !m.findings.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, m.job.running ? 'Analyse läuft' : 'Noch nicht analysiert')); e.appendChild(document.createTextNode(m.job.running ? 'Ergebnisse erscheinen hier, sobald die Analyse abgeschlossen ist. Du kannst die Seite verlassen – der Vorgang läuft auf dem Server weiter.' : `${m.documents.length} Dokument${m.documents.length === 1 ? '' : 'e'} bereit. Die Analyse liest jedes Dokument, klassifiziert es, erfasst Befunde mit Zitat und Fundstelle, fasst je Prüfbereich zusammen und erstellt den Bericht.`)); if (!m.job.running) { const b = el('button', 'btn', 'Analyse starten'); b.addEventListener('click', () => startDd({})); e.appendChild(b) } body.appendChild(e); return }
+        if (!m.documents.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch keine Dokumente')); e.appendChild(document.createTextNode('Lade den Datenraum hoch oder importiere ihn aus OneDrive/SharePoint – PDF, Word, Excel, E-Mails, Archive, auch ganze Ordner.')); const b = el('button', 'btn', 'Dokumente hinzufügen'); b.addEventListener('click', () => setTab('documents')); e.appendChild(b); body.appendChild(e); return }
+        if (!m.executive && !themes.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, m.job.running ? 'Analyse läuft' : 'Noch nicht analysiert')); e.appendChild(document.createTextNode(m.job.running ? 'Ergebnisse erscheinen hier, sobald die Analyse abgeschlossen ist. Du kannst die Seite verlassen – der Vorgang läuft auf dem Server weiter.' : `${m.documents.filter((d) => !d.container).length} Dokumente bereit. Die Analyse erstellt zuerst das Inventar und das Faktenregister des Akts, prüft dann jedes Dokument mit diesem Aktkontext, gleicht über den ganzen Akt ab und fasst die Befunde zu Themen zusammen.`)); if (!m.job.running) { const b = el('button', 'btn', 'Analyse starten'); b.addEventListener('click', () => startDd({})); e.appendChild(b) } body.appendChild(e); return }
         const two = el('div', 'two')
         const left = el('div')
         if (m.executive) {
           const c = el('div', 'card'); c.appendChild(el('h3', null, 'Executive Summary')); const p = el('div', 'prose'); p.innerHTML = renderMarkdown(m.executive.executive_summary || ''); c.appendChild(p)
-          if (m.executive.top_red_flags?.length) { c.appendChild(el('h3', null, 'Wichtigste Red Flags')).style.marginTop = '14px'; const ul = el('ul', 'prose'); m.executive.top_red_flags.forEach((t) => ul.appendChild(el('li', null, t))); c.appendChild(ul) }
+          const kf = m.executive.keyFigures || {}
+          if (Object.keys(kf).length) { c.appendChild(el('h3', null, 'Kennzahlen')).style.marginTop = '14px'; for (const [k, v] of Object.entries(kf)) c.appendChild(el('div', 'kv')).append(el('span', null, k), el('b', null, `${typeof v.value === 'number' ? v.value.toLocaleString('de-DE') : v.value}${k === 'Eigenkapitalquote' ? ' %' : ''} (${v.date || ''}, ${v.docNo})`)) }
           if (m.executive.next_steps?.length) { c.appendChild(el('h3', null, 'Nächste Schritte')).style.marginTop = '14px'; const ul = el('ul', 'prose'); m.executive.next_steps.forEach((t) => ul.appendChild(el('li', null, t))); c.appendChild(ul) }
           left.appendChild(c)
         }
-        const top = [...m.findings].filter((f) => !isRejected(f) && ['red', 'amber'].includes(sevOf(f))).sort((a, b) => SEV_RANK[sevOf(a)] - SEV_RANK[sevOf(b)]).slice(0, 6)
-        if (top.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Top-Befunde')); top.forEach((f) => c.appendChild(findingCard(f, m))); const all = el('button', 'more-toggle', `Alle ${m.findings.length} Befunde`); all.addEventListener('click', () => { findingFilter.sev = 'all'; setTab('findings') }); c.appendChild(all); left.appendChild(c) }
+        const top = themes.filter((t) => ['red', 'amber'].includes(gradeT(t))).sort((a, b) => SEV_RANK[gradeT(a)] - SEV_RANK[gradeT(b)]).slice(0, 8)
+        if (top.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Rote und gelbe Themen')); top.forEach((t) => c.appendChild(themeCard(t, m))); const all = el('button', 'more-toggle', `Alle ${themes.length} Themen`); all.addEventListener('click', () => { themeFilter.grade = 'all'; setTab('themes') }); c.appendChild(all); left.appendChild(c) }
         two.appendChild(left)
         const right = el('div')
         const ac = el('div', 'card'); ac.appendChild(el('h3', null, 'Prüfbereiche'))
-        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const nF = m.findings.filter((f) => f.area === k && !isRejected(f)), nR = nF.filter((f) => sevOf(f) === 'red').length, nA = nF.filter((f) => sevOf(f) === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (s?.legal?.answer) row.appendChild(el('span', 'pill teal', s.legal.via === 'web' ? 'Websuche' : 'AI:ssociate')); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (nF.length ? `${nF.length}` : '–'))); row.addEventListener('click', () => { findingFilter.area = k; findingFilter.sev = 'all'; setTab('findings') }); ac.appendChild(row) }
+        for (const k of m.settings.areas) { const s = m.areaSummaries?.[k]; const ts = themes.filter((t) => t.area === k), nR = ts.filter((t) => gradeT(t) === 'red').length, nA = ts.filter((t) => gradeT(t) === 'amber').length; const row = el('div', 'area-row'); row.appendChild(el('span', 'al', areaLabel(k))); if (nR) row.appendChild(el('span', 'pill red', String(nR))); if (nA) row.appendChild(el('span', 'pill amber', String(nA))); row.appendChild(el('span', 'as', s ? `${s.documents} Dok.` : (ts.length ? `${ts.length}` : '–'))); row.addEventListener('click', () => { themeFilter.area = k; themeFilter.grade = 'all'; setTab('themes') }); ac.appendChild(row) }
         right.appendChild(ac)
-        const legalAreas = m.settings.areas.filter((k) => m.areaSummaries?.[k]?.legal?.answer)
-        if (legalAreas.length) {
-          const lc = el('div', 'card'); lc.style.marginTop = '14px'; lc.appendChild(el('h3', null, 'Rechtliche Einordnung')); lc.appendChild(el('div', 'sub', 'Je Dokument: schwierige Rechtsfragen durch die AI:ssociate-Wissensdatenbank (eine Anfrage), einfache per Websuche.')).style.cssText = 'font-size:12.5px;color:var(--muted);margin-bottom:6px'
-          for (const k of legalAreas) { const L = m.areaSummaries[k].legal; const det = el('details', 'legal'); const sm = el('summary'); sm.appendChild(el('span', null, areaLabel(k))); sm.appendChild(el('span', 'as', `${L.sources?.length || 0} Dokumente`)); det.appendChild(sm); const body2 = el('div', 'prose'); body2.innerHTML = renderMarkdown(L.answer); det.appendChild(body2); if (L.sources?.length) { const ul = el('div', 'norms'); for (const src of L.sources.slice(0, 10)) { const a = el(src.url ? 'a' : 'span', 'norm', src.title || src.url); if (src.url) { a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ul.appendChild(a) } det.appendChild(ul) } lc.appendChild(det) }
-          left.appendChild(lc)
-        }
+        if (m.facts) { const fc = el('div', 'card'); fc.style.marginTop = '14px'; fc.appendChild(el('h3', null, 'Faktenregister')); fc.appendChild(el('div', 'kv')).append(el('span', null, 'Fakten'), el('b', null, String(m.facts.entries.length))); fc.appendChild(el('div', 'kv')).append(el('span', null, 'Widersprüche'), el('b', null, String(m.facts.contradictions.length))); if (m.factCorrections?.length) fc.appendChild(el('div', 'kv')).append(el('span', null, 'Korrekturen'), el('b', null, String(m.factCorrections.length))); fc.addEventListener('click', () => setTab('facts')); fc.style.cursor = 'pointer'; right.appendChild(fc) }
         if (m.verification) { const vc = el('div', 'card'); vc.style.marginTop = '14px'; vc.appendChild(el('h3', null, 'RIS-Prüfung der Normen')); const s = m.verification.summary; vc.appendChild(el('div', 'sub', s.checked ? `${s.ok} von ${s.checked} Normen bestätigt${s.warn ? `, ${s.warn} außer Kraft` : ''}${s.notFound ? `, ${s.notFound} nicht gefunden` : ''}${s.error ? `, ${s.error} nicht prüfbar` : ''}` : 'keine prüfbaren Normzitate')).style.cssText = 'font-size:13px;color:var(--muted)'; right.appendChild(vc) }
         const cc = el('div', 'card'); cc.style.marginTop = '14px'; cc.appendChild(el('h3', null, 'Aufwand'))
         cc.appendChild(el('div', 'kv')).append(el('span', null, 'Eingabe-Tokens'), el('b', null, fmtTok(m.job.usage?.inTok || 0) + ' / ' + fmtTok(ddConfig?.limits?.hardIn || 100e6) + ' (Grenze)'))
         cc.appendChild(el('div', 'kv')).append(el('span', null, 'Ausgabe-Tokens'), el('b', null, fmtTok(m.job.usage?.outTok || 0) + ' / ' + fmtTok(ddConfig?.limits?.hardOut || 10e6) + ' (Grenze)'))
         if (m.job.usage?.aissociateCalls) cc.appendChild(el('div', 'kv')).append(el('span', null, 'AI:ssociate-Anfragen'), el('b', null, String(m.job.usage.aissociateCalls)))
-        cc.appendChild(el('div', 'kv')).append(el('span', null, 'Analyseaufrufe'), el('b', null, String(m.job.usage?.calls || 0)))
         if (m.job.cost) cc.appendChild(el('div', 'kv')).append(el('span', null, 'Kosten (geschätzt)'), el('b', null, fmtUsd(m.job.cost.totalUsd)))
+        const su = m.job.stageUsage || {}
+        if (Object.keys(su).length) { const det = el('details'); det.appendChild(el('summary', null, 'je Stufe')).style.cssText = 'cursor:pointer;font-size:12.5px;color:var(--muted);margin-top:6px'; for (const [k, l] of STAGES) if (su[k]?.calls || su[k]?.inTok) det.appendChild(el('div', 'kv')).append(el('span', null, l), el('b', null, `${fmtTok(su[k].inTok)} / ${fmtTok(su[k].outTok)} · ${su[k].calls} Aufrufe${su[k].usd ? ' · ' + fmtUsd(su[k].usd) : ''}`)); cc.appendChild(det) }
         right.appendChild(cc)
         two.appendChild(right); body.appendChild(two)
+      }
+
+      // ---- inventory ----
+      function renderInventory(body, m) {
+        const inv = m.inventory || {}
+        const stats = el('div', 'stats')
+        const stat = (k, v, cls) => { const s = el('div', 'stat'); s.appendChild(el('div', 'k', k)); s.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), String(v))); return s }
+        stats.append(stat('In der Quelle', inv.source ?? 0), stat('Aufgenommen', inv.taken ?? 0), stat('Analysiert', inv.analysed ?? 0, 'green'), stat('Übersprungen', inv.skipped ?? 0, inv.skipped ? 'amber' : ''))
+        body.appendChild(stats)
+        const reasons = Object.entries(inv.byReason || {}).map(([k, n]) => `${n} ${ddConfig?.skipReasons?.[k] || k}`)
+        body.appendChild(el('div', 'legend', inv.complete ? 'Alle Dokumente analysiert.' : `Nicht „alle analysiert“: ${reasons.join(', ') || 'Analyse noch offen'}.${inv.containers ? ` ${inv.containers} Archiv${inv.containers > 1 ? 'e' : ''} entpackt.` : ''} Rolle und Rechtssubjekt sind änderbar – eine Änderung wirkt beim nächsten Lauf.`))
+        if (!m.documents.length) return
+        const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl'); const th = el('tr'); for (const h of ['ID', 'Dokument', 'Rolle', 'Rechtssubjekt', 'Status', 'Bezug']) th.appendChild(el('th', null, h)); t.appendChild(el('thead')).appendChild(th)
+        const tb = el('tbody'); const byId = new Map(m.documents.map((d) => [d.id, d]))
+        const sel = (opts, val, onChange) => { const s = el('select', 'sel'); const o0 = el('option', null, '–'); o0.value = ''; s.appendChild(o0); for (const v of opts) { const o = el('option', null, v); o.value = v; o.selected = v === val; s.appendChild(o) } s.addEventListener('change', () => onChange(s.value)); return s }
+        const patch = async (d, body2) => { try { await api(`/api/matters/${m.id}/documents/${d.id}`, { method: 'PATCH', body: body2 }); await reloadMatter() } catch (e) { toast(e.message) } }
+        for (const d of m.documents) {
+          const tr = el('tr'); tr.appendChild(el('td', null, d.no || ''))
+          const n = el('td', 'n'); n.appendChild(document.createTextNode(d.name)); n.appendChild(el('span', 'sub', `${d.folder ? d.folder + ' · ' : ''}${fmtSize(d.size)}${d.sha256 ? ' · SHA ' + d.sha256.slice(0, 10) : ''}${d.handwritingPages?.length ? ' · Handschrift S. ' + d.handwritingPages.join(', ') : ''}`)); tr.appendChild(n)
+          if (d.container) { const c = el('td'); c.colSpan = 2; c.textContent = 'Archiv'; tr.appendChild(c) }
+          else { const c1 = el('td'); const r = sel(ddConfig?.roles || [], d.role, (v) => v && patch(d, { role: v })); r.disabled = m.job.running; c1.appendChild(r); if (d.roleBy) c1.appendChild(el('span', 'sub', d.roleBy)); tr.appendChild(c1); const c2 = el('td'); const sj = sel(ddConfig?.subjects || [], d.subject, (v) => v && patch(d, { subject: v })); sj.disabled = m.job.running; c2.appendChild(sj); tr.appendChild(c2) }
+          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.status === 'skipped') cs.appendChild(el('span', 'sub', d.note || ddConfig?.skipReasons?.[d.skipReason] || '')); tr.appendChild(cs)
+          tr.appendChild(el('td', null, [d.duplicateOf ? `Duplikat von ${byId.get(d.duplicateOf)?.no || '?'}` : '', d.parent ? `aus ${byId.get(d.parent)?.name || '?'}` : '', d.container ? d.note : ''].filter(Boolean).join(' · ')))
+          tb.appendChild(tr)
+        }
+        t.appendChild(tb); wrap.appendChild(t); body.appendChild(wrap)
+      }
+
+      // ---- facts register ----
+      const factFilter = { type: 'all', q: '' }
+      function recomputeBanner(body, m) {
+        if (m.job.recompute !== 5 || m.job.running) return
+        const b = el('div', 'legend'); b.style.cssText += ';background:rgba(243,146,0,0.12);padding:10px 12px;border-radius:10px'
+        b.appendChild(el('span', null, 'Fakten wurden korrigiert – die Bewertung ab dem Crosscheck neu berechnen (ohne erneute Dokumentanalyse).'))
+        const go = el('button', 'btn sm', 'Neu bewerten'); go.addEventListener('click', () => startDd({ fromStage: 5 })); b.appendChild(go); body.appendChild(b)
+      }
+      function renderFacts(body, m) {
+        recomputeBanner(body, m)
+        if (!m.facts) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch kein Faktenregister')); e.appendChild(document.createTextNode('Das Register entsteht nach der Extraktion: Gesellschafter, Organe, Prokura, Todesfälle, Funktionsträger laut Bescheid, Genehmigungen, Standorte, Verträge, Zahlungen an Gesellschafter, Kennzahlen und Beschlüsse – jede Tatsache mit Beleg. Jedes Dokument wird danach mit diesem Aktkontext geprüft.')); body.appendChild(e); return }
+        const tb = el('div', 'toolbar')
+        const ts = el('select'); const o0 = el('option', null, 'Alle Faktentypen'); o0.value = 'all'; ts.appendChild(o0); for (const [k, l] of Object.entries(ddConfig?.factTypes || {})) { const o = el('option', null, l); o.value = k; o.selected = factFilter.type === k; ts.appendChild(o) } ts.addEventListener('change', () => { factFilter.type = ts.value; renderMatter() }); tb.appendChild(ts)
+        const q = el('input'); q.type = 'search'; q.placeholder = 'Suchen…'; q.value = factFilter.q; q.addEventListener('change', () => { factFilter.q = q.value; renderMatter() }); tb.appendChild(q)
+        tb.appendChild(el('span', 'sp'))
+        const bA = el('button', 'btn ghost sm', '+ Fakt'); bA.disabled = m.job.running; bA.addEventListener('click', () => openFactEditor(m, null)); tb.appendChild(bA)
+        body.appendChild(tb)
+        if (m.facts.contradictions.length) {
+          const c = el('div', 'card'); c.style.marginBottom = '14px'; c.appendChild(el('h3', null, `Widersprüche (${m.facts.contradictions.length})`))
+          for (const x of m.facts.contradictions) c.appendChild(el('div', 'req')).append(el('span', null, `${x.subject} – ${x.attribute}: ${x.values.map((v) => `${v.value} (${v.docNo})`).join(' vs. ')} → ${x.resolved}`), el('span', 'rr', x.reason))
+          body.appendChild(c)
+        }
+        const needle = factFilter.q.trim().toLowerCase()
+        const list = m.facts.entries.filter((e) => (factFilter.type === 'all' || e.type === factFilter.type) && (!needle || `${e.subject} ${e.attribute} ${e.value} ${e.counterparty}`.toLowerCase().includes(needle)))
+        const groups = {}; for (const e of list) (groups[e.type] ||= []).push(e)
+        for (const [type, es] of Object.entries(groups)) {
+          const c = el('div', 'card'); c.style.marginBottom = '14px'; c.appendChild(el('h3', null, `${ddConfig?.factTypes?.[type] || type} (${es.length})`))
+          const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl'); const th = el('tr'); for (const h of ['Betrifft', 'Merkmal', 'Wert', 'Gegenpartei', 'Gültig', 'Beleg', '']) th.appendChild(el('th', null, h)); t.appendChild(el('thead')).appendChild(th)
+          const tbody = el('tbody')
+          for (const e of es) {
+            const tr = el('tr'); tr.appendChild(el('td', 'n', e.subject)); tr.appendChild(el('td', null, e.attribute)); const v = el('td', null, `${e.value}${e.amount != null && !String(e.value).replace(/\s/g, '').includes(String(e.amount).replace('.', ',')) && !String(e.value).includes(e.amount.toLocaleString('de-DE')) && !/mio|mrd|tsd/i.test(e.value) ? ' (' + e.amount.toLocaleString('de-DE') + ')' : ''}`); if (e.flags?.length) v.appendChild(el('span', 'sub', e.flags.join(', '))); if (e.corrected) v.appendChild(el('span', 'pill amber', 'korrigiert')); tr.appendChild(v)
+            tr.appendChild(el('td', null, [e.counterparty, e.site].filter(Boolean).join(' · ')))
+            tr.appendChild(el('td', null, e.validFrom || e.validTo ? `${e.validFrom || '…'} – ${e.validTo || '…'}` : ''))
+            const ce = el('td'); for (const x of (e.evidence || []).slice(0, 3)) { const d = m.documents.find((y) => y.id === x.docId); const b = el('button', 'mini', `${x.docNo}${x.location ? ' ' + x.location : ''}`); b.title = x.quote; b.addEventListener('click', () => d && showDocText(d, m, x.quote)); ce.appendChild(b) } tr.appendChild(ce)
+            const ca = el('td'); const ra = el('div', 'rowacts'); const bE = el('button', null, 'Korrigieren'); bE.disabled = m.job.running; bE.addEventListener('click', () => openFactEditor(m, e)); ra.appendChild(bE); const bX = el('button', null, '×'); bX.title = 'Als falsch markieren'; bX.disabled = m.job.running; bX.addEventListener('click', async () => { const note = await promptDlg('Fakt entfernen', `${e.subject} – ${e.attribute}: ${e.value}`, { ok: 'Entfernen', placeholder: 'Grund (z. B. Verwechslung, überholt)' }); if (note == null) return; try { await api(`/api/matters/${m.id}/facts/corrections`, { method: 'POST', body: { action: 'delete', factId: e.id, note } }); await reloadMatter() } catch (err) { toast(err.message) } }); ra.appendChild(bX); ca.appendChild(ra); tr.appendChild(ca)
+            tbody.appendChild(tr)
+          }
+          t.appendChild(tbody); wrap.appendChild(t); c.appendChild(wrap); body.appendChild(c)
+        }
+        if (m.factCorrections?.length) {
+          const c = el('div', 'card'); c.appendChild(el('h3', null, `Korrekturen (${m.factCorrections.length})`))
+          for (const x of m.factCorrections) { const row = el('div', 'req'); row.appendChild(el('span', null, `${x.action === 'add' ? 'Neu' : x.action === 'delete' ? 'Entfernt' : 'Geändert'}: ${x.factId || x.id} ${x.value || ''}${x.note ? ' – ' + x.note : ''}`)); const b = el('button', 'mini', 'Zurücknehmen'); b.disabled = m.job.running; b.addEventListener('click', async () => { try { await api(`/api/matters/${m.id}/facts/corrections/${x.id}`, { method: 'DELETE' }); await reloadMatter() } catch (e) { toast(e.message) } }); row.appendChild(b); c.appendChild(row) }
+          body.appendChild(c)
+        }
+      }
+      function openFactEditor(m, e) {
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, e ? 'Fakt korrigieren' : 'Fakt ergänzen')); card.appendChild(el('div', 'md', 'Korrekturen haben Vorrang vor allen Dokumenten. Danach „Neu bewerten“: Crosscheck, Themen und Bericht werden neu berechnet, die Dokumente nicht erneut analysiert.'))
+        const field = (label, ctl) => { const x = el('div', 'field'); x.appendChild(el('label', null, label)); x.appendChild(ctl); return x }
+        const inp = (v) => { const i = el('input'); i.value = v ?? ''; return i }
+        const type = el('select'); for (const [k, l] of Object.entries(ddConfig?.factTypes || {})) { const o = el('option', null, l); o.value = k; o.selected = e?.type === k; type.appendChild(o) }
+        const subject = inp(e?.subject), attribute = inp(e?.attribute), value = inp(e?.value), amount = inp(e?.amount), cp = inp(e?.counterparty), from = inp(e?.validFrom), to = inp(e?.validTo), note = inp(''); from.placeholder = to.placeholder = 'JJJJ-MM-TT'; note.placeholder = 'Grund der Korrektur'
+        if (!e) card.appendChild(field('Faktentyp', type))
+        card.appendChild(field('Betrifft', subject)); const r1 = el('div', 'field-row'); r1.append(field('Merkmal', attribute), field('Wert', value)); card.appendChild(r1)
+        const r2 = el('div', 'field-row'); r2.append(field('Betrag', amount), field('Gegenpartei / Inhaber', cp)); card.appendChild(r2)
+        const r3 = el('div', 'field-row'); r3.append(field('gültig ab', from), field('gültig bis', to)); card.appendChild(r3); card.appendChild(field('Vermerk', note))
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Speichern')
+        g.addEventListener('click', async () => { g.disabled = true; try { await api(`/api/matters/${m.id}/facts/corrections`, { method: 'POST', body: { action: e ? 'edit' : 'add', factId: e?.id, type: type.value, subject: subject.value, attribute: attribute.value, value: value.value, amount: amount.value === '' ? '' : Number(amount.value), counterparty: cp.value, validFrom: from.value, validTo: to.value, note: note.value } }); closeDlg(); await reloadMatter() } catch (err) { toast(err.message); g.disabled = false } })
+        a.append(c, g); card.appendChild(a); $('dlg').classList.add('show')
+      }
+
+      // ---- themes ----
+      const themeFilter = { grade: 'all', area: 'all', q: '' }
+      function themeCard(t, m) {
+        const g = gradeT(t), rv = t.review?.status || 'open'
+        const c = el('div', 'finding' + (!liveT(t) ? ' rejected' : ''))
+        const h = el('div', 'fh'); h.appendChild(el('span', 'dot ' + g)); const tt0 = el('div'); tt0.style.flex = '1'; tt0.style.minWidth = '0'
+        const tt = el('div', 'ft'); tt.appendChild(el('span', 'fno', t.no)); tt.appendChild(document.createTextNode(t.title)); tt0.appendChild(tt)
+        const fs = m.findings.filter((f) => t.findingIds.includes(f.id))
+        tt0.appendChild(el('div', 'fm', `${SEV_DE[g]}${t.review?.grade ? ' (Review)' : t.gradeCalibrated && t.gradeCalibrated !== t.gradeComputed ? ` (nach Regeln ${SEV_DE[t.gradeComputed]})` : ''} · ${areaLabel(t.area)} · ${IMPACT_DE[t.review?.instrument || t.instrument] || '–'} · ${fs.length} Beleg${fs.length === 1 ? '' : 'e'} in ${t.docIds.length} Dok.${t.manual ? ' · manuell' : ''}`)); h.appendChild(tt0)
+        const badges = el('div', 'fbadges')
+        if (t.orphaned) badges.appendChild(el('span', 'pill', 'verwaist'))
+        if (t.unconfirmed) badges.appendChild(el('span', 'pill amber', 'unbestätigt'))
+        if (t.discarded) badges.appendChild(el('span', 'pill red', 'verworfen'))
+        else if (t.calibration && t.calibration.action !== 'behalten') badges.appendChild(el('span', 'pill teal', t.calibration.action))
+        if (t.legal?.via === 'aissociate' || t.legal?.via === 'web') badges.appendChild(el('span', 'pill', t.legal.via === 'aissociate' ? 'AI:ssociate' : 'RIS-Websuche'))
+        badges.appendChild(el('span', 'pill ' + (rv === 'accepted' ? 'green' : rv === 'rejected' ? 'red' : rv === 'modified' ? 'amber' : ''), REV_DE[rv]))
+        h.appendChild(badges); h.appendChild(svg('chev')); h.addEventListener('click', () => c.classList.toggle('open')); c.appendChild(h)
+        const b = el('div', 'fb')
+        b.appendChild(el('p', null, t.description))
+        if (t.gradeWhy) { b.appendChild(el('div', 'lbl', 'Grad nach Regeln')); b.appendChild(el('p', null, `${SEV_DE[t.gradeComputed]}: ${t.gradeWhy}`)) }
+        if (t.calibration) { b.appendChild(el('div', 'lbl', 'Kalibrierung')); b.appendChild(el('p', null, `${t.calibration.action}${t.calibration.to ? ` (${SEV_DE[t.calibration.from]} → ${SEV_DE[t.calibration.to]})` : ''}: ${t.calibration.reason}`)) }
+        if (t.discarded) { b.appendChild(el('div', 'lbl', 'Verworfen')); b.appendChild(el('p', null, t.discarded.reason)) }
+        if (t.legal?.answer) { const det = el('details', 'legal'); det.appendChild(el('summary', null, `Rechtsprüfung (${t.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche im RIS'})`)); const pr = el('div', 'prose'); pr.innerHTML = renderMarkdown(t.legal.answer); det.appendChild(pr); if (t.legal.sources?.length) { const ns = el('div', 'norms'); for (const src of t.legal.sources.slice(0, 8)) { const a = el(src.url ? 'a' : 'span', 'norm', src.title || src.url); if (src.url) { a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } det.appendChild(ns) } b.appendChild(det) }
+        if (t.norms?.length) { b.appendChild(el('div', 'lbl', 'Normen')); const ns = el('div', 'norms'); for (const n of t.norms) { const st = (t.normStatus || []).find((x) => x.norm === n); const a = el(st?.url ? 'a' : 'span', 'norm ' + (st?.status || ''), n + (st?.status === 'ok' ? ' ✓' : st?.status === 'not_found' ? ' (nicht gefunden)' : '')); if (st?.url) { a.href = st.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } b.appendChild(ns) }
+        if (fs.length) { b.appendChild(el('div', 'lbl', 'Belege')); for (const f of fs) b.appendChild(findingCard(f, m)) }
+        if (t.review?.note) { b.appendChild(el('div', 'lbl', 'Reviewer-Vermerk')); b.appendChild(el('p', null, t.review.note)) }
+        const patch = async (body2) => { try { await api(`/api/matters/${m.id}/themes/${t.id}`, { method: 'PATCH', body: body2 }); await reloadMatter() } catch (e) { toast(e.message) } }
+        const bar = el('div', 'review'); bar.appendChild(el('span', 'lbl', 'Review'))
+        const bA = el('button', 'mini' + (rv === 'accepted' ? ' on' : ''), 'Freigeben'); bA.addEventListener('click', () => patch({ status: 'accepted' }))
+        const bR = el('button', 'mini danger' + (rv === 'rejected' ? ' on' : ''), rv === 'rejected' ? 'Wiederherstellen' : 'Verwerfen'); bR.addEventListener('click', () => patch({ status: rv === 'rejected' ? 'open' : 'rejected' }))
+        const gs = el('select', 'sel'); for (const [k, l] of [['', `Grad: ${SEV_DE[t.gradeCalibrated || t.gradeComputed]} (Analyse)`], ['red', 'Grad: Rot'], ['amber', 'Grad: Gelb'], ['green', 'Grad: Grün']]) { const o = el('option', null, l); o.value = k; o.selected = (t.review?.grade || '') === k; gs.appendChild(o) } gs.addEventListener('change', () => patch({ grade: gs.value || null }))
+        const is = el('select', 'sel'); for (const [k, l] of [['', `Instrument: ${IMPACT_DE[t.instrument] || '–'} (Analyse)`], ...Object.entries(IMPACT_DE).map(([k, l]) => [k, 'Instrument: ' + (k === 'keine' ? 'keines' : l)])]) { const o = el('option', null, l); o.value = k; o.selected = (t.review?.instrument || '') === k; is.appendChild(o) } is.addEventListener('change', () => patch({ instrument: is.value || null }))
+        const bN = el('button', 'mini', t.review?.note ? 'Vermerk ändern' : 'Vermerk'); bN.addEventListener('click', async () => { const v = await promptDlg('Reviewer-Vermerk', `${t.no} ${t.title}`, { value: t.review?.note || '', ok: 'Speichern' }); if (v != null) patch({ note: v }) })
+        const bE = el('button', 'mini', 'Bearbeiten'); bE.addEventListener('click', async () => { const v = await promptDlg('Titel des Themas', t.no, { value: t.title, ok: 'Weiter' }); if (v == null) return; const d2 = await promptDlg('Beschreibung', t.no, { value: t.description, ok: 'Speichern' }); patch({ title: v, ...(d2 != null ? { description: d2 } : {}) }) })
+        bar.append(bA, bR, gs, is, bN, bE)
+        if (!t.orphaned) {
+          const mg = el('select', 'sel'); const m0 = el('option', null, 'Zusammenführen mit…'); m0.value = ''; mg.appendChild(m0); for (const x of (m.themes || []).filter((x) => x.id !== t.id && liveT(x))) { const o = el('option', null, `${x.no} ${x.title.slice(0, 50)}`); o.value = x.id; mg.appendChild(o) } mg.addEventListener('change', async () => { if (!mg.value) return; try { await api(`/api/matters/${m.id}/themes/${t.id}/merge`, { method: 'POST', body: { into: mg.value } }); await reloadMatter() } catch (e) { toast(e.message) } }); bar.appendChild(mg)
+          if (fs.length > 1) { const bS = el('button', 'mini', 'Abspalten'); bS.addEventListener('click', () => openSplitDialog(m, t, fs)); bar.appendChild(bS) }
+        } else { const bD = el('button', 'mini', 'Ausblenden'); bD.addEventListener('click', () => patch({ dismiss: true })); bar.appendChild(bD) }
+        b.appendChild(bar); c.appendChild(b)
+        return c
+      }
+      function openSplitDialog(m, t, fs) {
+        const card = $('dlgCard'); card.innerHTML = ''
+        card.appendChild(el('h2', null, `${t.no} abspalten`)); card.appendChild(el('div', 'md', 'Die gewählten Belege bilden ein eigenes Thema; die Zuordnung bleibt bei späteren Läufen erhalten.'))
+        const boxes = []; const list = el('div', 'checks'); for (const f of fs) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.value = f.id; boxes.push(cb); l.append(cb, document.createTextNode(`${f.no} ${f.title} (${f.docNo})`)); list.appendChild(l) } card.appendChild(list)
+        const name = el('input'); name.placeholder = 'Titel des neuen Themas'; const fld = el('div', 'field'); fld.append(el('label', null, 'Titel'), name); card.appendChild(fld)
+        const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Abbrechen'); c.addEventListener('click', closeDlg); const g = el('button', 'btn', 'Abspalten')
+        g.addEventListener('click', async () => { const ids = boxes.filter((x) => x.checked).map((x) => x.value); try { await api(`/api/matters/${m.id}/themes/${t.id}/split`, { method: 'POST', body: { findingIds: ids, title: name.value.trim() || undefined } }); closeDlg(); await reloadMatter() } catch (e) { toast(e.message) } })
+        a.append(c, g); card.appendChild(a); $('dlg').classList.add('show')
+      }
+      function renderThemes(body, m) {
+        recomputeBanner(body, m)
+        const all = m.themes || [], live = all.filter(liveT)
+        const tb = el('div', 'toolbar')
+        for (const [k, l, n] of [['all', 'Alle', live.length], ['red', 'Rot', live.filter((t) => gradeT(t) === 'red').length], ['amber', 'Gelb', live.filter((t) => gradeT(t) === 'amber').length], ['green', 'Grün', live.filter((t) => gradeT(t) === 'green').length], ['open', 'Review offen', live.filter((t) => ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length], ['out', 'Verworfen', all.filter((t) => !liveT(t)).length], ['orphan', 'Verwaist', (m.orphanThemes || []).length]]) { if (!n && !['all', 'red', 'amber'].includes(k)) continue; const b = el('button', 'fchip' + (themeFilter.grade === k ? ' on' : '')); if (['red', 'amber', 'green'].includes(k)) b.appendChild(el('span', 'dot ' + k)); b.appendChild(document.createTextNode(`${l} (${n})`)); b.addEventListener('click', () => { themeFilter.grade = k; renderMatter() }); tb.appendChild(b) }
+        const sel = el('select'); const o0 = el('option', null, 'Alle Bereiche'); o0.value = 'all'; sel.appendChild(o0); for (const k of [...new Set(all.map((t) => t.area))]) { const o = el('option', null, areaLabel(k)); o.value = k; o.selected = themeFilter.area === k; sel.appendChild(o) } sel.addEventListener('change', () => { themeFilter.area = sel.value; renderMatter() }); tb.appendChild(sel)
+        const q = el('input'); q.type = 'search'; q.placeholder = 'Suchen…'; q.value = themeFilter.q; q.addEventListener('change', () => { themeFilter.q = q.value; renderMatter() }); tb.appendChild(q)
+        tb.appendChild(el('span', 'sp'))
+        const bN = el('button', 'btn ghost sm', '+ Thema'); bN.addEventListener('click', async () => { const v = await promptDlg('Neues Thema', 'Eigenes Thema (erscheint im Bericht wie die übrigen, als freigegeben)', { ok: 'Anlegen', placeholder: 'Titel' }); if (!v || !v.trim()) return; try { await api(`/api/matters/${m.id}/themes`, { method: 'POST', body: { title: v.trim(), area: themeFilter.area !== 'all' ? themeFilter.area : 'none', grade: 'amber' } }); await reloadMatter() } catch (e) { toast(e.message) } }); tb.appendChild(bN)
+        body.appendChild(tb)
+        const openRv = live.filter((t) => ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length
+        if (openRv) body.appendChild(el('div', 'legend', `${openRv} rote/gelbe Themen noch ohne Review – der Bericht trägt bis dahin den Vermerk „Entwurf“.`))
+        const needle = themeFilter.q.trim().toLowerCase(), fg = themeFilter.grade
+        const pool = fg === 'orphan' ? (m.orphanThemes || []) : fg === 'out' ? all.filter((t) => !liveT(t)) : live
+        const items = pool.filter((t) => (['all', 'out', 'orphan'].includes(fg) || (fg === 'open' ? ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open' : gradeT(t) === fg)) && (themeFilter.area === 'all' || t.area === themeFilter.area) && (!needle || `${t.no} ${t.title} ${t.description}`.toLowerCase().includes(needle))).sort((a, b) => SEV_RANK[gradeT(a)] - SEV_RANK[gradeT(b)] || a.no.localeCompare(b.no))
+        if (!items.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, all.length ? 'Keine Themen für diesen Filter' : 'Noch keine Themen')); e.appendChild(document.createTextNode(all.length ? '' : 'Themen entstehen aus den Befunden: gleiche Sachverhalte über Dokumente hinweg werden zusammengeführt, der Grad folgt festen Regeln, rote Themen werden rechtlich geprüft.')); body.appendChild(e); return }
+        for (const t of items) body.appendChild(themeCard(t, m))
       }
 
       // ---- documents ----
       let docSelection = new Set()
       function renderDocuments(body, m) {
-        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente oder ganze Ordner hierher ziehen</b> (samt Unterordnern) oder klicken zum Auswählen · PDF, Word, Text, Bilder; Scans werden per OCR gelesen · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
+        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente oder ganze Ordner hierher ziehen</b> (samt Unterordnern) oder klicken zum Auswählen · PDF, Word, Excel, Text, Bilder, E-Mails (.eml/.msg) und Archive (.zip/.7z, werden entpackt); Scans per OCR · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
         dz.addEventListener('click', () => $('matterFileInput').click())
         dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over') }); dz.addEventListener('dragleave', () => dz.classList.remove('over'))
         dz.addEventListener('drop', async (e) => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('over'); const items = await droppedFiles(e.dataTransfer); if (items.length) uploadToMatter(items) })
@@ -3421,11 +3603,11 @@
         for (const h of ['Dokument', 'Typ', 'Bereich', 'Status', 'Rot / Gelb', '']) th.appendChild(el('th', null, h))
         t.appendChild(el('thead')).appendChild(th)
         const tb2 = el('tbody')
-        for (const d of m.documents) {
+        for (const d of m.documents.filter((x) => !x.container)) {
           const tr = el('tr'); const c0 = el('td'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = docSelection.has(d.id); cb.addEventListener('change', () => { if (cb.checked) docSelection.add(d.id); else docSelection.delete(d.id); renderMatter() }); c0.appendChild(cb); tr.appendChild(c0)
           const n = el('td', 'n'); n.appendChild(document.createTextNode(d.title || d.name)); n.appendChild(el('span', 'sub', `${d.folder ? d.folder + ' / ' : ''}${d.title ? d.name + ' · ' : ''}${fmtSize(d.size)}${d.pages ? ` · ${d.pages} S.` : ''}${d.source === 'ms' ? ' · Microsoft 365' : ''}${d.note ? ' · ' + d.note : ''}`)); tr.appendChild(n)
-          tr.appendChild(el('td', null, d.docType || '–')); tr.appendChild(el('td', null, d.area ? areaLabel(d.area) : '–'))
-          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.ocr) cs.appendChild(el('span', 'pill', 'OCR')); if (d.difficulty === 'hard') cs.appendChild(el('span', 'pill orange', 'komplex')); if (d.legal) cs.appendChild(el('span', 'pill teal', d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche')); tr.appendChild(cs)
+          const ct = el('td', null, d.docType || '–'); if (d.role) ct.appendChild(el('span', 'sub', d.role)); tr.appendChild(ct); tr.appendChild(el('td', null, d.area ? areaLabel(d.area) : '–'))
+          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.ocr) cs.appendChild(el('span', 'pill', 'OCR')); if (d.handwritingPages?.length) cs.appendChild(el('span', 'pill', 'Handschrift')); tr.appendChild(cs)
           const cf = el('td', 'c'); if (d.flags?.red || d.flags?.amber) { if (d.flags.red) cf.appendChild(el('span', 'pill red', String(d.flags.red))); if (d.flags.amber) cf.appendChild(el('span', 'pill amber', String(d.flags.amber))) } else cf.textContent = d.status === 'analysed' ? '–' : ''; tr.appendChild(cf)
           const ca = el('td'); const ra = el('div', 'rowacts')
           if (d.summary) { const bI = el('button', null, 'Details'); bI.addEventListener('click', () => showDocDetails(d, m)); ra.appendChild(bI) }
@@ -3499,7 +3681,7 @@
         }
         await flush()
         await reloadMatter(); await loadMatters()
-        if (skipped) errors.push(`${skipped} Datei${skipped > 1 ? 'en' : ''} übersprungen (nur PDF, Word, Text, Bilder)`)
+        if (skipped) errors.push(`${skipped} Datei${skipped > 1 ? 'en' : ''} übersprungen (nur PDF, Word, Excel, Text, Bilder, E-Mails, Archive)`)
         if (over) errors.push(`${over} über der Grenze von ${ddConfig?.limits?.maxDocs || 300} Dokumenten`)
         toast(errors.length ? `${ok} hochgeladen · ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? ' …' : ''}` : `${ok} Dokument${ok === 1 ? '' : 'e'} hochgeladen.`, 5000)
       }
@@ -3513,7 +3695,8 @@
         card.appendChild(el('h2', null, d.title || d.name)); card.appendChild(el('div', 'md', `${d.name} · ${d.docType || ''}${d.area ? ' · ' + areaLabel(d.area) : ''}`))
         const p = el('div', 'prose'); p.appendChild(el('p', null, d.summary || '')); card.appendChild(p)
         const kvs = el('div')
-        if (d.difficulty) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Einstufung'), el('b', null, d.difficulty === 'hard' ? 'komplex (Hauptmodell)' : 'einfach'))
+        if (d.role) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Rolle / Rechtssubjekt'), el('b', null, `${d.role}${d.subject ? ' · ' + d.subject : ''}`))
+        if (d.date) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Datum'), el('b', null, d.date))
         if (d.parties?.length) kvs.appendChild(el('div', 'kv')).append(el('span', null, 'Parteien'), el('b', null, d.parties.join('; ')))
         for (const x of d.dates || []) kvs.appendChild(el('div', 'kv')).append(el('span', null, x.label), el('b', null, x.date))
         for (const x of d.keyTerms || []) kvs.appendChild(el('div', 'kv')).append(el('span', null, x.term), el('b', null, x.value))
@@ -3522,6 +3705,7 @@
         if (d.questions?.length) { card.appendChild(el('h3', null, 'Nachfragen')).style.cssText = 'font-size:13px;margin:12px 0 4px'; const ul = el('ul', 'prose'); d.questions.forEach((t) => ul.appendChild(el('li', null, t))); card.appendChild(ul) }
         const fs = m.findings.filter((f) => f.docId === d.id)
         if (fs.length) { card.appendChild(el('h3', null, `Befunde (${fs.length})`)).style.cssText = 'font-size:13px;margin:12px 0 6px'; fs.forEach((f) => card.appendChild(findingCard(f, m))) }
+        if (d.facts?.length) { card.appendChild(el('h3', null, `Fakten (${d.facts.length})`)).style.cssText = 'font-size:13px;margin:14px 0 4px'; const ul = el('ul', 'prose'); d.facts.slice(0, 40).forEach((x) => ul.appendChild(el('li', null, `${ddConfig?.factTypes?.[x.type] || x.type}: ${x.subject}${x.attribute ? ' – ' + x.attribute : ''}: ${x.value}${x.valid_to ? ' (bis ' + x.valid_to + ')' : ''}`))); card.appendChild(ul) }
         if (d.legal?.answer) { card.appendChild(el('h3', null, `Rechtliche Einordnung (${d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche'})`)).style.cssText = 'font-size:13px;margin:14px 0 4px'; const ql = el('ul', 'prose'); (d.legal.questions || []).forEach((q) => ql.appendChild(el('li', null, q))); card.appendChild(ql); const la = el('div', 'prose'); la.innerHTML = renderMarkdown(d.legal.answer); card.appendChild(la); if (d.legal.sources?.length) { const ns = el('div', 'norms'); for (const src of d.legal.sources.slice(0, 10)) { const a = el(src.url ? 'a' : 'span', 'norm', src.title || src.url); if (src.url) { a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } card.appendChild(ns) } }
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', () => { closeDlg(); card.classList.remove('wide') }); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
@@ -3552,13 +3736,18 @@
         const c = el('div', 'finding' + (isRejected(f) ? ' rejected' : ''))
         const h = el('div', 'fh'); h.appendChild(el('span', 'dot ' + sv)); const t = el('div'); t.style.flex = '1'; t.style.minWidth = '0'
         const tt = el('div', 'ft'); if (f.no) tt.appendChild(el('span', 'fno', f.no)); tt.appendChild(document.createTextNode(f.title)); t.appendChild(tt)
-        const fm = el('div', 'fm', `${SEV_DE[sv]}${f.review?.severity && f.review.severity !== f.severity ? ' (vom Reviewer geändert)' : ''} · ${areaLabel(f.area)} · ${f.docNo ? f.docNo + ' ' : ''}${f.docName}${f.location ? ' · ' + f.location : ''}${f.rule ? ' · ' + f.rule : ''}${f.source === 'manual' ? ' · manuell' : ''}`); t.appendChild(fm); h.appendChild(t)
+        const th = (m.themes || []).find((x) => x.id === f.themeId)
+        const fm = el('div', 'fm', `${f.excluded ? 'ausgeschlossen' : f.discarded ? 'verworfen' : SEV_DE[sv]}${f.art ? ' · ' + KIND_DE[f.art] : ''}${f.betrag != null ? ' · ' + fmtEur(f.betrag) : ''}${f.kernvoraussetzung ? ' · Kernvoraussetzung' : ''}${f.betroffen && f.betroffen !== 'Zielgesellschaft' ? ' · betrifft ' + f.betroffen : ''} · ${areaLabel(f.area)} · ${f.docNo ? f.docNo + ' ' : ''}${f.docName}${f.location ? ' · ' + f.location : ''}${f.rule || f.aktRule ? ' · ' + (f.aktRule || f.rule) : ''}${f.quelle ? ' · ' + QUELLE_DE[f.quelle] : ''}${th ? ' · Thema ' + th.no : ''}`); t.appendChild(fm); h.appendChild(t)
         const badges = el('div', 'fbadges')
         if (f.evidence && EVID_DE[f.evidence]) badges.appendChild(el('span', 'pill ' + EVID_DE[f.evidence][1], f.evidence === 'verified' ? 'belegt' : f.evidence === 'partial' ? 'teilw. belegt' : 'unbelegt'))
         badges.appendChild(el('span', 'pill ' + (rv === 'accepted' ? 'green' : rv === 'rejected' ? 'red' : rv === 'modified' ? 'amber' : ''), REV_DE[rv]))
         h.appendChild(badges); h.appendChild(svg('chev')); h.addEventListener('click', () => c.classList.toggle('open')); c.appendChild(h)
         const b = el('div', 'fb')
         b.appendChild(el('p', null, f.description))
+        if (f.excluded) { b.appendChild(el('div', 'lbl', 'Ausschlusskatalog')); b.appendChild(el('p', null, `${f.excluded.id}: ${f.excluded.label}`)) }
+        if (f.discarded) { b.appendChild(el('div', 'lbl', 'Verworfen')); b.appendChild(el('p', null, f.discarded)) }
+        if (f.gradeWhy) { b.appendChild(el('div', 'lbl', 'Grad nach Regeln')); b.appendChild(el('p', null, f.gradeWhy)) }
+        if (f.unconfirmed) { b.appendChild(el('div', 'lbl', 'Unbestätigt')); b.appendChild(el('p', null, `Nur in einer Sekundärquelle${f.hypothesisFrom ? ' (' + f.hypothesisFrom.docNo + ')' : ''}; im Akt nicht durch eine Originalunterlage belegt.`)) }
         if (f.quote) { b.appendChild(el('div', 'lbl', 'Zitat' + (EVID_DE[f.evidence] ? ' · ' + EVID_DE[f.evidence][0] : ''))); b.appendChild(el('div', 'quote' + (f.evidence === 'unverified' ? ' bad' : ''), `„${f.quote}“`)) }
         if (f.recommendation) { b.appendChild(el('div', 'lbl', 'Empfehlung' + (f.dealImpact && f.dealImpact !== 'keine' ? ' · ' + IMPACT_DE[f.dealImpact] : ''))); b.appendChild(el('p', null, f.recommendation)) }
         if (f.norms?.length) { b.appendChild(el('div', 'lbl', 'Normen')); const ns = el('div', 'norms'); for (const n of f.norms) { const st = (f.normStatus || []).find((x) => x.norm === n); const a = el(st?.url ? 'a' : 'span', 'norm ' + (st?.status || ''), n + (st?.status === 'ok' ? ' ✓' : st?.status === 'expired' ? ' (außer Kraft)' : st?.status === 'not_found' ? ' (nicht gefunden)' : st?.status === 'unsure' ? ' (?)' : '')); if (st?.url) { a.href = st.url; a.target = '_blank'; a.rel = 'noopener noreferrer' } ns.appendChild(a) } b.appendChild(ns) }
@@ -3577,6 +3766,13 @@
         const acts = el('div', 'actions'); acts.style.marginTop = '8px'
         const d = m.documents.find((x) => x.id === f.docId)
         if (d?.textChars) { const bt = el('button', 'mini', 'Dokumenttext'); bt.addEventListener('click', () => showDocText(d, m, f.quote)); acts.appendChild(bt) }
+        if (!f.excluded && !f.discarded && (m.themes || []).length) {
+          const mv = el('select', 'sel'); const o0 = el('option', null, th ? `Thema ${th.no}` : 'keinem Thema zugeordnet'); o0.value = ''; mv.appendChild(o0)
+          for (const x of (m.themes || []).filter((x) => x.id !== f.themeId)) { const o = el('option', null, `→ ${x.no} ${x.title.slice(0, 50)}`); o.value = x.id; mv.appendChild(o) }
+          if (th) { const o = el('option', null, 'als Beleg entfernen'); o.value = '__remove'; mv.appendChild(o) } else { const o = el('option', null, 'automatisch zuordnen'); o.value = '__restore'; mv.appendChild(o) }
+          mv.addEventListener('change', async () => { if (!mv.value) return; try { await api(`/api/matters/${m.id}/findings/${f.id}`, { method: 'PATCH', body: mv.value === '__remove' ? { removeFromTheme: true } : mv.value === '__restore' ? { restoreTheme: true } : { themeId: mv.value } }); await reloadMatter() } catch (e) { toast(e.message) } })
+          acts.appendChild(mv)
+        }
         const ask = el('button', 'mini', 'Nachfragen'); ask.addEventListener('click', () => askAboutMatter(m, d ? [d.id] : [], `Zum Befund ${f.no || ''} „${f.title}“ (${f.docName}${f.location ? ', ' + f.location : ''}): `)); acts.appendChild(ask)
         b.appendChild(acts); c.appendChild(b)
         return c
@@ -3658,7 +3854,7 @@
         if (!(m.job.log || []).length) lg.appendChild(el('div', null, 'Noch keine Einträge.'))
         body.appendChild(lg); lg.scrollTop = lg.scrollHeight
         const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Ablauf der Analyse'))
-        const p = el('div', 'prose'); p.innerHTML = '<p>Jeder Schritt ist explizit programmiert und protokolliert – kein freier Agent entscheidet, was geprüft wird:</p><ol><li><b>Text</b> – PDF/Word/Text werden serverseitig gelesen; gescannte PDFs ohne Textebene und Bilder (PNG, JPG) liest das Modell per OCR (Seite für Seite, lange Scans in Teilen parallel; in der Liste mit „OCR“ markiert).</li><li><b>Analyse</b> – jedes Dokument einzeln (lange Dokumente in Teilen) nach festem Schema: Typ, Bereich, Parteien, Key Terms, Befunde mit Zitat/Fundstelle/Schweregrad/Empfehlung/Normen, Nachfragen.</li><li><b>Bereiche</b> – je Prüfbereich eine Synthese über alle Dokumente: Risiken, Widersprüche, fehlende Standarddokumente, Empfehlungen für Garantien/Freistellungen/CPs.</li><li><b>Summary</b> – Executive Summary mit Gesamteinschätzung.</li><li><b>RIS</b> – alle zitierten Normen deterministisch gegen das RIS geprüft.</li><li><b>Bericht</b> – Word (Red Flag Report) und Excel (Befunde, Dokumente, Nachfragen, Bereiche) aus festen Vorlagen.</li></ol><p>Pausieren ist jederzeit möglich; neue Dokumente werden beim nächsten Lauf ergänzt, bereits analysierte nicht erneut verrechnet.</p>'
+        const p = el('div', 'prose'); p.innerHTML = '<p>Jeder Schritt ist explizit programmiert und protokolliert; nach jeder Stufe gibt es einen Checkpoint, Tokens und Kosten werden je Stufe gezählt:</p><ol start="0"><li><b>Inventar</b> – SHA-256 über den ganzen Akt (Duplikate), Archive und E-Mails entpackt, Rolle aus dem Dateinamen.</li><li><b>Text</b> – PDF, Word, Excel, E-Mails; Scans und Bilder per OCR (Handschrift und Stempel markiert); Textvergleich findet inhaltsgleiche Dokumente; Rolle und Rechtssubjekt von der ersten Seite. Sekundärquellen (Prüfberichte, Memos, Gutachten Dritter) werden nicht analysiert.</li><li><b>Fakten</b> – je Dokument ein Aufruf: Gesellschafter, Organe, Funktionsträger, Genehmigungen, Standorte, Verträge, Zahlungen, Kennzahlen, Beschlüsse – jede Tatsache mit Beleg.</li><li><b>Faktenregister</b> – zusammengeführt, Firmenbuch und Jahresabschluss haben Vorrang, Widersprüche eigens; daraus der kompakte Aktkontext.</li><li><b>Analyse</b> – jedes Dokument mit Aktkontext und Dokumentliste; Befunde mit Merkmalen statt Grad; Zitate, die nicht im Text stehen, werden verworfen.</li><li><b>Crosscheck</b> – Akt-Regeln, Nachweis-Abgleich im ganzen Akt, Ausschlusskatalog, Grad nach festen Regeln.</li><li><b>Themen</b> – gleiche Sachverhalte zusammengeführt (stabiler Schlüssel).</li><li><b>Rechtsprüfung</b> – jedes rote Thema an AI:ssociate, gelbe per Websuche im RIS; danach eine Kalibrierung aller roten und gelben Themen.</li><li><b>Summary</b> – Bereiche und Executive Summary aus den Themen; Gesamteinschätzung nach Regeln.</li><li><b>RIS</b> – Normen je Thema geprüft.</li><li><b>Bericht</b> – Red-Flag-Bericht oder Vollbericht (Word) und Excel.</li></ol><p>Ergebnisse werden je Dokument (SHA-256) zwischengespeichert: neue Dokumente durchlaufen die Stufen 0–4, ab Stufe 3 wird der ganze Akt neu bewertet. Harte Grenze je Due Diligence: ' + fmtTok(ddConfig?.limits?.hardIn || 100e6) + ' Eingabe- / ' + fmtTok(ddConfig?.limits?.hardOut || 10e6) + ' Ausgabe-Tokens.</p>'
         c.appendChild(p); body.appendChild(c)
       }
       // ---- review tables ----
@@ -3724,14 +3920,15 @@
 
       // ---- reports ----
       function renderReports(body, m) {
-        const tb = el('div', 'toolbar'); tb.appendChild(el('span', 'sub', 'Red Flag Report (Word) und DD-Workbook (Excel: Befunde, Dokumente, Nachfragen, Bereiche) aus festen Vorlagen.')).style.cssText = 'font-size:13px;color:var(--muted)'; tb.appendChild(el('span', 'sp'))
-        const bR = el('button', 'btn ghost sm', 'Bericht neu erstellen'); bR.disabled = m.job.running || !(m.findings.length || m.executive); bR.addEventListener('click', async () => { bR.disabled = true; try { await api(`/api/matters/${m.id}/report`, { method: 'POST', body: {} }); await reloadMatter(); toast('Bericht erstellt.') } catch (e) { toast(e.message); bR.disabled = false } }); tb.appendChild(bR)
+        const tb = el('div', 'toolbar'); tb.appendChild(el('span', 'sub', 'Word-Bericht aus den Themen (Red-Flag-Bericht oder Vollbericht) und Excel (Themen, Befunde, Fakten, Dokumente, Nachfragen, Bereiche, Hinweise) – bis alle roten und gelben Themen geprüft sind, als „Entwurf“.')).style.cssText = 'font-size:13px;color:var(--muted)'; tb.appendChild(el('span', 'sp'))
+        const rtSel = el('select'); for (const [k, l] of Object.entries(ddConfig?.reportTypes || { redflag: 'Red-Flag-Bericht', full: 'Vollbericht' })) { const o = el('option', null, l); o.value = k; o.selected = (m.settings.reportType || 'redflag') === k; rtSel.appendChild(o) } rtSel.title = 'Red-Flag-Bericht: nur rote und gelbe Themen, höchstens 15.000 Wörter. Vollbericht: zusätzlich grüne Themen und eine Zusammenfassung je Dokument.'; tb.appendChild(rtSel)
+        const bR = el('button', 'btn ghost sm', 'Bericht neu erstellen'); bR.disabled = m.job.running || !((m.themes || []).length || m.executive); bR.addEventListener('click', async () => { bR.disabled = true; try { await api(`/api/matters/${m.id}/report`, { method: 'POST', body: { type: rtSel.value } }); await reloadMatter(); toast('Bericht erstellt.') } catch (e) { toast(e.message); bR.disabled = false } }); tb.appendChild(bR)
         const bS = el('button', 'btn sm', ''); bS.appendChild(svg('cloud')); bS.appendChild(document.createTextNode('Nach Microsoft 365 speichern')); bS.disabled = !(m.reports || []).length; bS.addEventListener('click', () => syncReports(m)); tb.appendChild(bS)
         body.appendChild(tb)
         if (!(m.reports || []).length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch kein Bericht')); e.appendChild(document.createTextNode('Der Bericht entsteht am Ende der Analyse und kann danach jederzeit neu erzeugt werden (z. B. nach Ergänzung von Dokumenten).')); body.appendChild(e); return }
         const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl'); const th = el('tr'); for (const h of ['Datei', 'Typ', 'Größe', 'Erstellt', '']) th.appendChild(el('th', null, h)); t.appendChild(el('thead')).appendChild(th)
         const tbody = el('tbody')
-        for (const r of m.reports) { const tr = el('tr'); tr.appendChild(el('td', 'n', r.name)); tr.appendChild(el('td', null, r.kind === 'docx' ? 'Word – Red Flag Report' : 'Excel – Befunde & Request List')); tr.appendChild(el('td', null, fmtSize(r.size))); tr.appendChild(el('td', null, fmtDate(r.createdAt))); const ca = el('td'); const ra = el('div', 'rowacts'); const b = el('button', null, '⬇ Download'); b.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/reports/${encodeURIComponent(r.name)}`, r.name)); ra.appendChild(b); ca.appendChild(ra); tr.appendChild(ca); tbody.appendChild(tr) }
+        for (const r of m.reports) { const tr = el('tr'); tr.appendChild(el('td', 'n', r.name)); tr.appendChild(el('td', null, r.kind === 'docx' ? (r.type === 'full' ? 'Word – Vollbericht' : 'Word – Red-Flag-Bericht') : 'Excel – Themen, Befunde, Fakten')); tr.appendChild(el('td', null, fmtSize(r.size))); tr.appendChild(el('td', null, fmtDate(r.createdAt))); const ca = el('td'); const ra = el('div', 'rowacts'); const b = el('button', null, '⬇ Download'); b.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/reports/${encodeURIComponent(r.name)}`, r.name)); ra.appendChild(b); ca.appendChild(ra); tr.appendChild(ca); tbody.appendChild(tr) }
         t.appendChild(tbody); wrap.appendChild(t); body.appendChild(wrap)
         if (m.sync?.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Zuletzt gespeichert')); for (const s of m.sync) { const row = el('div', 'sync-row'); row.appendChild(svg('cloud')); if (s.ok && s.webUrl) { const a = el('a', null, s.name); a.href = s.webUrl; a.target = '_blank'; a.rel = 'noopener noreferrer'; row.appendChild(a) } else row.appendChild(el('span', null, s.name)); if (!s.ok) row.appendChild(el('span', 'err', s.error || 'fehlgeschlagen')); c.appendChild(row) } body.appendChild(c) }
       }
