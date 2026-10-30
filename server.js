@@ -12,12 +12,12 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { PDFDocument } from 'pdf-lib'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
-import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, skipDoc, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
-import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES } from './lib/ddconfig.js'
+import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, skipDoc, rebuildIssuesLocal, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
+import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES, CLAUSE_KINDS, ISSUE_STATUS, DIFFICULTY } from './lib/ddconfig.js'
 import { sha256, unpackArchive, parseEml, parseMsg, ARCHIVE_RE, MAIL_RE, reconcile } from './lib/inventory.js'
 import { SearchIndex } from './lib/search.js'
-import { buildRegister } from './lib/facts.js'
-import { effectiveGrade, liveTheme, buildThemes, overallAssessment } from './lib/severity.js'
+import { buildAktModel } from './lib/aktmodel.js'
+import { effectiveGrade, liveTheme, overallAssessment } from './lib/severity.js'
 import ExcelJS from 'exceljs'
 import { agentsForClient, buildAgentTask, BRIEF_MARKUP, CONTRACT_MARKUP } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
@@ -1890,16 +1890,12 @@ async function aktIndex(m) {
   aktIndexes.set(m.id, idx)
   return idx
 }
-/** Theme rebuild after a review operation (no model calls; the calibration of the last run is kept). */
-function rethemeLocal(m) {
-  const r = buildThemes(m, [...(m.themes || []), ...(m.orphanThemes || [])], { carry: true })
-  m.themes = r.themes; m.orphanThemes = r.orphans
-  if (m.executive) m.executive.overall_assessment = overallAssessment(m.themes)
-}
+/** Issue rebuild after a review operation (no model calls; the last review of each issue is kept). */
+const rethemeLocal = (m) => rebuildIssuesLocal(m)
 const FINDING_FIELDS = ['title', 'description', 'quote', 'location', 'recommendation', 'severity', 'area', 'dealImpact', 'norms', 'docId']
 const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
-app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, clauseKinds: Object.fromEntries(Object.entries(CLAUSE_KINDS).map(([k, v]) => [k, v.label])), issueStatus: ISSUE_STATUS, difficulty: DIFFICULTY, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
 
 // ---- skills: reusable instruction packages of the workspace (plus the standard skills) ----
 async function findSkill(owner, id) {
@@ -2040,7 +2036,7 @@ app.post('/api/matters/:id/findings', async (req, res) => {
   f.review = { status: 'accepted', severity: null, note: String(b.note || '').slice(0, 1000), ts: Date.now() }
   f.evidence = f.quote ? locateQuote(await store.getText(m.id, d.id), f.quote).status : 'unverified'
   m.findings.push(f)
-  if (m.version >= 2) rethemeLocal(m)
+  if (m.version >= 3) rethemeLocal(m)
   await store.saveMatter(m)
   res.json({ finding: f })
 })
@@ -2120,7 +2116,7 @@ app.delete('/api/matters/:id/documents/:docId', async (req, res) => {
   for (const t of m.tables || []) t.rows = (t.rows || []).filter((r) => r.docId !== d.id)
   // Parts of an archive or e-mail stay in the Akt on their own; themes lose the evidence of this document.
   for (const x of m.documents) { if (x.parent === d.id) x.parent = null; if (x.duplicateOf === d.id) { x.duplicateOf = null; if (x.skipReason === 'duplicate') { x.status = 'new'; x.skipReason = ''; x.note = '' } } }
-  if (m.version >= 2) rethemeLocal(m)
+  if (m.version >= 3) rethemeLocal(m)
   try { await store.deleteDocument(m.id, d.id, d.file) } catch {}
   await store.saveMatter(m)
   res.json({ ok: true, documents: m.documents })
@@ -2215,7 +2211,7 @@ app.patch('/api/matters/:id/documents/:docId', async (req, res) => {
     const was = d.role
     d.role = b.role; d.roleBy = 'Prüfer'
     // A secondary source is not analysed; a document that is no longer one goes through extraction and analysis.
-    if (b.role === 'Sekundärquelle' && !m.settings.secondaryAsHypotheses && d.status !== 'skipped') { skipDoc(d, 'secondary', 'vom Prüfer als Sekundärquelle eingestuft'); m.findings = m.findings.filter((f) => f.docId !== d.id || f.source === 'manual') }
+    if (b.role === 'Sekundärquelle' && !m.settings.secondaryAsHypotheses && d.status !== 'skipped') { skipDoc(d, 'secondary', 'vom Prüfer als Sekundärquelle eingestuft'); d.facts = null; m.findings = m.findings.filter((f) => f.docId !== d.id || f.source === 'manual') }
     else if (was === 'Sekundärquelle' && d.skipReason === 'secondary') { d.status = d.textChars ? 'read' : 'new'; d.skipReason = ''; d.note = '' }
   }
   await store.saveMatter(m)
@@ -2234,15 +2230,15 @@ app.post('/api/matters/:id/facts/corrections', async (req, res) => {
   const c = { id: JsonStore.newId('fc'), action: b.action, factId: b.action === 'add' ? undefined : String(b.factId), type: b.action === 'add' ? b.type : undefined, subject: str(b.subject), attribute: str(b.attribute), value: str(b.value, 400), counterparty: str(b.counterparty), validFrom: str(b.validFrom, 10), validTo: str(b.validTo, 10), amount: b.amount === '' || b.amount == null ? (b.action === 'add' ? null : undefined) : Number(b.amount), flags: Array.isArray(b.flags) ? b.flags.filter((x) => FACT_FLAGS.includes(x)) : undefined, note: str(b.note, 500) || '', by: req.user?.name || '', ts: Date.now() }
   if (c.action === 'add') c.id = `K-${String((m.factCorrections || []).filter((x) => x.action === 'add').length + 1).padStart(3, '0')}`
   ;(m.factCorrections ||= []).push(c)
-  m.facts = buildRegister(m)
-  m.job.recompute = 5
+  m.facts = buildAktModel(m)
+  m.job.recompute = 3
   await store.saveMatter(m)
   res.json({ facts: m.facts, corrections: m.factCorrections })
 })
 app.delete('/api/matters/:id/facts/corrections/:cid', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
   m.factCorrections = (m.factCorrections || []).filter((c) => c.id !== req.params.cid)
-  m.facts = buildRegister(m); m.job.recompute = 5
+  m.facts = buildAktModel(m); m.job.recompute = 3
   await store.saveMatter(m)
   res.json({ facts: m.facts, corrections: m.factCorrections })
 })
@@ -2312,11 +2308,11 @@ app.post('/api/matters/:id/dd/run', async (req, res) => {
   if (req.body?.reanalyse && !ddRuns.has(m.id)) {
     // Everything from the extraction on, without the cache; reviews stay with their theme keys.
     for (const d of m.documents) if (['extracted', 'analysed'].includes(d.status)) d.status = 'read'
-    m.findings = m.findings.filter((f) => f.source === 'manual'); m.areaSummaries = {}; m.executive = null; m.verification = null; m.calibrationMemo = null
+    m.areaSummaries = {}; m.executive = null; m.verification = null
     opts.reanalyse = true
   }
   if (req.body?.retryErrors && !ddRuns.has(m.id)) for (const d of m.documents) if ((d.status === 'error' || (d.status === 'skipped' && ['failed', 'unreadable', 'budget'].includes(d.skipReason))) && d.file) { d.status = 'new'; d.note = ''; d.skipReason = '' }
-  if (Number(req.body?.fromStage) === 5) opts.fromStage = 5
+  if (Number(req.body?.fromStage) >= 3) opts.fromStage = 3
   let jobId
   try { jobId = startMatterJob(m, 'dd', (deps) => runDd(m, deps, opts)) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
   if (!jobId) return res.status(409).json({ error: 'Für diesen Akt läuft bereits ein Vorgang.' })

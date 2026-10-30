@@ -32,8 +32,7 @@ const reds = reported.filter((t) => grade(t) === 'red')
 const redRight = reds.filter((t) => high.some((e) => new RegExp(e.match, 'i').test(text(t))))
 const dupes = expected.filter((e) => hit(e).length > 1).map((e) => `${e.match} (${hit(e).map((t) => t.no).join(', ')})`)
 const traps = (exp.traps || []).filter((e) => hit(e).length).map((e) => `${e.match} → ${hit(e).map((t) => t.no).join(', ')}`)
-const findings = new Map((m.findings || []).map((f) => [f.id, f]))
-const withOriginal = reported.filter((t) => t.manual || t.findingIds.some((id) => findings.get(id) && findings.get(id).belegOriginal !== false))
+const withOriginal = reported.filter((t) => t.manual || (t.evidence || []).length > 0)
 let words = null
 const rep = (m.reports || []).find((r) => r.kind === 'docx')
 if (rep) { try { words = (await mammoth.extractRawText({ path: path.join(dataDir, 'reports', matterId, rep.name) })).value.split(/\s+/).filter(Boolean).length } catch {} }
