@@ -3244,7 +3244,7 @@
         const bAsk = el('button', 'btn ghost sm', 'Frage zum Akt'); bAsk.addEventListener('click', () => askAboutMatter(m)); acts.appendChild(bAsk)
         const bAdd = el('button', 'btn ghost sm', 'Dokumente hinzufügen'); bAdd.addEventListener('click', () => { setTab('documents'); setTimeout(() => $('matterFileInput').click(), 50) }); acts.appendChild(bAdd)
         if (running) { const bP = el('button', 'btn orange sm', m.job.pauseRequested ? 'Wird pausiert…' : 'Pausieren'); bP.disabled = Boolean(m.job.pauseRequested); bP.addEventListener('click', pauseMatterJob); acts.appendChild(bP) }
-        else { const newDocs = m.documents.filter((d) => d.status === 'new' || d.status === 'extracted').length; const bR = el('button', 'btn sm', m.job.status === 'paused' ? 'Analyse fortsetzen' : m.findings.length || m.executive ? (newDocs ? `Analyse aktualisieren (${newDocs} neu)` : 'Analyse aktualisieren') : 'Analyse starten'); bR.disabled = !m.documents.length; bR.addEventListener('click', () => startDd({})); acts.appendChild(bR) }
+        else { const newDocs = m.documents.filter((d) => d.status === 'new' || d.status === 'extracted' || (d.status === 'error' && /kein text|gescannt|ocr/i.test(d.note || ''))).length; const bR = el('button', 'btn sm', m.job.status === 'paused' ? 'Analyse fortsetzen' : m.findings.length || m.executive ? (newDocs ? `Analyse aktualisieren (${newDocs} neu)` : 'Analyse aktualisieren') : 'Analyse starten'); bR.disabled = !m.documents.length; bR.addEventListener('click', () => startDd({})); acts.appendChild(bR) }
         const more = el('button', 'iconbtn', ''); more.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'; more.title = 'Mehr'; more.addEventListener('click', () => matterMenu(more)); acts.appendChild(more)
         head.appendChild(acts); page.appendChild(head)
 
@@ -3637,8 +3637,8 @@
       // ---- requests ----
       function requestList(m) {
         const out = []
-        for (const [key, as] of Object.entries(m.areaSummaries || {})) { for (const r of as.requests || []) out.push({ area: areaLabel(key), text: r, ref: '' }); for (const x of as.missing_documents || []) out.push({ area: areaLabel(key), text: 'Dokument nachreichen: ' + x, ref: '' }) }
-        for (const d of m.documents) for (const q of d.questions || []) out.push({ area: d.area ? areaLabel(d.area) : 'Allgemein', text: q, ref: d.name })
+        for (const [key, as] of Object.entries(m.areaSummaries || {})) { for (const r of (as.requests || []).slice(0, 6)) out.push({ area: areaLabel(key), text: r, ref: '' }); for (const x of (as.missing_documents || []).slice(0, 4)) out.push({ area: areaLabel(key), text: 'Dokument nachreichen: ' + x, ref: '' }) }
+        // Only the consolidated requests of the review areas; questions of single documents stay in their details.
         const seen = new Set(); return out.filter((r) => { const k = r.text.toLowerCase().slice(0, 80); if (seen.has(k)) return false; seen.add(k); return true })
       }
       function renderRequests(body, m) {
