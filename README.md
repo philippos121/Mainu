@@ -358,9 +358,9 @@ branch-neutral and state their legal basis and scope:
 
 | Rule | Checks | Applies to |
 |---|---|---|
-| AKT-001 | A permit needs a person in a function (base: trade licence of a legal person → gewerberechtlicher Geschäftsführer, § 9 GewO; more from the industry modules): is someone available and validly appointed? Not available: died, left, or identity uncertain (namesake of a deceased person) | every DD |
+| AKT-001 | A permit needs a person in a function (base: trade licence of a legal person → gewerberechtlicher Geschäftsführer, § 9 GewO; more from the industry modules): is someone available and validly appointed (alive, not departed, assigned to one person)? A functionary belongs to a permit by the same document or by at least two common terms | every DD |
 | AKT-002 | Organ or functionary died or left, no successor in a later document (where AKT-001 does not cover it) | every DD |
-| AKT-003 | Namesakes in a key role (shareholder, organ, functionary) – only when a mention cannot be assigned, two of them hold key roles or one has died; attached to the AKT-001/002 issue when it concerns the same functions | every DD |
+| AKT-003 | Namesakes in a key role (shareholder, organ, functionary) – only when a mention cannot be assigned, two of them hold key roles or one has died. Whether they are one person (e.g. a typo in a date of birth) is not decided by a rule but in the review of the issue; attached to the AKT-001/002 issue when all its facts are already covered there | every DD |
 | AKT-004 | Change-of-control clause triggered by the share deal | share deal |
 | AKT-005 | Permit, contract or right of use ends before Stichtag or closing without renewal | every DD |
 | AKT-006 | Payments to shareholders without a contract or above it (§ 82 GmbHG, § 52 AktG) | capital companies |
