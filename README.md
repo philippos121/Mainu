@@ -196,19 +196,31 @@ the facts. There is no Mahnklage type: a Klage that seeks only payment of up to
 75.000 EUR is a Mahnklage (§ 244 ZPO) – the form shows a hint and the agent,
 instead of drafting, points to filing it directly in the ERV (structured form, not
 a full-text Klage), lists the form data and checks the exceptions of § 244 Abs 2
-ZPO. Every Schriftsatz – from the agent, the general assistant, a skill or a project
-conversation – is laid out by `lib/brief_layout.py` (copied into every sandbox as
-`.aiss/brief_layout.py`; the code model uses it whenever the task carries the
-markers). The agent adds the Rubrum of each type (e.g. Berufung: lodged with the
-Erstgericht, roles in brackets, Berufungsinteresse; EV: gefährdete Partei / Gegner
-der gefährdeten Partei; Exekution: betreibende / verpflichtete Partei;
-Bescheidbeschwerde: to the belangte Behörde „zur Vorlage an das
-Verwaltungsgericht“; Anzeige: to the Staatsanwaltschaft). The model writes the text with line markers
-(`[ADRESSAT]`, `[PARTEI] Klagende Partei: | …`, `[WEGEN]`, `[STREITWERT]`, `[RUBRUM] Label: | …`,
-`[TITEL]`, `[H]`, `[P]`, `[BEWEIS]`, `[ANTRAG]`, `[SCHLUSS]`), the module sets the
-Rubrum (addressee, party table, wegen, Streitwert, title), numbered paragraphs,
-indented "Beweis:" blocks and Begehren, signature line, page numbers and yellow
-placeholders. `GET /api/agents` serves the configuration;
+ZPO. Every Schriftsatz and every newly drafted contract – from the agents, the
+general assistant, a skill or a project conversation – is laid out by
+`lib/doc_layout.py` (copied into every sandbox as `.aiss/doc_layout.py`; the code
+model uses it whenever the task carries the markers). Briefs: page 1 holds only the
+Rubrum with the title (e.g. KLAGE, Beilagen), the text starts on page 2; a Klage
+opens with the Vollmachtsbekanntgabe (§ 30 Abs 2 ZPO). The agent adds the Rubrum of
+each type (e.g. Berufung: lodged with the Erstgericht, roles in brackets,
+Berufungsinteresse; EV: gefährdete Partei / Gegner der gefährdeten Partei;
+Exekution: betreibende / verpflichtete Partei; Bescheidbeschwerde: to the belangte
+Behörde „zur Vorlage an das Verwaltungsgericht“; Anzeige: to the
+Staatsanwaltschaft). Markers: `[ADRESSAT]`, `[AZ]`, `[PARTEI] Klagende Partei: | …`,
+`[WEGEN]`, `[STREITWERT]`, `[RUBRUM] Label: | …`, `[TITEL]`, `[UNTERTITEL]`,
+`[BEILAGEN]`, `[H]`, `[P]`, `[BEWEIS]`, `[ANTRAG]`, `[SCHLUSS]`. Contracts: page 1
+holds the title and the parties („abgeschlossen zwischen“, „im Folgenden …“), the
+clauses start on page 2, then signature block and annexes (`[VERTRAG]`,
+`[UNTERTITEL]`, `[PARTEI] Name; Anschrift | Kurzbezeichnung`, `[H]`, `[P]`,
+`[UNTERSCHRIFT] Ort, am Datum | Partei`, `[ANLAGE]`). Both use Arial 11, numbered
+paragraphs, page numbers and yellow placeholders.
+
+Contracts (review and drafting) work the same way as briefs: Austrian contract law,
+clause standards, form and fees from the model's knowledge, current figures and
+case law via web search; AI:ssociate only in exceptional cases, once, for a
+concrete difficult question of the contract (`ask_aissociate` with the clause
+wording). The planner leaves its knowledge-base questions empty for contract and
+brief drafting unless such a question is at stake. `GET /api/agents` serves the configuration;
 `POST /api/chat` takes `task: { type: 'agent', agent, phase, params }`.
 
 ## Skills

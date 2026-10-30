@@ -13,7 +13,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL } from './lib/ddconfig.js'
-import { agentsForClient, buildAgentTask, BRIEF_MARKUP } from './lib/agents.js'
+import { agentsForClient, buildAgentTask, BRIEF_MARKUP, CONTRACT_MARKUP } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
 import { BUILTIN_SKILLS, SKILL_OUTPUTS, SKILL_KB, SKILL_AREAS, SKILL_LIMITS, normalizeSkill, skillBlock, skillOutput, skillView } from './lib/skills.js'
 
@@ -773,8 +773,8 @@ const DEPS_CODE = 'import importlib, subprocess, sys\n' +
   '    try:\n        importlib.import_module(_m)\n    except Exception:\n        subprocess.run([sys.executable,"-m","pip","install","-q",_p])\n' +
   'print("DEPS_READY")'
 
-// Layout of Austrian briefs (python-docx), copied into the sandbox for the generated code.
-const BRIEF_LAYOUT_SRC = fsp.readFile(path.join(__dirname, 'lib', 'brief_layout.py')).catch((e) => { console.error('brief layout missing:', e?.message); return null })
+// Layout of Austrian briefs and contracts (python-docx), copied into the sandbox for the generated code.
+const LAYOUT_SRC = fsp.readFile(path.join(__dirname, 'lib', 'doc_layout.py')).catch((e) => { console.error('brief layout missing:', e?.message); return null })
 const CODE_SYSTEM = `Du schreibst EIN vollständiges Python-Skript für einen persistenten Jupyter-Sandbox-Kernel (Arbeitsverzeichnis /home/user, Internet verfügbar). Das Skript wird sofort ausgeführt. Antworte NUR mit einem einzigen \`\`\`python Codeblock, ohne Erklärungen.
 
 Regeln:
@@ -783,7 +783,7 @@ Regeln:
 - Exakt das geforderte Format erzeugen (.docx / .xlsx / .pdf / .html). Kein Fallback auf .txt/.csv, wenn Word/Excel verlangt ist.
 - Word-Dokumente: Formatierung des Originals erhalten (Paragraphen in place bearbeiten, keine Neuanlage, wenn Bearbeitung verlangt). Kommentare NUR an die genannten Stellen mit genau dem vorgegebenen Text. Änderungen sichtbar machen (Redline: Zusätze grün, Streichungen rot durchgestrichen via RGBColor/strike), wenn verlangt.
 - Vergleiche: zusätzlich delta.html (rot/grün) erzeugen.
-- Schriftsätze an Gerichte oder Behörden: Enthält die AUFGABE Zeilen mit Marken wie [ADRESSAT], [PARTEI], [TITEL], [P], [BEWEIS], [ANTRAG], dann NICHT selbst formatieren, sondern das vorhandene Layout-Modul verwenden (Rubrum und Formatierung der österreichischen Praxis): import sys; sys.path.insert(0, '/home/user/.aiss'); from brief_layout import render; render(TEXT, '/home/user/<Name>.docx') – TEXT ist der markierte Text aus der Aufgabe, wörtlich und vollständig (als r\"\"\"…\"\"\"-String).
+- Schriftsätze und Verträge: Enthält die AUFGABE Zeilen mit Marken wie [ADRESSAT], [PARTEI], [TITEL], [VERTRAG], [H], [P], [BEWEIS], [ANTRAG], [UNTERSCHRIFT], dann NICHT selbst formatieren, sondern das vorhandene Layout-Modul verwenden (österreichische Kanzleipraxis; Seite 1 Rubrum bzw. Vertragsbezeichnung und Parteien, Text ab Seite 2): import sys; sys.path.insert(0, '/home/user/.aiss'); from doc_layout import render; render(TEXT, '/home/user/<Name>.docx') – TEXT ist der markierte Text aus der Aufgabe, wörtlich und vollständig (als r\"\"\"…\"\"\"-String).
 - Alle inhaltlichen Texte (Kommentare, Klauseln, Tabellenwerte) kommen aus der Aufgabenbeschreibung – nichts erfinden, nichts weglassen.
 - Am Ende: print("RESULT: " + json.dumps({"files": [...erzeugte Dateinamen...], "summary": "<1-3 Sätze, was gemacht wurde>"}, ensure_ascii=False)).
 - Robust programmieren (try/except pro Datei), keine interaktiven Eingaben, keine Dateien außerhalb von /home/user.`
@@ -811,7 +811,7 @@ const PLAN_INSTRUCTIONS = `Du bist AI:ssociate, KI-Assistent für österreichisc
 - mode: "legal" = Rechtsfrage, Rechtsauskunft, Recherche, Prüfung eines Sachverhalts (→ juristische Wissensdatenbank). "document" = hochgeladene Dateien analysieren/bearbeiten, Dateien (Word/Excel/PDF) erzeugen, Dokumente vergleichen, Entwürfe als Datei. "general" = ohne Rechtsrecherche lösbar: Umformulieren, Übersetzen, Zusammenfassen von eingefügtem Text, Small Talk, Rückfrage, Folgefrage, die allein aus dem Verlauf beantwortbar ist.
 - legal_area: Rechtsgebiet der Wissensdatenbank. "civil" = Zivilrecht im weiten Sinn (ABGB, Schadenersatz, Vertrags-, Miet-, Familien-, Erb-, Arbeits-, Unternehmens-, Gesellschafts-, Insolvenz-, Zivilverfahrens-, Exekutionsrecht, Konsumentenschutz; OGH-Judikatur). "criminal" = Straf- und Strafverfahrensrecht. "tax" = Steuer- und Abgabenrecht (BAO, EStG, UStG, KStG, Finanzstrafrecht). "public" = öffentliches Recht (Verfassungs- und Verwaltungsrecht, Verwaltungsverfahren, Gewerbe-, Bau-, Raumordnungs-, Fremden-, Asyl-, Vergabe-, Datenschutzrecht, Landesrecht; VwGH/VfGH/BVwG). "none" nur bei mode general/document ohne Rechtsfrage.
 - scope: nur bei "public": "Bund" oder ein Bundesland (Wien, Niederösterreich, Oberösterreich, Salzburg, Steiermark, Tirol, Vorarlberg, Kärnten, Burgenland), wenn Landesrecht einschlägig ist; sonst leer "".
-- questions: 1 bis ${KB_MAX_QUESTIONS} KONKRETE, KOMPAKTE Fragen an die juristische Wissensdatenbank (je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten; eigenständig, keine Verweise wie "siehe oben"; auf Deutsch). Zerlege die Anfrage nur dann in mehrere Fragen, wenn sie wirklich mehrere Rechtsfragen enthält – sonst genau eine. Bei mode "document": die Rechtsfragen, die für die Bearbeitung des Dokuments geklärt sein müssen (z. B. Zulässigkeit einer konkreten Klausel, Rechtsfolge, Frist); rein redaktionelle Dokumentaufgaben (Zusammenfassen, Vergleichen, Formatieren) → leere Liste. Bei mode "general": leere Liste.
+- questions: 1 bis ${KB_MAX_QUESTIONS} KONKRETE, KOMPAKTE Fragen an die juristische Wissensdatenbank (je Frage höchstens 2 Sätze plus die unbedingt nötigen Fakten; eigenständig, keine Verweise wie "siehe oben"; auf Deutsch). Zerlege die Anfrage nur dann in mehrere Fragen, wenn sie wirklich mehrere Rechtsfragen enthält – sonst genau eine. Bei mode "document": die Rechtsfragen, die für die Bearbeitung des Dokuments geklärt sein müssen (z. B. Zulässigkeit einer konkreten Klausel, Rechtsfolge, Frist); rein redaktionelle Dokumentaufgaben (Zusammenfassen, Vergleichen, Formatieren) → leere Liste. Verträge entwerfen oder prüfen und Schriftsätze verfassen: Aufbau, Form, Standardklauseln und Verfahrensregeln beantwortet das Modell selbst → leere Liste; nur eine konkrete, schwierige Rechtsfrage aus dem Sachverhalt (Ausnahmefall) kommt hierher. Bei mode "general": leere Liste.
 - needs_document_context: true, sobald sich eine Frage an die Wissensdatenbank auf den Inhalt eines Dokuments oder Akts bezieht (hochgeladen, früher im Gespräch hochgeladen, aus einem Ordner oder Akt), z. B. „Ist diese Klausel wirksam?“, „Was gilt nach Punkt 7?“, „Ist der Vertrag kündbar?“. Die Wissensdatenbank sieht die Dokumente NICHT – bei true wird ihr der einschlägige Wortlaut automatisch mitgeschickt. Formuliere die Fragen trotzdem eigenständig (Klausel kurz benennen, z. B. „die Haftungsbeschränkung in Punkt 9“). false bei abstrakten Rechtsfragen ohne Dokumentbezug.
 - difficulty: "hard" = schwere Aufgabe. Bei Rechtsfragen: Recherche in Normen und Judikatur nötig (Spezialmaterie, Judikaturlage, mehrere verschränkte Rechtsfragen, Rechtsfolgen/Fristen im Detail, Sachverhalt mit Dokumenten) → geht an die juristische Wissensdatenbank. Bei Dokument-/sonstigen Aufgaben: umfangreiche Dokumentbearbeitung (klauselweise Kommentierung, Vertragsentwurf, Redline, komplexe Excel-Auswertung), mehrschichtige Argumentation, lange Texte, mehrere große Dokumente. "easy" = einfache Rechtsfrage, die mit gesichertem Grundwissen und einer kurzen Websuche beantwortbar ist, bzw. kurze Entwürfe, Zusammenfassungen, Umformulierungen, einfache Dateien.
 - jurisdiction: "DE", wenn ausdrücklich nach deutschem Recht gefragt wird (z. B. „nach deutschem Recht“, „in Deutschland“, BGB/HGB/StGB für einen deutschen Sachverhalt); "other" bei anderem ausländischem Recht (z. B. Schweiz, Italien); sonst "AT" (österreichisches Recht, auch EU-Recht mit Österreich-Bezug). Die Wissensdatenbank kennt nur österreichisches Recht.
@@ -869,12 +869,15 @@ const docInstructions = (web) => `Du bist AI:ssociate, KI-Assistent für österr
 WERKZEUGE
 - read_document: nur für Dateien, deren Text NICHT bereits unten im Volltext enthalten ist (in Teilen; lies so viel wie nötig, nicht mehr).
 ${web ? `- web_search: für Fundstellen zu einfachen Rechtsfragen bzw. nur falls die Wissensdatenbank nicht ausreicht (höchstens ${MAX_WEB_SEARCHES} Suchen).` : '- Eine Websuche ist NICHT verfügbar; Unsicheres ausdrücklich kennzeichnen.'}
-- create_or_edit_file: erzeugt/bearbeitet Dateien (Word/Excel/PDF/HTML). Ein Aufruf je Deliverable. Ein Schriftsatz an ein Gericht oder eine Behörde (Klage, Klagebeantwortung, Einspruch, Rechtsmittel, Antrag, Beschwerde, Anzeige …) geht IMMER im österreichischen Schriftsatzlayout: den Text in task Zeile für Zeile mit den Schriftsatz-Marken (siehe unten) schreiben, das Werkzeug setzt Rubrum und Formatierung. Die gesamte juristische Arbeit (welche Klausel, welcher Kommentar, welche Formulierung) machst DU vorher und gibst sie wörtlich in task mit. Niemals generische oder identische Kommentare für mehrere Absätze; jeder Kommentar nennt das konkrete Problem der konkreten Klausel.
+- create_or_edit_file: erzeugt/bearbeitet Dateien (Word/Excel/PDF/HTML). Ein Aufruf je Deliverable. Ein Schriftsatz an ein Gericht oder eine Behörde (Klage, Klagebeantwortung, Einspruch, Rechtsmittel, Antrag, Beschwerde, Anzeige …) und ein neu entworfener Vertrag gehen IMMER im österreichischen Kanzleilayout: den Text in task Zeile für Zeile mit den Schriftsatz- bzw. Vertragsmarken (siehe unten) schreiben, das Werkzeug setzt Seite 1 (Rubrum bzw. Vertragsbezeichnung und Parteien) und die Formatierung. Die gesamte juristische Arbeit (welche Klausel, welcher Kommentar, welche Formulierung) machst DU vorher und gibst sie wörtlich in task mit. Niemals generische oder identische Kommentare für mehrere Absätze; jeder Kommentar nennt das konkrete Problem der konkreten Klausel.
 
 RECHTSQUELLE: Liegt unten ein Abschnitt „ANTWORTEN DER WISSENSDATENBANK“ vor, ist er die maßgebliche Rechtsquelle – übernimm ihn inhaltlich in das Deliverable, soweit einschlägig, und erfinde keine weiteren Normen oder Entscheidungen. Fehlt er, beantworte einfache Rechtsfragen aus gesichertem Grundwissen${web ? ' mit einer kurzen Websuche für die Fundstellen' : ''} und kennzeichne Unsicheres.
 
 SCHRIFTSATZ-MARKEN (nur für Schriftsätze; reine Geldforderungen bis 75.000 EUR sind Mahnklagen – nicht als Volltextklage entwerfen, sondern auf die Einbringung im ERV-Formular hinweisen, § 244 ZPO):
 ${BRIEF_MARKUP}
+
+VERTRAGS-MARKEN (nur für neu entworfene Verträge; bestehende Verträge bearbeiten = Original erhalten):
+${CONTRACT_MARKUP}
 
 ABLAUF (so kurz wie möglich): Liegt der Dokumenttext unten vor, NICHT zuerst lesen → Deliverable erzeugen (create_or_edit_file), wenn eine Datei verlangt oder sinnvoll ist; sonst direkt antworten → kurze Antwort. Keine unnötigen Schritte, keine Wiederholungen, keine Nachkontrollen durch erneutes Lesen. Antworte am Ende in Markdown: was erstellt/geändert wurde, die wesentlichen inhaltlichen Punkte (konkret) und Prüfpunkte für die Anwältin. Fundstellen mit §/Gesetz bzw. Gericht/GZ. Nie Fundstellen erfinden.`
 // Extra instructions when a folder is attached: a local folder (the browser runs the
@@ -2422,9 +2425,9 @@ app.post('/api/chat', async (req, res) => {
   let sandboxLayout = false
   async function toolCreateFile(args, stepId) {
     await ensureSandbox()
-    // The Austrian brief layout is available to every file task (hidden folder, so it is no result file).
+    // The layout of briefs and contracts is available to every file task (hidden folder, so it is no result file).
     if (!sandboxLayout) {
-      try { const src = await BRIEF_LAYOUT_SRC; if (src) await sandbox.files.write(`${WORKDIR}/.aiss/brief_layout.py`, src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength)); sandboxLayout = true } catch (e) { console.error('layout module:', e?.message) }
+      try { const src = await LAYOUT_SRC; if (src) await sandbox.files.write(`${WORKDIR}/.aiss/doc_layout.py`, src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength)); sandboxLayout = true } catch (e) { console.error('layout module:', e?.message) }
     }
     const task = String(args.task || '')
     const wanted = Array.isArray(args.output_files) ? args.output_files.map(String) : []
@@ -2628,7 +2631,7 @@ app.post('/api/chat', async (req, res) => {
     // read_document for every document whose text is not inline (long uploads, documents of earlier turns).
     const readable = [...uploadTexts.keys()].filter((n) => !(inlineAll && uploads.some((u) => u.name === n)))
     const kbOnDemand = agentRun?.kbMode === 'tool'
-    const kbTool = Boolean((filesSrc || kbOnDemand) && heavy && kbAllowed && AISSOCIATE_API_KEY && aissCalls === 0)
+    const kbTool = Boolean(((filesSrc && heavy) || kbOnDemand) && kbAllowed && AISSOCIATE_API_KEY && aissCalls === 0)
     const baseTools = [TOOL_FILE, ...(readable.length ? [TOOL_READ_DOCUMENT] : []), ...(filesSrc ? TOOLS_FILES : []), ...(kbTool ? [TOOL_ASK_AISSOCIATE_CTX] : [])]
     const instructions = docInstructions(useWeb) + (filesSrc ? filesInstructions({ local: filesSrc.kind === 'local', name: filesSrc.name, count: filesSrc.count, kbTool }) : '') +
       (kbTool && !filesSrc ? `\n- ask_aissociate: höchstens EIN Aufruf, nur für konkrete Rechtsfragen, die sich aus dem Vorbringen ergeben und nicht gesichert zu beantworten sind; den einschlägigen Sachverhalt in context mitgeben. Nicht für Aufbau, Form oder allgemeine Verfahrensfragen.` : '')

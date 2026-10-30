@@ -1,8 +1,10 @@
-"""Layout of an Austrian Schriftsatz (Klage, Klagebeantwortung, Rechtsmittel …) with python-docx.
+"""Layout of Austrian legal documents with python-docx: Schriftsätze and Verträge.
 
 The drafting model writes the text line by line with markers; this module sets the layout, so
-the Rubrum and the formatting are the same in every brief:
+every brief and every contract looks the same. Page 1 carries only the Rubrum (brief) or the
+title and the parties (contract); the text starts on page 2.
 
+Schriftsatz:
     [ADRESSAT] An das            [AZ] 12 Cg 34/26x
     [ADRESSAT] Landesgericht für ZRS Wien
     [PARTEI] Klagende Partei: | Name; Anschrift; FN
@@ -11,16 +13,25 @@ the Rubrum and the formatting are the same in every brief:
     [WEGEN] EUR 18.400,-- s.A.   [STREITWERT] EUR 18.400,--
     [RUBRUM] Berufungsinteresse: | EUR 18.400,--      (any further Rubrum line)
     [TITEL] KLAGE                [UNTERTITEL] …            [BEILAGEN] ./A bis ./F
+    --- page 2 ---
     [H] I. Sachverhalt           [P] 1. …                  [BEWEIS] ./A Rechnung; PV; Zeuge …
     [ANTRAG] Die beklagte Partei ist schuldig, …
     [SCHLUSS] Wien, am [Datum] | Klagende Partei
 
-Lines without a marker continue the previous paragraph type. Placeholders in [ … ] are
+Vertrag:
+    [VERTRAG] MIETVERTRAG        [UNTERTITEL] über das Geschäftslokal …
+    [PARTEI] Name; Anschrift; FN | Vermieterin              (one line per party)
+    --- page 2 ---
+    [H] 1. Mietgegenstand        [P] 1.1 …
+    [UNTERSCHRIFT] Wien, am [Datum] | Name der Partei       (one line per party)
+    [ANLAGE] ./1 Lageplan
+
+Lines without a marker continue the previous paragraph. Placeholders in [ … ] are
 highlighted yellow.
 
     import sys; sys.path.insert(0, '/home/user/.aiss')
-    from brief_layout import render
-    render(TEXT, '/home/user/Klage.docx')
+    from doc_layout import render
+    render(TEXT, '/home/user/Klage.docx')     # brief or contract, detected from the markers
 """
 import re
 
@@ -31,7 +42,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
-MARKERS = ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'RUBRUM', 'TITEL', 'UNTERTITEL', 'BEILAGEN', 'H', 'P', 'BEWEIS', 'ANTRAG', 'SCHLUSS')
+MARKERS = ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'RUBRUM', 'TITEL', 'UNTERTITEL', 'BEILAGEN', 'H', 'P', 'BEWEIS', 'ANTRAG', 'SCHLUSS', 'VERTRAG', 'UNTERSCHRIFT', 'ANLAGE')
 LINE = re.compile(r'^\s*\[(%s)\]\s?(.*)$' % '|'.join(MARKERS))
 PLACEHOLDER = re.compile(r'(\[[^\[\]]*\])')
 FONT = 'Arial'
@@ -191,10 +202,77 @@ def parties(doc, rows):
     widths(t, LABEL_W, VALUE_W)
 
 
-def render(text, path, title=None):
-    items = parse(text)
-    doc = Document()
-    setup(doc)
+RUBRUM_KEYS = ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'RUBRUM')
+NUMBERED = re.compile(r'^(\d+(?:\.\d+)+\.?|\d+\.|\(?[a-z]\))\s+(.*)$')  # 1.  1.1  1.1.  a)  (a)
+
+
+class Body:
+    """Text part (page 2 onwards): the first paragraph opens a new page."""
+
+    def __init__(self, doc, new_page=True):
+        self.doc, self.pending = doc, new_page
+
+    def par(self):
+        p = self.doc.add_paragraph()
+        if self.pending:
+            p.paragraph_format.page_break_before = True
+            self.pending = False
+        return p
+
+    def add(self, k, t):
+        doc = self.doc
+        if k == 'H':
+            runs(fmt(self.par(), before=12, after=6, keep_next=True), t, bold=True)
+        elif k == 'P':
+            p = self.par()
+            m = NUMBERED.match(t)
+            if m:
+                ind = 1.0 if '.' in m.group(1).rstrip('.') else 0.75
+                fmt(p, align=WD_ALIGN_PARAGRAPH.JUSTIFY, left=ind, first=-ind)
+                tab_stop(p, ind)
+                p.add_run(m.group(1) + '\t')
+                runs(p, m.group(2))
+            else:
+                runs(fmt(p, align=WD_ALIGN_PARAGRAPH.JUSTIFY), t)
+        elif k == 'BEWEIS':
+            p = fmt(self.par(), after=8, left=3.0, first=-1.75)
+            tab_stop(p, 3.0)
+            items_ = [x.strip() for x in re.sub(r'^\s*Beweis:\s*', '', t).split(';') if x.strip()]
+            p.add_run('Beweis:').bold = True
+            p.add_run('\t')
+            for i, it in enumerate(items_):
+                if i:
+                    p.add_run().add_break(WD_BREAK.LINE)
+                runs(p, it)
+        elif k == 'ANTRAG':
+            lead = bool(re.fullmatch(r'[A-ZÄÖÜ ]{4,}[:,]?', t))  # e.g. "URTEILSBEGEHREN:"
+            runs(fmt(self.par(), after=6, align=WD_ALIGN_PARAGRAPH.LEFT if lead else WD_ALIGN_PARAGRAPH.JUSTIFY, left=1.5, right=1.5, spacing=1.5, keep_next=lead), t, bold=lead)
+        elif k == 'SCHLUSS':
+            place, _, who = t.partition('|')
+            fmt(self.par(), before=12, after=0)
+            tbl = doc.add_table(rows=1, cols=2)
+            borderless(tbl)
+            widths(tbl, Cm(8.25), Cm(8.25))
+            a, b = tbl.rows[0].cells
+            cell_text(a, [place.strip()])
+            cell_text(b, [x.strip() for x in who.split(';') if x.strip()] or [''], align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+
+def first_page_title(doc, items, size=14, before=36):
+    for k, t in items:
+        if k in ('TITEL', 'VERTRAG'):
+            p = fmt(doc.add_paragraph(), before=before, after=6, align=WD_ALIGN_PARAGRAPH.CENTER, keep_next=True)
+            r = p.add_run(t.upper())
+            r.bold, r.font.size = True, Pt(size)
+            r.font.color.rgb = RGBColor(0, 0, 0)
+        elif k == 'UNTERTITEL':
+            runs(fmt(doc.add_paragraph(), after=4, align=WD_ALIGN_PARAGRAPH.CENTER), t)
+        elif k == 'BEILAGEN':
+            label = t if t.lower().startswith('beilage') else 'Beilagen: ' + t
+            runs(fmt(doc.add_paragraph(), before=8, after=4, align=WD_ALIGN_PARAGRAPH.CENTER), label, italic=True, size=10)
+
+
+def render_brief(doc, items):
     adressat = [t for k, t in items if k == 'ADRESSAT']
     az = [t for k, t in items if k == 'AZ' and t]
     head(doc, adressat, az)
@@ -208,54 +286,65 @@ def render(text, path, title=None):
             rows.append((k, label.strip() if bar else default, value.strip() if bar else t))
     if rows:
         parties(doc, rows)
+    first_page_title(doc, items)
+    body = Body(doc)
     for k, t in items:
-        if k in ('ADRESSAT', 'AZ', 'PARTEI', 'WEGEN', 'STREITWERT', 'RUBRUM'):
-            continue
-        if k == 'TITEL':
-            p = fmt(doc.add_paragraph(), before=24, after=4, align=WD_ALIGN_PARAGRAPH.CENTER, keep_next=True)
-            r = p.add_run(t.upper())
-            r.bold, r.font.size = True, Pt(14)
-            r.font.color.rgb = RGBColor(0, 0, 0)
-        elif k == 'UNTERTITEL':
-            runs(fmt(doc.add_paragraph(), after=4, align=WD_ALIGN_PARAGRAPH.CENTER), t)
-        elif k == 'BEILAGEN':
-            label = t if t.lower().startswith('beilage') else 'Beilagen: ' + t
-            runs(fmt(doc.add_paragraph(), after=18, align=WD_ALIGN_PARAGRAPH.CENTER), label, italic=True, size=10)
-        elif k == 'H':
-            runs(fmt(doc.add_paragraph(), before=12, after=6, keep_next=True), t, bold=True)
-        elif k == 'P':
-            p = doc.add_paragraph()
-            m = re.match(r'^(\d+(?:\.\d+)*\.|[a-z]\))\s+(.*)$', t)
-            if m:
-                fmt(p, align=WD_ALIGN_PARAGRAPH.JUSTIFY, left=0.75, first=-0.75)
-                tab_stop(p, 0.75)
-                p.add_run(m.group(1) + '\t')
-                runs(p, m.group(2))
-            else:
-                runs(fmt(p, align=WD_ALIGN_PARAGRAPH.JUSTIFY), t)
-        elif k == 'BEWEIS':
-            p = fmt(doc.add_paragraph(), after=8, left=3.0, first=-1.75)
-            tab_stop(p, 3.0)
-            items_ = [x.strip() for x in re.sub(r'^\s*Beweis:\s*', '', t).split(';') if x.strip()]
-            p.add_run('Beweis:').bold = True
-            p.add_run('\t')
-            for i, it in enumerate(items_):
-                if i:
-                    p.add_run().add_break(WD_BREAK.LINE)
-                runs(p, it)
-        elif k == 'ANTRAG':
-            lead = bool(re.fullmatch(r'[A-ZÄÖÜ ]{4,}[:,]?', t))  # e.g. "URTEILSBEGEHREN:"
-            runs(fmt(doc.add_paragraph(), after=6, align=WD_ALIGN_PARAGRAPH.LEFT if lead else WD_ALIGN_PARAGRAPH.JUSTIFY, left=1.5, right=1.5, spacing=1.5, keep_next=lead), t, bold=lead)
-        elif k == 'SCHLUSS':
-            place, _, who = t.partition('|')
-            fmt(doc.add_paragraph(), before=12, after=0)
-            tbl = doc.add_table(rows=1, cols=2)
-            borderless(tbl)
-            widths(tbl, Cm(8.25), Cm(8.25))
-            a, b = tbl.rows[0].cells
-            cell_text(a, [place.strip()])
-            cell_text(b, [x.strip() for x in who.split(';') if x.strip()] or [''], align=WD_ALIGN_PARAGRAPH.RIGHT)
-    doc.core_properties.title = title or next((t for k, t in items if k == 'TITEL'), 'Schriftsatz')
+        if k not in RUBRUM_KEYS and k not in ('TITEL', 'UNTERTITEL', 'BEILAGEN'):
+            body.add(k, t)
+
+
+def render_contract(doc, items):
+    first_page_title(doc, [(k, t) for k, t in items if k in ('VERTRAG', 'TITEL', 'UNTERTITEL')], size=18, before=140)
+    parts = [t for k, t in items if k == 'PARTEI']
+    runs(fmt(doc.add_paragraph(), before=36, after=18, align=WD_ALIGN_PARAGRAPH.CENTER), 'abgeschlossen zwischen')
+    for i, t in enumerate(parts):
+        if i:
+            word = 'und' if i == len(parts) - 1 else 'sowie'
+            runs(fmt(doc.add_paragraph(), before=6, after=12, align=WD_ALIGN_PARAGRAPH.CENTER), word)
+        details, bar, short = t.partition('|')
+        lines = [x.strip() for x in details.split(';') if x.strip()] or ['[Partei]']
+        for j, line in enumerate(lines):
+            runs(fmt(doc.add_paragraph(), after=0, align=WD_ALIGN_PARAGRAPH.CENTER), line, bold=j == 0)
+        name = short.strip().strip('„“"')
+        if bar and name:
+            runs(fmt(doc.add_paragraph(), before=4, after=0, align=WD_ALIGN_PARAGRAPH.CENTER), '(im Folgenden „' + name + '“)', italic=True)
+    body = Body(doc)
+    signs, annexes = [], []
+    for k, t in items:
+        if k in ('H', 'P', 'ANTRAG', 'BEWEIS'):
+            body.add(k, t)
+        elif k == 'UNTERSCHRIFT':
+            signs.append(t)
+        elif k == 'ANLAGE':
+            annexes.append(t)
+    if signs:
+        fmt(body.par(), before=24, after=0, keep_next=True)
+        tbl = doc.add_table(rows=0, cols=2)
+        borderless(tbl)
+        for i in range(0, len(signs), 2):
+            cells = tbl.add_row().cells
+            for c, t in zip(cells, signs[i:i + 2]):
+                place, _, who = t.partition('|')
+                c.paragraphs[0].text = ''
+                fmt(c.paragraphs[0], after=36)
+                runs(c.paragraphs[0], place.strip() or '[Ort], am [Datum]')
+                fmt(c.add_paragraph(), after=0).add_run('_' * 32)
+                runs(fmt(c.add_paragraph(), after=18), who.strip() or '[Partei]')
+        widths(tbl, Cm(8.25), Cm(8.25))
+    if annexes:
+        runs(fmt(body.par(), before=18, after=4, keep_next=True), 'Anlagen', bold=True)
+        for t in annexes:
+            runs(fmt(body.par(), after=0, left=0.5), t)
+
+
+def render(text, path, title=None):
+    """Brief or contract, detected from the markers ([VERTRAG] = contract)."""
+    items = parse(text)
+    doc = Document()
+    setup(doc)
+    contract = any(k == 'VERTRAG' for k, _ in items)
+    (render_contract if contract else render_brief)(doc, items)
+    doc.core_properties.title = title or next((t for k, t in items if k in ('TITEL', 'VERTRAG')), 'Vertrag' if contract else 'Schriftsatz')
     doc.save(path)
     return path
 
