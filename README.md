@@ -332,70 +332,47 @@ analysis results, review tables and reports. Everything long-running is a
 server job with a resumable event stream (`GET /api/jobs/:id/stream?after=seq`),
 can be paused, and survives closed browser tabs.
 
-**Due diligence** (`lib/dd.js` orchestration; `lib/inventory.js`, `lib/aktmodel.js`,
-`lib/issues.js`, `lib/severity.js`, `lib/report.js`; catalogues and schemas in
-`lib/ddconfig.js`) is an explicit pipeline, not an agent. Principle: **documents deliver
-facts and clauses; conclusions are drawn only at the level of the Akt, once per issue
-(Sachverhalt), with the whole context and the relevant documents.** No document states
-what is missing elsewhere, so the same matter cannot be concluded several times from
-partial views.
+**Due diligence** (`lib/dd.js`; `lib/inventory.js`, `lib/aktmodel.js`, `lib/themes.js`,
+`lib/report.js`; schemas and catalogues in `lib/ddconfig.js`) is a short pipeline in
+which **agents decide**. The code only does what needs no judgement: hashing, text,
+merging facts into the Akt model, caching, the token limit. Principle: **first the
+whole context, then every document is reviewed by an agent against it.**
 
 | Stage | What happens | Model |
 |---|---|---|
-| 0 Inventar | SHA-256 across the Akt (duplicates stay in the inventory as "übersprungen: Duplikat"), archives (.zip/.7z) and e-mails (.eml/.msg) unpacked on upload – every part a document with its parent; role from the file name | – |
-| 1 Text | PDF, Word, Excel, text, e-mail; scans and images by OCR (`[handschriftlich: …]`, `[Stempel: …]`); content duplicates; role and legal subject from the first page (rules, else one call on 3,000 characters); secondary sources (audit reports, memos, third-party opinions) are not read further unless they are to be read as hypotheses (setting, or `DD_SECONDARY_AS_HYPOTHESES`; their clauses then become issues that need evidence in an original) | extraction, low |
-| 2 Lesen | every document in full (sections of 150,000 characters, up to 40): facts – persons with date of birth, companies with FN, functions, permits, contracts, payments, key figures, resolutions – and the clauses that carry a risk by themselves, each with a verbatim quote; anything whose quote is not in the text is dropped; statements about other documents are not allowed. The Akt model is built only when every document is read | extraction, medium |
-| 3 Aktmodell | facts merged (Firmenbuch and annual accounts first, contradictions kept); persons and companies resolved across documents by name, date of birth and FN – namesakes stay apart, a mention that could be several of them is "unklar"; functions, deaths, departures per entity; content-based ids | – |
-| 4 Sachverhalte | the Akt rules of the catalogue (below), clauses bundled per kind and counterparty, and one pass of the main model over the whole Akt model for further issues; each issue exactly once (stable key) | main, one call |
-| 5 Prüfung | one call per issue with the slice of the Akt model, the clauses and the wording of the relevant documents (whole up to 25,000 characters, else the passages around the evidence; at most `DD_REVIEW_MAX_CHARS`, default 120,000, per issue): bestätigt / ungeklärt / widerlegt, verbatim evidence (verified), features, legal question and its difficulty; grade by rules | main |
-| 6 Rechtsprüfung | leicht: internal knowledge; schwer: web search, RIS first (≤ 3 searches); sehr schwer: AI:ssociate (at most `DD_MAX_KB_CALLS`, default 30, per run); "nicht zutreffend" discards the issue, "teilweise zutreffend" caps it at yellow unless a core prerequisite is concerned | main / fast + web / AI:ssociate |
-| 7 Summary | area summaries (≤ 6 requests, ≤ 4 missing documents) and executive summary from the issues and key figures; overall assessment by rules | main |
-| 8 RIS | norms of the issues verified | – |
-| 9 Bericht | Red-Flag-Bericht (default; red and yellow issues, ≤ 180 words each, ≤ 15,000 words) or Vollbericht (plus green issues and a summary per document); the document index proves coverage per document (issues or "geprüft, unauffällig"); Excel: Themen, Klauseln, Entitäten, Fakten, Dokumente, Nachfragen, Bereiche, Hinweise | – |
+| 0 Inventar | SHA-256 across the Akt (duplicates stay in the inventory as "übersprungen: Duplikat"), archives (.zip/.7z) and e-mails (.eml/.msg) unpacked on upload – every part a document with its parent | – |
+| 1 Text | PDF, Word, Excel, text, e-mail; scans and images by OCR; content duplicates | – |
+| 2 Lesen | every document in full (sections of 150,000 characters, up to 40): role (original or secondary source), facts – persons with date of birth, companies with FN, functions, permits, contracts, payments, key figures, resolutions – each with a verbatim quote; no assessment. Secondary sources (audit reports, memos) are not reviewed unless they are to be read as hypotheses (`DD_SECONDARY_AS_HYPOTHESES`) | extraction, low |
+| 3 Aktmodell | facts merged (contradictions kept); persons and companies resolved by name, date of birth and FN – namesakes stay apart, an ambiguous mention is "unklar"; functions, deaths, departures per entity | – |
+| 4 Dokumentprüfung | **one review agent per document** with the document in full, the core context of the Akt (shareholders, organs, functionaries, permits, deaths, sites) and what the Akt knows about this document's persons and contracts, plus tools: `list_documents`, `search_akt` (full-text search across the Akt), `read_document` (another document verbatim) – up to `DD_DOC_AGENT_STEPS` rounds (default 3). It decides what is a finding, its grade (red / yellow / green) and instrument, the legal question and how hard it is; easy questions it answers from its own knowledge. A finding whose quote is not in the document is dropped | main |
+| 5 Konsolidierung | one agent merges the findings of all documents into themes (same matter from several documents = one theme), decides status (bestätigt / ungeklärt / widerlegt), grade, instrument and the legal question; existing theme keys are kept | main |
+| 6 Rechtsprüfung | leicht: the answer of the document agent (internal knowledge); schwer: a legal agent with web search, RIS first; sehr schwer: the legal agent puts the question to AI:ssociate (at most `DD_MAX_KB_CALLS`, default 30, per run) and may search the web as well. "nicht zutreffend" discards the theme; the agent may change the grade with a reason | main + web / AI:ssociate |
+| 7 Summary | area summaries and executive summary with the overall assessment | main |
+| 8 RIS | cited norms verified | – |
+| 9 Bericht | Red-Flag-Bericht or Vollbericht; the document index proves coverage per document (themes or "geprüft, unauffällig"); Excel: Themen, Klauseln, Entitäten, Fakten, Dokumente, Regeln, Nachfragen, Bereiche, Hinweise | – |
 
-**Akt rules** (`AKT_RULES` in `lib/ddconfig.js`, implemented in `lib/issues.js`) are
-branch-neutral and state their legal basis and scope:
-
-| Rule | Checks | Applies to |
-|---|---|---|
-| AKT-001 | A permit needs a person in a function (base: trade licence of a legal person → gewerberechtlicher Geschäftsführer, § 9 GewO; more from the industry modules): is someone available and validly appointed (alive, not departed, assigned to one person)? A functionary belongs to a permit by the same document or by at least two common terms | every DD |
-| AKT-002 | Organ or functionary died or left, no successor in a later document (where AKT-001 does not cover it) | every DD |
-| AKT-003 | Namesakes in a key role (shareholder, organ, functionary) – only when a mention cannot be assigned, two of them hold key roles or one has died. Whether they are one person (e.g. a typo in a date of birth) is not decided by a rule but in the review of the issue; attached to the AKT-001/002 issue when all its facts are already covered there | every DD |
-| AKT-004 | Change-of-control clause triggered by the share deal | share deal |
-| AKT-005 | Permit, contract or right of use ends before Stichtag or closing without renewal | every DD |
-| AKT-006 | Payments to shareholders without a contract or above it (§ 82 GmbHG, § 52 AktG) | capital companies |
-| AKT-007 | Written resolution (Umlaufbeschluss) without all shareholders (§ 34 GmbHG); resolutions of a general meeting are not checked | GmbH, FlexKapG |
-| AKT-008 | Contradictions about shares, organs, functionaries, permits | every DD |
-
-The legal form of the target is set in the DD settings or taken from its name.
-**Industry modules** (`INDUSTRY_MODULES`, switched on per DD: Abfall- und
-Umweltwirtschaft, Güter- und Personenbeförderung, Bau und Bauträger, Gesundheit und
-Pflege, Finanzdienstleistungen und Versicherung) add permits that need a functionary,
-core prerequisites and red flags; without a module the catalogue is branch-neutral.
-Every Akt shows per rule how many of its issues held up (Protokoll tab, Excel sheet
-"Regeln", `eval/run.mjs`); a rule whose issues are mostly refuted, excluded or rejected is
-marked for review.
-
-Severity rules, in order: exclusion catalogue → no issue; affected party not the target
-→ at most yellow (unless the rule allows it); only a secondary source → at most yellow,
-"unbestätigt"; red for an established defect above the materiality threshold or at a
-core prerequisite; red for a point the whole Akt leaves open at a core prerequisite;
-yellow otherwise; green for checked/unremarkable. Core prerequisites and the
-exclusion catalogue are branch-neutral code in `lib/ddconfig.js`.
+The agents get the transaction (deal type, perspective, target and its legal form,
+Stichtag, materiality), the core prerequisites of the legal form, the requirements of the
+industry modules switched on for the DD (`INDUSTRY_MODULES`: Abfall- und
+Umweltwirtschaft, Beförderung, Bau, Gesundheit, Finanzdienstleistungen) and the
+exclusion catalogue – all branch-neutral and general; there are no case-specific rules.
+The Protokoll tab and `eval/run.mjs` show per source (findings, hypotheses, manual) how
+many themes held up.
 
 Every stage writes a checkpoint and counts tokens and cost. Model results are cached by
-content (`DATA_DIR/cache`) and requested with temperature 0: a re-run reads only new
-documents and reviews again only the issues whose slice of the Akt model, clauses or
-documents changed. Corrections in the Aktmodell tab offer "Neu bewerten", which
-recomputes from stage 3 without reading a document again. The hard limit of
+content (`DATA_DIR/cache`) and requested with temperature 0: a re-run reads and reviews
+only new documents and those whose context changed (e.g. a later document names a
+successor in a function); unchanged findings are not consolidated again, answered legal
+questions are not asked again. Corrections in the Aktmodell tab offer "Neu bewerten",
+which recomputes from stage 3 without reading a document again. The hard limit of
 100,000,000 input and 10,000,000 output tokens per due diligence (all runs together;
-`DD_MAX_INPUT_TOKENS` / `DD_MAX_OUTPUT_TOKENS`) cannot be raised in the UI: every call
-reserves its estimated tokens before it starts, so parallel calls (`DD_CONCURRENCY`,
-default 24) cannot overshoot; at the limit the run pauses with a clear message. Uploads:
-at most 300 documents (archive parts included) and 30 MB per file; anything over stays
-in the inventory as "übersprungen". A matter is stored in parts; a save writes only
-what changed. Questions about the Akt get the issues, the Akt model and the best
-passages of a full-text search.
+`DD_MAX_INPUT_TOKENS` / `DD_MAX_OUTPUT_TOKENS`) cannot be raised in the UI: every call –
+each tool round of an agent included – reserves its estimated tokens before it starts,
+so parallel calls (`DD_CONCURRENCY`, default 24) cannot overshoot; at the limit the run
+pauses with a clear message. Uploads: at most 300 documents (archive parts included) and
+30 MB per file; anything over stays in the inventory as "übersprungen". A matter is
+stored in parts; a save writes only what changed. Questions about the Akt get the
+themes, the Akt model and the best passages of a full-text search.
 
 Tabs: Übersicht, Inventar (role and legal subject editable), Dokumente (coverage per
 document), Aktmodell (persons and companies, namesakes, contradictions, facts with

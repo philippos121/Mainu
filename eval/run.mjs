@@ -9,7 +9,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import mammoth from 'mammoth'
-import { ruleStats } from '../lib/issues.js'
+import { ruleStats } from '../lib/themes.js'
 
 const arg = (k) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : null }
 const dataDir = arg('data') || process.env.DATA_DIR || './data'

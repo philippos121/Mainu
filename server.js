@@ -14,11 +14,10 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, skipDoc, rebuildIssuesLocal, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES, CLAUSE_KINDS, ISSUE_STATUS, DIFFICULTY, LEGAL_FORMS, INDUSTRY_MODULES, AKT_RULES, legalFormOf } from './lib/ddconfig.js'
-import { ruleStats } from './lib/issues.js'
 import { sha256, unpackArchive, parseEml, parseMsg, ARCHIVE_RE, MAIL_RE, reconcile } from './lib/inventory.js'
 import { SearchIndex } from './lib/search.js'
 import { buildAktModel } from './lib/aktmodel.js'
-import { effectiveGrade, liveTheme, overallAssessment } from './lib/severity.js'
+import { effectiveGrade, liveTheme, overallAssessment, ruleStats } from './lib/themes.js'
 import ExcelJS from 'exceljs'
 import { agentsForClient, buildAgentTask, BRIEF_MARKUP, CONTRACT_MARKUP } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
@@ -1791,6 +1790,7 @@ const ddDeps = (send) => ({
   // knowledge base only for very hard questions (lib/dd.js decides, a few per run).
   askKnowledgeBase: AISSOCIATE_API_KEY ? async ({ question, legalArea }) => { const r = await askAissociate({ question: KB_BRIEF + question, legalArea: LEGAL_AREAS[legalArea] ? legalArea : 'civil', scope: '', threadId: null }); return { answer: r.answer, sources: r.sources } } : null,
   cache: { get: (k) => store.getCache(k), set: (k, v) => store.putCache(k, v) },
+  webSearchTool: WEB_SEARCH_ENABLED ? WEB_SEARCH_TOOL : null,
   searchIndex: (m) => aktIndex(m),
   answerEasyLegal: async (ctx, { question, ris = false, maxSearches = MAX_WEB_SEARCHES }) => {
     const web = WEB_SEARCH_ENABLED && !webSearchRejected
@@ -2259,7 +2259,7 @@ app.patch('/api/matters/:id/themes/:tid', async (req, res) => {
   if (typeof b.description === 'string') { r.description = b.description.slice(0, 4000); t.description = r.description; if (r.status === 'open') r.status = 'modified' }
   r.ts = Date.now(); r.by = req.user?.name || ''
   if (t.orphaned && b.dismiss) m.orphanThemes = (m.orphanThemes || []).filter((x) => x.id !== t.id)
-  if (m.executive) m.executive.overall_assessment = overallAssessment(m.themes)
+  if (m.executive && !m.executive.byAgent) m.executive.overall_assessment = overallAssessment(m.themes)
   await store.saveMatter(m)
   res.json({ theme: t, overall: m.executive?.overall_assessment || null })
 })
