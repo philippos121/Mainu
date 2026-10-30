@@ -158,6 +158,16 @@ keeps its subfolder (`folder`, e.g. `Datenraum/02 Verträge/Kunden`), so equal f
 names in different folders stay apart; uploads run one request after the other in
 batches of up to 10 files / 20 MB (parallel requests would overwrite the Akt).
 
+**OCR.** Scanned PDFs (under ~80 visible characters per page in the text layer)
+and images (PNG, JPG, WebP) are read by the model itself: `extractText` sends the
+PDF pages (split with pdf-lib into parts of `OCR_PAGES_PER_CALL`, default 10, six
+parts side by side, at most `OCR_MAX_PAGES`, default 400) or the image as input
+with a strict transcription prompt ("--- Seite N ---" markers, tables as Markdown,
+handwriting marked, nothing added). This works for chat attachments, documents of
+an Akt / project / due diligence (counted against the hard limit; marked "OCR"),
+and files of a local folder (the agent takes a scanned file over with
+`files_attach` and reads it with `read_document`). `OCR=off` switches it off.
+
 ## Local folders and Akten as searchable sources
 
 "Lokaler Ordner" in the "Hinzufügen" menu connects a local folder (File System Access API;

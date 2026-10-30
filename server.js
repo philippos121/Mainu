@@ -9,6 +9,7 @@ import { Sandbox } from '@e2b/code-interpreter'
 import { LocalSandbox } from './lib/localSandbox.js'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
+import { PDFDocument } from 'pdf-lib'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, DD_HARD_IN, DD_HARD_OUT } from './lib/dd.js'
@@ -88,7 +89,7 @@ const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
 const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
 const DD_MAX_DOC_BYTES = Number(process.env.DD_MAX_DOC_BYTES || 30 * 1024 * 1024)
 const DD_MAX_CONCURRENT = Number(process.env.DD_MAX_CONCURRENT || 2)
-const DOC_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml)$/i
+const DOC_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp)$/i
 
 // Sandbox (only used by the file tool).
 const WORKDIR = '/home/user'
@@ -729,14 +730,66 @@ async function verifyNormList(text, max = 60) {
 // ---------------------------------------------------------------------------
 // Uploads: server-side text extraction
 // ---------------------------------------------------------------------------
-async function extractText(name, buf) {
+// ---- OCR: scanned PDFs and images are read by the model itself (PDF pages / images as input) ----
+const OCR_ENABLED = process.env.OCR !== 'off'
+const OCR_PAGES_PER_CALL = Number(process.env.OCR_PAGES_PER_CALL || 10)
+const OCR_MAX_PAGES = Number(process.env.OCR_MAX_PAGES || 400)
+const IMAGE_EXT = /\.(png|jpe?g|webp)$/i
+const OCR_INSTRUCTIONS = `Du bist ein präziser OCR-Dienst einer österreichischen Rechtsanwaltskanzlei. Transkribiere den gesamten sichtbaren Text wörtlich und vollständig in der Reihenfolge der Seiten – auch Kopf- und Fußzeilen, Stempel, Randvermerke und handschriftliche Ergänzungen (als [handschriftlich: …]). Jede Seite beginnt mit einer eigenen Zeile „--- Seite N ---“. Tabellen als Markdown-Tabellen. Nichts zusammenfassen, nichts ergänzen, nichts übersetzen, keine Kommentare; Unleserliches als [unleserlich]. Antworte nur mit dem transkribierten Text.`
+/** A PDF whose text layer is (nearly) empty: under ~80 visible characters per page. */
+const needsOcr = (text, pages) => String(text || '').replace(/\s+/g, '').length < Math.max(1, pages || 1) * 80
+function ocrPool(n) {
+  let active = 0; const q = []
+  const next = () => { if (active >= n || !q.length) return; active++; const { fn, ok, fail } = q.shift(); Promise.resolve().then(fn).then(ok, fail).finally(() => { active--; next() }) }
+  return (fn) => new Promise((ok, fail) => { q.push({ fn, ok, fail }); next() })
+}
+/** OCR of a scanned PDF (in parts of a few pages, side by side) or of an image. */
+async function ocrDocument(ctx, name, buf) {
+  const call = (content) => callModel(ctx, { model: MODEL_EXTRACT, instructions: OCR_INSTRUCTIONS, effort: 'low', maxOut: 16_000, input: [{ role: 'user', content }] })
+  if (IMAGE_EXT.test(name)) {
+    const mime = /\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : 'image/jpeg'
+    const resp = await call([{ type: 'input_image', image_url: `data:${mime};base64,${buf.toString('base64')}` }, { type: 'input_text', text: `Bild „${name}“ – transkribiere den Text (eine Seite).` }])
+    return { text: (resp.output_text || '').trim(), pages: 1, ocr: true }
+  }
+  const src = await PDFDocument.load(buf, { ignoreEncryption: true })
+  const pages = src.getPageCount()
+  const total = Math.min(pages, OCR_MAX_PAGES)
+  const parts = []
+  for (let a = 0; a < total; a += OCR_PAGES_PER_CALL) parts.push([a, Math.min(total, a + OCR_PAGES_PER_CALL)])
+  const run = ocrPool(6)
+  const texts = await Promise.all(parts.map(([a, b]) => run(async () => {
+    const part = await PDFDocument.create()
+    for (const p of await part.copyPages(src, Array.from({ length: b - a }, (_, i) => a + i))) part.addPage(p)
+    const bytes = Buffer.from(await part.save())
+    const resp = await call([{ type: 'input_file', filename: name, file_data: `data:application/pdf;base64,${bytes.toString('base64')}` }, { type: 'input_text', text: `Dieser Teil enthält die Seiten ${a + 1} bis ${b} von ${pages} – nummeriere ab „--- Seite ${a + 1} ---“.` }])
+    return (resp.output_text || '').trim()
+  })))
+  return { text: texts.join('\n\n'), pages, ocr: true, ocrTruncated: pages > total }
+}
+/**
+ * Text of an uploaded file. With a model context (ctx), scanned PDFs (no text layer) and images
+ * are read by OCR; without one they come back empty.
+ */
+async function extractText(name, buf, { ctx = null } = {}) {
   const ext = name.toLowerCase().split('.').pop()
   try {
-    if (ext === 'pdf') { const r = await pdfParse(buf); return { text: r.text || '', pages: r.numpages } }
+    if (ext === 'pdf') {
+      const r = await pdfParse(buf)
+      const out = { text: r.text || '', pages: r.numpages }
+      if (ctx && OCR_ENABLED && needsOcr(out.text, out.pages)) {
+        try { const o = await ocrDocument(ctx, name, buf); if (o.text.replace(/\s+/g, '').length > out.text.replace(/\s+/g, '').length) return o } catch (e) { if (e instanceof BudgetExceeded) throw e; out.ocrError = String(e?.message || e).slice(0, 200) }
+      }
+      return out
+    }
+    if (IMAGE_EXT.test(name)) {
+      if (!(ctx && OCR_ENABLED)) return { text: '', unsupported: true }
+      return await ocrDocument(ctx, name, buf)
+    }
     if (ext === 'docx') { const r = await mammoth.extractRawText({ buffer: buf }); return { text: r.value || '' } }
     if (['txt', 'md', 'csv', 'json', 'xml', 'rtf'].includes(ext)) return { text: buf.toString('utf8') }
     if (['html', 'htm'].includes(ext)) return { text: htmlToText(buf.toString('utf8')) }
   } catch (e) {
+    if (e instanceof BudgetExceeded) throw e
     return { text: '', error: e?.message }
   }
   return { text: '', unsupported: true }
@@ -887,7 +940,7 @@ ORDNER: ${local ? `Lokaler Ordner „${name}“ auf dem Rechner der Nutzerin (${
 - files_search: Dateinamen und Inhalte nach Begriffen durchsuchen (mehrere Begriffe = alle müssen vorkommen; Alternativen mit |). Zuerst suchen, dann gezielt lesen.
 - files_list: Ordnerstruktur (Unterordner mit path).
 - files_read: Text einer Datei (Teil für Teil, je ca. ${FILES_PART_CHARS / 1000}k Zeichen). Lies nur die Dateien und Teile, die für die Aufgabe nötig sind.
-- files_attach: Datei in die Sandbox übernehmen – nur wenn create_or_edit_file die Originaldatei bearbeiten soll (z. B. Kommentare in ein Word-Dokument).
+- files_attach: Datei in die Sandbox übernehmen – wenn create_or_edit_file die Originaldatei bearbeiten soll (z. B. Kommentare in ein Word-Dokument) oder wenn files_read bei einem Scan bzw. Bild keinen Text liefert: danach mit read_document lesen (OCR).
 Nenne in der Antwort die Dateien mit Pfad, auf die du dich stützt.${kbTool ? `
 - ask_aissociate: EINE Anfrage an die juristische Wissensdatenbank für schwierige Rechtsfragen, ERST nachdem du die relevanten Dateien gelesen hast. Die Wissensdatenbank sieht die Dateien nicht: gib in context den einschlägigen Wortlaut wörtlich mit (Klauseln, Beträge, Daten, mit Datei und Fundstelle).` : ''}`
 // Documents up to this many characters (all attachments together) are handed to
@@ -2415,7 +2468,7 @@ app.post('/api/chat', async (req, res) => {
     const t = uploadTexts.get(name) || [...uploadTexts.entries()].find(([k]) => k.toLowerCase() === name.toLowerCase())?.[1]
     if (!t) return { text: `Datei „${name}“ nicht gefunden. Vorhanden: ${[...uploadTexts.keys()].join(', ') || '(keine)'}`, detail: 'nicht gefunden' }
     if (t.unsupported) return { text: `Dateityp von „${name}“ kann nicht direkt gelesen werden (z. B. .xlsx/.pptx). Nutze create_or_edit_file, um den Inhalt per Python zu extrahieren.`, detail: 'Typ nicht lesbar' }
-    if (!t.text.trim()) return { text: `„${name}“ enthält keinen extrahierbaren Text (gescannt?). Falls nötig: create_or_edit_file mit OCR (pytesseract/ocrmypdf) versuchen.`, detail: 'kein Text' }
+    if (!t.text.trim()) return { text: `„${name}“ enthält keinen extrahierbaren Text – auch die OCR hat keinen Text erkannt${t.ocrError ? ` (${t.ocrError})` : ''}.`, detail: 'kein Text' }
     const parts = Math.max(1, Math.ceil(t.text.length / UPLOAD_PART_CHARS))
     const part = Math.min(parts, Math.max(1, Number(args.part) || 1))
     const chunk = t.text.slice((part - 1) * UPLOAD_PART_CHARS, part * UPLOAD_PART_CHARS)
@@ -2484,7 +2537,7 @@ app.post('/api/chat', async (req, res) => {
     if (uploads.length >= MAX_UPLOADS) throw new Error(`höchstens ${MAX_UPLOADS} Dateien je Aufgabe in der Sandbox`)
     if (buf.length > MAX_UPLOAD_BYTES) throw new Error(`„${name}“ überschreitet ${MAX_UPLOAD_BYTES / 1048576} MB`)
     uploads.push({ name: n, buf })
-    if (!uploadTexts.has(n)) uploadTexts.set(n, await extractText(n, buf))
+    if (!uploadTexts.has(n)) uploadTexts.set(n, await extractText(n, buf, { ctx }))
     if (sandboxReady) {
       await sandbox.files.write(`${WORKDIR}/${n}`, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
       try { for (const e of await sandbox.files.list(WORKDIR)) if (e.name === n) before.set(e.path, e.size) } catch {}
@@ -2523,9 +2576,9 @@ app.post('/api/chat', async (req, res) => {
       text = (await store.getText(matterReq.id, d.id)) || ''
       if (!text && d.file) {
         const buf = await store.getFile(matterReq.id, d.file)
-        const r = buf ? await extractText(d.name, buf) : null
+        const r = buf ? await extractText(d.name, buf, { ctx }) : null
         text = r && !r.unsupported ? r.text : ''
-        if (text.trim()) { await store.putText(matterReq.id, d.id, text); if (d.status === 'new') { d.status = 'extracted'; d.textChars = text.length; d.pages = r.pages ?? null; aktDirty = true } }
+        if (text.trim()) { await store.putText(matterReq.id, d.id, text); if (d.status === 'new') { d.status = 'extracted'; d.textChars = text.length; d.pages = r.pages ?? null; if (r.ocr) d.ocr = true; aktDirty = true } }
       }
     } catch (e) { console.error('akt text failed:', e?.message) }
     aktTexts.set(d.id, text)
@@ -2641,7 +2694,7 @@ app.post('/api/chat', async (req, res) => {
     const readable = [...uploadTexts.keys()].filter((n) => !(inlineAll && uploads.some((u) => u.name === n)))
     const kbOnDemand = agentRun?.kbMode === 'tool'
     const kbTool = Boolean(((filesSrc && heavy) || kbOnDemand) && kbAllowed && AISSOCIATE_API_KEY && aissCalls === 0)
-    const baseTools = [TOOL_FILE, ...(readable.length ? [TOOL_READ_DOCUMENT] : []), ...(filesSrc ? TOOLS_FILES : []), ...(kbTool ? [TOOL_ASK_AISSOCIATE_CTX] : [])]
+    const baseTools = [TOOL_FILE, ...(readable.length || filesSrc ? [TOOL_READ_DOCUMENT] : []), ...(filesSrc ? TOOLS_FILES : []), ...(kbTool ? [TOOL_ASK_AISSOCIATE_CTX] : [])]
     const instructions = docInstructions(useWeb) + (filesSrc ? filesInstructions({ local: filesSrc.kind === 'local', name: filesSrc.name, count: filesSrc.count, kbTool }) : '') +
       (kbTool && !filesSrc ? `\n- ask_aissociate: höchstens EIN Aufruf, nur für konkrete Rechtsfragen, die sich aus dem Vorbringen ergeben und nicht gesichert zu beantworten sind; den einschlägigen Sachverhalt in context mitgeben. Nicht für Aufbau, Form oder allgemeine Verfahrensfragen.` : '')
     // Folder searches need a few more steps (search → read → maybe a second search → deliverable).
@@ -2694,8 +2747,8 @@ app.post('/api/chat', async (req, res) => {
     // ---- 0. uploads: extract text ----
     if (uploads.length) {
       const sid = step('read', `${uploads.length} Datei${uploads.length > 1 ? 'en' : ''} wird vorbereitet`)
-      for (const u of uploads) uploadTexts.set(u.name, await extractText(u.name, u.buf))
-      stepDone(sid, { detail: uploads.map((u) => { const n = uploadTexts.get(u.name).text.length; return `${u.name} (${n < 1000 ? n.toLocaleString('de-AT') : Math.round(n / 1000).toLocaleString('de-AT') + 'k'} Zeichen)` }).join(', ') })
+      await Promise.all(uploads.map(async (u) => uploadTexts.set(u.name, await extractText(u.name, u.buf, { ctx }))))
+      stepDone(sid, { detail: uploads.map((u) => { const n = uploadTexts.get(u.name).text.length; return `${u.name} (${n < 1000 ? n.toLocaleString('de-AT') : Math.round(n / 1000).toLocaleString('de-AT') + 'k'} Zeichen${uploadTexts.get(u.name).ocr ? ', per OCR gelesen' : ''})` }).join(', ') })
     }
     // Documents of earlier turns of this conversation stay readable (and reach the knowledge base when a question refers to them).
     const prior = persistent ? sessionDocs.get(sessionId) : null

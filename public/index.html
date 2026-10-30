@@ -967,7 +967,7 @@
 
     <!-- shared composer (moved between home and chat) -->
     <div class="composer" id="composer">
-      <input type="file" id="fileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.xlsx,.rtf,.xml" />
+      <input type="file" id="fileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.xlsx,.rtf,.xml,.png,.jpg,.jpeg,.webp" />
       <div class="attach-list" id="attachList"></div>
       <textarea id="input" placeholder="Frage AI:ssociate." rows="1"></textarea>
       <div class="composer-bar">
@@ -1013,7 +1013,7 @@
       <button class="pm-item" id="helpTour" role="menuitem"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span class="tx"><b>Feature-Tour starten</b><span>Schritt für Schritt direkt in der App</span></span></button>
     </div>
 
-    <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml" />
+    <input type="file" id="matterFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml,.png,.jpg,.jpeg,.webp" />
     <input type="file" id="folderInput" multiple hidden webkitdirectory />
     <input type="file" id="ddFolderInput" multiple hidden webkitdirectory />
     <input type="file" id="skillFileInput" multiple hidden accept=".pdf,.docx,.txt,.md,.rtf,.html,.htm,.xlsx" />
@@ -1036,7 +1036,7 @@
       const LS_CONVOS = 'aiss.convos.v2', LS_SETTINGS = 'aiss.settings.v2', LS_TOUR = 'aiss.tourSeen.v3', LS_OWNER = 'aiss.owner.v1'
       const MAX_UPLOADS = 5, MAX_UPLOAD_BYTES = 15 * 1024 * 1024, MAX_TOTAL_UPLOAD_BYTES = 28 * 1024 * 1024 // base64 of 28 MB stays under the server's 40 MB JSON limit
       const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
-      const DOC_RE = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml)$/i
+      const DOC_RE = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp)$/i // images and scanned PDFs are read by OCR
 
       let settings = { webSearch: true, msSync: true, msSaveAnswer: true, kb: 'auto', scope: '', folderSave: true }
       try { settings = { ...settings, ...JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}') } } catch {}
@@ -2413,7 +2413,7 @@
       const FOLDER_MAX_ENTRIES = 5000
       const FOLDER_SKIP = new Set(['node_modules', '.git', '$RECYCLE.BIN', 'System Volume Information', '__MACOSX'])
       const LOCAL_TEXT_EXT = /\.(pdf|docx|xlsx|txt|md|csv|tsv|json|xml|html?|rtf|eml|log)$/i
-      const AKT_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml)$/i
+      const AKT_EXT = /\.(pdf|docx|txt|md|csv|json|html?|rtf|xml|png|jpe?g|webp)$/i
       const FILE_PART = 24000
       let localFolder = null // { name, via, entries: [{ path, size, lastModified, get }], texts: Map(path -> {text, pages} | null) }
       const handledCalls = new Set()
@@ -2599,7 +2599,7 @@
           if (!e) { const near = localFolder.entries.filter((x) => normQ(x.path).includes(normQ(String(p || '').split('/').pop()).slice(0, 6))).slice(0, 8).map((x) => x.path); return { ok: true, text: `Datei „${p}“ nicht gefunden.${near.length ? ` Ähnlich: ${near.join('; ')}` : ''}` } }
           const r = await localText(e)
           if (!r) return { ok: true, text: `„${e.path}“ kann im Browser nicht gelesen werden (Dateityp). Mit files_attach in die Sandbox übernehmen, wenn der Inhalt nötig ist.` }
-          if (!r.text.trim()) return { ok: true, text: `„${e.path}“ enthält keinen lesbaren Text${r.error ? ` (${r.error})` : ' (gescannt?)'}.` }
+          if (!r.text.trim()) return { ok: true, text: `„${e.path}“ enthält keinen lesbaren Text${r.error ? ` (${r.error})` : ' (gescannt?)'}. Für OCR: mit files_attach übernehmen und danach mit read_document lesen – der Server liest Scans und Bilder per OCR.` }
           const parts = Math.max(1, Math.ceil(r.text.length / FILE_PART)), n = Math.min(parts, Math.max(1, Number(part) || 1))
           return { ok: true, text: `${e.path} – Teil ${n}/${parts}${r.pages ? ` (${r.pages} Seite${r.pages === 1 ? '' : 'n'})` : ''}\n\n${r.text.slice((n - 1) * FILE_PART, n * FILE_PART)}` }
         },
@@ -3400,7 +3400,7 @@
       // ---- documents ----
       let docSelection = new Set()
       function renderDocuments(body, m) {
-        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente oder ganze Ordner hierher ziehen</b> (samt Unterordnern) oder klicken zum Auswählen · PDF, Word, Text · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
+        const dz = el('div', 'dropzone'); dz.innerHTML = '<b>Dokumente oder ganze Ordner hierher ziehen</b> (samt Unterordnern) oder klicken zum Auswählen · PDF, Word, Text, Bilder; Scans werden per OCR gelesen · bis zu ' + (ddConfig?.limits?.maxDocs || 300) + ' Dokumente je Akt'
         dz.addEventListener('click', () => $('matterFileInput').click())
         dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over') }); dz.addEventListener('dragleave', () => dz.classList.remove('over'))
         dz.addEventListener('drop', async (e) => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('over'); const items = await droppedFiles(e.dataTransfer); if (items.length) uploadToMatter(items) })
@@ -3425,7 +3425,7 @@
           const tr = el('tr'); const c0 = el('td'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = docSelection.has(d.id); cb.addEventListener('change', () => { if (cb.checked) docSelection.add(d.id); else docSelection.delete(d.id); renderMatter() }); c0.appendChild(cb); tr.appendChild(c0)
           const n = el('td', 'n'); n.appendChild(document.createTextNode(d.title || d.name)); n.appendChild(el('span', 'sub', `${d.folder ? d.folder + ' / ' : ''}${d.title ? d.name + ' · ' : ''}${fmtSize(d.size)}${d.pages ? ` · ${d.pages} S.` : ''}${d.source === 'ms' ? ' · Microsoft 365' : ''}${d.note ? ' · ' + d.note : ''}`)); tr.appendChild(n)
           tr.appendChild(el('td', null, d.docType || '–')); tr.appendChild(el('td', null, d.area ? areaLabel(d.area) : '–'))
-          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.difficulty === 'hard') cs.appendChild(el('span', 'pill orange', 'komplex')); if (d.legal) cs.appendChild(el('span', 'pill teal', d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche')); tr.appendChild(cs)
+          const [sl, sc] = DOC_STATUS[d.status] || [d.status, '']; const cs = el('td'); cs.appendChild(el('span', 'pill ' + sc, sl)); if (d.ocr) cs.appendChild(el('span', 'pill', 'OCR')); if (d.difficulty === 'hard') cs.appendChild(el('span', 'pill orange', 'komplex')); if (d.legal) cs.appendChild(el('span', 'pill teal', d.legal.via === 'aissociate' ? 'AI:ssociate' : 'Websuche')); tr.appendChild(cs)
           const cf = el('td', 'c'); if (d.flags?.red || d.flags?.amber) { if (d.flags.red) cf.appendChild(el('span', 'pill red', String(d.flags.red))); if (d.flags.amber) cf.appendChild(el('span', 'pill amber', String(d.flags.amber))) } else cf.textContent = d.status === 'analysed' ? '–' : ''; tr.appendChild(cf)
           const ca = el('td'); const ra = el('div', 'rowacts')
           if (d.summary) { const bI = el('button', null, 'Details'); bI.addEventListener('click', () => showDocDetails(d, m)); ra.appendChild(bI) }
@@ -3499,7 +3499,7 @@
         }
         await flush()
         await reloadMatter(); await loadMatters()
-        if (skipped) errors.push(`${skipped} Datei${skipped > 1 ? 'en' : ''} übersprungen (nur PDF, Word, Text)`)
+        if (skipped) errors.push(`${skipped} Datei${skipped > 1 ? 'en' : ''} übersprungen (nur PDF, Word, Text, Bilder)`)
         if (over) errors.push(`${over} über der Grenze von ${ddConfig?.limits?.maxDocs || 300} Dokumenten`)
         toast(errors.length ? `${ok} hochgeladen · ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? ' …' : ''}` : `${ok} Dokument${ok === 1 ? '' : 'e'} hochgeladen.`, 5000)
       }
@@ -3658,7 +3658,7 @@
         if (!(m.job.log || []).length) lg.appendChild(el('div', null, 'Noch keine Einträge.'))
         body.appendChild(lg); lg.scrollTop = lg.scrollHeight
         const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Ablauf der Analyse'))
-        const p = el('div', 'prose'); p.innerHTML = '<p>Jeder Schritt ist explizit programmiert und protokolliert – kein freier Agent entscheidet, was geprüft wird:</p><ol><li><b>Text</b> – PDF/Word/Text werden serverseitig gelesen; gescannte PDFs ohne Text werden als Fehler markiert (OCR nachliefern).</li><li><b>Analyse</b> – jedes Dokument einzeln (lange Dokumente in Teilen) nach festem Schema: Typ, Bereich, Parteien, Key Terms, Befunde mit Zitat/Fundstelle/Schweregrad/Empfehlung/Normen, Nachfragen.</li><li><b>Bereiche</b> – je Prüfbereich eine Synthese über alle Dokumente: Risiken, Widersprüche, fehlende Standarddokumente, Empfehlungen für Garantien/Freistellungen/CPs.</li><li><b>Summary</b> – Executive Summary mit Gesamteinschätzung.</li><li><b>RIS</b> – alle zitierten Normen deterministisch gegen das RIS geprüft.</li><li><b>Bericht</b> – Word (Red Flag Report) und Excel (Befunde, Dokumente, Nachfragen, Bereiche) aus festen Vorlagen.</li></ol><p>Pausieren ist jederzeit möglich; neue Dokumente werden beim nächsten Lauf ergänzt, bereits analysierte nicht erneut verrechnet.</p>'
+        const p = el('div', 'prose'); p.innerHTML = '<p>Jeder Schritt ist explizit programmiert und protokolliert – kein freier Agent entscheidet, was geprüft wird:</p><ol><li><b>Text</b> – PDF/Word/Text werden serverseitig gelesen; gescannte PDFs ohne Textebene und Bilder (PNG, JPG) liest das Modell per OCR (Seite für Seite, lange Scans in Teilen parallel; in der Liste mit „OCR“ markiert).</li><li><b>Analyse</b> – jedes Dokument einzeln (lange Dokumente in Teilen) nach festem Schema: Typ, Bereich, Parteien, Key Terms, Befunde mit Zitat/Fundstelle/Schweregrad/Empfehlung/Normen, Nachfragen.</li><li><b>Bereiche</b> – je Prüfbereich eine Synthese über alle Dokumente: Risiken, Widersprüche, fehlende Standarddokumente, Empfehlungen für Garantien/Freistellungen/CPs.</li><li><b>Summary</b> – Executive Summary mit Gesamteinschätzung.</li><li><b>RIS</b> – alle zitierten Normen deterministisch gegen das RIS geprüft.</li><li><b>Bericht</b> – Word (Red Flag Report) und Excel (Befunde, Dokumente, Nachfragen, Bereiche) aus festen Vorlagen.</li></ol><p>Pausieren ist jederzeit möglich; neue Dokumente werden beim nächsten Lauf ergänzt, bereits analysierte nicht erneut verrechnet.</p>'
         c.appendChild(p); body.appendChild(c)
       }
       // ---- review tables ----
@@ -3902,7 +3902,7 @@
           }
           if (canEdit && docsAll.length) dc.appendChild(projectDocActions(docsAll))
           if (canEdit) {
-            const inp = el('input'); inp.type = 'file'; inp.multiple = true; inp.hidden = true; inp.accept = '.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml'; inp.id = 'projFileInput'
+            const inp = el('input'); inp.type = 'file'; inp.multiple = true; inp.hidden = true; inp.accept = '.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.rtf,.xml,.png,.jpg,.jpeg,.webp'; inp.id = 'projFileInput'
             inp.addEventListener('change', async () => { await uploadToProject(inp.files); inp.value = '' })
             const b = el('button', 'btn ghost sm'); b.appendChild(svg('upload')); b.appendChild(document.createTextNode(' Dokumente hochladen')); b.style.marginTop = '10px'; b.addEventListener('click', () => inp.click())
             dc.append(inp, b)
@@ -3955,7 +3955,7 @@
       }
       async function refreshProject() { if (!project) return; project = (await api('/api/projects/' + project.id)).project; fillProjectLists() }
       async function uploadToProject(fileList) {
-        const files = [...fileList].filter((f) => DOC_RE.test(f.name)); if (!files.length) { toast('Nur PDF, Word und Text.'); return }
+        const files = [...fileList].filter((f) => DOC_RE.test(f.name)); if (!files.length) { toast('Nur PDF, Word, Text und Bilder.'); return }
         toast(`Lädt ${files.length} Dokument${files.length === 1 ? '' : 'e'} hoch…`, 6000)
         const errs = []
         for (const f of files) { try { const r = await api(`/api/matters/${project.matterId}/documents`, { method: 'POST', body: { files: [{ name: f.name, base64: await readAsBase64(f) }] } }); errs.push(...(r.errors || [])) } catch (e) { errs.push(`${f.name}: ${e.message}`) } }
