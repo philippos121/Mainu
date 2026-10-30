@@ -1463,7 +1463,7 @@
       function skillChip() {
         const c = chipEl('skill', 'skill', 'Skill: ' + pendingSkill.name, '', () => { pendingSkill = null; renderAttachments() }, 'Skill entfernen')
         c.title = 'Skill für die nächste Nachricht'
-        c.addEventListener('click', () => { const sk = skillsCache.find((x) => x.id === pendingSkill.id); if (sk?.fields?.length) skillParamsForm(sk, pendingSkill.params) })
+        c.addEventListener('click', () => { const sk = skillsCache.find((x) => x.id === pendingSkill.id); if (formFields(sk).length) skillParamsForm(sk, pendingSkill.params) })
         return c
       }
       /** Fills a container with the grouped context chips (composer and agent pages share it). */
@@ -2843,7 +2843,11 @@
         toast(`Skill „${sk.name}“ gilt für die nächste Nachricht.`)
       }
       // onUse(skill, params) decides where the skill goes: by default into the next chat message.
-      function pickSkill(sk, onUse = useSkill) { if (sk.fields?.length) skillParamsForm(sk, {}, onUse); else { closeDlg(); onUse(sk, {}) } }
+      // The question or task of a skill is the chat message – such a field is never asked in the dialog
+      // (also in own copies of a skill); only real options (style, format, recipient …) are.
+      const isChatField = (f) => /^(question|frage|fragestellung|rechtsfrage|task|auftrag|aufgabe|prompt)$/i.test(f.k || '') || /^(frage|fragestellung|rechtsfrage|auftrag|aufgabe|aufgabenstellung)\b/i.test(f.label || '')
+      const formFields = (sk) => (sk?.fields || []).filter((f) => !isChatField(f))
+      function pickSkill(sk, onUse = useSkill) { if (formFields(sk).length) skillParamsForm(sk, {}, onUse); else { closeDlg(); onUse(sk, {}) } }
       async function openSkillPicker(filter = '', onUse = useSkill) {
         await loadSkills()
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
@@ -2874,7 +2878,7 @@
         const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
         card.appendChild(el('h2', null, sk.name)); card.appendChild(el('div', 'md', sk.description || ''))
         const inputs = {}
-        for (const f of sk.fields) {
+        for (const f of formFields(sk)) {
           const fld = el('div', 'field'); fld.appendChild(el('label', null, f.label + (f.required ? ' *' : '')))
           let c
           if (f.type === 'select') { c = el('select'); for (const o of f.opts || []) { const op = el('option', null, o); op.value = o; c.appendChild(op) } }
@@ -2888,7 +2892,7 @@
         const ok = el('button', 'btn', 'Übernehmen')
         ok.addEventListener('click', () => {
           const params = {}
-          for (const f of sk.fields) { const v = String(inputs[f.k].value || '').trim(); if (f.required && !v) { toast(`Bitte „${f.label}“ ausfüllen.`); inputs[f.k].focus(); return } if (v) params[f.k] = v }
+          for (const f of formFields(sk)) { const v = String(inputs[f.k].value || '').trim(); if (f.required && !v) { toast(`Bitte „${f.label}“ ausfüllen.`); inputs[f.k].focus(); return } if (v) params[f.k] = v }
           closeDlg(); onUse(sk, params)
         })
         a.append(back, el('span', 'sp'), ok); card.appendChild(a)

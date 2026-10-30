@@ -2216,7 +2216,10 @@ app.post('/api/chat', async (req, res) => {
     const sk = await findSkill(owner, body.skill.id)
     if (!sk) { send('error', { message: 'Skill nicht gefunden (anderer Arbeitsbereich?).' }); return finish() }
     const params = body.skill.params && typeof body.skill.params === 'object' ? body.skill.params : {}
-    const missing = (sk.fields || []).filter((f) => f.required && !String(params[f.k] || '').trim())
+    // A question/task field of the skill is the chat message itself (the dialog does not ask for it).
+    const chatField = (f) => /^(question|frage|fragestellung|rechtsfrage|task|auftrag|aufgabe|prompt)$/i.test(f.k || '') || /^(frage|fragestellung|rechtsfrage|auftrag|aufgabe|aufgabenstellung)\b/i.test(f.label || '')
+    for (const f of sk.fields || []) if (chatField(f) && !String(params[f.k] || '').trim() && prompt) params[f.k] = prompt
+    const missing = (sk.fields || []).filter((f) => f.required && !chatField(f) && !String(params[f.k] || '').trim())
     if (missing.length) { send('error', { message: `Skill „${sk.name}“: bitte ${missing.map((f) => `„${f.label}“`).join(', ')} angeben.` }); return finish() }
     skillRun = { skill: sk, params, auto: false }
     prompt = prompt || `Skill „${sk.name}“ anwenden.`
