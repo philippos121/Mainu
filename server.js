@@ -13,7 +13,8 @@ import { PDFDocument } from 'pdf-lib'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
 import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, skipDoc, rebuildIssuesLocal, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
-import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES, CLAUSE_KINDS, ISSUE_STATUS, DIFFICULTY } from './lib/ddconfig.js'
+import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES, CLAUSE_KINDS, ISSUE_STATUS, DIFFICULTY, LEGAL_FORMS, INDUSTRY_MODULES, AKT_RULES, legalFormOf } from './lib/ddconfig.js'
+import { ruleStats } from './lib/issues.js'
 import { sha256, unpackArchive, parseEml, parseMsg, ARCHIVE_RE, MAIL_RE, reconcile } from './lib/inventory.js'
 import { SearchIndex } from './lib/search.js'
 import { buildAktModel } from './lib/aktmodel.js'
@@ -1771,7 +1772,7 @@ const matterSummary = (m) => ({
   status: m.job?.status || 'idle', stage: m.job?.stage || null, progress: m.job?.progress || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null,
   assessment: m.executive?.overall_assessment || null, reports: (m.reports || []).length, tables: (m.tables || []).length,
 })
-const matterView = (m) => ({ ...m, ownerKey: undefined, inventory: reconcile(m), job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
+const matterView = (m) => ({ ...m, ownerKey: undefined, inventory: reconcile(m), ruleStats: m.kind === 'dd' ? ruleStats(m) : [], legalFormDetected: legalFormOf(m.settings || {}), job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
 async function loadMatter(req, res) {
   const owner = ownerOf(req)
   if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
@@ -1895,7 +1896,7 @@ const rethemeLocal = (m) => rebuildIssuesLocal(m)
 const FINDING_FIELDS = ['title', 'description', 'quote', 'location', 'recommendation', 'severity', 'area', 'dealImpact', 'norms', 'docId']
 const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
-app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, clauseKinds: Object.fromEntries(Object.entries(CLAUSE_KINDS).map(([k, v]) => [k, v.label])), issueStatus: ISSUE_STATUS, difficulty: DIFFICULTY, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, clauseKinds: Object.fromEntries(Object.entries(CLAUSE_KINDS).map(([k, v]) => [k, v.label])), issueStatus: ISSUE_STATUS, difficulty: DIFFICULTY, legalForms: LEGAL_FORMS, modules: Object.fromEntries(Object.entries(INDUSTRY_MODULES).map(([k, v]) => [k, { label: v.label, requirements: v.requirements.map((r) => ({ label: r.label, basis: r.basis })) }])), aktRules: AKT_RULES, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
 
 // ---- skills: reusable instruction packages of the workspace (plus the standard skills) ----
 async function findSkill(owner, id) {

@@ -3192,11 +3192,16 @@
         const sellers = el('select'); for (const [v, l] of [['all', 'Alle Gesellschafter verkaufen'], ['partial', 'Nicht alle Gesellschafter verkaufen']]) { const o = el('option', null, l); o.value = v; o.selected = (s.sellers || 'all') === v; sellers.appendChild(o) }
         const rt = el('select'); for (const [v, l] of Object.entries(ddConfig?.reportTypes || { redflag: 'Red-Flag-Bericht', full: 'Vollbericht' })) { const o = el('option', null, l); o.value = v; o.selected = (s.reportType || 'redflag') === v; rt.appendChild(o) }
         const hy = el('input'); hy.type = 'checkbox'; hy.checked = Boolean(s.secondaryAsHypotheses); const hyl = el('label'); hyl.className = 'check1'; hyl.append(hy, document.createTextNode('Sekundärquellen (Prüfberichte, Memos, Gutachten Dritter) als Hypothesen lesen – nur im Akt belegte Punkte werden Befunde'))
+        const lf = el('select'); { const o = el('option', null, 'aus dem Namen erkennen'); o.value = ''; lf.appendChild(o) } for (const v of ddConfig?.legalForms || []) { const o = el('option', null, v); o.value = v; o.selected = s.legalForm === v; lf.appendChild(o) }
+        const mods = el('div', 'checks'); const modBoxes = []
+        for (const [k, md] of Object.entries(ddConfig?.modules || {})) { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.value = k; cb.checked = (s.modules || []).includes(k); modBoxes.push(cb); l.title = md.requirements.map((r) => `${r.label} (${r.basis})`).join('; '); l.append(cb, document.createTextNode(md.label)); mods.appendChild(l) }
         const r1 = el('div', 'field-row'); r1.append(field('Firmenbuchnummer', fn), field('Stichtag', st, 'Bezugsdatum für Befristungen und Ausschüttungen')); form.appendChild(r1)
+        const r0 = el('div', 'field-row'); r0.append(field('Rechtsform der Zielgesellschaft', lf, 'Steuert, welche Akt-Regeln gelten (z. B. Einlagenrückgewähr nur bei Kapitalgesellschaften).')); form.appendChild(r0)
+        form.appendChild(field('Branchenmodule', mods, 'Zusätzliche Berechtigungen mit Funktionsträgern, Kernvoraussetzungen und Red Flags der Branche. Ohne Modul gilt der branchenneutrale Katalog.'))
         const r2 = el('div', 'field-row'); r2.append(field('Closing (geplant)', cl), field('Verkäufer', sellers)); form.appendChild(r2)
         form.appendChild(field('Berichtsart', rt, 'Red-Flag-Bericht: nur rote und gelbe Themen (15–30 Seiten). Vollbericht: zusätzlich grüne Themen und eine Zusammenfassung je Dokument.'))
         form.appendChild(field('Sekundärquellen', hyl))
-        return () => ({ targetFn: fn.value.trim(), stichtag: st.value, closing: cl.value, sellers: sellers.value, reportType: rt.value, secondaryAsHypotheses: hy.checked })
+        return () => ({ targetFn: fn.value.trim(), stichtag: st.value, closing: cl.value, sellers: sellers.value, reportType: rt.value, secondaryAsHypotheses: hy.checked, legalForm: lf.value, modules: modBoxes.filter((b) => b.checked).map((b) => b.value) })
       }
       // ---- wizard ----
       async function openMatterWizard(kind) {
@@ -3542,6 +3547,7 @@
         const b = el('div', 'fb')
         b.appendChild(el('p', null, t.description))
         if (t.gradeWhy) { b.appendChild(el('div', 'lbl', 'Grad nach Regeln')); b.appendChild(el('p', null, `${SEV_DE[t.gradeComputed]}: ${t.gradeWhy}`)) }
+        if (t.rule && t.ruleLabel) { b.appendChild(el('div', 'lbl', `Akt-Regel ${t.rule}`)); b.appendChild(el('p', null, `${t.ruleLabel}${t.basis ? ' · Rechtsgrundlage: ' + t.basis : ''}`)) }
         if (t.question) { b.appendChild(el('div', 'lbl', `Prüffrage (${t.source === 'regel' ? 'Regel über das Aktmodell' : t.source === 'klausel' ? 'gebündelte Klauseln' : t.source === 'akt' ? 'Durchgang über den Akt' : t.source === 'hypothese' ? 'Hypothese aus Sekundärquelle' : 'manuell'})`)); b.appendChild(el('p', null, t.question)) }
         if (t.legalQuestion) { b.appendChild(el('div', 'lbl', `Rechtsfrage · ${ddConfig?.difficulty?.[t.difficulty] || t.difficulty || ''}`)); b.appendChild(el('p', null, t.legalQuestion)) }
         if (t.calibration) { b.appendChild(el('div', 'lbl', 'Nach der Rechtsprüfung')); b.appendChild(el('p', null, `${t.calibration.action}${t.calibration.to ? ` (${SEV_DE[t.calibration.from]} → ${SEV_DE[t.calibration.to]})` : ''}: ${t.calibration.reason}`)) }
@@ -3875,6 +3881,16 @@
         const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Ablauf der Analyse'))
         const p = el('div', 'prose'); p.innerHTML = '<p>Grundsatz: Dokumente liefern Tatsachen und Klauseln; Schlüsse werden nur auf Ebene des Akts gezogen – einmal je Sachverhalt, mit dem ganzen Kontext. Nach jeder Stufe gibt es einen Checkpoint; Tokens und Kosten werden je Stufe gezählt.</p><ol start="0"><li><b>Inventar</b> – SHA-256 über den Akt (Duplikate), Archive und E-Mails entpackt.</li><li><b>Text</b> – auch Scans per OCR (Handschrift und Stempel markiert); Rolle und Rechtssubjekt; Sekundärquellen werden nicht weiter gelesen.</li><li><b>Lesen</b> – jedes Dokument vollständig: Tatsachen (Personen mit Geburtsdatum, Gesellschaften mit FN) und Klauseln mit Eigenrisiko, jeweils mit wörtlichem Beleg; keine Aussagen über andere Dokumente.</li><li><b>Aktmodell</b> – Tatsachen zusammengeführt, Personen und Gesellschaften über alle Dokumente aufgelöst (Namensgleiche bleiben getrennt), Funktionen, Todesfälle, Widersprüche.</li><li><b>Sachverhalte</b> – aus Regeln über das Aktmodell, aus den gebündelten Klauseln und aus einem Durchgang über das ganze Aktmodell; jeder Sachverhalt genau einmal.</li><li><b>Prüfung</b> – je Sachverhalt mit dem Ausschnitt des Aktmodells und den Wortlauten der einschlägigen Dokumente: bestätigt, ungeklärt oder widerlegt; Grad nach festen Regeln.</li><li><b>Rechtsprüfung</b> – leicht aus internem Wissen, schwer per Websuche im RIS, sehr schwer an AI:ssociate.</li><li><b>Summary</b> – Bereiche und Executive Summary; Gesamteinschätzung nach Regeln.</li><li><b>RIS</b> – Normen geprüft.</li><li><b>Bericht</b> – Red-Flag-Bericht oder Vollbericht (Word) und Excel.</li></ol><p>Neue Dokumente werden allein gelesen; danach werden nur die Sachverhalte neu geprüft, deren Fakten oder Dokumente sich geändert haben. Harte Grenze je Due Diligence: ' + fmtTok(ddConfig?.limits?.hardIn || 100e6) + ' Eingabe- / ' + fmtTok(ddConfig?.limits?.hardOut || 10e6) + ' Ausgabe-Tokens.</p>'
         c.appendChild(p); body.appendChild(c)
+        // Rule catalogue with the statistics of this Akt: a rule whose issues rarely hold up fires too often.
+        const rc = el('div', 'card'); rc.style.marginTop = '14px'; rc.appendChild(el('h3', null, 'Akt-Regeln und Trefferbilanz'))
+        rc.appendChild(el('div', 'sub', `Rechtsform: ${m.settings.legalForm || m.legalFormDetected || 'unbekannt'} · Branchenmodule: ${(m.settings.modules || []).map((k) => ddConfig?.modules?.[k]?.label || k).join(', ') || 'keine (branchenneutral)'}`)).style.cssText = 'font-size:12.5px;color:var(--muted);margin-bottom:6px'
+        const stats = new Map((m.ruleStats || []).map((r) => [r.source, r]))
+        const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl'); const th = el('tr'); for (const h of ['Regel', 'Rechtsgrundlage', 'gilt für', 'Themen', 'gehalten', 'nicht gehalten']) th.appendChild(el('th', null, h)); t.appendChild(el('thead')).appendChild(th)
+        const tb = el('tbody')
+        const row = (id, label, basis, applies) => { const r = stats.get(id); const tr = el('tr'); const n = el('td', 'n', label); n.appendChild(el('span', 'sub', id)); tr.appendChild(n); tr.appendChild(el('td', null, basis)); tr.appendChild(el('td', null, applies)); tr.appendChild(el('td', null, r ? String(r.issues) : '–')); tr.appendChild(el('td', null, r ? String(r.issues - r.refuted - r.excluded - r.notApplicable - r.rejected) : '–')); const f = el('td', null, r ? `${r.falseRate} %` : '–'); if (r?.falseRate >= 50 && r.issues >= 3) f.appendChild(el('span', 'pill amber', 'prüfen')); tr.appendChild(f); tb.appendChild(tr) }
+        for (const x of ddConfig?.aktRules || []) row(x.id, x.label, x.basis, x.applies)
+        for (const k of ['Klauseln', 'Akt-Durchgang', 'Hypothesen']) if (stats.has(k)) row(k, k === 'Klauseln' ? 'Gebündelte Klauseln der Dokumente' : k === 'Akt-Durchgang' ? 'Durchgang über das ganze Aktmodell' : 'Hypothesen aus Sekundärquellen', '–', '–')
+        t.appendChild(tb); wrap.appendChild(t); rc.appendChild(wrap); body.appendChild(rc)
       }
       // ---- review tables ----
       function renderTables(body, m) {

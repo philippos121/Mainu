@@ -346,12 +346,35 @@ partial views.
 | 1 Text | PDF, Word, Excel, text, e-mail; scans and images by OCR (`[handschriftlich: …]`, `[Stempel: …]`); content duplicates; role and legal subject from the first page (rules, else one call on 3,000 characters); secondary sources (audit reports, memos, third-party opinions) are not read further unless they are to be read as hypotheses (setting, or `DD_SECONDARY_AS_HYPOTHESES`; their clauses then become issues that need evidence in an original) | extraction, low |
 | 2 Lesen | every document in full (sections of 150,000 characters, up to 40): facts – persons with date of birth, companies with FN, functions, permits, contracts, payments, key figures, resolutions – and the clauses that carry a risk by themselves, each with a verbatim quote; anything whose quote is not in the text is dropped; statements about other documents are not allowed. The Akt model is built only when every document is read | extraction, medium |
 | 3 Aktmodell | facts merged (Firmenbuch and annual accounts first, contradictions kept); persons and companies resolved across documents by name, date of birth and FN – namesakes stay apart, a mention that could be several of them is "unklar"; functions, deaths, departures per entity; content-based ids | – |
-| 4 Sachverhalte | rules over the Akt model (functionary died or left without a successor in a later document, namesakes in functions, change of control in a share deal, expiry before Stichtag/closing, payments to shareholders without a contract, resolution without all shareholders, contradictions); clauses bundled per kind and counterparty; one pass of the main model over the whole Akt model for further issues; each issue exactly once (stable key) | main, one call |
+| 4 Sachverhalte | the Akt rules of the catalogue (below), clauses bundled per kind and counterparty, and one pass of the main model over the whole Akt model for further issues; each issue exactly once (stable key) | main, one call |
 | 5 Prüfung | one call per issue with the slice of the Akt model, the clauses and the wording of the relevant documents (whole up to 25,000 characters, else the passages around the evidence; at most `DD_REVIEW_MAX_CHARS`, default 120,000, per issue): bestätigt / ungeklärt / widerlegt, verbatim evidence (verified), features, legal question and its difficulty; grade by rules | main |
 | 6 Rechtsprüfung | leicht: internal knowledge; schwer: web search, RIS first (≤ 3 searches); sehr schwer: AI:ssociate (at most `DD_MAX_KB_CALLS`, default 30, per run); "nicht zutreffend" discards the issue, "teilweise zutreffend" caps it at yellow unless a core prerequisite is concerned | main / fast + web / AI:ssociate |
 | 7 Summary | area summaries (≤ 6 requests, ≤ 4 missing documents) and executive summary from the issues and key figures; overall assessment by rules | main |
 | 8 RIS | norms of the issues verified | – |
 | 9 Bericht | Red-Flag-Bericht (default; red and yellow issues, ≤ 180 words each, ≤ 15,000 words) or Vollbericht (plus green issues and a summary per document); the document index proves coverage per document (issues or "geprüft, unauffällig"); Excel: Themen, Klauseln, Entitäten, Fakten, Dokumente, Nachfragen, Bereiche, Hinweise | – |
+
+**Akt rules** (`AKT_RULES` in `lib/ddconfig.js`, implemented in `lib/issues.js`) are
+branch-neutral and state their legal basis and scope:
+
+| Rule | Checks | Applies to |
+|---|---|---|
+| AKT-001 | A permit needs a person in a function (base: trade licence of a legal person → gewerberechtlicher Geschäftsführer, § 9 GewO; more from the industry modules): is someone available and validly appointed? Not available: died, left, or identity uncertain (namesake of a deceased person) | every DD |
+| AKT-002 | Organ or functionary died or left, no successor in a later document (where AKT-001 does not cover it) | every DD |
+| AKT-003 | Namesakes in a key role (shareholder, organ, functionary) – only when a mention cannot be assigned, two of them hold key roles or one has died; attached to the AKT-001/002 issue when it concerns the same functions | every DD |
+| AKT-004 | Change-of-control clause triggered by the share deal | share deal |
+| AKT-005 | Permit, contract or right of use ends before Stichtag or closing without renewal | every DD |
+| AKT-006 | Payments to shareholders without a contract or above it (§ 82 GmbHG, § 52 AktG) | capital companies |
+| AKT-007 | Written resolution (Umlaufbeschluss) without all shareholders (§ 34 GmbHG); resolutions of a general meeting are not checked | GmbH, FlexKapG |
+| AKT-008 | Contradictions about shares, organs, functionaries, permits | every DD |
+
+The legal form of the target is set in the DD settings or taken from its name.
+**Industry modules** (`INDUSTRY_MODULES`, switched on per DD: Abfall- und
+Umweltwirtschaft, Güter- und Personenbeförderung, Bau und Bauträger, Gesundheit und
+Pflege, Finanzdienstleistungen und Versicherung) add permits that need a functionary,
+core prerequisites and red flags; without a module the catalogue is branch-neutral.
+Every Akt shows per rule how many of its issues held up (Protokoll tab, Excel sheet
+"Regeln", `eval/run.mjs`); a rule whose issues are mostly refuted, excluded or rejected is
+marked for review.
 
 Severity rules, in order: exclusion catalogue → no issue; affected party not the target
 → at most yellow (unless the rule allows it); only a secondary source → at most yellow,

@@ -9,6 +9,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import mammoth from 'mammoth'
+import { ruleStats } from '../lib/issues.js'
 
 const arg = (k) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : null }
 const dataDir = arg('data') || process.env.DATA_DIR || './data'
@@ -49,6 +50,9 @@ const rows = [
   ['Wörter im Bericht', words == null ? 'n/a' : String(words), words == null || words <= targets.maxWords],
 ]
 for (const [k, v, ok] of rows) console.log(`${ok ? 'ok  ' : 'FAIL'} ${k.padEnd(20)} ${v}`)
+// Per rule: how many of its issues held up (a high share of refuted/excluded/rejected issues marks a rule that fires too often).
+console.log('\nje Regel (Themen · gehalten · nicht gehalten):')
+for (const r of ruleStats(m)) console.log(`${r.falseRate >= 50 && r.issues >= 3 ? 'prüfen' : '      '} ${r.source.padEnd(14)} ${String(r.issues).padStart(3)} · ${String(r.issues - r.refuted - r.excluded - r.notApplicable - r.rejected).padStart(3)} · ${r.falseRate} %  ${r.label}`)
 const missed = expected.filter((e) => !hit(e).length)
 if (missed.length) console.log('\nnicht gefunden:\n' + missed.map((e) => `- [${e.grade}] ${e.label || e.match}`).join('\n'))
 if (dupes.length) console.log('\ndoppelt:\n' + dupes.map((x) => '- ' + x).join('\n'))
