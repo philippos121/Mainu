@@ -377,13 +377,34 @@ pauses with a clear message. Uploads: at most 300 documents (archive parts inclu
 stored in parts; a save writes only what changed. Questions about the Akt get the
 themes, the Akt model and the best passages of a full-text search.
 
+**Team.** The owner of a due diligence invites registered colleagues as in projects
+(Bearbeiten or Lesen); the shared DD appears in their list as "Geteilt von …". Every
+prüfbereich can be given to one person, a single theme to someone else (the theme card
+shows who is responsible; "Mir zugeordnet" filters the own themes; reviews record who
+made them). The Team tab has a message thread for the DD – to everyone or to one person,
+optionally about a theme; unread messages show on the tab (polled every 15 s). Only the
+owner invites, changes roles and deletes the DD; reading members can write messages;
+members can leave; a deleted account leaves every team.
+
+**SPA draft.** "SPA-Entwurf erstellen" (Berichte) drafts a purchase agreement under
+Austrian law for the planned transaction – share deal (Abtretungsvertrag, form
+requirements of the legal form) or asset deal, from the buyer's or the seller's side –
+on its own model (`AZURE_OPENAI_SPA_DEPLOYMENT` / `OPENAI_MODEL_SPA`, Astra). Every red
+and yellow theme lands in the instrument from the review (else the analysis):
+CP → condition precedent, Garantie → specific warranty, Freistellung → specific
+indemnity, Kaufpreisanpassung → price mechanism; Nachfrage and Abbruch become open
+points before signing. Unknown data stays `[●]`. The Word document cites the themes at
+each clause and ends with a working annex (theme → instrument → clauses), the themes
+with an instrument but no clause, open points and drafting notes. One background job,
+counted against the hard limit of the DD (`lib/spa.js`).
+
 Tabs: Übersicht, Inventar (role and legal subject editable), Dokumente (coverage per
 document), Aktmodell (persons and companies, namesakes, contradictions, facts with
 corrections), Themen (one per issue: status, question, legal question and route,
 evidence, legal check; approve / discard, grade and instrument, note, edit, merge,
 split, new issue; reviews survive re-runs by issue key, issues that disappear stay
 visible as "verwaist"), Klauseln (move to another issue or remove), Nachfragen,
-Tabellen, Berichte, Protokoll.
+Tabellen, Berichte, Team, Protokoll.
 
 **Review tables**: user-defined columns (presets: Vertragsübersicht,
 Dienstverträge, Mietverträge, Fristen, Steuerbescheide) extracted per document
@@ -423,6 +444,8 @@ Matter routes: `GET/POST /api/matters`, `GET/PATCH/DELETE /api/matters/:id`,
 `PATCH /api/matters/:id/documents/:docId` (role, legal subject),
 `POST/DELETE /api/matters/:id/facts/corrections[/:cid]`, `PATCH/POST /api/matters/:id/themes[/:tid]`,
 `POST /api/matters/:id/themes/:tid/merge|split`, `POST /api/matters/:id/dd/run` with `{ fromStage: 3 }`,
+`POST/PATCH/DELETE /api/matters/:id/members[/:userId]`, `POST /api/matters/:id/assign`,
+`GET/POST /api/matters/:id/messages`, `POST /api/matters/:id/messages/read`, `POST /api/matters/:id/spa`,
 `GET /api/dd/config`; `POST /api/chat` accepts `matterId` + `matterDocIds`.
 
 ## Run locally

@@ -12,12 +12,13 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { PDFDocument } from 'pdf-lib'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ExternalHyperlink } from 'docx'
 import { JsonStore } from './lib/store.js'
-import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, skipDoc, rebuildIssuesLocal, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
+import { newMatter, newDocument, newFinding, nextNo, locateQuote, estimateRun, runDd, runReviewTable, buildReports, tableXlsx, matterContext, matterCtx, skipDoc, rebuildIssuesLocal, DD_HARD_IN, DD_HARD_OUT, DD_STAGES } from './lib/dd.js'
 import { DD_AREAS, DD_AREA_KEYS, REVIEW_TABLE_PRESETS, SEVERITY_LABEL, DEAL_IMPACTS, DEAL_IMPACT_LABEL, REVIEW_STATUS, REVIEW_LABEL, DOC_ROLES, LEGAL_SUBJECTS, REPORT_TYPES, FACT_TYPES, FACT_FLAGS, FINDING_KINDS, SKIP_REASONS, EXCLUSIONS, CORE_PREREQUISITES, CLAUSE_KINDS, ISSUE_STATUS, DIFFICULTY, LEGAL_FORMS, INDUSTRY_MODULES, AKT_RULES, legalFormOf } from './lib/ddconfig.js'
 import { sha256, unpackArchive, parseEml, parseMsg, ARCHIVE_RE, MAIL_RE, reconcile } from './lib/inventory.js'
 import { SearchIndex } from './lib/search.js'
 import { buildAktModel } from './lib/aktmodel.js'
 import { effectiveGrade, liveTheme, overallAssessment, ruleStats } from './lib/themes.js'
+import { runSpa } from './lib/spa.js'
 import ExcelJS from 'exceljs'
 import { agentsForClient, buildAgentTask, BRIEF_MARKUP, CONTRACT_MARKUP } from './lib/agents.js'
 import { AuthStore, verifyPassword, hashPassword, checkPassword, signSession, verifySession, userView, normEmail, Throttle, SESSION_DAYS } from './lib/auth.js'
@@ -96,6 +97,8 @@ const MODEL_EXTRACT = USE_AZURE ? MODEL_FAST : (process.env.OPENAI_MODEL_EXTRACT
 const AZURE_DD_DEPLOYMENT = process.env.AZURE_OPENAI_DD_DEPLOYMENT || 'gpt-6.1-sol'
 const MODEL_DD_MAIN = USE_AZURE ? AZURE_DD_DEPLOYMENT : MODEL_MAIN
 const MODEL_DD_EXTRACT = USE_AZURE ? AZURE_DD_DEPLOYMENT : MODEL_EXTRACT
+// SPA draft from the themes of a due diligence: its own model (Astra).
+const MODEL_SPA = USE_AZURE ? (process.env.AZURE_OPENAI_SPA_DEPLOYMENT || 'gpt-6.1-astra') : (process.env.OPENAI_MODEL_SPA || 'gpt-6-astra')
 const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
 const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
 const DD_MAX_DOC_BYTES = Number(process.env.DD_MAX_DOC_BYTES || 30 * 1024 * 1024)
@@ -1356,7 +1359,10 @@ app.delete('/api/auth/users/:id', async (req, res) => {
   if (u.id === req.user.id) return res.status(400).json({ error: 'Das eigene Konto kann nicht gelöscht werden.' })
   // The account goes together with its data (Akten, Skills, Verlauf).
   const owner = ownerKeyOfUser(u)
-  for (const m of await store.listMatters(owner)) { if (!ddRuns.has(m.id)) await store.deleteMatter(m.id) }
+  for (const m of await store.listMatters(undefined)) {
+    if (m.ownerKey === owner) { if (!ddRuns.has(m.id)) await store.deleteMatter(m.id) }
+    else if ((m.members || []).some((x) => x.userId === u.id)) { m.members = m.members.filter((x) => x.userId !== u.id); await store.saveMatter(m) }
+  }
   for (const sk of await store.listSkills(owner)) await store.deleteSkill(sk.id)
   await fsp.rm(convoDir(owner), { recursive: true, force: true })
   // Projects of the account go with it; memberships elsewhere end.
@@ -1525,7 +1531,8 @@ function newJob(id) {
 }
 
 // A job belongs to the user who started it (with accounts); others get 404.
-const jobOf = (req) => { const job = jobs.get(String(req.params.id || '')); return job && (!AUTH_ON || !job.owner || job.owner === ownerOf(req)) ? job : null }
+// Jobs of a due diligence are visible to its team as well.
+const jobOf = (req) => { const job = jobs.get(String(req.params.id || '')); const me = ownerOf(req); return job && (!AUTH_ON || !job.owner || job.owner === me || (job.matter?.members || []).some((x) => `u_${x.userId}` === me)) ? job : null }
 const streamJob = (req, res) => {
   const job = jobOf(req)
   if (!job) return res.status(404).json({ error: 'Auftrag unbekannt oder abgelaufen.' })
@@ -1647,6 +1654,8 @@ async function matterRole(m, req) {
   const owner = ownerOf(req)
   if (!m || !owner) return null
   if (m.ownerKey === owner) return 'owner'
+  const mem = req.user && (m.members || []).find((x) => x.userId === req.user.id)
+  if (mem) return mem.role === 'view' ? 'view' : 'edit'
   if (!m.projectId) return null
   let p = null; try { p = await store.getProject(m.projectId) } catch {}
   const r = projectRole(p, req)
@@ -1778,17 +1787,41 @@ const matterSummary = (m) => ({
   status: m.job?.status || 'idle', stage: m.job?.stage || null, progress: m.job?.progress || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null,
   assessment: m.executive?.overall_assessment || null, reports: (m.reports || []).length, tables: (m.tables || []).length,
 })
-const matterView = (m) => ({ ...m, ownerKey: undefined, inventory: reconcile(m), ruleStats: m.kind === 'dd' ? ruleStats(m) : [], legalFormDetected: legalFormOf(m.settings || {}), job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
-async function loadMatter(req, res) {
+const matterView = (m) => ({ ...m, ownerKey: undefined, messages: undefined, readAt: undefined, inventory: reconcile(m), ruleStats: m.kind === 'dd' ? ruleStats(m) : [], legalFormDetected: legalFormOf(m.settings || {}), job: { ...m.job, log: (m.job.log || []).slice(-80), jobId: ddRuns.get(m.id)?.jobId || null, running: ddRuns.has(m.id), runningKind: ddRuns.get(m.id)?.kind || null } })
+async function loadMatter(req, res, { allowView = false } = {}) {
   const owner = ownerOf(req)
   if (!owner) { res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' }); return null }
   let m = null
   try { m = await store.getMatter(String(req.params.id || '')) } catch {}
   const role = await matterRole(m, req)
   if (!role) { res.status(404).json({ error: 'Akt nicht gefunden.' }); return null }
-  if (role === 'view' && req.method !== 'GET') { res.status(403).json({ error: 'Für dieses Projekt haben Sie nur Leserechte.' }); return null }
+  if (role === 'view' && req.method !== 'GET' && !allowView) { res.status(403).json({ error: m.projectId ? 'Für dieses Projekt haben Sie nur Leserechte.' : 'Für diese Due Diligence haben Sie nur Leserechte.' }); return null }
+  req.matterRole = role
+  if (role === 'owner' && req.user && !m.ownerUserId) m.ownerUserId = req.user.id
   return m
 }
+
+// ---- team of a due diligence: members (as in projects), who takes which area or theme, messages ----
+const MATTER_MESSAGES_MAX = 5000
+const myId = (req) => req.user?.id || 'owner'
+const visibleMsg = (x, me) => !x.to?.length || x.userId === me || x.to.includes(me)
+function msgInfo(m, req) {
+  const me = myId(req), since = m.readAt?.[me] || 0
+  const vis = (m.messages || []).filter((x) => visibleMsg(x, me))
+  return { count: vis.length, unread: vis.filter((x) => x.userId !== me && x.at > since).length }
+}
+async function matterTeam(m, req) {
+  const users = await usersById()
+  const ou = m.ownerUserId ? users.get(m.ownerUserId) : null
+  return {
+    sharing: AUTH_ON && !m.projectId, me: myId(req), role: req.matterRole,
+    owner: { userId: m.ownerUserId || 'owner', name: ou?.name || (req.matterRole === 'owner' ? req.user?.name || 'Ich' : '–'), email: ou?.email || '' },
+    members: (m.members || []).map((x) => { const u = users.get(x.userId); return u ? { userId: u.id, name: u.name, email: u.email, role: x.role === 'view' ? 'view' : 'edit', addedAt: x.addedAt } : null }).filter(Boolean),
+    assign: { areas: m.assign?.areas || {}, themes: m.assign?.themes || {} },
+  }
+}
+const fullMatterView = async (m, req) => ({ ...matterView(m), team: await matterTeam(m, req), messageInfo: msgInfo(m, req) })
+const teamIds = (m) => new Set([m.ownerUserId || 'owner', ...(m.members || []).map((x) => x.userId)])
 const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 24) // model calls of one due diligence running side by side
 const ddDeps = (send) => ({
   store, callModel, extractText, modelMain: MODEL_DD_MAIN, modelExtract: MODEL_DD_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY, kbContextChars: KB_CONTEXT_CHARS,
@@ -1815,7 +1848,7 @@ function startMatterJob(m, kind, runner) {
   if (ddRuns.has(m.id)) return null
   if (ddRuns.size >= DD_MAX_CONCURRENT) throw Object.assign(new Error(`Es laufen bereits ${DD_MAX_CONCURRENT} Analysen auf diesem Server – bitte später erneut starten.`), { status: 429 })
   const job = newJob(`dd_${Date.now().toString(36)}_${crypto.randomBytes(6).toString('base64url')}`)
-  job.owner = m.ownerKey
+  job.owner = m.ownerKey; job.matter = m
   m.job.jobId = job.id
   ddRuns.set(m.id, { jobId: job.id, kind })
   job.send('job', { id: job.id, matterId: m.id, kind })
@@ -2066,7 +2099,13 @@ app.get('/api/matters/:id/dd/estimate', async (req, res) => {
 app.get('/api/matters', async (req, res) => {
   const owner = ownerOf(req)
   if (!owner) return res.status(401).json({ error: 'Kein Arbeitsbereich-Schlüssel (X-Owner-Key).' })
-  try { res.json({ matters: (await store.listMatters(owner)).filter((m) => !m.projectId).map(matterSummary) }) } catch (e) { res.status(500).json({ error: e.message }) }
+  try {
+    // Own Akten and due diligences shared with this account.
+    const uid = req.user?.id
+    const list = (await store.listMatters(uid ? undefined : owner)).filter((m) => !m.projectId && (m.ownerKey === owner || (uid && (m.members || []).some((x) => x.userId === uid))))
+    const users = list.some((m) => m.ownerKey !== owner) ? await usersById() : new Map()
+    res.json({ matters: list.map((m) => ({ ...matterSummary(m), role: m.ownerKey === owner ? 'owner' : ((m.members || []).find((x) => x.userId === uid)?.role === 'view' ? 'view' : 'edit'), ownerName: m.ownerKey === owner ? '' : users.get(m.ownerUserId)?.name || '', members: (m.members || []).length })) })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/matters', async (req, res) => {
   const owner = ownerOf(req)
@@ -2075,11 +2114,12 @@ app.post('/api/matters', async (req, res) => {
   if (!String(b.name || '').trim()) return res.status(400).json({ error: 'Bitte einen Namen für den Akt angeben.' })
   try {
     const m = newMatter({ ownerKey: owner, name: String(b.name).trim(), kind: b.kind, client: b.client, settings: b.settings && typeof b.settings === 'object' ? b.settings : {} })
+    m.ownerUserId = req.user?.id || null
     await store.saveMatter(m)
     res.json({ matter: matterView(m) })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
-app.get('/api/matters/:id', async (req, res) => { const m = await loadMatter(req, res); if (m) res.json({ matter: matterView(m) }) })
+app.get('/api/matters/:id', async (req, res) => { const m = await loadMatter(req, res); if (m) res.json({ matter: await fullMatterView(m, req) }) })
 app.patch('/api/matters/:id', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
   const b = req.body || {}
@@ -2091,10 +2131,96 @@ app.patch('/api/matters/:id', async (req, res) => {
 })
 app.delete('/api/matters/:id', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
+  if (req.matterRole !== 'owner' && !m.projectId) return res.status(403).json({ error: 'Löschen kann nur die Person, die die Due Diligence angelegt hat.' })
   if (m.projectId) return res.status(409).json({ error: 'Die Dokumente eines Projekts werden mit dem Projekt gelöscht.' })
   if (ddRuns.has(m.id)) return res.status(409).json({ error: 'Für diesen Akt läuft gerade ein Vorgang – zuerst pausieren.' })
   await store.deleteMatter(m.id)
   res.json({ ok: true })
+})
+
+// ---- team: members, responsibilities, messages ----
+app.post('/api/matters/:id/members', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (req.matterRole !== 'owner') return res.status(403).json({ error: 'Einladen kann nur die Person, die die Due Diligence angelegt hat.' })
+  if (!AUTH_ON) return res.status(400).json({ error: 'Einladen setzt Konten voraus (AUTH).' })
+  if (m.projectId) return res.status(400).json({ error: 'Dieser Akt gehört zu einem Projekt – bitte über das Projekt teilen.' })
+  const userId = String(req.body?.userId || ''), role = req.body?.role === 'view' ? 'view' : 'edit'
+  const u = await auth.get(userId).catch(() => null)
+  if (!u || u.disabled) return res.status(404).json({ error: 'Konto nicht gefunden.' })
+  if (u.id === m.ownerUserId || ownerKeyOfUser(u) === m.ownerKey) return res.status(400).json({ error: 'Die Due Diligence gehört bereits dieser Person.' })
+  m.members ||= []
+  const ex = m.members.find((x) => x.userId === u.id)
+  if (ex) ex.role = role; else m.members.push({ userId: u.id, role, addedAt: Date.now(), addedBy: req.user?.id || null })
+  await store.saveMatter(m)
+  res.json({ team: await matterTeam(m, req) })
+})
+app.patch('/api/matters/:id/members/:userId', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (req.matterRole !== 'owner') return res.status(403).json({ error: 'Rollen ändert die Person, die die Due Diligence angelegt hat.' })
+  const x = (m.members || []).find((y) => y.userId === req.params.userId); if (!x) return res.status(404).json({ error: 'Mitglied nicht gefunden.' })
+  x.role = req.body?.role === 'view' ? 'view' : 'edit'
+  await store.saveMatter(m)
+  res.json({ team: await matterTeam(m, req) })
+})
+app.delete('/api/matters/:id/members/:userId', async (req, res) => {
+  // The owner removes anyone; a member may leave.
+  const self = req.user && req.user.id === req.params.userId
+  const m = await loadMatter(req, res, { allowView: self }); if (!m) return
+  if (!self && req.matterRole !== 'owner') return res.status(403).json({ error: 'Entfernen kann nur die Person, die die Due Diligence angelegt hat.' })
+  const id = req.params.userId
+  m.members = (m.members || []).filter((x) => x.userId !== id)
+  for (const k of ['areas', 'themes']) for (const [key, v] of Object.entries(m.assign?.[k] || {})) if (v === id) delete m.assign[k][key]
+  await store.saveMatter(m)
+  res.json(self ? { ok: true } : { team: await matterTeam(m, req) })
+})
+// Who takes an area or a single theme ('' = nobody); a theme without its own assignment follows its area.
+app.post('/api/matters/:id/assign', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const b = req.body || {}, userId = String(b.userId || '')
+  if (userId && !teamIds(m).has(userId)) return res.status(400).json({ error: 'Diese Person gehört nicht zum Team.' })
+  m.assign ||= { areas: {}, themes: {} }; m.assign.areas ||= {}; m.assign.themes ||= {}
+  let map, key
+  if (b.area) { if (!DD_AREA_KEYS.includes(b.area)) return res.status(400).json({ error: 'Unbekannter Prüfbereich.' }); map = m.assign.areas; key = b.area }
+  else if (b.themeId) { const t = findTheme(m, String(b.themeId)); if (!t) return res.status(404).json({ error: 'Thema nicht gefunden.' }); map = m.assign.themes; key = t.key }
+  else return res.status(400).json({ error: 'Bereich oder Thema angeben.' })
+  if (userId) map[key] = userId; else delete map[key]
+  await store.saveMatter(m)
+  res.json({ team: await matterTeam(m, req) })
+})
+app.get('/api/matters/:id/messages', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  const me = myId(req), after = Number(req.query.after || 0)
+  res.json({ messages: (m.messages || []).filter((x) => visibleMsg(x, me) && x.at > after), info: msgInfo(m, req), readAt: m.readAt?.[me] || 0 })
+})
+app.post('/api/matters/:id/messages', async (req, res) => {
+  const m = await loadMatter(req, res, { allowView: true }); if (!m) return
+  const b = req.body || {}, text = String(b.text || '').trim().slice(0, 4000)
+  if (!text) return res.status(400).json({ error: 'Nachricht ist leer.' })
+  const ids = teamIds(m), me = myId(req)
+  const to = [...new Set((Array.isArray(b.to) ? b.to : []).map(String))].filter((id) => ids.has(id) && id !== me)
+  const t = b.themeId ? findTheme(m, String(b.themeId)) : null
+  const x = { id: JsonStore.newId('msg'), userId: me, name: req.user?.name || 'Ich', text, to, themeId: t?.id || null, themeNo: t?.no || '', themeTitle: t?.title || '', at: Date.now() }
+  m.messages ||= []; m.messages.push(x); if (m.messages.length > MATTER_MESSAGES_MAX) m.messages.splice(0, m.messages.length - MATTER_MESSAGES_MAX)
+  m.readAt ||= {}; m.readAt[me] = x.at
+  await store.saveMatter(m)
+  res.json({ message: x, info: msgInfo(m, req) })
+})
+app.post('/api/matters/:id/messages/read', async (req, res) => {
+  const m = await loadMatter(req, res, { allowView: true }); if (!m) return
+  m.readAt ||= {}; m.readAt[myId(req)] = Date.now()
+  await store.saveMatter(m)
+  res.json({ info: msgInfo(m, req) })
+})
+
+// ---- SPA draft from the themes (a background job on the SPA model) ----
+app.post('/api/matters/:id/spa', async (req, res) => {
+  const m = await loadMatter(req, res); if (!m) return
+  if (m.kind !== 'dd') return res.status(400).json({ error: 'Nur für eine Due Diligence.' })
+  if (!(m.themes || []).some(liveTheme)) return res.status(400).json({ error: 'Noch keine Themen – zuerst die Analyse durchführen.' })
+  let jobId
+  try { jobId = startMatterJob(m, 'spa', (deps) => runSpa(m, { ...deps, ctx: matterCtx(m), modelSpa: MODEL_SPA })) } catch (e) { return res.status(e.status || 500).json({ error: e.message }) }
+  if (!jobId) return res.status(409).json({ error: 'Für diesen Akt läuft bereits ein Vorgang.' })
+  res.json({ jobId })
 })
 
 // ---- documents ----

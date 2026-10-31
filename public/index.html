@@ -486,6 +486,25 @@
       .instr[readonly] { background: var(--surface-2); }
       .chip.project { background: rgba(243,146,0,0.12); border-color: rgba(243,146,0,0.4); color: #8a5300; }
       .chip.project svg { color: #b36a00; }
+      .msgs { display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto; padding: 2px; }
+      .msg-it { display: flex; gap: 8px; align-items: flex-start; }
+      .msg-it .bub { background: var(--surface-2); border-radius: 12px; padding: 8px 11px; min-width: 0; flex: 1; }
+      .msg-it.mine .bub { background: var(--accent-soft); }
+      .msg-it .mh { font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+      .msg-it .mh b { color: var(--text); }
+      .msg-it .mt { font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 3px; }
+      .msg-compose { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 12px; }
+      .msg-compose select { flex: 1 1 170px; }
+      .msg-it .mh .mini { white-space: normal; text-align: left; max-width: 100%; }
+      .msg-compose textarea { width: 100%; box-sizing: border-box; min-width: 0; font-family: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; min-height: 64px; resize: vertical; background: var(--surface); color: var(--text); }
+      .msg-compose .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .msg-compose .row .sp { flex: 1; }
+      .msg-compose select, .assign-row select { font-family: inherit; font-size: 12.5px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; background: var(--surface); color: var(--text); max-width: 100%; min-width: 0; }
+      .assign-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); }
+      .assign-row:first-of-type { border-top: none; }
+      .assign-row .al { flex: 1; min-width: 0; font-size: 13.5px; }
+      .assign-row .al span { display: block; font-size: 12px; color: var(--muted); }
+      .tab .cnt.unread { background: var(--accent); color: #fff; }
       .ro-note { font-size: 12px; color: #8a5300; background: rgba(243,146,0,0.10); border-radius: 8px; padding: 6px 10px; margin: 0 4px 6px; }
       /* ---------- matters / DD ---------- */
       .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
@@ -3148,7 +3167,15 @@
       const STATUS_DE = { bestaetigt: 'bestätigt', ungeklaert: 'ungeklärt', widerlegt: 'widerlegt', offen: 'noch nicht geprüft' }
       const VIA_DE = { intern: 'internes Wissen', web: 'Websuche im RIS', aissociate: 'AI:ssociate' }
       const DOC_STATUS = { new: ['neu', ''], inventoried: ['inventarisiert', ''], read: ['Text gelesen', 'teal'], extracted: ['Fakten erfasst', 'teal'], analysed: ['analysiert', 'green'], skipped: ['übersprungen', 'amber'], unpacked: ['entpackt', ''], error: ['Fehler', 'red'] }
-      const MATTER_TABS = ['overview', 'inventory', 'documents', 'facts', 'themes', 'findings', 'requests', 'tables', 'reports', 'log']
+      const MATTER_TABS = ['overview', 'inventory', 'documents', 'facts', 'themes', 'findings', 'requests', 'tables', 'reports', 'team', 'log']
+      // Team of a due diligence: the owner plus invited colleagues; who takes which area or theme.
+      const teamPeople = (m) => m.team ? [{ userId: m.team.owner.userId, name: m.team.owner.name, email: m.team.owner.email, role: 'owner' }, ...(m.team.members || [])] : []
+      const personName = (m, id) => teamPeople(m).find((p) => p.userId === id)?.name || ''
+      const assigneeOf = (m, t) => m.team?.assign?.themes?.[t.key] || m.team?.assign?.areas?.[t.area] || ''
+      const hasTeam = (m) => (m.team?.members || []).length > 0
+      const canEditMatter = (m) => m.team?.role !== 'view'
+      let teamPrefill = null, matterPoll = 0
+      const msgState = { id: null, list: [] }
       const areaLabel = (k) => ddConfig?.areas.find((a) => a.key === k)?.label || (k === 'none' || !k ? 'Allgemein' : k)
       async function loadDdConfig() { if (!ddConfig) { try { ddConfig = await api('/api/dd/config') } catch { ddConfig = { areas: [], presets: [], limits: {} } } } return ddConfig }
       async function loadMatters() { try { mattersCache = (await api('/api/matters')).matters } catch (e) { mattersCache = []; toast(e.message) } updateMatterCounts(); return mattersCache }
@@ -3172,7 +3199,7 @@
       }
       function matterCard(m) {
         const c = el('div', 'card click'); c.addEventListener('click', () => navigate(`#/matter/${m.id}`))
-        const top = el('div', 'kinds'); top.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'Due Diligence' : 'Akt')); if (m.running) top.appendChild(el('span', 'pill run', m.runningKind === 'import' ? 'Import läuft' : m.runningKind === 'table' ? 'Tabelle läuft' : 'Analyse läuft')); else if (m.status === 'paused') top.appendChild(el('span', 'pill amber', 'pausiert')); else if (m.status === 'error') top.appendChild(el('span', 'pill red', 'Fehler')); c.appendChild(top)
+        const top = el('div', 'kinds'); top.appendChild(el('span', 'pill ' + (m.kind === 'dd' ? 'orange' : 'teal'), m.kind === 'dd' ? 'Due Diligence' : 'Akt')); if (m.running) top.appendChild(el('span', 'pill run', m.runningKind === 'import' ? 'Import läuft' : m.runningKind === 'table' ? 'Tabelle läuft' : m.runningKind === 'spa' ? 'SPA-Entwurf läuft' : 'Analyse läuft')); else if (m.status === 'paused') top.appendChild(el('span', 'pill amber', 'pausiert')); else if (m.status === 'error') top.appendChild(el('span', 'pill red', 'Fehler')); if (m.role && m.role !== 'owner') top.appendChild(el('span', 'pill teal', `Geteilt von ${m.ownerName || '–'}`)); else if (m.members) top.appendChild(el('span', 'pill', `Team: ${m.members + 1}`)); c.appendChild(top)
         c.appendChild(el('h3', null, m.name)); c.style.marginTop = '0'; c.querySelector('h3').style.marginTop = '8px'
         const meta = el('div', 'meta'); if (m.client) meta.appendChild(el('span', null, m.client)); if (m.settings?.target) meta.appendChild(el('span', null, m.settings.target)); meta.appendChild(el('span', null, `${m.documents} Dokument${m.documents === 1 ? '' : 'e'}`)); meta.appendChild(el('span', null, fmtDate(m.updatedAt))); c.appendChild(meta)
         const foot = el('div', 'foot')
@@ -3255,6 +3282,17 @@
         document.querySelectorAll('.nav-item[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === 'dd'))
         renderMatter()
         if (matter.job.running && matter.job.jobId) followMatterJob(matter.job.jobId)
+        startMatterPolling()
+      }
+      // New messages of the team while the due diligence is open (every 15 s, only with a team or on the team tab).
+      function startMatterPolling() {
+        clearInterval(matterPoll)
+        matterPoll = setInterval(async () => {
+          if (viewName !== 'matter' || !matter) { clearInterval(matterPoll); return }
+          if (document.hidden || (!hasTeam(matter) && matterTab !== 'team')) return
+          const m = matter
+          try { const n = await loadMessages(m, msgState.id !== m.id); if (matter !== m) return; if (matterTab === 'team') { if (n) { fillMessages(m); markRead(m) } } else updateTeamCnt(m) } catch {}
+        }, 15000)
       }
       async function reloadMatter() { if (!matter) return; try { matter = (await api(`/api/matters/${matter.id}`)).matter; renderMatter() } catch (e) { toast(e.message) } }
       function setTab(t) { matterTab = t; history.replaceState(null, '', `#/matter/${matter.id}/${t}`); renderMatter() }
@@ -3281,9 +3319,10 @@
 
         // tabs
         const tabs = el('div', 'tabs')
-        const T = [['overview', 'Übersicht'], ['inventory', 'Inventar', m.inventory?.source], ['documents', 'Dokumente', m.documents.filter((d) => !d.container).length], ['facts', 'Aktmodell', (m.facts?.entities || []).length], ['themes', 'Themen', (m.themes || []).filter(liveT).length], ['findings', 'Klauseln', m.findings.filter((f) => !isRejected(f)).length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['log', 'Protokoll']]
-        for (const [k, l, n] of T) { const b = el('button', 'tab' + (matterTab === k ? ' active' : ''), l); if (n) b.appendChild(el('span', 'cnt', String(n))); b.addEventListener('click', () => setTab(k)); tabs.appendChild(b) }
+        const T = [['overview', 'Übersicht'], ['inventory', 'Inventar', m.inventory?.source], ['documents', 'Dokumente', m.documents.filter((d) => !d.container).length], ['facts', 'Aktmodell', (m.facts?.entities || []).length], ['themes', 'Themen', (m.themes || []).filter(liveT).length], ['findings', 'Klauseln', m.findings.filter((f) => !isRejected(f)).length], ['requests', 'Nachfragen', requestList(m).length], ['tables', 'Tabellen', (m.tables || []).length], ['reports', 'Berichte', (m.reports || []).length], ['team', 'Team', m.messageInfo?.unread], ['log', 'Protokoll']]
+        for (const [k, l, n] of T) { const b = el('button', 'tab' + (matterTab === k ? ' active' : ''), l); if (k === 'team') b.id = 'teamTab'; if (n) b.appendChild(el('span', 'cnt' + (k === 'team' ? ' unread' : ''), String(n))); b.addEventListener('click', () => setTab(k)); tabs.appendChild(b) }
         page.appendChild(tabs)
+        { const a = tabs.querySelector('.tab.active'); if (a && a.offsetLeft + a.offsetWidth > tabs.clientWidth) tabs.scrollLeft = a.offsetLeft - 24 }
         const body = el('div'); page.appendChild(body)
         if (matterTab === 'overview') renderOverview(body, m)
         else if (matterTab === 'inventory') renderInventory(body, m)
@@ -3294,19 +3333,20 @@
         else if (matterTab === 'requests') renderRequests(body, m)
         else if (matterTab === 'tables') renderTables(body, m)
         else if (matterTab === 'reports') renderReports(body, m)
+        else if (matterTab === 'team') renderTeam(body, m)
         else if (matterTab === 'log') renderLog(body, m)
       }
       function renderRunBox(m) {
         const box = el('div', 'runbox'); box.id = 'runbox'
         const rh = el('div', 'rh')
         const kind = m.job.runningKind
-        if (m.job.running) { rh.innerHTML = '<span class="spinner"></span>'; rh.appendChild(el('span', null, kind === 'import' ? 'Import aus Microsoft 365' : kind === 'table' ? 'Review-Tabelle wird erstellt' : 'Due-Diligence-Analyse läuft')) }
+        if (m.job.running) { rh.innerHTML = '<span class="spinner"></span>'; rh.appendChild(el('span', null, kind === 'import' ? 'Import aus Microsoft 365' : kind === 'table' ? 'Review-Tabelle wird erstellt' : kind === 'spa' ? 'SPA-Entwurf wird erstellt' : 'Due-Diligence-Analyse läuft')) }
         else if (m.job.status === 'paused') rh.appendChild(el('span', 'pill amber', 'Pausiert'))
         else rh.appendChild(el('span', 'pill red', 'Fehler'))
         rh.appendChild(el('span', 'sp')); const pr = el('span', 'rp', ''); pr.style.fontSize = '12.5px'; pr.style.color = 'var(--muted)'; rh.appendChild(pr); box.appendChild(rh)
         const msg = el('div', 'rm', m.job.error || (m.job.log?.length ? m.job.log[m.job.log.length - 1].message : 'Startet…')); box.appendChild(msg)
         const bar = el('div', 'progress'); const i = el('i'); bar.appendChild(i); box.appendChild(bar)
-        if (kind !== 'import' && kind !== 'table') { const st = el('div', 'stages'); for (const [k, l] of STAGES) st.appendChild(el('span', 'stage', l)); box.appendChild(st) }
+        if (!['import', 'table', 'spa'].includes(kind)) { const st = el('div', 'stages'); for (const [k, l] of STAGES) st.appendChild(el('span', 'stage', l)); box.appendChild(st) }
         updateRunBox(m.job.stage, m.job.progress, null, m.job.running)
         return box
       }
@@ -3328,7 +3368,7 @@
           if (ev.event === 'dd') { matter.job.stage = ev.stage; if (ev.progress) matter.job.progress = ev.progress; if (ev.message) { matter.job.log = [...(matter.job.log || []), { t: Date.now(), message: ev.message }].slice(-80); const lg = $('matterLog'); if (lg) { lg.appendChild(el('div', null, `${new Date().toLocaleTimeString('de-AT')}  ${ev.message}`)); lg.scrollTop = lg.scrollHeight } } updateRunBox(ev.stage, ev.progress, ev.message, true) }
           else if (ev.event === 'table') { updateRunBox('table', { done: ev.done, total: ev.total }, ev.message || (ev.docName ? `Ausgewertet: ${ev.docName}` : ''), true) }
           else if (ev.event === 'error') { toast('Vorgang fehlgeschlagen: ' + ev.message, 5000) }
-          else if (ev.event === 'end') { reloadMatter().then(() => { if (matter?.id !== mid) return; if (matter.job.running && matter.job.jobId) { setTimeout(() => followMatterJob(matter.job.jobId), 1500); return } if (matter.job.status === 'done' && ev.kind === 'dd') toast('Analyse abgeschlossen – Bericht liegt unter „Berichte“.', 4000) }) }
+          else if (ev.event === 'end') { reloadMatter().then(() => { if (matter?.id !== mid) return; if (matter.job.running && matter.job.jobId) { setTimeout(() => followMatterJob(matter.job.jobId), 1500); return } if (matter.job.status === 'done' && ev.kind === 'dd') toast('Analyse abgeschlossen – Bericht liegt unter „Berichte“.', 4000); if (ev.kind === 'spa' && matter.spa?.at > Date.now() - 120000) toast('SPA-Entwurf liegt unter „Berichte“.', 4000) }) }
         })
       }
       async function startDd(opts) {
@@ -3353,10 +3393,11 @@
         const item = (label, fn, danger) => { const b = el('button', 'btn ghost full' + (danger ? ' danger' : ''), label); if (danger) { b.style.color = 'var(--err)'; b.style.borderColor = 'rgba(217,45,32,0.35)' } b.addEventListener('click', () => { closeDlg(); fn() }); list.appendChild(b) }
         item('Umbenennen', async () => { const v = await promptDlg('Akt umbenennen', '', { value: m.name }); if (v && v.trim()) { await api(`/api/matters/${m.id}`, { method: 'PATCH', body: { name: v.trim() } }); await reloadMatter(); loadMatters() } })
         if (m.kind === 'dd') item('Einstellungen der DD', () => openMatterSettings())
+        if (m.kind === 'dd') item('Team und Nachrichten', () => setTab('team'))
         if (m.findings.length || m.executive) item('Alles neu analysieren', async () => { if (await confirmDlg('Neu analysieren', 'Fakten, Befunde, Themen und Zusammenfassungen werden ohne Zwischenspeicher neu erstellt (Token-Kosten!). Review-Entscheidungen bleiben an ihren Themen.', { ok: 'Neu analysieren' })) startDd({ reanalyse: true }) })
         if (m.documents.some((d) => d.status === 'error' || (d.status === 'skipped' && ['failed', 'unreadable', 'budget'].includes(d.skipReason)))) item('Fehlgeschlagene Dokumente erneut lesen', () => startDd({ retryErrors: true }))
         if ((m.themes || []).length) item('Neu bewerten (ab Aktmodell, ohne erneutes Lesen)', () => startDd({ fromStage: 3 }))
-        item('Akt löschen', async () => { if (await confirmDlg('Akt löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akt gelöscht.'); matter = null; await loadMatters(); navigate('#/dd') } catch (e) { toast(e.message) } } }, true)
+        if (m.team?.role === 'owner' || m.projectId) item('Akt löschen', async () => { if (await confirmDlg('Akt löschen', `„${m.name}“ mit allen Dokumenten, Befunden und Berichten endgültig löschen?`)) { try { await api(`/api/matters/${m.id}`, { method: 'DELETE' }); toast('Akt gelöscht.'); matter = null; await loadMatters(); navigate('#/dd') } catch (e) { toast(e.message) } } }, true)
         card.appendChild(list)
         const a = el('div', 'modal-actions'); const c = el('button', 'btn ghost', 'Schließen'); c.addEventListener('click', closeDlg); a.appendChild(c); card.appendChild(a)
         $('dlg').classList.add('show')
@@ -3534,7 +3575,7 @@
         const tt = el('div', 'ft'); tt.appendChild(el('span', 'fno', t.no)); tt.appendChild(document.createTextNode(t.title)); tt0.appendChild(tt)
         const fs = m.findings.filter((f) => t.findingIds.includes(f.id))
         const ev = t.evidence || []
-        tt0.appendChild(el('div', 'fm', `${SEV_DE[g]}${t.review?.grade ? ' (Review)' : t.gradeCalibrated && t.gradeCalibrated !== t.gradeComputed ? ` (nach Regeln ${SEV_DE[t.gradeComputed]})` : ''} · ${STATUS_DE[t.status] || ''} · ${areaLabel(t.area)} · ${IMPACT_DE[t.review?.instrument || t.instrument] || '–'} · ${ev.length} Beleg${ev.length === 1 ? '' : 'e'} in ${new Set(ev.map((x) => x.docId)).size} Dok.${t.manual ? ' · manuell' : ''}`)); h.appendChild(tt0)
+        tt0.appendChild(el('div', 'fm', `${SEV_DE[g]}${t.review?.grade ? ' (Review)' : t.gradeCalibrated && t.gradeCalibrated !== t.gradeComputed ? ` (nach Regeln ${SEV_DE[t.gradeComputed]})` : ''} · ${STATUS_DE[t.status] || ''} · ${areaLabel(t.area)} · ${IMPACT_DE[t.review?.instrument || t.instrument] || '–'} · ${ev.length} Beleg${ev.length === 1 ? '' : 'e'} in ${new Set(ev.map((x) => x.docId)).size} Dok.${t.manual ? ' · manuell' : ''}${hasTeam(m) && assigneeOf(m, t) ? ' · Zuständig: ' + (personName(m, assigneeOf(m, t)) || '–') : ''}`)); h.appendChild(tt0)
         const badges = el('div', 'fbadges')
         if (t.orphaned) badges.appendChild(el('span', 'pill', 'verwaist'))
         if (t.unconfirmed) badges.appendChild(el('span', 'pill amber', 'unbestätigt'))
@@ -3569,6 +3610,12 @@
         const bN = el('button', 'mini', t.review?.note ? 'Vermerk ändern' : 'Vermerk'); bN.addEventListener('click', async () => { const v = await promptDlg('Reviewer-Vermerk', `${t.no} ${t.title}`, { value: t.review?.note || '', ok: 'Speichern' }); if (v != null) patch({ note: v }) })
         const bE = el('button', 'mini', 'Bearbeiten'); bE.addEventListener('click', async () => { const v = await promptDlg('Titel des Themas', t.no, { value: t.title, ok: 'Weiter' }); if (v == null) return; const d2 = await promptDlg('Beschreibung', t.no, { value: t.description, ok: 'Speichern' }); patch({ title: v, ...(d2 != null ? { description: d2 } : {}) }) })
         bar.append(bA, bR, gs, is, bN, bE)
+        if (hasTeam(m) && !t.orphaned) {
+          const areaWho = personName(m, m.team.assign.areas?.[t.area])
+          const as = el('select', 'sel'); for (const [k, l] of [['', `Zuständig: ${areaWho ? areaWho + ' (Bereich)' : 'niemand'}`], ...teamPeople(m).map((p) => [p.userId, 'Zuständig: ' + p.name])]) { const o = el('option', null, l); o.value = k; o.selected = (m.team.assign.themes?.[t.key] || '') === k; as.appendChild(o) }
+          as.addEventListener('change', async () => { try { await api(`/api/matters/${m.id}/assign`, { method: 'POST', body: { themeId: t.id, userId: as.value } }); await reloadMatter() } catch (e) { toast(e.message) } }); bar.appendChild(as)
+          const bM = el('button', 'mini', 'Nachricht'); bM.addEventListener('click', () => { const who = assigneeOf(m, t); teamPrefill = { themeId: t.id, to: who && who !== m.team.me ? who : '' }; setTab('team') }); bar.appendChild(bM)
+        }
         if (!t.orphaned) {
           const mg = el('select', 'sel'); const m0 = el('option', null, 'Zusammenführen mit…'); m0.value = ''; mg.appendChild(m0); for (const x of (m.themes || []).filter((x) => x.id !== t.id && liveT(x))) { const o = el('option', null, `${x.no} ${x.title.slice(0, 50)}`); o.value = x.id; mg.appendChild(o) } mg.addEventListener('change', async () => { if (!mg.value) return; try { await api(`/api/matters/${m.id}/themes/${t.id}/merge`, { method: 'POST', body: { into: mg.value } }); await reloadMatter() } catch (e) { toast(e.message) } }); bar.appendChild(mg)
           if (fs.length > 1) { const bS = el('button', 'mini', 'Abspalten'); bS.addEventListener('click', () => openSplitDialog(m, t, fs)); bar.appendChild(bS) }
@@ -3589,7 +3636,7 @@
         recomputeBanner(body, m)
         const all = m.themes || [], live = all.filter(liveT)
         const tb = el('div', 'toolbar')
-        for (const [k, l, n] of [['all', 'Alle', live.length], ['red', 'Rot', live.filter((t) => gradeT(t) === 'red').length], ['amber', 'Gelb', live.filter((t) => gradeT(t) === 'amber').length], ['green', 'Grün', live.filter((t) => gradeT(t) === 'green').length], ['open', 'Review offen', live.filter((t) => ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length], ['out', 'Verworfen', all.filter((t) => !liveT(t)).length], ['orphan', 'Verwaist', (m.orphanThemes || []).length]]) { if (!n && !['all', 'red', 'amber'].includes(k)) continue; const b = el('button', 'fchip' + (themeFilter.grade === k ? ' on' : '')); if (['red', 'amber', 'green'].includes(k)) b.appendChild(el('span', 'dot ' + k)); b.appendChild(document.createTextNode(`${l} (${n})`)); b.addEventListener('click', () => { themeFilter.grade = k; renderMatter() }); tb.appendChild(b) }
+        for (const [k, l, n] of [['all', 'Alle', live.length], ['red', 'Rot', live.filter((t) => gradeT(t) === 'red').length], ['amber', 'Gelb', live.filter((t) => gradeT(t) === 'amber').length], ['green', 'Grün', live.filter((t) => gradeT(t) === 'green').length], ['open', 'Review offen', live.filter((t) => ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length], ['out', 'Verworfen', all.filter((t) => !liveT(t)).length], ['orphan', 'Verwaist', (m.orphanThemes || []).length], ...(hasTeam(m) ? [['mine', 'Mir zugeordnet', live.filter((t) => assigneeOf(m, t) === m.team.me).length]] : [])]) { if (!n && !['all', 'red', 'amber', 'mine'].includes(k)) continue; const b = el('button', 'fchip' + (themeFilter.grade === k ? ' on' : '')); if (['red', 'amber', 'green'].includes(k)) b.appendChild(el('span', 'dot ' + k)); b.appendChild(document.createTextNode(`${l} (${n})`)); b.addEventListener('click', () => { themeFilter.grade = k; renderMatter() }); tb.appendChild(b) }
         const sel = el('select'); const o0 = el('option', null, 'Alle Bereiche'); o0.value = 'all'; sel.appendChild(o0); for (const k of [...new Set(all.map((t) => t.area))]) { const o = el('option', null, areaLabel(k)); o.value = k; o.selected = themeFilter.area === k; sel.appendChild(o) } sel.addEventListener('change', () => { themeFilter.area = sel.value; renderMatter() }); tb.appendChild(sel)
         const q = el('input'); q.type = 'search'; q.placeholder = 'Suchen…'; q.value = themeFilter.q; q.addEventListener('change', () => { themeFilter.q = q.value; renderMatter() }); tb.appendChild(q)
         tb.appendChild(el('span', 'sp'))
@@ -3599,7 +3646,7 @@
         if (openRv) body.appendChild(el('div', 'legend', `${openRv} rote/gelbe Themen noch ohne Review – der Bericht trägt bis dahin den Vermerk „Entwurf“.`))
         const needle = themeFilter.q.trim().toLowerCase(), fg = themeFilter.grade
         const pool = fg === 'orphan' ? (m.orphanThemes || []) : fg === 'out' ? all.filter((t) => !liveT(t)) : live
-        const items = pool.filter((t) => (['all', 'out', 'orphan'].includes(fg) || (fg === 'open' ? ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open' : gradeT(t) === fg)) && (themeFilter.area === 'all' || t.area === themeFilter.area) && (!needle || `${t.no} ${t.title} ${t.description}`.toLowerCase().includes(needle))).sort((a, b) => SEV_RANK[gradeT(a)] - SEV_RANK[gradeT(b)] || a.no.localeCompare(b.no))
+        const items = pool.filter((t) => (['all', 'out', 'orphan'].includes(fg) || (fg === 'open' ? ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open' : fg === 'mine' ? assigneeOf(m, t) === m.team?.me : gradeT(t) === fg)) && (themeFilter.area === 'all' || t.area === themeFilter.area) && (!needle || `${t.no} ${t.title} ${t.description}`.toLowerCase().includes(needle))).sort((a, b) => SEV_RANK[gradeT(a)] - SEV_RANK[gradeT(b)] || a.no.localeCompare(b.no))
         if (!items.length) { const e = el('div', 'empty'); e.appendChild(el('b', null, all.length ? 'Keine Themen für diesen Filter' : 'Noch keine Themen')); e.appendChild(document.createTextNode(all.length ? '' : 'Themen entstehen aus den Befunden: gleiche Sachverhalte über Dokumente hinweg werden zusammengeführt, der Grad folgt festen Regeln, rote Themen werden rechtlich geprüft.')); body.appendChild(e); return }
         for (const t of items) body.appendChild(themeCard(t, m))
       }
@@ -3958,15 +4005,127 @@
         const tb = el('div', 'toolbar'); tb.appendChild(el('span', 'sub', 'Word-Bericht aus den Themen (Red-Flag-Bericht oder Vollbericht) und Excel (Themen, Befunde, Fakten, Dokumente, Nachfragen, Bereiche, Hinweise) – bis alle roten und gelben Themen geprüft sind, als „Entwurf“.')).style.cssText = 'font-size:13px;color:var(--muted)'; tb.appendChild(el('span', 'sp'))
         const rtSel = el('select'); for (const [k, l] of Object.entries(ddConfig?.reportTypes || { redflag: 'Red-Flag-Bericht', full: 'Vollbericht' })) { const o = el('option', null, l); o.value = k; o.selected = (m.settings.reportType || 'redflag') === k; rtSel.appendChild(o) } rtSel.title = 'Red-Flag-Bericht: nur rote und gelbe Themen, höchstens 15.000 Wörter. Vollbericht: zusätzlich grüne Themen und eine Zusammenfassung je Dokument.'; tb.appendChild(rtSel)
         const bR = el('button', 'btn ghost sm', 'Bericht neu erstellen'); bR.disabled = m.job.running || !((m.themes || []).length || m.executive); bR.addEventListener('click', async () => { bR.disabled = true; try { await api(`/api/matters/${m.id}/report`, { method: 'POST', body: { type: rtSel.value } }); await reloadMatter(); toast('Bericht erstellt.') } catch (e) { toast(e.message); bR.disabled = false } }); tb.appendChild(bR)
+        if (m.kind === 'dd') { const bSpa = el('button', 'btn ghost sm', 'SPA-Entwurf erstellen'); bSpa.title = 'Kaufvertrag nach österreichischem Recht für die geplante Transaktion: jedes rote und gelbe Thema im Instrument aus dem Review (Vollzugsbedingung, Garantie, Freistellung, Kaufpreisanpassung).'; bSpa.disabled = m.job.running || !canEditMatter(m) || !(m.themes || []).some(liveT); bSpa.addEventListener('click', () => startSpa(m)); tb.appendChild(bSpa) }
         const bS = el('button', 'btn sm', ''); bS.appendChild(svg('cloud')); bS.appendChild(document.createTextNode('Nach Microsoft 365 speichern')); bS.disabled = !(m.reports || []).length; bS.addEventListener('click', () => syncReports(m)); tb.appendChild(bS)
         body.appendChild(tb)
         if (!(m.reports || []).length) { const e = el('div', 'empty'); e.appendChild(el('b', null, 'Noch kein Bericht')); e.appendChild(document.createTextNode('Der Bericht entsteht am Ende der Analyse und kann danach jederzeit neu erzeugt werden (z. B. nach Ergänzung von Dokumenten).')); body.appendChild(e); return }
         const wrap = el('div', 'tbl-wrap'); const t = el('table', 'tbl'); const th = el('tr'); for (const h of ['Datei', 'Typ', 'Größe', 'Erstellt', '']) th.appendChild(el('th', null, h)); t.appendChild(el('thead')).appendChild(th)
         const tbody = el('tbody')
-        for (const r of m.reports) { const tr = el('tr'); tr.appendChild(el('td', 'n', r.name)); tr.appendChild(el('td', null, r.kind === 'docx' ? (r.type === 'full' ? 'Word – Vollbericht' : 'Word – Red-Flag-Bericht') : 'Excel – Themen, Befunde, Fakten')); tr.appendChild(el('td', null, fmtSize(r.size))); tr.appendChild(el('td', null, fmtDate(r.createdAt))); const ca = el('td'); const ra = el('div', 'rowacts'); const b = el('button', null, '⬇ Download'); b.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/reports/${encodeURIComponent(r.name)}`, r.name)); ra.appendChild(b); ca.appendChild(ra); tr.appendChild(ca); tbody.appendChild(tr) }
+        for (const r of m.reports) { const tr = el('tr'); tr.appendChild(el('td', 'n', r.name)); tr.appendChild(el('td', null, r.kind === 'docx' ? (r.type === 'spa' ? 'Word – SPA-Entwurf' : r.type === 'full' ? 'Word – Vollbericht' : 'Word – Red-Flag-Bericht') : 'Excel – Themen, Befunde, Fakten')); tr.appendChild(el('td', null, fmtSize(r.size))); tr.appendChild(el('td', null, fmtDate(r.createdAt))); const ca = el('td'); const ra = el('div', 'rowacts'); const b = el('button', null, '⬇ Download'); b.addEventListener('click', () => downloadApi(`/api/matters/${m.id}/reports/${encodeURIComponent(r.name)}`, r.name)); ra.appendChild(b); ca.appendChild(ra); tr.appendChild(ca); tbody.appendChild(tr) }
         t.appendChild(tbody); wrap.appendChild(t); body.appendChild(wrap)
+        if (m.spa) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Letzter SPA-Entwurf')); c.appendChild(el('div', 'kv')).append(el('span', null, 'Erstellt'), el('b', null, fmtDate(m.spa.at))); c.appendChild(el('div', 'kv')).append(el('span', null, 'Klauseln / Themen der DD'), el('b', null, `${m.spa.clauses} / ${m.spa.themes}`)); c.appendChild(el('div', 'kv')).append(el('span', null, 'Offene Punkte vor Signing'), el('b', null, String(m.spa.openPoints))); if (m.spa.uncovered?.length) c.appendChild(el('div', 'ro-note', `Ohne Klausel (im Arbeitsanhang des Entwurfs aufgelistet): ${m.spa.uncovered.join(', ')}`)); body.appendChild(c) }
         if (m.sync?.length) { const c = el('div', 'card'); c.style.marginTop = '14px'; c.appendChild(el('h3', null, 'Zuletzt gespeichert')); for (const s of m.sync) { const row = el('div', 'sync-row'); row.appendChild(svg('cloud')); if (s.ok && s.webUrl) { const a = el('a', null, s.name); a.href = s.webUrl; a.target = '_blank'; a.rel = 'noopener noreferrer'; row.appendChild(a) } else row.appendChild(el('span', null, s.name)); if (!s.ok) row.appendChild(el('span', 'err', s.error || 'fehlgeschlagen')); c.appendChild(row) } body.appendChild(c) }
       }
+      async function startSpa(m) {
+        const live = (m.themes || []).filter(liveT), rv = live.filter((t) => ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length
+        const s = m.settings || {}
+        const txt = `${s.transaction === 'asset' ? 'Unternehmenskaufvertrag (Asset Deal)' : 'Anteilskaufvertrag (Share Deal)'} nach österreichischem Recht aus ${s.perspective === 'seller' ? 'Verkäufersicht' : 'Käufersicht'}, aus ${live.filter((t) => ['red', 'amber'].includes(gradeT(t))).length} roten und gelben Themen. Läuft im Hintergrund (einige Minuten); das Ergebnis erscheint als Word-Datei unter „Berichte“.`
+        const details = `Vollzugsbedingungen, Garantien, Freistellungen und Kaufpreisanpassungen folgen dem Instrument jedes Themas (Review vor Analyse); Nachfragen und Deal Breaker werden offene Punkte vor Signing. Unbekannte Angaben bleiben als [●] offen.${rv ? ` ${rv} rote/gelbe Themen sind noch ohne Review – sie gehen mit dem Instrument der Analyse ein.` : ''} Die Tokens zählen zur Grenze der Due Diligence.`
+        if (!(await confirmDlg('SPA-Entwurf erstellen?', txt, { ok: 'Erstellen', danger: false, details }))) return
+        try { const r = await api(`/api/matters/${m.id}/spa`, { method: 'POST', body: {} }); toast('SPA-Entwurf wird erstellt.'); await reloadMatter(); followMatterJob(r.jobId) } catch (e) { toast(e.message, 4000) }
+      }
+
+      // ---- team: members, responsibilities, messages ----
+      async function loadMessages(m, full) {
+        if (msgState.id !== m.id) { msgState.id = m.id; msgState.list = []; full = true }
+        const r = await api(`/api/matters/${m.id}/messages?after=${full ? 0 : (msgState.list.at(-1)?.at || 0)}`)
+        if (full) msgState.list = r.messages; else msgState.list.push(...r.messages.filter((x) => !msgState.list.some((y) => y.id === x.id)))
+        m.messageInfo = r.info
+        return r.messages.length
+      }
+      function updateTeamCnt(m) { const b = $('teamTab'); if (!b) return; let c = b.querySelector('.cnt'); const n = m.messageInfo?.unread || 0; if (!n) { c?.remove(); return } if (!c) { c = el('span', 'cnt unread'); b.appendChild(c) } c.textContent = String(n) }
+      async function markRead(m) { if (!m.messageInfo?.unread) return; try { m.messageInfo = (await api(`/api/matters/${m.id}/messages/read`, { method: 'POST', body: {} })).info; updateTeamCnt(m) } catch {} }
+      function msgItem(m, x) {
+        const it = el('div', 'msg-it' + (x.userId === m.team?.me ? ' mine' : ''))
+        const who = teamPeople(m).find((p) => p.userId === x.userId); it.appendChild(avatars([{ name: x.name, email: who?.email || x.userId }], 1))
+        const bub = el('div', 'bub'), mh = el('div', 'mh')
+        mh.appendChild(el('b', null, x.name)); mh.appendChild(el('span', null, new Date(x.at).toLocaleString('de-AT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })))
+        if (x.to?.length) mh.appendChild(el('span', 'pill', 'nur an ' + x.to.map((id) => personName(m, id) || '–').join(', ')))
+        if (x.themeNo) { const b = el('button', 'mini', `${x.themeNo} ${String(x.themeTitle || '').slice(0, 48)}`); b.title = 'Thema öffnen'; b.addEventListener('click', () => { themeFilter.grade = 'all'; themeFilter.area = 'all'; themeFilter.q = x.themeNo; setTab('themes') }); mh.appendChild(b) }
+        bub.append(mh, el('div', 'mt', x.text)); it.appendChild(bub)
+        return it
+      }
+      function fillMessages(m) {
+        const list = $('teamMsgs'); if (!list) return
+        list.innerHTML = ''
+        if (!msgState.list.length) list.appendChild(el('div', 'recent-empty', hasTeam(m) ? 'Noch keine Nachrichten – schreib dem Team.' : 'Noch keine Nachrichten. Lade Kolleginnen und Kollegen ein, um die Due Diligence gemeinsam zu bearbeiten.'))
+        for (const x of msgState.list) list.appendChild(msgItem(m, x))
+        list.scrollTop = list.scrollHeight
+      }
+      function renderTeam(body, m) {
+        const tm = m.team || { role: 'owner', me: 'owner', owner: {}, members: [], assign: { areas: {}, themes: {} } }
+        const people = teamPeople(m), isOwner = tm.role === 'owner', canEdit = canEditMatter(m)
+        const live = (m.themes || []).filter(liveT)
+        const two = el('div', 'two')
+        // messages
+        const mc = el('div', 'card'); mc.appendChild(el('h3', null, 'Nachrichten'))
+        const list = el('div', 'msgs'); list.id = 'teamMsgs'; list.appendChild(el('div', 'recent-empty', 'Lädt…')); mc.appendChild(list)
+        const pre = teamPrefill; teamPrefill = null
+        const comp = el('div', 'msg-compose')
+        const ta = el('textarea'); ta.id = 'teamMsgText'; ta.placeholder = 'Nachricht an das Team … (Strg+Enter sendet)'
+        const row = el('div', 'row')
+        const to = el('select'); to.id = 'teamMsgTo'; to.setAttribute('aria-label', 'Empfänger'); { const o = el('option', null, 'An: alle im Team'); o.value = ''; to.appendChild(o) } for (const p of people) if (p.userId !== tm.me) { const o = el('option', null, 'Nur an: ' + p.name); o.value = p.userId; o.selected = pre?.to === p.userId; to.appendChild(o) }
+        const th = el('select'); th.id = 'teamMsgTheme'; th.setAttribute('aria-label', 'Thema'); { const o = el('option', null, 'Ohne Thema'); o.value = ''; th.appendChild(o) } for (const t of live) { const o = el('option', null, `${t.no} ${t.title.slice(0, 60)}`); o.value = t.id; o.selected = pre?.themeId === t.id; th.appendChild(o) }
+        const send = el('button', 'btn sm', 'Senden'); send.id = 'teamMsgSend'
+        const doSend = async () => { const text = ta.value.trim(); if (!text) { ta.focus(); return } send.disabled = true; try { const r = await api(`/api/matters/${m.id}/messages`, { method: 'POST', body: { text, to: to.value ? [to.value] : [], themeId: th.value || null } }); if (msgState.id === m.id && !msgState.list.some((y) => y.id === r.message.id)) msgState.list.push(r.message); m.messageInfo = r.info; ta.value = ''; fillMessages(m) } catch (e) { toast(e.message) } send.disabled = false; ta.focus() }
+        send.addEventListener('click', doSend); ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSend() } })
+        row.append(to, th, el('span', 'sp'), send); comp.append(ta, row); mc.appendChild(comp)
+        if (pre) setTimeout(() => ta.focus(), 30)
+        two.appendChild(mc)
+        // members and responsibilities
+        const right = el('div')
+        const pc = el('div', 'card'); pc.appendChild(el('h3', null, `Team (${people.length})`))
+        const openOf = (id) => live.filter((t) => assigneeOf(m, t) === id && ['red', 'amber'].includes(gradeT(t)) && (t.review?.status || 'open') === 'open').length
+        for (const p of people) {
+          const r = el('div', 'pm-row'); r.dataset.member = p.userId; r.appendChild(avatars([p], 1))
+          const w = el('div', 'who'); w.appendChild(el('b', null, p.name + (p.userId === tm.me ? ' (ich)' : ''))); const nA = Object.values(tm.assign.areas || {}).filter((v) => v === p.userId).length, nO = openOf(p.userId); w.appendChild(el('span', null, [p.email, nA ? `${nA} Bereich${nA > 1 ? 'e' : ''}` : '', nO ? `${nO} ${nO === 1 ? 'Thema' : 'Themen'} offen` : ''].filter(Boolean).join(' · '))); r.appendChild(w)
+          if (p.role === 'owner' || !isOwner) r.appendChild(el('span', 'pill', ROLE_LABEL[p.role]))
+          else {
+            const rs = el('select'); for (const [v, l] of [['edit', 'Kann bearbeiten'], ['view', 'Kann lesen']]) { const o = el('option', null, l); o.value = v; rs.appendChild(o) } rs.value = p.role
+            rs.addEventListener('change', async () => { try { await api(`/api/matters/${m.id}/members/${p.userId}`, { method: 'PATCH', body: { role: rs.value } }); await reloadMatter(); toast('Rolle geändert.') } catch (e) { toast(e.message) } })
+            const x = el('button', 'rm', '×'); x.title = 'Aus dem Team entfernen'; x.addEventListener('click', async () => { if (!(await confirmDlg('Aus dem Team entfernen?', `${p.name} verliert den Zugriff auf „${m.name}“.`, { ok: 'Entfernen' }))) return; try { await api(`/api/matters/${m.id}/members/${p.userId}`, { method: 'DELETE' }); await reloadMatter() } catch (e) { toast(e.message) } })
+            r.append(rs, x)
+          }
+          pc.appendChild(r)
+        }
+        if (isOwner && tm.sharing) { const b = el('button', 'btn ghost sm'); b.id = 'teamInvite'; b.appendChild(svg('share')); b.appendChild(document.createTextNode(' Einladen')); b.style.marginTop = '10px'; b.addEventListener('click', () => teamInviteDialog(m)); pc.appendChild(b) }
+        else if (!tm.sharing && isOwner) pc.appendChild(el('div', 'ro-note', m.projectId ? 'Dieser Akt gehört zu einem Projekt – das Team ist das des Projekts.' : 'Einladen setzt Benutzerkonten voraus (Anmeldung ist auf diesem Server ausgeschaltet).'))
+        if (!isOwner && !m.projectId) { const lv = el('button', 'mini', 'Team verlassen'); lv.style.marginTop = '10px'; lv.addEventListener('click', async () => { if (!(await confirmDlg('Team verlassen?', `Du verlierst den Zugriff auf „${m.name}“, bis du erneut eingeladen wirst.`, { ok: 'Verlassen' }))) return; try { await api(`/api/matters/${m.id}/members/${tm.me}`, { method: 'DELETE' }); matter = null; await loadMatters(); navigate('#/dd') } catch (e) { toast(e.message) } }); pc.appendChild(lv) }
+        right.appendChild(pc)
+        const ac = el('div', 'card'); ac.style.marginTop = '14px'; ac.appendChild(el('h3', null, 'Zuständigkeiten'))
+        ac.appendChild(el('div', 'hint', 'Wer welchen Prüfbereich übernimmt. Einzelne Themen lassen sich im Thema selbst jemand anderem zuweisen; „Mir zugeordnet“ im Reiter Themen zeigt die eigenen.')).style.cssText = 'font-size:12.5px;color:var(--muted);margin-bottom:6px'
+        for (const k of m.settings.areas || []) {
+          const ts = live.filter((t) => t.area === k && ['red', 'amber'].includes(gradeT(t))), open = ts.filter((t) => (t.review?.status || 'open') === 'open').length
+          const r = el('div', 'assign-row'); const al = el('div', 'al', areaLabel(k)); al.appendChild(el('span', null, ts.length ? `${ts.length} rote/gelbe Themen${open ? `, ${open} ohne Review` : ', alle geprüft'}` : 'keine roten oder gelben Themen')); r.appendChild(al)
+          const sel = el('select'); sel.dataset.area = k; { const o = el('option', null, 'niemand'); o.value = ''; sel.appendChild(o) } for (const p of people) { const o = el('option', null, p.name); o.value = p.userId; o.selected = tm.assign.areas?.[k] === p.userId; sel.appendChild(o) }
+          sel.disabled = !canEdit; sel.addEventListener('change', async () => { try { await api(`/api/matters/${m.id}/assign`, { method: 'POST', body: { area: k, userId: sel.value } }); await reloadMatter() } catch (e) { toast(e.message) } })
+          r.appendChild(sel); ac.appendChild(r)
+        }
+        right.appendChild(ac)
+        two.appendChild(right); body.appendChild(two)
+        loadMessages(m, true).then(() => { if (matter?.id !== m.id || matterTab !== 'team') return; fillMessages(m); markRead(m) }).catch((e) => { list.innerHTML = ''; list.appendChild(el('div', 'recent-empty', e.message)) })
+      }
+      async function teamInviteDialog(m) {
+        await loadDirectory()
+        const card = $('dlgCard'); card.innerHTML = ''; card.classList.add('wide')
+        card.appendChild(el('h2', null, `Zu „${m.name}“ einladen`))
+        card.appendChild(el('div', 'md', 'Registrierte Kolleginnen und Kollegen ins Team holen. Bearbeiten: Themen prüfen, Dokumente ergänzen, Analyse starten. Lesen: alles ansehen und Nachrichten schreiben. Zuständigkeiten je Prüfbereich legst du danach im Reiter Team fest.'))
+        if (!directory.enabled) card.appendChild(el('div', 'ro-note', 'Einladen setzt Benutzerkonten voraus (Anmeldung ist auf diesem Server ausgeschaltet).'))
+        else {
+          const taken = new Set(teamPeople(m).map((p) => p.userId)), free = directory.users.filter((u) => !taken.has(u.id))
+          const add = el('div', 'share-add')
+          const sel = el('select'); sel.id = 'teamUser'; sel.setAttribute('aria-label', 'Person'); { const o = el('option', null, free.length ? 'Person wählen …' : 'Alle registrierten Personen sind bereits im Team'); o.value = ''; sel.appendChild(o) } for (const u of free) { const o = el('option', null, `${u.name} · ${u.email}`); o.value = u.id; sel.appendChild(o) }
+          const role = el('select'); role.id = 'teamRole'; role.setAttribute('aria-label', 'Rolle'); for (const [v, l] of [['edit', 'Kann bearbeiten'], ['view', 'Kann lesen']]) { const o = el('option', null, l); o.value = v; role.appendChild(o) }
+          const go = el('button', 'btn', 'Hinzufügen'); go.id = 'teamAdd'; go.disabled = !free.length
+          go.addEventListener('click', async () => { if (!sel.value) { sel.focus(); return } go.disabled = true; try { m.team = (await api(`/api/matters/${m.id}/members`, { method: 'POST', body: { userId: sel.value, role: role.value } })).team; toast(`${directory.users.find((x) => x.id === sel.value)?.name || 'Kollegin/Kollege'} ist im Team.`); teamInviteDialog(m) } catch (e) { toast(e.message); go.disabled = false } })
+          add.append(sel, role, go); card.appendChild(add)
+          if (!directory.users.length) card.appendChild(el('div', 'ro-note', 'Noch keine weiteren Konten. Administrator:innen legen sie unter Einstellungen → Benutzer an.'))
+        }
+        const list = el('div'); for (const p of teamPeople(m)) { const r = el('div', 'pm-row'); r.appendChild(avatars([p], 1)); const w = el('div', 'who'); w.appendChild(el('b', null, p.name)); w.appendChild(el('span', null, p.email)); r.append(w, el('span', 'pill', ROLE_LABEL[p.role])); list.appendChild(r) } card.appendChild(list)
+        const a = el('div', 'modal-actions'); const ok = el('button', 'btn', 'Fertig'); ok.addEventListener('click', () => { closeDlg(); reloadMatter() }); a.appendChild(ok); card.appendChild(a)
+        $('dlg').classList.add('show')
+      }
+
       function syncReports(m) {
         if (!msState.configured) { toast('Microsoft 365 ist auf dem Server nicht konfiguriert (MS_CLIENT_ID).'); return }
         if (!msState.connected) { openMsConnect(); return }
