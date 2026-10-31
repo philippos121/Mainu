@@ -26,11 +26,14 @@ question ──▶ fast model: mode, legal area, difficulty, 0–3 compact quest
   documents it consults are shown live as research steps.
 * **Azure OpenAI (EU):** with `AZURE_OPENAI_API_KEY` every model call goes to the
   Azure resource (`AZURE_OPENAI_ENDPOINT`, v1 API `/openai/v1/responses`) and one
-  deployment does everything (`AZURE_OPENAI_DEPLOYMENT`, default `gpt-6.1-terra`).
+  deployment does everything (`AZURE_OPENAI_DEPLOYMENT`, default `gpt-6.1-terra`) –
+  except the due diligence, which runs entirely on its own deployment
+  (`AZURE_OPENAI_DD_DEPLOYMENT`, default `gpt-6.1-sol`, region global, so DD
+  documents are processed outside the EU).
   The routing by difficulty stays (knowledge base for hard legal questions, higher
-  reasoning effort for hard tasks). If the deployment rejects the hosted web
-  search, the call is repeated without it and web search stays off for the
-  process. Outside Azure: web search (if used), the E2B sandbox for file
+  reasoning effort for hard tasks). If a deployment rejects the hosted web
+  search, the call is repeated without it and web search stays off for that
+  deployment. Outside Azure: web search (if used), the E2B sandbox for file
   generation and the Render region decide where else data is processed.
 * **Models (OpenAI):** `gpt-6-luna` (`OPENAI_MODEL_FAST`) for everything easy, planning,
   question formulation and the per-document due-diligence analysis;

@@ -41,7 +41,8 @@ const AISSOCIATE_TIMEOUT_MS = Number(process.env.AISSOCIATE_TIMEOUT_MS || 240_00
 // Model provider. With AZURE_OPENAI_API_KEY every model call goes to the Azure
 // OpenAI resource (EU deployment) and ONE deployment does everything (default
 // gpt-6.1-terra); the OPENAI_MODEL_* variables are ignored there, so an old
-// OPENAI_MODEL_MAIN=gpt-6-sol cannot route data to a global deployment.
+// OPENAI_MODEL_MAIN=gpt-6-sol cannot route data to a global deployment. Only the
+// due diligence runs on its own deployment (AZURE_OPENAI_DD_DEPLOYMENT, below).
 // Without it: OpenAI with the fast/main pair (Luna plans and handles easy tasks,
 // Sol hard ones).
 const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || ''
@@ -90,6 +91,11 @@ const AUTH_ON = process.env.AUTH !== 'off'
 const AUTH_DOMAINS = String(process.env.AUTH_ALLOWED_DOMAINS || '').split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean)
 const AUTH_SIGNUP_OPEN = process.env.AUTH_SIGNUP === 'open'
 const MODEL_EXTRACT = USE_AZURE ? MODEL_FAST : (process.env.OPENAI_MODEL_EXTRACT || MODEL_FAST)
+// Due diligence on Azure: its own deployment (default gpt-6.1-sol, region global) for every
+// model call of the DD – reading, review, consolidation, legal check, summaries, review tables.
+const AZURE_DD_DEPLOYMENT = process.env.AZURE_OPENAI_DD_DEPLOYMENT || 'gpt-6.1-sol'
+const MODEL_DD_MAIN = USE_AZURE ? AZURE_DD_DEPLOYMENT : MODEL_MAIN
+const MODEL_DD_EXTRACT = USE_AZURE ? AZURE_DD_DEPLOYMENT : MODEL_EXTRACT
 const EFFORT_DD = process.env.OPENAI_EFFORT_DD || 'medium'
 const DD_MAX_DOCS = Number(process.env.DD_MAX_DOCS || 300)
 const DD_MAX_DOC_BYTES = Number(process.env.DD_MAX_DOC_BYTES || 30 * 1024 * 1024)
@@ -222,7 +228,8 @@ function getOpenAI() {
   return _openai
 }
 // A deployment that rejects the hosted web search once is not offered it again (saves a failing round trip per call).
-let webSearchRejected = false
+const webSearchRejectedBy = new Set()
+const webSearchOk = (model) => WEB_SEARCH_ENABLED && !webSearchRejectedBy.has(model)
 
 class BudgetExceeded extends Error {}
 
@@ -237,7 +244,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
   const remainingOut = (ctx.limits?.outMax ?? MAX_OUTPUT_TOKENS) - ctx.usage.outTok
   const remainingIn = (ctx.limits?.inMax ?? MAX_INPUT_TOKENS) - ctx.usage.inTok
   if (remainingOut < 800 || remainingIn < 2000) throw new BudgetExceeded(ctx.limits ? 'Token-Budget des Akts ausgeschöpft.' : 'Token-Budget für diese Frage ausgeschöpft.')
-  if (webSearchRejected && tools?.length) tools = tools.filter((t) => !String(t.type).startsWith('web_search'))
+  if (webSearchRejectedBy.has(model) && tools?.length) tools = tools.filter((t) => !String(t.type).startsWith('web_search'))
   const params = {
     model,
     instructions,
@@ -276,7 +283,7 @@ async function callModel(ctx, { model, instructions, input, tools, toolChoice, e
     if (p2.max_tool_calls && /max_tool_calls/i.test(msg)) { delete p2.max_tool_calls; changed = true }
     if (p2.temperature != null && /temperature/i.test(msg)) { delete p2.temperature; temperatureRejected.add(model); changed = true }
     if (p2.reasoning && /reasoning/i.test(msg)) { delete p2.reasoning; changed = true }
-    if (p2.tools && /web_search/i.test(msg)) { webSearchRejected = true; console.warn(`web search rejected by ${model}: disabled for this process`); p2.tools = p2.tools.filter((t) => !String(t.type).startsWith('web_search')); if (!p2.tools.length) { delete p2.tools; delete p2.tool_choice; delete p2.max_tool_calls }; changed = true }
+    if (p2.tools && /web_search/i.test(msg)) { webSearchRejectedBy.add(model); console.warn(`web search rejected by ${model}: disabled for this model`); p2.tools = p2.tools.filter((t) => !String(t.type).startsWith('web_search')); if (!p2.tools.length) { delete p2.tools; delete p2.tool_choice; delete p2.max_tool_calls }; changed = true }
     if (p2.text && /text|format|schema/i.test(msg)) { delete p2.text; changed = true }
     if (!changed && p2.reasoning) { delete p2.reasoning; changed = true }
     if (!changed) throw e
@@ -1442,7 +1449,7 @@ app.get('/api/ms/browse', async (req, res) => {
 app.get('/api/health', async (req, res) => {
   let storeStats = null
   try { storeStats = await store.stats() } catch {}
-  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), sandbox: LOCAL_SANDBOX ? 'local' : 'e2b', aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), msRedirectUri: MS.clientId ? msRedirectUri(req) : undefined, msTenant: MS.clientId ? MS.tenant : undefined, models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
+  res.json({ ok: true, auth: AUTH_ON, dataDir: DATA_DIR, persistentDisk: DATA_DIR === '/data' || DATA_DIR.startsWith('/data/'), openai: Boolean(LLM_API_KEY), provider: LLM_PROVIDER, e2b: Boolean(E2B_API_KEY), sandbox: LOCAL_SANDBOX ? 'local' : 'e2b', aissociate: Boolean(AISSOCIATE_API_KEY), ms: Boolean(MS.clientId), msRedirectUri: MS.clientId ? msRedirectUri(req) : undefined, msTenant: MS.clientId ? MS.tenant : undefined, models: { main: MODEL_MAIN, fast: MODEL_FAST, code: MODEL_CODE || MODEL_FAST, extract: MODEL_EXTRACT, dd: MODEL_DD_MAIN }, reviewAnswers: REVIEW_ANSWERS, knowledgeBase: 'AI:ssociate API', webSearch: WEB_SEARCH_ENABLED, maxWebSearches: MAX_WEB_SEARCHES, budget: { inMax: MAX_INPUT_TOKENS, outMax: MAX_OUTPUT_TOKENS }, store: storeStats, dd: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, running: ddRuns.size } })
 })
 
 app.post('/api/export/docx', async (req, res) => {
@@ -1784,7 +1791,7 @@ async function loadMatter(req, res) {
 }
 const DD_CONCURRENCY = Number(process.env.DD_CONCURRENCY || 24) // model calls of one due diligence running side by side
 const ddDeps = (send) => ({
-  store, callModel, extractText, modelMain: MODEL_MAIN, modelExtract: MODEL_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY, kbContextChars: KB_CONTEXT_CHARS,
+  store, callModel, extractText, modelMain: MODEL_DD_MAIN, modelExtract: MODEL_DD_EXTRACT, effort: EFFORT_DD, concurrency: DD_CONCURRENCY, kbContextChars: KB_CONTEXT_CHARS,
   verifyAnswer: (text) => verifyNormList(text, 60), computeCost, send,
   // Per document: legal questions are answered by the model with a web search in the RIS; the
   // knowledge base only for very hard questions (lib/dd.js decides, a few per run).
@@ -1793,7 +1800,7 @@ const ddDeps = (send) => ({
   webSearchTool: WEB_SEARCH_ENABLED ? WEB_SEARCH_TOOL : null,
   searchIndex: (m) => aktIndex(m),
   answerEasyLegal: async (ctx, { question, ris = false, maxSearches = MAX_WEB_SEARCHES }) => {
-    const web = WEB_SEARCH_ENABLED && !webSearchRejected
+    const web = webSearchOk(MODEL_FAST)
     const risHint = ris && web ? ' Suche bevorzugt im RIS (ris.bka.gv.at: Bundes- und Landesrecht in der geltenden Fassung, Judikatur von OGH, VwGH, VfGH) und belege mit RIS-Links.' : ''
     const resp = await callModel(ctx, { model: MODEL_FAST, instructions: easyLegalInstructions(web) + risHint, effort: EFFORT_PLAN, maxOut: 5000, input: [{ role: 'user', content: question }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? maxSearches : undefined })
     const sources = []
@@ -1896,7 +1903,7 @@ const rethemeLocal = (m) => rebuildIssuesLocal(m)
 const FINDING_FIELDS = ['title', 'description', 'quote', 'location', 'recommendation', 'severity', 'area', 'dealImpact', 'norms', 'docId']
 const sevOk = (s) => ['red', 'amber', 'green', 'info'].includes(s)
 
-app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, clauseKinds: Object.fromEntries(Object.entries(CLAUSE_KINDS).map(([k, v]) => [k, v.label])), issueStatus: ISSUE_STATUS, difficulty: DIFFICULTY, legalForms: LEGAL_FORMS, modules: Object.fromEntries(Object.entries(INDUSTRY_MODULES).map(([k, v]) => [k, { label: v.label, requirements: v.requirements.map((r) => ({ label: r.label, basis: r.basis })) }])), aktRules: AKT_RULES, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_MAIN, extract: MODEL_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
+app.get('/api/dd/config', (_req, res) => res.json({ areas: DD_AREAS.map(({ key, label, profession, documents, code }) => ({ key, label, profession, documents, code })), presets: REVIEW_TABLE_PRESETS, severities: SEVERITY_LABEL, dealImpacts: DEAL_IMPACT_LABEL, reviewStatus: REVIEW_LABEL, limits: { maxDocs: DD_MAX_DOCS, maxDocBytes: DD_MAX_DOC_BYTES, maxConcurrent: DD_MAX_CONCURRENT, hardIn: DD_HARD_IN, hardOut: DD_HARD_OUT }, roles: DOC_ROLES, subjects: LEGAL_SUBJECTS, reportTypes: REPORT_TYPES, factTypes: FACT_TYPES, factFlags: FACT_FLAGS, findingKinds: FINDING_KINDS, clauseKinds: Object.fromEntries(Object.entries(CLAUSE_KINDS).map(([k, v]) => [k, v.label])), issueStatus: ISSUE_STATUS, difficulty: DIFFICULTY, legalForms: LEGAL_FORMS, modules: Object.fromEntries(Object.entries(INDUSTRY_MODULES).map(([k, v]) => [k, { label: v.label, requirements: v.requirements.map((r) => ({ label: r.label, basis: r.basis })) }])), aktRules: AKT_RULES, skipReasons: SKIP_REASONS, exclusions: EXCLUSIONS, core: CORE_PREREQUISITES, stages: DD_STAGES, models: { main: MODEL_DD_MAIN, extract: MODEL_DD_EXTRACT, knowledgeBase: AISSOCIATE_API_KEY ? 'AI:ssociate' : null } }))
 
 // ---- skills: reusable instruction packages of the workspace (plus the standard skills) ----
 async function findSkill(owner, id) {
@@ -2052,7 +2059,7 @@ app.delete('/api/matters/:id/findings/:fid', async (req, res) => {
 })
 app.get('/api/matters/:id/dd/estimate', async (req, res) => {
   const m = await loadMatter(req, res); if (!m) return
-  const p = priceFor(MODEL_EXTRACT)
+  const p = priceFor(MODEL_DD_EXTRACT)
   res.json({ estimate: estimateRun(m, p.in, p.out, DD_CONCURRENCY), usage: m.job.usage, budgetTokens: m.settings.budgetTokens, budgetOutTokens: m.settings.budgetOutTokens })
 })
 
@@ -2481,7 +2488,7 @@ app.post('/api/chat', async (req, res) => {
   const folderReq = lf && typeof lf.name === 'string' && lf.name ? { name: lf.name.slice(0, 200), count: Math.max(0, Math.min(1e6, Number(lf.count) || 0)), sample: (Array.isArray(lf.sample) ? lf.sample : []).slice(0, 150).map((x) => String(x).slice(0, 300)) } : null
 
   const persistent = typeof sessionId === 'string' && sessionId.length > 0
-  const useWeb = WEB_SEARCH_ENABLED && !webSearchRejected && webSearch !== false
+  const useWeb = webSearchOk(MODEL_FAST) && webSearch !== false
   const threadIn = typeof aissThreadId === 'string' && aissThreadId.length < 200 ? aissThreadId : null
 
   // --- uploads: validate + extract text server-side ---
@@ -3063,7 +3070,7 @@ app.post('/api/chat', async (req, res) => {
     try {
       if (plan.mode === 'legal' && foreignLaw) {
         // German / foreign law: the main model researches with web search (the knowledge base is Austrian).
-        const web = WEB_SEARCH_ENABLED && !webSearchRejected
+        const web = webSearchOk(MODEL_MAIN)
         const sid = step('think', `Recherche im ${foreignLaw === 'DE' ? 'deutschen' : 'ausländischen'} Recht${web ? ' mit Websuche' : ''}`, { model: MODEL_MAIN })
         const resp = await callModel(ctx, { model: MODEL_MAIN, instructions: foreignLawInstructions(foreignLaw, web), effort: EFFORT_MAIN, maxOut: 12_000, input: [...histInput, { role: 'user', content: userContent }], tools: web ? [WEB_SEARCH_TOOL] : undefined, maxToolCalls: web ? MAX_WEB_SEARCHES : undefined })
         collectWebCitations(resp)
